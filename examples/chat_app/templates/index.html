@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LocalLM Lab — Simple Chat</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 720px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  h1 { font-size: 1.25rem; }
+  .meta { color: #888; font-size: 0.85rem; margin-bottom: 1.5rem; }
+  #log {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    min-height: 200px;
+  }
+  .msg {
+    padding: 0.6rem 0.9rem;
+    border-radius: 0.6rem;
+    max-width: 85%;
+    white-space: pre-wrap;
+    line-height: 1.4;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: #2f6fed;
+    color: white;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: rgba(127,127,127,0.15);
+  }
+  .msg.error {
+    align-self: flex-start;
+    background: #f8d7da;
+    color: #842029;
+  }
+  form { display: flex; gap: 0.5rem; }
+  input[type=text] {
+    flex: 1;
+    padding: 0.6rem 0.8rem;
+    border-radius: 0.5rem;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+  }
+  button {
+    padding: 0.6rem 1.1rem;
+    border-radius: 0.5rem;
+    border: none;
+    background: #2f6fed;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+  <h1>LocalLM Lab — Simple Chat</h1>
+  <div class="meta">Talking to <code>{{ base_url }}</code> · each question is independent (no memory between turns)</div>
+
+  <div id="log"></div>
+
+  <form id="form">
+    <input type="text" id="question" placeholder="Ask something..." autocomplete="off" autofocus>
+    <button type="submit" id="send">Send</button>
+  </form>
+
+  <script>
+    const form = document.getElementById('form');
+    const input = document.getElementById('question');
+    const log = document.getElementById('log');
+    const sendBtn = document.getElementById('send');
+
+    function addMessage(text, cls) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + cls;
+      div.textContent = text;
+      log.appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      return div;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = input.value.trim();
+      if (!question) return;
+
+      addMessage(question, 'user');
+      input.value = '';
+      input.disabled = true;
+      sendBtn.disabled = true;
+      const pending = addMessage('Thinking…', 'bot');
+
+      try {
+        const res = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          pending.textContent = 'Error: ' + (data.error || res.statusText);
+          pending.className = 'msg error';
+        } else {
+          pending.textContent = data.answer;
+        }
+      } catch (err) {
+        pending.textContent = 'Error: ' + err.message;
+        pending.className = 'msg error';
+      } finally {
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
