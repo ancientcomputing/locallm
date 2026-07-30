@@ -1,6 +1,6 @@
 # Simple Chat App
 
-A minimal browser-based chatbot UI for experimenting with LocalLM Lab's API.
+A minimal browser-based chatbot UI for experimenting with LocalLM Lab's OpenAI-compatible API.
 Each question is answered independently — there's no conversation history
 carried from one Q+A to the next, so it's a clean example for people just
 getting started with API Lab.
