@@ -51,3 +51,21 @@ If a script can't connect at all, double check:
   your configured one was busy — always check the Settings screen for the
   actual port in use)
 - The token hasn't been regenerated since you copied it
+
+## `localai-cli` (no server required)
+
+The scripts above all go through LocalLM Lab's Go server/API. If you'd rather
+call the local AI directly from a 3rd-party app — no server, no HTTP, just a
+subprocess — see [`localai-cli/`](localai-cli/), which shows the pattern
+using `localai-cli` + `localai-playground-run` from Python (including a
+sample that requests an MCP server tool), and
+[`localai-cli-swift/`](localai-cli-swift/) for the same pattern from Swift.
+
+**Fastest way to see it work**: `quickstart_clock.py` / `quickstart_clock.swift`
+in those two folders run with zero setup beyond one toggle in Local AI
+Settings — no permission dialog, no OAuth, no editing. Their MCP
+counterparts, `quickstart_mcp_deepwiki.py` / `quickstart_mcp_deepwiki.swift`,
+do the same against a real public MCP server (DeepWiki, auth type `None`) —
+the exact server/tool/prompt from [`web/mcp-servers.html`](../web/mcp-servers.html)
+already filled in, so the only setup is connecting that one server in
+LocalLM Lab's MCP Servers panel.
