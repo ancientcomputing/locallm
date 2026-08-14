@@ -13,6 +13,8 @@ dist/
 .gocache/
 .nuget/
 *.iconset/
+examples/plate-today/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
+examples/components-demo/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
 tmp/
 %SystemDrive%/
 .DS_Store

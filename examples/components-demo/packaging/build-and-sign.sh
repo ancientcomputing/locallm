@@ -88,6 +88,20 @@ mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
 echo "Generating app icon..."
 python3 "$SCRIPT_DIR/generate_app_icon.py"
+ICON_BUILD_DIR="$BUILD_DIR/icon"
+mkdir -p "$ICON_BUILD_DIR"
+# CFBundleIconName (already set in Info.plist) requires an actual asset catalog to resolve
+# against — a bare .icns via CFBundleIconFile alone isn't sufficient for App Store Connect's
+# asset-catalog validation or System Settings' Privacy & Security pane (see plate-today's
+# packaging/build-and-sign.sh, where this was confirmed live). actool derives both Assets.car and
+# an AppIcon.icns from the same appiconset in one pass.
+echo "Compiling app icon asset catalog..."
+xcrun actool --output-format human-readable-text --notices --warnings --errors \
+  --app-icon AppIcon \
+  --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
+  --platform macosx --minimum-deployment-target 26.0 \
+  --compile "$ICON_BUILD_DIR" \
+  "$SCRIPT_DIR/Resources/Assets.xcassets"
 
 echo "Building Components Demo for arm64..."
 swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift"
@@ -129,7 +143,8 @@ cp "$SCRIPT_DIR/Info.plist" "$CONTENTS_DIR/Info.plist"
 # error" -- keep entitlements-file comments plain ASCII if any are ever added here.)
 cp "$SCRIPT_DIR/ComponentsDemo.entitlements" "$ENTITLEMENTS"
 
-cp "$SCRIPT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ICON_BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ICON_BUILD_DIR/Assets.car" "$RESOURCES_DIR/Assets.car"
 cp "$BINARY" "$MACOS_DIR/ComponentsDemo"
 cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"

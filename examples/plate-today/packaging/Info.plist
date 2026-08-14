@@ -11,6 +11,7 @@
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>0.1.0</string>
 	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key><string>26.0</string>
 	<key>NSHighResolutionCapable</key><true/>
 	<!-- Usage-description strings required alongside the matching entitlements in

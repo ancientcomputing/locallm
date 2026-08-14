@@ -95,9 +95,15 @@ list and its Info.plist/entitlement requirements):
 ```xml
 <key>com.apple.security.personal-information.calendars</key>
 <true/>
-<key>com.apple.security.personal-information.reminders</key>
-<true/>
 ```
+
+There is no separate "reminders" sandbox entitlement — Reminders access (EventKit) is covered by
+this same `calendars` entitlement; only the Info.plist `NSRemindersFullAccessUsageDescription` key
+and the TCC prompt itself are Reminders-specific. A
+`com.apple.security.personal-information.reminders` key isn't a real Apple entitlement — local
+`codesign`/`pkgutil --check-signature` don't catch this, but a real App Store Connect
+validation (Transporter upload) rejects it outright with "Invalid Code Signing Entitlements."
+Confirmed live, 2026-08-14.
 
 **Both 2a and 2b are required together, on your final signed bundle, or TCC fails in confusing
 ways.** The specific failure sequence (confirmed live, more than once):

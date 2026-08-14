@@ -23,6 +23,11 @@ NOTARIZE_APP="${NOTARIZE_APP:-1}"
 # itself, because packaging also needs to know whether to declare the Location entitlement/
 # usage-description key at all.
 PLATETODAY_INCLUDE_LOCATION_WEATHER="${PLATETODAY_INCLUDE_LOCATION_WEATHER:-0}"
+# Build-time opt-in, default OFF — see Package.swift's comment for why (not part of the daily-
+# summary narrative, on-demand enrichment only; avoids an extra TCC prompt by default). Read here
+# too, same reason as Location above — packaging needs to know whether to declare the Contacts
+# entitlement/usage-description key at all.
+PLATETODAY_INCLUDE_CONTACTS="${PLATETODAY_INCLUDE_CONTACTS:-0}"
 # Build-time opt-in, default OFF.
 # Plate Today is the SDK's proving ground for App Sandbox compatibility: a single-process SwiftUI
 # app with no subprocess spawning, unlike LocalLM Lab's Go<->Swift architecture, so it can validate
@@ -102,9 +107,23 @@ mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
 echo "Generating app icon..."
 python3 "$SCRIPT_DIR/generate_app_icon.py"
+ICON_BUILD_DIR="$BUILD_DIR/icon"
+mkdir -p "$ICON_BUILD_DIR"
+# CFBundleIconName (already set in Info.plist) requires an actual asset catalog to resolve
+# against — a bare .icns via CFBundleIconFile alone isn't sufficient for every consumer (System
+# Settings' Privacy & Security pane, and App Store Connect's asset-catalog validation for the MAS
+# build). actool derives both Assets.car and an AppIcon.icns from the same appiconset in one pass.
+echo "Compiling app icon asset catalog..."
+xcrun actool --output-format human-readable-text --notices --warnings --errors \
+  --app-icon AppIcon \
+  --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
+  --platform macosx --minimum-deployment-target 26.0 \
+  --compile "$ICON_BUILD_DIR" \
+  "$SCRIPT_DIR/Resources/Assets.xcassets"
 
-echo "Building Plate Today for arm64 (Location/Weather: $([ "$PLATETODAY_INCLUDE_LOCATION_WEATHER" == "1" ] && echo included || echo excluded), App Sandbox: $([ "$PLATETODAY_APP_SANDBOX" == "1" ] && echo on || echo off))..."
+echo "Building Plate Today for arm64 (Location/Weather: $([ "$PLATETODAY_INCLUDE_LOCATION_WEATHER" == "1" ] && echo included || echo excluded), Contacts: $([ "$PLATETODAY_INCLUDE_CONTACTS" == "1" ] && echo included || echo excluded), App Sandbox: $([ "$PLATETODAY_APP_SANDBOX" == "1" ] && echo on || echo off))..."
 PLATETODAY_INCLUDE_LOCATION_WEATHER="$PLATETODAY_INCLUDE_LOCATION_WEATHER" \
+PLATETODAY_INCLUDE_CONTACTS="$PLATETODAY_INCLUDE_CONTACTS" \
   swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift"
 
 BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/PlateToday"
@@ -150,6 +169,11 @@ if [[ "$PLATETODAY_INCLUDE_LOCATION_WEATHER" == "1" ]]; then
   /usr/libexec/PlistBuddy -c "Add :NSLocationUsageDescription string 'Plate Today looks up your current location, once, to include today'\\''s local weather in your summary.'" "$CONTENTS_DIR/Info.plist"
   /usr/libexec/PlistBuddy -c "Add :com.apple.security.personal-information.location bool true" "$ENTITLEMENTS"
 fi
+if [[ "$PLATETODAY_INCLUDE_CONTACTS" == "1" ]]; then
+  echo "Adding Contacts usage-description key and entitlement (PLATETODAY_INCLUDE_CONTACTS=1)..."
+  /usr/libexec/PlistBuddy -c "Add :NSContactsUsageDescription string 'Plate Today searches your Contacts, on request, to enrich a calendar event or reminder that names a specific person.'" "$CONTENTS_DIR/Info.plist"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.security.personal-information.addressbook bool true" "$ENTITLEMENTS"
+fi
 if [[ "$PLATETODAY_APP_SANDBOX" == "1" ]]; then
   echo "Adding App Sandbox entitlement (PLATETODAY_APP_SANDBOX=1)..."
   /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENTITLEMENTS"
@@ -161,7 +185,8 @@ if [[ "$PLATETODAY_APP_SANDBOX" == "1" ]]; then
   /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" "$ENTITLEMENTS"
 fi
 
-cp "$SCRIPT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ICON_BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ICON_BUILD_DIR/Assets.car" "$RESOURCES_DIR/Assets.car"
 cp "$BINARY" "$MACOS_DIR/PlateToday"
 cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
@@ -175,6 +200,7 @@ echo "Signing app bundle..."
 # --entitlements again — the bundle-level sign re-signs the main executable regardless, silently
 # dropping entitlements applied a moment earlier if --entitlements isn't repeated here. Confirmed
 # the hard way.
+# failure-mode writeup.
 codesign --force --options runtime --timestamp --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/PlateToday"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"

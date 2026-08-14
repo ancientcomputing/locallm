@@ -32,6 +32,7 @@ PROVISIONING_PROFILE="${PROVISIONING_PROFILE:-}"
 DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 PLATETODAY_INCLUDE_LOCATION_WEATHER="${PLATETODAY_INCLUDE_LOCATION_WEATHER:-0}"
 PLATETODAY_INCLUDE_TODOIST="${PLATETODAY_INCLUDE_TODOIST:-1}"
+PLATETODAY_INCLUDE_CONTACTS="${PLATETODAY_INCLUDE_CONTACTS:-0}"
 
 DIST_DIR="$APP_ROOT/dist"
 BUILD_DIR="$APP_ROOT/build/release-mas"
@@ -111,16 +112,45 @@ if [[ -z "$PROVISIONING_PROFILE" || ! -f "$PROVISIONING_PROFILE" ]]; then
 fi
 echo "Using provisioning profile: $PROVISIONING_PROFILE"
 
+# The provisioning profile embeds an application-identifier (TEAMID.bundleID) that must ALSO be
+# signed into the bundle's own entitlements — Xcode's automatic signing does this invisibly, but a
+# manual codesign --entitlements call only embeds exactly what's in that plist. Without it, App
+# Store Connect rejects the upload for TestFlight with "the signature ... is missing an
+# application identifier but has an application identifier in the provisioning profile" (confirmed
+# live via a real Transporter upload, 2026-08-14). Same plutil-escaping caveat as the profile
+# lookup above.
+APP_IDENTIFIER="$(security cms -D -i "$PROVISIONING_PROFILE" 2>/dev/null | plutil -extract 'Entitlements.com\.apple\.application-identifier' raw -o - - 2>/dev/null || true)"
+if [[ -z "$APP_IDENTIFIER" ]]; then
+  echo "Could not extract com.apple.application-identifier from $PROVISIONING_PROFILE" >&2
+  exit 1
+fi
+echo "Using application identifier: $APP_IDENTIFIER"
+
 echo "Cleaning release artifacts..."
 rm -rf "$BUILD_DIR" "$APP_DIR" "$PKG_PATH"
 mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
 echo "Generating app icon..."
 python3 "$SCRIPT_DIR/generate_app_icon.py"
+ICON_BUILD_DIR="$BUILD_DIR/icon"
+mkdir -p "$ICON_BUILD_DIR"
+# CFBundleIconName (already set in Info.plist) requires an actual asset catalog to resolve
+# against — a bare .icns via CFBundleIconFile alone isn't sufficient for App Store Connect's
+# asset-catalog validation ("Missing asset catalog", confirmed live via a real Transporter upload,
+# 2026-08-14) or for System Settings' Privacy & Security pane. actool derives both Assets.car and
+# an AppIcon.icns from the same appiconset in one pass.
+echo "Compiling app icon asset catalog..."
+xcrun actool --output-format human-readable-text --notices --warnings --errors \
+  --app-icon AppIcon \
+  --output-partial-info-plist "$ICON_BUILD_DIR/partial.plist" \
+  --platform macosx --minimum-deployment-target 26.0 \
+  --compile "$ICON_BUILD_DIR" \
+  "$SCRIPT_DIR/Resources/Assets.xcassets"
 
-echo "Building Plate Today for arm64 (App Sandbox: on, always, for MAS; Location/Weather: $([ "$PLATETODAY_INCLUDE_LOCATION_WEATHER" == "1" ] && echo included || echo excluded); Todoist: $([ "$PLATETODAY_INCLUDE_TODOIST" == "1" ] && echo included || echo excluded))..."
+echo "Building Plate Today for arm64 (App Sandbox: on, always, for MAS; Location/Weather: $([ "$PLATETODAY_INCLUDE_LOCATION_WEATHER" == "1" ] && echo included || echo excluded); Todoist: $([ "$PLATETODAY_INCLUDE_TODOIST" == "1" ] && echo included || echo excluded); Contacts: $([ "$PLATETODAY_INCLUDE_CONTACTS" == "1" ] && echo included || echo excluded))..."
 PLATETODAY_INCLUDE_LOCATION_WEATHER="$PLATETODAY_INCLUDE_LOCATION_WEATHER" \
 PLATETODAY_INCLUDE_TODOIST="$PLATETODAY_INCLUDE_TODOIST" \
+PLATETODAY_INCLUDE_CONTACTS="$PLATETODAY_INCLUDE_CONTACTS" \
   swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift"
 
 BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/PlateToday"
@@ -152,15 +182,52 @@ cp "$SCRIPT_DIR/Info.plist" "$CONTENTS_DIR/Info.plist"
 cp "$SCRIPT_DIR/PlateToday.entitlements" "$ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c "Add :com.apple.security.app-sandbox bool true" "$ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" "$ENTITLEMENTS"
+/usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $APP_IDENTIFIER" "$ENTITLEMENTS"
 if [[ "$PLATETODAY_INCLUDE_LOCATION_WEATHER" == "1" ]]; then
   echo "Adding Location usage-description key and entitlement (PLATETODAY_INCLUDE_LOCATION_WEATHER=1)..."
   /usr/libexec/PlistBuddy -c "Add :NSLocationUsageDescription string 'Plate Today looks up your current location, once, to include today'\\''s local weather in your summary.'" "$CONTENTS_DIR/Info.plist"
   /usr/libexec/PlistBuddy -c "Add :com.apple.security.personal-information.location bool true" "$ENTITLEMENTS"
 fi
+if [[ "$PLATETODAY_INCLUDE_CONTACTS" == "1" ]]; then
+  echo "Adding Contacts usage-description key and entitlement (PLATETODAY_INCLUDE_CONTACTS=1)..."
+  /usr/libexec/PlistBuddy -c "Add :NSContactsUsageDescription string 'Plate Today searches your Contacts, on request, to enrich a calendar event or reminder that names a specific person.'" "$CONTENTS_DIR/Info.plist"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.security.personal-information.addressbook bool true" "$ENTITLEMENTS"
+fi
 
-cp "$SCRIPT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ICON_BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ICON_BUILD_DIR/Assets.car" "$RESOURCES_DIR/Assets.car"
 cp "$BINARY" "$MACOS_DIR/PlateToday"
 cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
+
+if [[ "$CORE_ARTIFACT_NAME" == *.framework ]]; then
+  # SwiftPM's .framework build output (and the public locallm copy's binaryTarget slice) is a
+  # flat, unversioned bundle — no Versions/ directory at all. That's fine for dyld to load, but
+  # App Store Connect's real validation rejects it: "must contain a symbolic link 'X' ->
+  # 'Versions/Current/X'" for the binary, Headers, and Resources, plus a Versions/Current symlink
+  # resolving to a real version directory (confirmed live via a real Transporter upload,
+  # 2026-08-14 — see "Anatomy of Framework Bundles"). Restructure into the classic umbrella-
+  # framework layout before signing.
+  echo "Restructuring $CORE_ARTIFACT_NAME into a versioned framework bundle (required for MAS/TestFlight validation)..."
+  FW_DIR="$MACOS_DIR/$CORE_ARTIFACT_NAME"
+  FW_BINARY_NAME="${CORE_ARTIFACT_NAME%.framework}"
+  FW_VERSION_DIR="$FW_DIR/Versions/A"
+  mkdir -p "$FW_VERSION_DIR"
+  for item in "$FW_DIR"/*; do
+    [[ "$(basename "$item")" == "Versions" ]] && continue
+    mv "$item" "$FW_VERSION_DIR/"
+  done
+  # Info.plist belongs inside Versions/A/Resources in the versioned layout, not at the top level.
+  mkdir -p "$FW_VERSION_DIR/Resources"
+  if [[ -f "$FW_VERSION_DIR/Info.plist" ]]; then
+    mv "$FW_VERSION_DIR/Info.plist" "$FW_VERSION_DIR/Resources/Info.plist"
+  fi
+  ln -s A "$FW_DIR/Versions/Current"
+  ln -s "Versions/Current/$FW_BINARY_NAME" "$FW_DIR/$FW_BINARY_NAME"
+  ln -s Versions/Current/Resources "$FW_DIR/Resources"
+  [[ -d "$FW_VERSION_DIR/Headers" ]] && ln -s Versions/Current/Headers "$FW_DIR/Headers"
+  [[ -d "$FW_VERSION_DIR/Modules" ]] && ln -s Versions/Current/Modules "$FW_DIR/Modules"
+fi
+
 cp "$PROVISIONING_PROFILE" "$CONTENTS_DIR/embedded.provisionprofile"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 chmod +x "$MACOS_DIR/PlateToday"

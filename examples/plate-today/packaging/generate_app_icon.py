@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Generates PlateToday's AppIcon.icns — a simple placeholder, not a designed icon.
+"""Generates PlateToday's app icon images into Resources/Assets.xcassets/AppIcon.appiconset.
 
-Deliberately simple (no Assets.xcassets/actool pass): this app only needs CFBundleIconFile to
-resolve for Finder/Dock/the
-Calendar & Reminders TCC permission rows, since Info.plist has no CFBundleIconName here. Revisit
-if a real design is wanted later.
+A placeholder design, not a real one. Writes PNGs only — build-and-sign.sh/build-and-sign-mas.sh
+run `actool` afterward to compile this into Assets.car (and derive AppIcon.icns from it). Both are
+required in the shipped app: CFBundleIconName (already set in Info.plist) resolves through
+Assets.car, which is what App Store Connect's asset-catalog validation and System Settings'
+Privacy & Security pane actually read; a bare .icns via CFBundleIconFile alone renders fine in
+Finder/Dock but isn't sufficient for either of those.
 """
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 try:
@@ -17,8 +17,21 @@ except ImportError:
     print("Pillow is required: pip3 install Pillow", file=sys.stderr)
     sys.exit(1)
 
-SIZES = [16, 32, 64, 128, 256, 512, 1024]
-OUTPUT = Path(__file__).parent / "AppIcon.icns"
+APPICONSET = Path(__file__).parent / "Resources" / "Assets.xcassets" / "AppIcon.appiconset"
+
+# (filename, pixel size) — the standard macOS app icon set, matching AppIcon.appiconset/Contents.json.
+ICON_FILES = [
+    ("icon_16x16.png", 16),
+    ("icon_16x16@2x.png", 32),
+    ("icon_32x32.png", 32),
+    ("icon_32x32@2x.png", 64),
+    ("icon_128x128.png", 128),
+    ("icon_128x128@2x.png", 256),
+    ("icon_256x256.png", 256),
+    ("icon_256x256@2x.png", 512),
+    ("icon_512x512.png", 512),
+    ("icon_512x512@2x.png", 1024),
+]
 
 
 def render(size: int) -> Image.Image:
@@ -46,15 +59,10 @@ def render(size: int) -> Image.Image:
 
 
 def main():
-    with tempfile.TemporaryDirectory() as tmp:
-        iconset = Path(tmp) / "AppIcon.iconset"
-        iconset.mkdir()
-        for size in SIZES:
-            render(size).save(iconset / f"icon_{size}x{size}.png")
-            if size <= 512:
-                render(size * 2).save(iconset / f"icon_{size}x{size}@2x.png")
-        subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(OUTPUT)], check=True)
-    print(f"Wrote {OUTPUT}")
+    APPICONSET.mkdir(parents=True, exist_ok=True)
+    for filename, size in ICON_FILES:
+        render(size).save(APPICONSET / filename)
+    print(f"Wrote {len(ICON_FILES)} icon images to {APPICONSET}")
 
 
 if __name__ == "__main__":
