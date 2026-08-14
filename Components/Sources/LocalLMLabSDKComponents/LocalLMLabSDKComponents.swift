@@ -12,5 +12,4 @@ import LocalLMLabSDKCore
 //   based so the host app decides what "attach"/"use" means for its own UI.
 //
 // Aggregate context-budget display (LocalLM Lab's own "Context budget" section, beyond the
-// per-server counts already shown here) isn't here yet — see
-// locallmlab-sdk/docs/07-release-roadmap.md phase 5's capability audit.
+// per-server counts already shown here) isn't here yet.

@@ -1,12 +1,13 @@
 // "What's on my plate today" — v1: Todoist (via Core's MCP client) + Calendar + Reminders (also
 // via Core, through CalendarAccess/RemindersAccess — see below). Linear is a planned v2 addition,
-// deliberately deferred (see docs/roadmap-mcp-sdk.md).
+// deliberately deferred.
 //
 // SwiftUI app shape (not a bare CLI): launch -> request Calendar/Reminders/Todoist access on
 // first run -> pull + synthesize -> show result -> Done closes the app. Packaged as a real signed
-// .app bundle by build-and-sign.sh, mirroring locallmlab-main's scripts/release-macos.sh, since a
-// bare SwiftPM executable can't get TCC grants (no Info.plist/usage-description strings, no code
-// signing) -- confirmed the hard way in the CLI-only version of this app.
+// .app bundle by build-and-sign.sh, with the same signing discipline LocalLM Lab's own release
+// tooling uses, since a bare SwiftPM executable can't get TCC grants (no Info.plist/usage-
+// description strings, no code signing) -- confirmed the hard way in the CLI-only version of this
+// app.
 
 import Foundation
 import FoundationModels
@@ -270,8 +271,8 @@ struct ContentView: View {
 // WindowGroup treats an open-URL event as a request for a new scene instance and spins up a
 // second window for it (confirmed live: signing in to Todoist brought back a second "Plate
 // Today" window instead of returning to the original one). NSApplicationDelegate gets the same
-// Apple Event without SwiftUI creating anything — same fix LocalLM Lab's own Chooser app already
-// uses for this exact problem (see LocalLMLabChooser.swift's AppDelegate).
+// Apple Event without SwiftUI creating anything — same fix LocalLM Lab's own chooser window
+// already uses for this exact problem.
 @available(macOS 26.0, *)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -302,12 +303,12 @@ struct PlateTodayApp: App {
         // content's *ideal* size on every re-layout, which fights a user's manual resize — every
         // drag would just get snapped back. .contentMinSize only imposes a floor (from
         // ContentView's own minHeight above), leaving the user's own resize as the real source of
-        // truth for how tall the window can grow. Same reasoning as LocalLM Lab's
-        // LocalLMLabChooser.swift windows.
+        // truth for how tall the window can grow. Same reasoning as LocalLM Lab's own chooser
+        // windows.
         .windowResizability(.contentMinSize)
         // Without this, WindowGroup matches every external event by default and ALSO opens a new
         // scene for the same platetoday:// callback AppDelegate already handles above — matching
-        // nothing here makes AppDelegate the only handler, same as LocalLMLabChooserApp does.
+        // nothing here makes AppDelegate the only handler, same as LocalLM Lab's own chooser app.
         .handlesExternalEvents(matching: [])
     }
 }

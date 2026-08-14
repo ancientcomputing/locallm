@@ -2,12 +2,11 @@
 import Foundation
 import PackageDescription
 
-// "What's on my plate today" — the public copy of the SDK's reference app (source lives
-// privately at locallmlab-sdk's examples/plate-today; see that repo's docs/04-open-source-sync.md
-// for the copy process). Depends on Core as a BINARY (LocalLMLabSDKCore.xcframework via a GitHub
-// Release asset), unlike the private repo's copy which depends on Core as source — this is the
-// one real difference the copy process has to account for, since Core itself never leaves the
-// private repo.
+// "What's on my plate today" — the public copy of the SDK's reference app (this source is
+// maintained privately and copied here). Depends on Core as a BINARY (LocalLMLabSDKCore.xcframework
+// via a GitHub Release asset), unlike the private source, which depends on Core directly — this
+// is the one real difference the copy process has to account for, since Core itself never leaves
+// the private repo.
 
 // MARK: - Which SDK version to build against
 
@@ -25,12 +24,12 @@ struct SDKRelease {
 }
 
 // The source of truth for which SDK versions this Package.swift knows how to build against —
-// add a new entry here whenever locallmlab-sdk publishes a new Core.xcframework release.
+// add a new entry here whenever a new Core.xcframework release is published.
 let knownSDKReleases: [String: SDKRelease] = [
     // TEMPORARY (2026-08-14): this repo's own v0.7.0 GitHub Release is still a draft, and GitHub
     // 404s an anonymous `swift build` download of a draft release's asset — confirmed live. Using
-    // ancientcomputing/locallm-staging's real PUBLISHED v0.7.0 asset here in the meantime (see
-    // locallmlab-sdk's docs/07-release-roadmap.md phase 3 step 9). Swap `url` below to
+    // ancientcomputing/locallm-staging's real PUBLISHED v0.7.0 asset in the meantime (a separate,
+    // public testing repo). Swap `url` below to
     // "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip"
     // once this repo's own v0.7.0 is published non-draft — `checksum` is content-based and won't
     // change either way.

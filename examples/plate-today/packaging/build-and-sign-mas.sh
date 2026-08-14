@@ -14,7 +14,7 @@ set -euo pipefail
 #     different certificate types, easy to conflate since both commonly get called "distribution"
 #     casually), not a notarized .dmg. MAS packages aren't notarized/stapled the normal way — App
 #     Review is the equivalent gate, not notarytool.
-# See docs/02-sdk-developer-guide.md section 10d for the one-time Apple Developer Portal setup
+# See docs/sdk-guide.md section 10d for the one-time Apple Developer Portal setup
 # (certificate, App ID, provisioning profile) this script assumes is already done.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,7 +43,7 @@ ENTITLEMENTS="$BUILD_DIR/PlateToday-MAS.entitlements"
 PKG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}-mas.pkg"
 # Modern Xcode's actual storage location — NOT ~/Library/MobileDevice/Provisioning Profiles/,
 # which is what most online docs/scripts still reference and where nothing shows up if you only
-# check there. See docs/02-sdk-developer-guide.md section 10d.
+# check there. See docs/sdk-guide.md section 10d.
 PROFILES_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 
 export DEVELOPER_DIR
@@ -66,7 +66,7 @@ if [[ -z "$APP_SIGN_IDENTITY" ]]; then
 fi
 if [[ -z "$APP_SIGN_IDENTITY" ]]; then
   echo "No APP_SIGN_IDENTITY set and no 'Apple Distribution' identity found automatically." >&2
-  echo "See docs/02-sdk-developer-guide.md section 10d to create one." >&2
+  echo "See docs/sdk-guide.md section 10d to create one." >&2
   security find-identity -v -p codesigning || true
   exit 1
 fi
@@ -106,7 +106,7 @@ fi
 if [[ -z "$PROVISIONING_PROFILE" || ! -f "$PROVISIONING_PROFILE" ]]; then
   echo "Could not find a provisioning profile for $BUNDLE_ID automatically." >&2
   echo "Set PROVISIONING_PROFILE explicitly, or check $PROFILES_DIR for the right one -" >&2
-  echo "see docs/02-sdk-developer-guide.md section 10d for how it's verified." >&2
+  echo "see docs/sdk-guide.md section 10d for how it's verified." >&2
   exit 1
 fi
 echo "Using provisioning profile: $PROVISIONING_PROFILE"

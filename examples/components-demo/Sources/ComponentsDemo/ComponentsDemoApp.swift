@@ -1,9 +1,7 @@
 // Components Demo — the SDK's second reference app. plate-today shows building a real feature on
 // Core's API directly; this shows the other half of the pitch: drop in Components' prebuilt
 // MCPServerPickerView and get a working "add/manage MCP servers" screen with a few lines of glue
-// code, no UI of your own to write. First real live run of MCPServerManagerObservable /
-// MCPServerPickerView / MCPOAuthWaitingView — they built clean against the binary boundary before
-// this, but had never actually been rendered (docs/07-release-roadmap.md phase 4).
+// code, no UI of your own to write.
 //
 // Packaged as a real signed .app (packaging/build-and-sign.sh) for the same reason plate-today is:
 // the OAuth redirect needs a registered URL scheme, which a bare `swift run` binary doesn't have.

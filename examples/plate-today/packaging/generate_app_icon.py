@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generates PlateToday's AppIcon.icns — a simple placeholder, not a designed icon.
 
-Deliberately simpler than locallmlab-main's packaging/generate_app_icon.py (no
-Assets.xcassets/actool pass): this app only needs CFBundleIconFile to resolve for Finder/Dock/the
+Deliberately simple (no Assets.xcassets/actool pass): this app only needs CFBundleIconFile to
+resolve for Finder/Dock/the
 Calendar & Reminders TCC permission rows, since Info.plist has no CFBundleIconName here. Revisit
 if a real design is wanted later.
 """

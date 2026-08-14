@@ -4,8 +4,8 @@
 //
 // WHAT THIS SCRIPT DOES
 //     A Swift port of examples/localai-cli/plate_today.py, itself a
-//     localai-cli port of the SDK's examples/plate-today reference app
-//     (locallmlab-sdk): checks Calendar, Reminders, and Todoist for what's
+//     localai-cli port of the SDK's examples/plate-today reference app:
+//     checks Calendar, Reminders, and Todoist for what's
 //     due today and asks the on-device model to summarize the day. Like
 //     that Python version (and unlike the SDK's Swift app), this is a plain
 //     script — no EventKit calls of its own, no TCC prompts triggered by

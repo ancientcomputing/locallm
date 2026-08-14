@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds, signs, and (optionally) notarizes Plate Today.app — mirrors locallmlab-main's
-# scripts/release-macos.sh structure (same env-var names, same codesign/notarize sequence, same
-# --entitlements-on-every-touching-sign discipline) since that script already worked out the real
-# TCC/codesign failure modes the hard way (see packaging/PlateToday.entitlements' comment). This
-# app is simpler (single binary, no nested chooser bundle), so the script is shorter, but the
-# sequence that matters — sign binary, sign bundle WITH --entitlements again, verify, notarize,
-# staple — is unchanged.
+# Builds, signs, and (optionally) notarizes Plate Today.app — same env-var names, same
+# codesign/notarize sequence, same --entitlements-on-every-touching-sign discipline LocalLM Lab's
+# own release tooling uses, since that already worked out the real TCC/codesign failure modes the
+# hard way (see packaging/PlateToday.entitlements' comment). This app is simpler (single binary,
+# no nested chooser bundle), so the script is shorter, but the sequence that matters — sign
+# binary, sign bundle WITH --entitlements again, verify, notarize, staple — is unchanged.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -24,7 +23,7 @@ NOTARIZE_APP="${NOTARIZE_APP:-1}"
 # itself, because packaging also needs to know whether to declare the Location entitlement/
 # usage-description key at all.
 PLATETODAY_INCLUDE_LOCATION_WEATHER="${PLATETODAY_INCLUDE_LOCATION_WEATHER:-0}"
-# Build-time opt-in, default OFF — see docs/07-release-roadmap.md (locallmlab-sdk) phase 1.
+# Build-time opt-in, default OFF.
 # Plate Today is the SDK's proving ground for App Sandbox compatibility: a single-process SwiftUI
 # app with no subprocess spawning, unlike LocalLM Lab's Go<->Swift architecture, so it can validate
 # Core under sandbox without also needing LocalLM Lab's XPC rearchitecture solved first. Default
@@ -175,8 +174,7 @@ echo "Signing app bundle..."
 # Sign the binary directly first (cheap early sanity check), then the whole bundle WITH
 # --entitlements again — the bundle-level sign re-signs the main executable regardless, silently
 # dropping entitlements applied a moment earlier if --entitlements isn't repeated here. Confirmed
-# the hard way in locallmlab-main's release-macos.sh; see that script's comments for the full
-# failure-mode writeup.
+# the hard way.
 codesign --force --options runtime --timestamp --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/PlateToday"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"

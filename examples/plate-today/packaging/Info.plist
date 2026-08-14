@@ -14,9 +14,8 @@
 	<key>LSMinimumSystemVersion</key><string>26.0</string>
 	<key>NSHighResolutionCapable</key><true/>
 	<!-- Usage-description strings required alongside the matching entitlements in
-	     PlateToday.entitlements — see that file's comment, and the same multi-step TCC failure
-	     mode documented in locallmlab-main's packaging/Resources/Chooser.entitlements, for why
-	     both are required together and neither alone is sufficient. -->
+	     PlateToday.entitlements — see that file's comment for the multi-step TCC failure mode
+	     this avoids: both are required together, neither alone is sufficient. -->
 	<key>NSCalendarsFullAccessUsageDescription</key><string>Plate Today reads your calendar events for today to summarize what's on your plate.</string>
 	<key>NSRemindersFullAccessUsageDescription</key><string>Plate Today reads your reminders due today to summarize what's on your plate.</string>
 	<!-- NSLocationUsageDescription is intentionally NOT here by default — Location/Weather is a
