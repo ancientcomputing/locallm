@@ -8,21 +8,58 @@ import PackageDescription
 // Release asset), unlike the private repo's copy which depends on Core as source — this is the
 // one real difference the copy process has to account for, since Core itself never leaves the
 // private repo.
-//
-// TEMPORARY, 2026-08-14: url/checksum below point at ancientcomputing/locallm-staging's
-// PUBLISHED v0.7.0 release, not this repo's (ancientcomputing/locallm) own v0.7.0 — that one is
-// still a DRAFT, and GitHub 404s an anonymous `swift build` download of a draft release's asset
-// (confirmed live: a manual copy of this file pointed at locallm's own draft failed with
-// badResponseStatusCode(404)). locallm-staging is the standing clean-room testing repo (see
-// locallmlab-sdk's docs/07-release-roadmap.md phase 3 step 9) — using its real published asset
-// here lets this file actually build in the meantime.
-//
-// TODO before this repo's own release goes out for real: switch url/checksum back to
-// ancientcomputing/locallm's own v0.7.0 asset once that release is published (non-draft) —
-// `releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip`, not the placeholder
-// `untagged-<hash>` path draft assets live under. This is part of
-// docs/07-release-roadmap.md's "where to pick this back up" item 5 (promote from locallm-staging
-// to the real locallm) — don't ship this file pointed at locallm-staging.
+
+// MARK: - Which SDK version to build against
+
+// Deliberately NOT implicit, and deliberately NOT silently defaulted. This manifest previously
+// baked in a single hardcoded url/checksum, which is how it ended up pointed at a draft release
+// that 404s on an anonymous `swift build` (confirmed live), then at a TEMPORARY stand-in
+// (ancientcomputing/locallm-staging) with a comment nobody was forced to actually read before
+// building. Neither gave a developer honest, visible control over which SDK release they're
+// pulling, or a clear failure when that choice was never made. Now: set LOCALLM_SDK_VERSION
+// explicitly, e.g. `LOCALLM_SDK_VERSION=0.7.0 swift build`, or this manifest fails fast with a
+// clear message instead of silently resolving to whichever version happened to be hardcoded.
+struct SDKRelease {
+    let url: String
+    let checksum: String
+}
+
+// The source of truth for which SDK versions this Package.swift knows how to build against —
+// add a new entry here whenever locallmlab-sdk publishes a new Core.xcframework release.
+let knownSDKReleases: [String: SDKRelease] = [
+    // TEMPORARY (2026-08-14): this repo's own v0.7.0 GitHub Release is still a draft, and GitHub
+    // 404s an anonymous `swift build` download of a draft release's asset — confirmed live. Using
+    // ancientcomputing/locallm-staging's real PUBLISHED v0.7.0 asset here in the meantime (see
+    // locallmlab-sdk's docs/07-release-roadmap.md phase 3 step 9). Swap `url` below to
+    // "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip"
+    // once this repo's own v0.7.0 is published non-draft — `checksum` is content-based and won't
+    // change either way.
+    "0.7.0": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm-staging/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
+        checksum: "51a458aa6a4ea2836eaa3c3740512f4d043563f4e5a894aa41e65db914eac5a6"
+    )
+]
+
+func failManifest(_ message: String) -> Never {
+    FileHandle.standardError.write(Data((message + "\n").utf8))
+    exit(1)
+}
+
+guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] else {
+    failManifest("""
+    error: LOCALLM_SDK_VERSION is not set.
+    Set it to the LocalLM Lab SDK version to build against, e.g.:
+        LOCALLM_SDK_VERSION=0.7.0 swift build
+    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
+    """)
+}
+
+guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
+    failManifest("""
+    error: Unknown LOCALLM_SDK_VERSION "\(requestedSDKVersion)".
+    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
+    """)
+}
 
 // Location (and, since it feeds off Location's result, Weather) is a build-time opt-in, default
 // OFF — set PLATETODAY_INCLUDE_LOCATION_WEATHER=1 in the environment before building to include
@@ -53,8 +90,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
-            url: "https://github.com/ancientcomputing/locallm-staging/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
-            checksum: "51a458aa6a4ea2836eaa3c3740512f4d043563f4e5a894aa41e65db914eac5a6"
+            url: sdkRelease.url,
+            checksum: sdkRelease.checksum
         ),
         .executableTarget(
             name: "PlateToday",
