@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Both entitlements below require a matching NS*FullAccessUsageDescription key in
+	     Info.plist AND must be present on every codesign call that touches this binary,
+	     including the final sign of the outer .app bundle. See locallmlab-main's
+	     packaging/Resources/Chooser.entitlements for the exact multi-step TCC failure mode this
+	     was confirmed against there: missing entitlement gives "Policy disallows prompt";
+	     missing Info.plist key gives "Refusing authorization request without
+	     NSCalendarsUsageDescription key"; a final bundle-level codesign that omits the
+	     entitlements flag silently strips what an earlier per-binary sign applied.
+	     build-and-sign.sh's final codesign call passes the entitlements flag for exactly this
+	     reason. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+	<key>com.apple.security.personal-information.reminders</key>
+	<true/>
+	<!-- com.apple.security.personal-information.location is intentionally NOT here by default —
+	     Location/Weather is a build-time opt-in (see ../Package.swift), off by default.
+	     build-and-sign.sh adds this key via PlistBuddy only when
+	     PLATETODAY_INCLUDE_LOCATION_WEATHER=1. -->
+</dict>
+</plist>
