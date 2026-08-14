@@ -67,6 +67,10 @@ for a first try: launch the app, "Add a server" with that URL and auth type "Non
 enable a tool to see it show up under "Tools available this session." "Save As…" exports a text
 summary of everything the server offers (tools, resources, prompts) and their enabled state.
 
+For a fuller list of real MCP servers to test against — including ones that exercise OAuth and
+personal-access-token auth, not just no-auth — see
+[thisbrain.ai/locallm/mcp-servers.html](https://thisbrain.ai/locallm/mcp-servers.html).
+
 ## More
 
 - [`docs/sdk-guide.md`](../../docs/sdk-guide.md) — the full SDK guide, including all three MCP
