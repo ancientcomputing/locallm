@@ -170,8 +170,7 @@ final class PlateTodayModel: ObservableObject {
     // Called from the Done button, before the app terminates — this is a dev/demo app, not
     // something meant to accumulate standing Todoist access across runs, so each run's grant is
     // wiped rather than persisted. removeServer(_:) already clears both the OAuth and PAT
-    // Keychain entries for a server (see MCPServerManager.swift), so reusing it here covers both
-    // without duplicating that logic.
+    // Keychain entries for a server, so reusing it here covers both without duplicating that logic.
     func cleanUpBeforeQuit() {
         manager.removeServer(MCPServerID(rawValue: todoistURL.absoluteString))
     }
@@ -289,9 +288,9 @@ struct PlateTodayApp: App {
     @StateObject private var model = PlateTodayModel()
 
     init() {
-        // Distinct from LocalLM Lab's own "locallmlab" scheme (see MCPOAuthFlow.swift) so the two
-        // apps' OAuth callbacks don't collide if both are installed on the same Mac — see
-        // Info.plist's CFBundleURLTypes for the matching registration.
+        // Distinct from LocalLM Lab's own "locallmlab" scheme so the two apps' OAuth callbacks
+        // don't collide if both are installed on the same Mac — see Info.plist's CFBundleURLTypes
+        // for the matching registration.
         MCPOAuthFlow.redirectURI = "platetoday://oauth/callback"
     }
 

@@ -743,25 +743,28 @@ enum Connectors {
 
 // CalendarAccess
 enum CalendarAccess {
+    static let store: EKEventStore  // the raw EventKit store, for anything the wrapper below doesn't cover
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct EventSummary: Codable { var title: String; var start: Date; var end: Date; /* ... */ }
+    struct EventSummary: Codable { var title: String; var start: String; var end: String; var calendar: String; var location: String?; var isAllDay: Bool }
     static func upcomingEvents(days: Int) -> [EventSummary]
     struct AddEventResult { var success: Bool; var error: String? }
     static func addEvent(title: String, start: Date, end: Date) -> AddEventResult
 }
 
-// RemindersAccess — same shape as CalendarAccess
+// RemindersAccess — same shape as CalendarAccess, also backed by EventKit (EKEventStore
+// handles both calendar events and reminders)
 enum RemindersAccess {
+    static let store: EKEventStore
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct ReminderSummary: Codable, Sendable { var title: String; /* ... */ }
+    struct ReminderSummary: Codable, Sendable { var title: String; var dueDate: String?; var list: String; var isCompleted: Bool; var priority: Int }
     static func upcomingReminders(days: Int) async -> [ReminderSummary]
     struct AddReminderResult { var success: Bool; var error: String? }
     static func addReminder(title: String, dueDateComponents: DateComponents?) -> AddReminderResult
@@ -769,6 +772,7 @@ enum RemindersAccess {
 
 // ContactsAccess
 enum ContactsAccess {
+    static let store: CNContactStore  // the raw Contacts store, for anything the wrapper below doesn't cover
     static var authorizationStatus: CNAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -789,7 +793,7 @@ final class LocationAccess {
     struct AccessResult: Sendable { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct LocationSummary: Codable { var latitude: Double; var longitude: Double; var placeName: String?; var horizontalAccuracyMeters: Double }
+    struct LocationSummary: Codable { var latitude: Double; var longitude: Double; var horizontalAccuracyMeters: Double; var timestamp: String; var placeName: String? }
     func currentLocation() async -> LocationSummary?
 }
 ```
@@ -810,6 +814,8 @@ struct WeatherTool: Tool {
     // call() returns current conditions + 7-day forecast via Open-Meteo
 }
 ```
+
+**A note on what's not listed above**: `@Generable` (Apple's FoundationModels macro, applied to every `Arguments` struct in this SDK and in your own tools) synthesizes additional public members on each one — a `PartiallyGenerated` nested type, `generationSchema`, `generatedContent`, and a few others. These are FoundationModels' own machinery for incremental/streaming generation, not SDK API — you'll never call them directly, only `@Generable`/`LanguageModelSession` do. Left out here deliberately, the same way compiler-synthesized `Codable`/`Hashable` methods (`init(from:)`, `encode(to:)`, `hash(into:)`) are left out of the reference types above — real public symbols, but noise for this list's purpose. If you inspect the compiled binary directly and see these, that's expected, not a sign this reference is out of date.
 
 ### MCP client
 

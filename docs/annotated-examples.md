@@ -97,6 +97,11 @@ struct TodaysLocationTool: Tool {
     let name = "getCurrentLocation"
     let description = "Returns the user's current one-shot location (place name, if available) — useful as input to the weather tool."
 
+    // Zero-property Arguments is valid and correct for a no-input tool (proven by Core's
+    // ClockTool) -- an earlier "unused placeholder" field here was a fragile workaround that
+    // actively caused decode failures: FoundationModels sometimes calls a tool with genuinely
+    // empty generated content when no argument makes sense, and a required-but-unused field then
+    // fails to decode from that empty content.
     @Generable
     struct Arguments {}
 
@@ -126,6 +131,11 @@ struct TodoistTasksTool: Tool {
     let manager: MCPServerManager                                     // ← SDK (type)
     let serverURL: URL
 
+    // Zero-property Arguments is valid and correct for a no-input tool (proven by Core's
+    // ClockTool) -- an earlier "unused placeholder" field here was a fragile workaround that
+    // actively caused decode failures: FoundationModels sometimes calls a tool with genuinely
+    // empty generated content when no argument makes sense, and a required-but-unused field then
+    // fails to decode from that empty content.
     @Generable
     struct Arguments {}
 

@@ -23,9 +23,9 @@
 	     (and the matching entitlement) via PlistBuddy only when
 	     PLATETODAY_INCLUDE_LOCATION_WEATHER=1, so the default build doesn't declare an
 	     entitlement it doesn't use. -->
-	<!-- Redirect target for the Todoist MCP server's OAuth flow (see Core's MCPOAuthFlow.swift
-	     and PlateTodayApp.swift's init(), which sets MCPOAuthFlow.redirectURI to match this
-	     scheme). Deliberately distinct from LocalLM Lab's own "locallmlab" scheme so the two
+	<!-- Redirect target for the Todoist MCP server's OAuth flow (see PlateTodayApp.swift's
+	     init(), which sets MCPOAuthFlow.redirectURI to match this scheme). Deliberately
+	     distinct from LocalLM Lab's own "locallmlab" scheme so the two
 	     don't collide if both are installed on the same Mac. -->
 	<key>CFBundleURLTypes</key>
 	<array>
