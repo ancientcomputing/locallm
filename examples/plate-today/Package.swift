@@ -31,11 +31,13 @@ let knownSDKReleases: [String: SDKRelease] = [
     // ancientcomputing/locallm-staging's real PUBLISHED v0.7.0 asset in the meantime (a separate,
     // public testing repo). Swap `url` below to
     // "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip"
-    // once this repo's own v0.7.0 is published non-draft — `checksum` is content-based and won't
-    // change either way.
+    // once this repo's own v0.7.0 is published non-draft — that repo's draft was built BEFORE
+    // Core gained exportSummary()/Contacts (2026-08-14), so `checksum` there is currently stale
+    // too; re-derive both `url` and `checksum` from a fresh publish, don't assume this one
+    // carries over.
     "0.7.0": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm-staging/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
-        checksum: "51a458aa6a4ea2836eaa3c3740512f4d043563f4e5a894aa41e65db914eac5a6"
+        checksum: "8853f891f782cb052dd49850e6490558ba68b21b6970a0e1b83d393ab50f8289"
     )
 ]
 
