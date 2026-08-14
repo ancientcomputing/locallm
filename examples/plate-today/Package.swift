@@ -9,13 +9,20 @@ import PackageDescription
 // one real difference the copy process has to account for, since Core itself never leaves the
 // private repo.
 //
-// url/checksum below point at a DRAFT release (ancientcomputing/locallm's v0.7.0 — aligned with
-// locallmlab-main/locallmlab-sdk's shared 0.7.x release train, not a separate SDK version line)
-// — GitHub doesn't assign a draft's assets their final tag-based download path until the release
-// is actually published; right now they live under a placeholder "untagged-<hash>" path that WILL
-// change on publish. The checksum is content-based and stays valid regardless, but the url must
-// be updated to the real "releases/download/v0.7.0/..." path once this release actually goes out
-// — this file is not yet in its final, publishable state.
+// TEMPORARY, 2026-08-14: url/checksum below point at ancientcomputing/locallm-staging's
+// PUBLISHED v0.7.0 release, not this repo's (ancientcomputing/locallm) own v0.7.0 — that one is
+// still a DRAFT, and GitHub 404s an anonymous `swift build` download of a draft release's asset
+// (confirmed live: a manual copy of this file pointed at locallm's own draft failed with
+// badResponseStatusCode(404)). locallm-staging is the standing clean-room testing repo (see
+// locallmlab-sdk's docs/07-release-roadmap.md phase 3 step 9) — using its real published asset
+// here lets this file actually build in the meantime.
+//
+// TODO before this repo's own release goes out for real: switch url/checksum back to
+// ancientcomputing/locallm's own v0.7.0 asset once that release is published (non-draft) —
+// `releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip`, not the placeholder
+// `untagged-<hash>` path draft assets live under. This is part of
+// docs/07-release-roadmap.md's "where to pick this back up" item 5 (promote from locallm-staging
+// to the real locallm) — don't ship this file pointed at locallm-staging.
 
 // Location (and, since it feeds off Location's result, Weather) is a build-time opt-in, default
 // OFF — set PLATETODAY_INCLUDE_LOCATION_WEATHER=1 in the environment before building to include
@@ -46,8 +53,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
-            url: "https://github.com/ancientcomputing/locallm/releases/download/untagged-bf3ddf841dfc9442ae9f/LocalLMLabSDKCore-0.7.0.xcframework.zip",
-            checksum: "7469f338d8c764d818b5ce2f0908a937db703522cd27d6255c0490550c44c274"
+            url: "https://github.com/ancientcomputing/locallm-staging/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
+            checksum: "51a458aa6a4ea2836eaa3c3740512f4d043563f4e5a894aa41e65db914eac5a6"
         ),
         .executableTarget(
             name: "PlateToday",

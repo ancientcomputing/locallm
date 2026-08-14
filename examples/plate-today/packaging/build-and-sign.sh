@@ -113,9 +113,31 @@ BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/PlateToday"
 # — required for the Components/xcframework binary boundary elsewhere in this repo), so
 # PlateToday links against it via @rpath at runtime rather than statically. A bare `swift build`
 # output directory has both files side by side and works; a packaged .app does not unless the
-# dylib is copied in explicitly and re-signed — confirmed the hard way via a dyld "Library not
-# loaded" failure on first real launch of the packaged bundle.
+# Core artifact is copied in explicitly and re-signed — confirmed the hard way via a dyld "Library
+# not loaded" failure on first real launch of the packaged bundle.
+#
+# The on-disk shape differs depending on how this package.swift depends on Core, and both are real:
+# this private repo's `.package(path: "../../Core")` produces a flat `libLocalLMLabSDKCore.dylib`
+# next to the binary, but the public `locallm` copy's `.binaryTarget` (a prebuilt
+# Core.xcframework) produces a `LocalLMLabSDKCore.framework` bundle instead — PlateToday's own
+# @rpath entry (`@rpath/LocalLMLabSDKCore.framework/LocalLMLabSDKCore` in that case) expects the
+# whole framework directory, not a renamed flat file. Confirmed the hard way running this same
+# script against the public copy's binaryTarget build, which produces the framework shape and
+# failed to find a nonexistent flat dylib. Detect whichever shape this build actually produced.
 CORE_DYLIB="$BUILD_DIR/swift/arm64-apple-macosx/release/libLocalLMLabSDKCore.dylib"
+CORE_FRAMEWORK="$BUILD_DIR/swift/arm64-apple-macosx/release/LocalLMLabSDKCore.framework"
+if [[ -f "$CORE_DYLIB" ]]; then
+  CORE_ARTIFACT_NAME="libLocalLMLabSDKCore.dylib"
+  CORE_ARTIFACT_SRC="$CORE_DYLIB"
+elif [[ -d "$CORE_FRAMEWORK" ]]; then
+  CORE_ARTIFACT_NAME="LocalLMLabSDKCore.framework"
+  CORE_ARTIFACT_SRC="$CORE_FRAMEWORK"
+else
+  echo "Core build output not found as either a dylib or a framework:" >&2
+  echo "  $CORE_DYLIB" >&2
+  echo "  $CORE_FRAMEWORK" >&2
+  exit 1
+fi
 
 echo "Creating app bundle..."
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -142,7 +164,7 @@ fi
 
 cp "$SCRIPT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$BINARY" "$MACOS_DIR/PlateToday"
-cp "$CORE_DYLIB" "$MACOS_DIR/libLocalLMLabSDKCore.dylib"
+cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 chmod +x "$MACOS_DIR/PlateToday"
 
@@ -155,7 +177,7 @@ echo "Signing app bundle..."
 # dropping entitlements applied a moment earlier if --entitlements isn't repeated here. Confirmed
 # the hard way in locallmlab-main's release-macos.sh; see that script's comments for the full
 # failure-mode writeup.
-codesign --force --options runtime --timestamp --sign "$APP_IDENTITY" "$MACOS_DIR/libLocalLMLabSDKCore.dylib"
+codesign --force --options runtime --timestamp --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/PlateToday"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"
 

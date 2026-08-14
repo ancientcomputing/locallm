@@ -125,8 +125,23 @@ PLATETODAY_INCLUDE_TODOIST="$PLATETODAY_INCLUDE_TODOIST" \
 
 BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/PlateToday"
 # Same @rpath dynamic-library situation as build-and-sign.sh — see that script's comment for the
-# full "Library not loaded" failure-mode writeup this works around.
+# full "Library not loaded" failure-mode writeup this works around, including why the on-disk
+# shape (flat dylib vs. LocalLMLabSDKCore.framework) depends on whether Core comes from source
+# (this private repo) or a binaryTarget (the public locallm copy).
 CORE_DYLIB="$BUILD_DIR/swift/arm64-apple-macosx/release/libLocalLMLabSDKCore.dylib"
+CORE_FRAMEWORK="$BUILD_DIR/swift/arm64-apple-macosx/release/LocalLMLabSDKCore.framework"
+if [[ -f "$CORE_DYLIB" ]]; then
+  CORE_ARTIFACT_NAME="libLocalLMLabSDKCore.dylib"
+  CORE_ARTIFACT_SRC="$CORE_DYLIB"
+elif [[ -d "$CORE_FRAMEWORK" ]]; then
+  CORE_ARTIFACT_NAME="LocalLMLabSDKCore.framework"
+  CORE_ARTIFACT_SRC="$CORE_FRAMEWORK"
+else
+  echo "Core build output not found as either a dylib or a framework:" >&2
+  echo "  $CORE_DYLIB" >&2
+  echo "  $CORE_FRAMEWORK" >&2
+  exit 1
+fi
 
 echo "Creating app bundle..."
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -145,7 +160,7 @@ fi
 
 cp "$SCRIPT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$BINARY" "$MACOS_DIR/PlateToday"
-cp "$CORE_DYLIB" "$MACOS_DIR/libLocalLMLabSDKCore.dylib"
+cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 cp "$PROVISIONING_PROFILE" "$CONTENTS_DIR/embedded.provisionprofile"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 chmod +x "$MACOS_DIR/PlateToday"
@@ -157,7 +172,7 @@ echo "Signing app bundle..."
 # Same discipline as build-and-sign.sh: sign the binary first, then the whole bundle WITH
 # --entitlements again, since the bundle-level sign re-signs the main executable regardless and
 # silently drops entitlements applied a moment earlier if --entitlements isn't repeated.
-codesign --force --options runtime --timestamp --sign "$APP_SIGN_IDENTITY" "$MACOS_DIR/libLocalLMLabSDKCore.dylib"
+codesign --force --options runtime --timestamp --sign "$APP_SIGN_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_SIGN_IDENTITY" "$MACOS_DIR/PlateToday"
 codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_SIGN_IDENTITY" "$APP_DIR"
 
