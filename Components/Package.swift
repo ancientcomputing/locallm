@@ -26,18 +26,8 @@ struct SDKRelease {
 // a new entry here whenever a new Core.xcframework release is published. Keep in sync with
 // examples/plate-today/Package.swift's own table.
 let knownSDKReleases: [String: SDKRelease] = [
-    // TEMPORARY (2026-08-14): this repo's own v0.7.0 GitHub Release is still a draft, and GitHub
-    // 404s an anonymous `swift build` download of a draft release's asset — confirmed live. Using
-    // ancientcomputing/locallm-staging's real PUBLISHED v0.7.0 asset in the meantime (a separate,
-    // public testing repo). Swap `url` below to
-    // "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip"
-    // once this repo's own v0.7.0 is published non-draft — that repo's draft was built BEFORE
-    // Core gained exportSummary()/Contacts (2026-08-14), so `checksum` there is currently stale
-    // too; re-derive both `url` and `checksum` from a fresh publish, don't assume this one
-    // carries over. Same TEMPORARY state as examples/plate-today/Package.swift; fix both
-    // together.
     "0.7.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm-staging/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
         checksum: "8853f891f782cb052dd49850e6490558ba68b21b6970a0e1b83d393ab50f8289"
     )
 ]
