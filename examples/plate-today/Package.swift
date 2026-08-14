@@ -9,11 +9,12 @@ import PackageDescription
 // one real difference the copy process has to account for, since Core itself never leaves the
 // private repo.
 //
-// url/checksum below point at a DRAFT release (ancientcomputing/locallm's v0.1.0) — GitHub
-// doesn't assign a draft's assets their final tag-based download path until the release is
-// actually published; right now they live under a placeholder "untagged-<hash>" path that WILL
+// url/checksum below point at a DRAFT release (ancientcomputing/locallm's v0.7.0 — aligned with
+// locallmlab-main/locallmlab-sdk's shared 0.7.x release train, not a separate SDK version line)
+// — GitHub doesn't assign a draft's assets their final tag-based download path until the release
+// is actually published; right now they live under a placeholder "untagged-<hash>" path that WILL
 // change on publish. The checksum is content-based and stays valid regardless, but the url must
-// be updated to the real "releases/download/v0.1.0/..." path once this release actually goes out
+// be updated to the real "releases/download/v0.7.0/..." path once this release actually goes out
 // — this file is not yet in its final, publishable state.
 
 // Location (and, since it feeds off Location's result, Weather) is a build-time opt-in, default
@@ -45,8 +46,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
-            url: "https://github.com/ancientcomputing/locallm/releases/download/untagged-879716c7b213518b51cb/LocalLMLabSDKCore-0.1.0.xcframework.zip",
-            checksum: "bbd5e3524fdae3353cc14c5dca8067e36a79e2c96e24e8def6b2f0fa7c6ab8bd"
+            url: "https://github.com/ancientcomputing/locallm/releases/download/untagged-bf3ddf841dfc9442ae9f/LocalLMLabSDKCore-0.7.0.xcframework.zip",
+            checksum: "7469f338d8c764d818b5ce2f0908a937db703522cd27d6255c0490550c44c274"
         ),
         .executableTarget(
             name: "PlateToday",
