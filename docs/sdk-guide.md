@@ -674,11 +674,15 @@ Application"/"3rd Party Mac Developer Installer" pair instead, which works the s
 
 **Starting from `plate-today` or `components-demo`? Change `CFBundleIdentifier` in `Info.plist`
 first.** App ID registration is global across Apple's entire Developer Portal, not scoped per
-team — the example apps' bundle IDs (`lab.locallm.sdk.reference.platetoday`,
-`lab.locallm.sdk.reference.componentsdemo`) are already registered under this project's own team,
-so no other developer's account can register them. Building and running the examples locally
-works fine unmodified (`CFBundleIdentifier` doesn't need to be globally unique for Developer
-ID/ad-hoc signing), but MAS submission of your own app needs your own bundle ID from the start.
+team. `plate-today`'s bundle ID (`lab.locallm.sdk.reference.platetoday`) is already registered
+under this project's own team (it has a real MAS provisioning profile — see the walkthrough
+below), so no other developer's account can register it. `components-demo` has no MAS path today
+and its bundle ID (`lab.locallm.sdk.reference.componentsdemo`) isn't currently registered as an
+App ID at all — but don't build a real product under it regardless: it's this project's own
+reverse-DNS namespace, and if a MAS path is ever added for `components-demo` later, this project
+would register it too. Building and running either example locally works fine unmodified —
+`CFBundleIdentifier` doesn't need to be globally unique for Developer ID/ad-hoc signing — but MAS
+submission of your own app needs your own bundle ID from the start.
 
 - **Identifiers → + → App IDs → App → Explicit Bundle ID** (e.g. `com.yourcompany.yourapp`).
 - Leave every Capability unchecked unless something you're using genuinely needs an App
