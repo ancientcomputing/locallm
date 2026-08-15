@@ -672,6 +672,14 @@ Application"/"3rd Party Mac Developer Installer" pair instead, which works the s
 
 **2. An App ID**, explicit (not wildcard), matching your app's real bundle identifier.
 
+**Starting from `plate-today` or `components-demo`? Change `CFBundleIdentifier` in `Info.plist`
+first.** App ID registration is global across Apple's entire Developer Portal, not scoped per
+team — the example apps' bundle IDs (`lab.locallm.sdk.reference.platetoday`,
+`lab.locallm.sdk.reference.componentsdemo`) are already registered under this project's own team,
+so no other developer's account can register them. Building and running the examples locally
+works fine unmodified (`CFBundleIdentifier` doesn't need to be globally unique for Developer
+ID/ad-hoc signing), but MAS submission of your own app needs your own bundle ID from the start.
+
 - **Identifiers → + → App IDs → App → Explicit Bundle ID** (e.g. `com.yourcompany.yourapp`).
 - Leave every Capability unchecked unless something you're using genuinely needs an App
   ID-level capability (iCloud, Push Notifications, etc.) — App Sandbox, network client, and the
