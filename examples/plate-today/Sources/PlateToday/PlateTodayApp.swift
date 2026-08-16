@@ -214,7 +214,7 @@ final class PlateTodayModel: ObservableObject {
             let response = try await session.respond(to: prompt)
             state = .ready(response.content)
         } catch {
-            state = .failed("\(error)")
+            state = .failed(await GenerationErrorDescription.describe(error))
         }
     }
 }

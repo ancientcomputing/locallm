@@ -429,6 +429,30 @@ schema." FoundationModels sometimes calls a no-input tool with genuinely empty g
 and a required field with nothing to satisfy it fails to decode — confirmed live: this produced a
 `GenerationError.decodingFailure` in a real tool call, not a hypothetical concern.
 
+**On reading `GenerationError` failures**: `LanguageModelSession.GenerationError`'s default
+`NSError` bridging is useless — `error.localizedDescription` (and string-interpolating the error
+directly) always prints a generic wrapper like `"The operation couldn't be completed.
+(...GenerationError error -1.)"` regardless of which case actually fired, and on-device failures
+sometimes surface an opaque nested `com.apple.tokengeneration` error with no further detail either.
+Core's `GenerationErrorDescription.describe(_:) async -> String` switches on the real case
+(`.guardrailViolation`, `.decodingFailure`, `.exceededContextWindowSize`, `.refusal`, etc.) and
+returns its `Context.debugDescription` instead, so a guardrail violation reads differently from a
+context-window overflow instead of both looking identical:
+
+```swift
+do {
+    let response = try await session.respond(to: prompt)
+} catch {
+    state = .failed(await GenerationErrorDescription.describe(error))
+}
+```
+
+Also worth knowing: this generic `error -1` sometimes fires as a transient, prompt-independent
+on-device hiccup — retrying the exact same request can succeed with no other change (see
+`examples/plate-today/README.md`'s Troubleshooting section for a confirmed live instance). If it
+persists across several retries, that's no longer this known transient case — use the description
+above to find out which real `GenerationError` case is actually firing.
+
 **On extracting more than just tools**: a connected server can also expose **resources** (readable
 content, e.g. a document or dataset) and **prompts** (server-defined templates). `manager.
 resourcesForSession()`/`.promptsForSession()` list what's currently enabled;
@@ -830,6 +854,17 @@ struct WeatherTool: Tool {
     init(description: String? = nil)
     struct Arguments { var location: String }
     // call() returns current conditions + 7-day forecast via Open-Meteo
+}
+```
+
+### Error handling
+
+```swift
+enum GenerationErrorDescription {
+    // Turns a LanguageModelSession.GenerationError into a readable, per-case explanation
+    // (falls back to error.localizedDescription for any other error type). async because
+    // .refusal's explanation is itself computed asynchronously by FoundationModels.
+    static func describe(_ error: Error) async -> String
 }
 ```
 
