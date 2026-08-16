@@ -91,11 +91,11 @@ opt-**out** if you want to build without a Todoist account.
   granted). Confirmed transient: quitting and relaunching produced a normal summary on the very
   next attempt with no other change. The same generic `error -1` is also documented as transient
   in [`examples/localai-cli/README.md`](../localai-cli/README.md#troubleshooting)'s Troubleshooting
-  section. If it persists across several retries, that's no longer this known transient case — see
-  `docs/sdk-guide.md`'s `GenerationError.decodingFailure` discussion for other possible causes
-  (guardrail violation, context window overflow, etc.), which this app's own error display doesn't
-  currently distinguish (it just shows the raw error, unlike `LocalAIPlayground`'s
-  `describeGenerationError`).
+  section. If it persists across several retries, that's no longer this known transient case — as
+  of SDK 0.7.1, the failure screen shows Core's `GenerationErrorDescription.describe(_:)` output
+  instead of the raw error, so a retry that keeps failing will actually tell you which
+  `GenerationError` case fired (guardrail violation, context window overflow, decoding failure,
+  etc.) — see `docs/sdk-guide.md` §6's "On reading `GenerationError` failures" for the full list.
 
 ## More
 
