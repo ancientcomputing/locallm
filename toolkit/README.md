@@ -12,19 +12,19 @@ and [../examples/localai-cli-swift/](../examples/localai-cli-swift/) (Swift).
 
 ## Download
 
-- `localai-toolkit-0.6.0-arm64.zip`
-- `localai-toolkit-0.6.0-arm64.zip.sha256`
+- `localai-toolkit-0.7.0-arm64.zip`
+- `localai-toolkit-0.7.0-arm64.zip.sha256`
 
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-0.6.0-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-0.7.0-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-0.6.0-arm64.zip
+unzip localai-toolkit-0.7.0-arm64.zip
 ```
 
 This produces `localai-cli` and `localai-playground-run`. Put them
