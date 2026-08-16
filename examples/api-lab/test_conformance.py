@@ -75,8 +75,8 @@ def check_streaming(client):
     # Foundation Models' own streaming granularity is coarser for short
     # replies and can legitimately deliver the whole answer in a single
     # snapshot before "done" — that's real model behavior, not a broken
-    # relay (see docs/requirements.md §1's "interface-compatible, not
-    # behavior-identical" framing). What actually matters here is that the
+    # relay (this API is "interface-compatible, not behavior-identical"
+    # with OpenAI's). What actually matters here is that the
     # stream=True code path works end-to-end via SSE, not the chunk count.
     print("\n[3/5] Streaming — expecting content delivered via SSE (chunk count may vary)")
     try:

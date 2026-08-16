@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key><string>Components Demo</string>
+	<key>CFBundleExecutable</key><string>ComponentsDemo</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIconName</key><string>AppIcon</string>
+	<key>CFBundleIdentifier</key><string>lab.locallm.sdk.reference.componentsdemo</string>
+	<key>CFBundleName</key><string>Components Demo</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+	<key>LSMinimumSystemVersion</key><string>26.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<!-- Redirect target for an MCP server's OAuth flow (see Core's MCPOAuthFlow.swift and
+	     ComponentsDemoApp.swift's init(), which sets MCPOAuthFlow.redirectURI to match this
+	     scheme). Distinct from both plate-today's "platetoday" scheme and LocalLM Lab's own
+	     "locallmlab" scheme so none collide if all three are installed on the same Mac. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key><string>lab.locallm.sdk.reference.componentsdemo.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>componentsdemo</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

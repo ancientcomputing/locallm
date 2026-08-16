@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key><string>Plate Today</string>
+	<key>CFBundleExecutable</key><string>PlateToday</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIconName</key><string>AppIcon</string>
+	<key>CFBundleIdentifier</key><string>lab.locallm.sdk.reference.platetoday</string>
+	<key>CFBundleName</key><string>Plate Today</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key><string>26.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<!-- Usage-description strings required alongside the matching entitlements in
+	     PlateToday.entitlements — see that file's comment for the multi-step TCC failure mode
+	     this avoids: both are required together, neither alone is sufficient. -->
+	<key>NSCalendarsFullAccessUsageDescription</key><string>Plate Today reads your calendar events for today to summarize what's on your plate.</string>
+	<key>NSRemindersFullAccessUsageDescription</key><string>Plate Today reads your reminders due today to summarize what's on your plate.</string>
+	<!-- NSLocationUsageDescription is intentionally NOT here by default — Location/Weather is a
+	     build-time opt-in (see Package.swift), off by default. build-and-sign.sh adds this key
+	     (and the matching entitlement) via PlistBuddy only when
+	     PLATETODAY_INCLUDE_LOCATION_WEATHER=1, so the default build doesn't declare an
+	     entitlement it doesn't use. -->
+	<!-- Redirect target for the Todoist MCP server's OAuth flow (see PlateTodayApp.swift's
+	     init(), which sets MCPOAuthFlow.redirectURI to match this scheme). Deliberately
+	     distinct from LocalLM Lab's own "locallmlab" scheme so the two
+	     don't collide if both are installed on the same Mac. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key><string>lab.locallm.sdk.reference.platetoday.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>platetoday</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -75,7 +75,7 @@ LOCALAI_CONFIG_PATH = os.environ.get(
 # Which connectors this particular call wants active — must already be
 # enabled in localai-config.json, or localai-cli rejects the request before
 # ever invoking the model. Omitting this list entirely means NO connectors
-# are made available to the call, by design (see requirements doc).
+# are made available to the call — a deliberate least-privilege default.
 CONNECTORS = ["clock"]
 # ------------------------------------------------------------------------
 
