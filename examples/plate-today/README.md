@@ -82,6 +82,21 @@ App ID, provisioning profile). `PLATETODAY_INCLUDE_LOCATION_WEATHER`/`PLATETODAY
 work the same as above; `PLATETODAY_INCLUDE_TODOIST` (default `1`, included) is the build-time
 opt-**out** if you want to build without a Todoist account.
 
+## Troubleshooting
+
+- Failure screen showing `FoundationModels.LanguageModelSession.GenerationError Code=-1 "(null)"`
+  with an underlying `com.apple.tokengeneration` error (e.g. `Code=10`) — a generic on-device
+  generation failure from FoundationModels itself, not a signing/TCC/OAuth problem (confirmed on a
+  properly signed build via `build-and-sign.sh`, with Calendar/Reminders/Todoist access already
+  granted). Confirmed transient: quitting and relaunching produced a normal summary on the very
+  next attempt with no other change. The same generic `error -1` is also documented as transient
+  in [`examples/localai-cli/README.md`](../localai-cli/README.md#troubleshooting)'s Troubleshooting
+  section. If it persists across several retries, that's no longer this known transient case — see
+  `docs/sdk-guide.md`'s `GenerationError.decodingFailure` discussion for other possible causes
+  (guardrail violation, context window overflow, etc.), which this app's own error display doesn't
+  currently distinguish (it just shows the raw error, unlike `LocalAIPlayground`'s
+  `describeGenerationError`).
+
 ## More
 
 - [`docs/sdk-guide.md`](../../docs/sdk-guide.md) — the full SDK guide, including entitlements,
