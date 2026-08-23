@@ -486,12 +486,33 @@ let contacts = ContactsAccess.search(query: "Jane", limit: 10)
 let location = await LocationAccess.shared.currentLocation()
 ```
 
+**Calendar and Reminders also have write methods**: `CalendarAccess.addEvent(title:start:end:)` /
+`.updateEvent(identifier:title:start:end:)` / `.deleteEvent(identifier:)`, and the equivalent
+`RemindersAccess.addReminder`/`.updateReminder`/`.deleteReminder` (the last also takes
+`isCompleted:` for marking a reminder done/not done). Contacts has the same three:
+`ContactsAccess.addContact`/`.updateContact`/`.deleteContact` — `phoneNumbers`/`emails` on
+`updateContact`, when provided, replace that contact's entire existing list rather than adding to
+it. `EventSummary`/`ReminderSummary`/`ContactSummary` each carry a stable identifier
+(`eventIdentifier`/`calendarItemIdentifier`/`identifier`) specifically so a read result can be
+passed straight into the matching `update*`/`delete*` call. Full signatures are in §12 below.
+
+**There is no built-in gate on any of this beyond the TCC grant itself.** Unlike LocalLM Lab the
+product, which has its own app-specific "Full Access" toggle deciding whether a given session
+exposes update/delete as tools the model can call at all, Core has no equivalent concept — that's
+UI/IPC behavior specific to that app, not something this SDK provides or enforces. The moment a
+user grants Calendar/Reminders/Contacts access, every method above (read and write) is callable
+unconditionally. Whether and how to expose update/delete to a model — as a `Tool` at all, behind
+your own confirmation UI, restricted by your own app-level setting — is entirely your design
+decision as the integrating developer.
+
 Each connector requires its own Info.plist usage-description key and entitlement, same pattern as
 section 2a/2b — see that section for Calendar/Reminders; Contacts needs
 `NSContactsUsageDescription` + `com.apple.security.personal-information.addressbook`, Location
 needs `NSLocationUsageDescription` + `com.apple.security.personal-information.location`.
 `examples/plate-today`'s `SearchContactsTool` and (build-time opt-in) location/weather tools are
-working examples of each, including the exact packaging-script changes each one needs.
+working examples of each, including the exact packaging-script changes each one needs — note that
+the reference app only wires up the read methods; the write methods above are equally available
+but not currently demonstrated there.
 
 **One real side effect worth knowing about**: requesting Location access briefly switches your
 app's own `NSApplication.ActivationPolicy` to `.regular` for the duration of the fetch, then
@@ -615,6 +636,10 @@ Required entitlements for this to work under App Sandbox:
   surfaced gaps. If you hit a "X is inaccessible due to internal protection level" error on
   something that looks like it should obviously be public, it probably should be — that's a real
   gap, not a step you're missing. File an issue.
+- **No logging of prompts, responses, or tool calls, on by default or otherwise.** Core doesn't
+  write a persisted trace of what the model saw or said anywhere, and gives you nothing to opt out
+  of — there's simply nothing there. If your app wants that kind of record, you build and own it
+  yourself.
 
 ## 10. App Sandbox — building for the Mac App Store
 
@@ -791,10 +816,14 @@ enum CalendarAccess {
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct EventSummary: Codable { var title: String; var start: String; var end: String; var calendar: String; var location: String?; var isAllDay: Bool }
+    struct EventSummary: Codable { var eventIdentifier: String; var title: String; var start: String; var end: String; var calendar: String; var location: String?; var isAllDay: Bool }
     static func upcomingEvents(days: Int) -> [EventSummary]
     struct AddEventResult { var success: Bool; var error: String? }
     static func addEvent(title: String, start: Date, end: Date) -> AddEventResult
+    struct MutateEventResult { var success: Bool; var error: String? }
+    // nil parameters leave that field unchanged
+    static func updateEvent(identifier: String, title: String?, start: Date?, end: Date?) -> MutateEventResult
+    static func deleteEvent(identifier: String) -> MutateEventResult
 }
 
 // RemindersAccess — same shape as CalendarAccess, also backed by EventKit (EKEventStore
@@ -806,10 +835,14 @@ enum RemindersAccess {
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct ReminderSummary: Codable, Sendable { var title: String; var dueDate: String?; var list: String; var isCompleted: Bool; var priority: Int }
+    struct ReminderSummary: Codable, Sendable { var calendarItemIdentifier: String; var title: String; var dueDate: String?; var list: String; var isCompleted: Bool; var priority: Int }
     static func upcomingReminders(days: Int) async -> [ReminderSummary]
     struct AddReminderResult { var success: Bool; var error: String? }
     static func addReminder(title: String, dueDateComponents: DateComponents?) -> AddReminderResult
+    struct MutateReminderResult { var success: Bool; var error: String? }
+    // nil parameters leave that field unchanged
+    static func updateReminder(identifier: String, title: String?, dueDateComponents: DateComponents?, isCompleted: Bool?) -> MutateReminderResult
+    static func deleteReminder(identifier: String) -> MutateReminderResult
 }
 
 // ContactsAccess
@@ -820,9 +853,14 @@ enum ContactsAccess {
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct ContactSummary: Codable { var name: String; var organization: String?; var phoneNumbers: [String]; var emails: [String] }
+    struct ContactSummary: Codable { var identifier: String; var name: String; var organization: String?; var phoneNumbers: [String]; var emails: [String] }
     static func search(query: String, limit: Int) -> [ContactSummary]
     static func list(limit: Int) -> [ContactSummary]
+    struct MutateContactResult { var success: Bool; var error: String? }
+    static func addContact(givenName: String, familyName: String, organization: String?, phoneNumbers: [String], emails: [String]) -> MutateContactResult
+    // nil parameters leave that field unchanged; non-nil phoneNumbers/emails replace the contact's entire existing list
+    static func updateContact(identifier: String, givenName: String?, familyName: String?, organization: String?, phoneNumbers: [String]?, emails: [String]?) -> MutateContactResult
+    static func deleteContact(identifier: String) -> MutateContactResult
 }
 
 // LocationAccess — a class (LocationAccess.shared), not a static enum, since it holds
