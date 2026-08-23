@@ -486,15 +486,37 @@ let contacts = ContactsAccess.search(query: "Jane", limit: 10)
 let location = await LocationAccess.shared.currentLocation()
 ```
 
-**Calendar and Reminders also have write methods**: `CalendarAccess.addEvent(title:start:end:)` /
-`.updateEvent(identifier:title:start:end:)` / `.deleteEvent(identifier:)`, and the equivalent
-`RemindersAccess.addReminder`/`.updateReminder`/`.deleteReminder` (the last also takes
-`isCompleted:` for marking a reminder done/not done). Contacts has the same three:
-`ContactsAccess.addContact`/`.updateContact`/`.deleteContact` — `phoneNumbers`/`emails` on
-`updateContact`, when provided, replace that contact's entire existing list rather than adding to
-it. `EventSummary`/`ReminderSummary`/`ContactSummary` each carry a stable identifier
-(`eventIdentifier`/`calendarItemIdentifier`/`identifier`) specifically so a read result can be
-passed straight into the matching `update*`/`delete*` call. Full signatures are in §12 below.
+**Calendar, Reminders, and Contacts also have write methods.** `CalendarAccess.addEvent(title:
+start:end:)` creates a new event; `.updateEvent`/`.deleteEvent` locate an *existing* one by its
+exact title plus the day it's currently on — not an identifier. `RemindersAccess.addReminder`
+creates a new reminder; `.updateReminder`/`.deleteReminder` (both `async`) locate an existing one
+by title, with an optional current due date to disambiguate reminders sharing a title (a reminder
+may have no due date at all, unlike an event's date, which is required). `ContactsAccess.
+addContact` creates a new contact; `.updateContact`/`.deleteContact` locate an existing one by
+given name, with an optional current family name to disambiguate. `newPhoneNumbers`/`newEmails`
+on `updateContact`, when provided, replace that contact's entire existing list rather than adding
+to it. Full signatures are in §12 below.
+
+**Why name-based lookup, not an identifier** (`EventSummary`/`ReminderSummary`/`ContactSummary`
+still carry `eventIdentifier`/`calendarItemIdentifier`/`identifier` for any consumer that wants
+the raw token, but `update*`/`delete*` no longer take it): two real problems with identifier-based
+lookup, found the hard way. Some calendar backends (Exchange/Outlook-synced calendars especially)
+return identifiers long enough to meaningfully bloat an LLM's context just by appearing in a
+listing; and, separately, a small on-device model calling these as tools proved unreliable at
+faithfully copying an opaque identifier string across two tool calls. Locating by the same
+title/name a person actually thinks in terms of fixed both. The one honest cost: for Contacts,
+name collisions are common enough in a real address book that the "found more than one match"
+error fires more often than it would for Calendar/Reminders (same-titled events on the same day
+are rare) — an accepted tradeoff, not a bug; the error tells the caller to add a family name or
+search first.
+
+**If you're building your own model-callable tools on Core**, carry forward one naming lesson:
+keep lookup parameters (`onDate`, `dueDate`, `familyName`, …) and change parameters
+(`newDate`, `newTime`, `newFamilyName`, …) under clearly distinct names — never a bare
+`date`/`familyName` serving double duty as both "search by" and "change to." A bare shared name
+was tried first here and shipped a real bug: asked to "change the date," the model put the *new*
+date into the field literally named `date` instead of a separate change field, so the lookup
+searched on the wrong date and failed.
 
 **There is no built-in gate on any of this beyond the TCC grant itself.** Unlike LocalLM Lab the
 product, which has its own app-specific "Full Access" toggle deciding whether a given session
@@ -810,7 +832,7 @@ enum Connectors {
 
 // CalendarAccess
 enum CalendarAccess {
-    static let store: EKEventStore  // the raw EventKit store, for anything the wrapper below doesn't cover
+    static var store: EKEventStore { get }  // raw EventKit store, for anything the wrapper below doesn't cover; refreshed internally after a fresh grant
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -821,15 +843,15 @@ enum CalendarAccess {
     struct AddEventResult { var success: Bool; var error: String? }
     static func addEvent(title: String, start: Date, end: Date) -> AddEventResult
     struct MutateEventResult { var success: Bool; var error: String? }
-    // nil parameters leave that field unchanged
-    static func updateEvent(identifier: String, title: String?, start: Date?, end: Date?) -> MutateEventResult
-    static func deleteEvent(identifier: String) -> MutateEventResult
+    // locates the event by title + the day it's currently on, not eventIdentifier; nil new* parameters leave that field unchanged
+    static func updateEvent(title: String, onDate: DateComponents, newTitle: String?, newDate: DateComponents?, newTime: DateComponents?, durationMinutes: Int?) -> MutateEventResult
+    static func deleteEvent(title: String, onDate: DateComponents) -> MutateEventResult
 }
 
 // RemindersAccess — same shape as CalendarAccess, also backed by EventKit (EKEventStore
 // handles both calendar events and reminders)
 enum RemindersAccess {
-    static let store: EKEventStore
+    static var store: EKEventStore { get }
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -840,27 +862,27 @@ enum RemindersAccess {
     struct AddReminderResult { var success: Bool; var error: String? }
     static func addReminder(title: String, dueDateComponents: DateComponents?) -> AddReminderResult
     struct MutateReminderResult { var success: Bool; var error: String? }
-    // nil parameters leave that field unchanged
-    static func updateReminder(identifier: String, title: String?, dueDateComponents: DateComponents?, isCompleted: Bool?) -> MutateReminderResult
-    static func deleteReminder(identifier: String) -> MutateReminderResult
+    // locates the reminder by title, optionally narrowed by its current due date; nil new* parameters leave that field unchanged
+    static func updateReminder(title: String, dueDate: DateComponents?, newTitle: String?, newDate: DateComponents?, newTime: DateComponents?, isCompleted: Bool?) async -> MutateReminderResult
+    static func deleteReminder(title: String, dueDate: DateComponents?) async -> MutateReminderResult
 }
 
 // ContactsAccess
 enum ContactsAccess {
-    static let store: CNContactStore  // the raw Contacts store, for anything the wrapper below doesn't cover
+    static var store: CNContactStore { get }  // raw Contacts store, for anything the wrapper below doesn't cover; refreshed internally after a fresh grant
     static var authorizationStatus: CNAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct ContactSummary: Codable { var identifier: String; var name: String; var organization: String?; var phoneNumbers: [String]; var emails: [String] }
+    struct ContactSummary: Codable { var identifier: String; var name: String; var givenName: String; var familyName: String?; var organization: String?; var phoneNumbers: [String]; var emails: [String] }
     static func search(query: String, limit: Int) -> [ContactSummary]
     static func list(limit: Int) -> [ContactSummary]
     struct MutateContactResult { var success: Bool; var error: String? }
     static func addContact(givenName: String, familyName: String, organization: String?, phoneNumbers: [String], emails: [String]) -> MutateContactResult
-    // nil parameters leave that field unchanged; non-nil phoneNumbers/emails replace the contact's entire existing list
-    static func updateContact(identifier: String, givenName: String?, familyName: String?, organization: String?, phoneNumbers: [String]?, emails: [String]?) -> MutateContactResult
-    static func deleteContact(identifier: String) -> MutateContactResult
+    // locates the contact by givenName, optionally narrowed by its current familyName; nil new* parameters leave that field unchanged, non-nil newPhoneNumbers/newEmails replace the contact's entire existing list
+    static func updateContact(givenName: String, familyName: String?, newGivenName: String?, newFamilyName: String?, newOrganization: String?, newPhoneNumbers: [String]?, newEmails: [String]?) -> MutateContactResult
+    static func deleteContact(givenName: String, familyName: String?) -> MutateContactResult
 }
 
 // LocationAccess — a class (LocationAccess.shared), not a static enum, since it holds
