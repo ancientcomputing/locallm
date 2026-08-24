@@ -8,29 +8,23 @@ what's possible entirely on-device.
 
 Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled.
 
-## Before you build: this needs an SDK version that isn't released yet
+## Requires SDK 0.8.0+
 
 Same situation as `plate-today-tools`/`repo-qa`, same reason: this app's whole point is
-`WorkspaceAccess`/`WorkspaceTools`, which postdates the latest published release (`0.7.1`).
-Building against `0.7.0`/`0.7.1` **fails to compile** —
-`cannot find 'ListWorkspaceFilesTool' in scope` — not "runs with less functionality." Published
-now so the source is readable and diffable immediately; once a release containing
-`WorkspaceAccess.swift`/`WorkspaceTools.swift` ships, add its entry to `Package.swift`'s
-`knownSDKReleases` and this builds like any other example. Until then, clone
-[`locallmlab-sdk`](https://github.com/ancientcomputing/locallmlab-sdk) privately and build
-`examples/workspace-buddy` there against Core as a source dependency instead — that's how this
-example was actually verified live.
+`WorkspaceAccess`/`WorkspaceTools`, which shipped starting with `0.8.0`. Building against
+`0.7.0`/`0.7.1` **fails to compile** — `cannot find 'ListWorkspaceFilesTool' in scope` — not
+"runs with less functionality."
 
 ## Getting the SDK
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.1 swift build
+LOCALLM_SDK_VERSION=0.8.0 swift build
 ```
 
 ## Real build: `packaging/build-and-sign.sh`
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.1 \
+LOCALLM_SDK_VERSION=0.8.0 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh

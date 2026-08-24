@@ -8,15 +8,11 @@ import PackageDescription
 // which depends on Core directly — see plate-today's Package.swift for the fuller explanation of
 // that one real difference the copy process accounts for.
 //
-// IMPORTANT: this example needs an SDK release that includes CalendarTools.swift/
-// RemindersTools.swift/ContactsTools.swift/LocationTools.swift/MCPToolAdapter.swift (the
-// ready-made FoundationModels Tools — see docs/sdk-guide.md §7a). As of this writing the latest
-// published release is 0.7.1, which predates those files — building against 0.7.0 or 0.7.1 will
-// fail to compile (`cannot find 'GetUpcomingEventsTool' in scope`, etc.), not run with reduced
-// functionality. This file is published now, ahead of a release that actually contains the new
-// Tools, so the source is available to read and diff against plate-today immediately; add the new
-// version's entry to knownSDKReleases below once it ships, and this will build like any other
-// example.
+// Requires an SDK release that includes CalendarTools.swift/RemindersTools.swift/
+// ContactsTools.swift/LocationTools.swift/MCPToolAdapter.swift (the ready-made FoundationModels
+// Tools — see docs/sdk-guide.md §7a) — that's 0.8.0 and later. Building against 0.7.0/0.7.1 fails
+// to compile (`cannot find 'GetUpcomingEventsTool' in scope`, etc.), not run with reduced
+// functionality, since those versions predate the files this app depends on.
 
 struct SDKRelease {
     let url: String
@@ -47,11 +43,10 @@ guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK
     failManifest("""
     error: LOCALLM_SDK_VERSION is not set.
     Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.7.0 swift build
+        LOCALLM_SDK_VERSION=0.8.0 swift build
     Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    NOTE: this example needs a release that includes CalendarTools/RemindersTools/ContactsTools/
-    LocationTools/MCPToolAdapter (docs/sdk-guide.md §7a) — none of the versions above have those
-    yet. It will fail to compile until a newer release is added to this file's knownSDKReleases.
+    NOTE: this example needs 0.8.0 or later — it depends on CalendarTools/RemindersTools/
+    ContactsTools/LocationTools/MCPToolAdapter (docs/sdk-guide.md §7a), which 0.7.0/0.7.1 predate.
     """)
 }
 

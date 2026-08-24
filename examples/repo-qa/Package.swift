@@ -7,14 +7,12 @@ import PackageDescription
 // (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift
 // for the fuller explanation of that one real difference the copy process accounts for.
 //
-// Same version gap as plate-today-tools, same reason: this app's whole point is MCPTool
-// (MCPToolAdapter.swift), which — like the ready-made connector Tools — postdates the latest
-// published release (0.7.1). Building against a version below fails to compile
-// (`cannot find 'MCPTool' in scope`), not run with reduced functionality. Published now so the
-// source is readable immediately; add a newer release's entry to knownSDKReleases below once one
-// exists and this builds like any other example. MCPServerManager/MCPToolDescriptor themselves
-// (used to connect and list tools) have been in Core since before this gap and work fine already —
-// it's specifically the MCPTool wrapper that's missing from 0.7.0/0.7.1.
+// This app's whole point is MCPTool (MCPToolAdapter.swift), which — like the ready-made
+// connector Tools — shipped starting with 0.8.0. Building against 0.7.0/0.7.1 fails to compile
+// (`cannot find 'MCPTool' in scope`), not run with reduced functionality.
+// MCPServerManager/MCPToolDescriptor themselves (used to connect and list tools) have been in
+// Core since before 0.8.0 and work fine on 0.7.x too — it's specifically the MCPTool wrapper
+// that needs 0.8.0+.
 
 struct SDKRelease {
     let url: String
@@ -45,11 +43,10 @@ guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK
     failManifest("""
     error: LOCALLM_SDK_VERSION is not set.
     Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.7.1 swift build
+        LOCALLM_SDK_VERSION=0.8.0 swift build
     Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    NOTE: this example needs a release that includes MCPToolAdapter's MCPTool
-    (docs/sdk-guide.md §7a) — none of the versions above have it yet. It will fail to compile
-    until a newer release is added to this file's knownSDKReleases.
+    NOTE: this example needs 0.8.0 or later — it depends on MCPToolAdapter's MCPTool
+    (docs/sdk-guide.md §7a), which 0.7.0/0.7.1 predate.
     """)
 }
 

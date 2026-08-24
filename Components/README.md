@@ -26,7 +26,7 @@ This is a library, not an app — there's nothing to sign or package, just `swif
 test`. `Package.swift` requires an explicit SDK version, same as the example apps:
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 swift build
+LOCALLM_SDK_VERSION=0.8.0 swift build
 ```
 
 Omitting it, or setting an unknown version, fails fast with a clear error listing the versions

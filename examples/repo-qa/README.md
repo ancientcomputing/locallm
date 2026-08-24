@@ -31,22 +31,16 @@ comment in `Sources/RepoQA/main.swift` for the full writeup.
 
 Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled.
 
-## Before you build: this needs an SDK version that isn't released yet
+## Requires SDK 0.8.0+
 
 Same situation as `plate-today-tools`, same reason: this app's entire point is `MCPTool`
-(`MCPToolAdapter.swift`), which postdates the latest published release (`0.7.1`). Building against
-`0.7.0`/`0.7.1` fails to compile — `cannot find 'MCPTool' in scope` — not "runs with less
-functionality." Published now so the source is readable and diffable immediately; once a release
-containing `MCPToolAdapter.swift` ships, add its entry to `Package.swift`'s `knownSDKReleases` and
-this builds like any other example. Until then, clone
-[`locallmlab-sdk`](https://github.com/ancientcomputing/locallmlab-sdk) privately and build
-`examples/repo-qa` there against Core as a source dependency instead — that's exactly how this
-example was actually verified live (see below).
+(`MCPToolAdapter.swift`), which shipped starting with `0.8.0`. Building against `0.7.0`/`0.7.1`
+fails to compile — `cannot find 'MCPTool' in scope` — not "runs with less functionality."
 
 ## Getting the SDK
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.1 swift build
+LOCALLM_SDK_VERSION=0.8.0 swift build
 ```
 
 Same `LOCALLM_SDK_VERSION` mechanism as the other examples — omitting it, or requesting an unknown
@@ -58,8 +52,8 @@ No `build-and-sign.sh` step needed — a bare `swift run` is the real, intended 
 not just a fast dev-loop shortcut like it is for `plate-today`/`plate-today-tools`:
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.1 swift run RepoQA anthropics/claude-code "What is the plugin system?"
-LOCALLM_SDK_VERSION=0.7.1 swift run RepoQA facebook/react   # no question: defaults to "what does this repo do?"
+LOCALLM_SDK_VERSION=0.8.0 swift run RepoQA anthropics/claude-code "What is the plugin system?"
+LOCALLM_SDK_VERSION=0.8.0 swift run RepoQA facebook/react   # no question: defaults to "what does this repo do?"
 ```
 
 ## Verified live

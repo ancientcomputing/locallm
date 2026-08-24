@@ -13,21 +13,17 @@ including the annotated walkthrough in
 
 Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled.
 
-## Before you build: this needs an SDK version that isn't released yet
+## Requires SDK 0.8.0+
 
 `GetUpcomingEventsTool`/`RemindersTools`/`ContactsTools`/`LocationTools`/`MCPToolAdapter` shipped
-in Core after the latest published release (`0.7.1`). Building this example against `0.7.0` or
-`0.7.1` **fails to compile** — `cannot find 'GetUpcomingEventsTool' in scope` — not "runs with less
-functionality." This source is published now so it's readable and diffable immediately; once a
-release containing those files ships, add its entry to `Package.swift`'s `knownSDKReleases` and
-this builds like any other example. Until then, use it to read the code, not to run it — or clone
-[`locallmlab-sdk`](https://github.com/ancientcomputing/locallmlab-sdk) privately and build
-`examples/plate-today-tools` there against Core as a source dependency instead.
+in Core starting with `0.8.0` — building this example against `0.7.0`/`0.7.1` fails to compile
+(`cannot find 'GetUpcomingEventsTool' in scope`), not "runs with less functionality." `0.8.0` and
+later are fine.
 
 ## Getting the SDK
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.1 swift build
+LOCALLM_SDK_VERSION=0.8.0 swift build
 ```
 
 Same `LOCALLM_SDK_VERSION` mechanism as `plate-today` — see that example's README for the general
@@ -40,7 +36,7 @@ Same script shape as `plate-today`'s — Calendar/Reminders TCC prompts and the 
 both require a properly signed `.app`, not a bare `swift build` binary.
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.1 \
+LOCALLM_SDK_VERSION=0.8.0 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh

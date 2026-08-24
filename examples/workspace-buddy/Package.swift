@@ -7,12 +7,10 @@ import PackageDescription
 // (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift
 // for the fuller explanation of that one real difference the copy process accounts for.
 //
-// Same version gap as plate-today-tools/repo-qa, same reason: this app's whole point is
-// WorkspaceAccess/WorkspaceTools (docs/sdk-guide.md §8a), which postdates the latest published
-// release (0.7.1). Building against a version below fails to compile
-// (`cannot find 'ListWorkspaceFilesTool' in scope`), not run with reduced functionality.
-// Published now so the source is readable immediately; add a newer release's entry to
-// knownSDKReleases below once one exists and this builds like any other example.
+// Same as plate-today-tools/repo-qa, same reason: this app's whole point is
+// WorkspaceAccess/WorkspaceTools (docs/sdk-guide.md §8a), which shipped starting with 0.8.0.
+// Building against 0.7.0/0.7.1 fails to compile (`cannot find 'ListWorkspaceFilesTool' in
+// scope`), not run with reduced functionality.
 
 struct SDKRelease {
     let url: String
@@ -43,11 +41,10 @@ guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK
     failManifest("""
     error: LOCALLM_SDK_VERSION is not set.
     Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.7.1 swift build
+        LOCALLM_SDK_VERSION=0.8.0 swift build
     Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    NOTE: this example needs a release that includes WorkspaceAccess/WorkspaceTools
-    (docs/sdk-guide.md §8a) — none of the versions above have them yet. It will fail to compile
-    until a newer release is added to this file's knownSDKReleases.
+    NOTE: this example needs 0.8.0 or later — it depends on WorkspaceAccess/WorkspaceTools
+    (docs/sdk-guide.md §8a), which 0.7.0/0.7.1 predate.
     """)
 }
 

@@ -18,7 +18,7 @@ Nothing to download or unzip by hand — `Package.swift` requires an explicit `L
 and resolves `LocalLMLabSDKCore` as a binary dependency from there:
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 swift build
+LOCALLM_SDK_VERSION=0.8.0 swift build
 ```
 
 Omitting it, or setting an unknown version, fails fast with a clear error listing the versions
@@ -27,7 +27,7 @@ this copy knows about — see `Package.swift` itself for the current table.
 ## Quick dev-loop run (no signing, no TCC/OAuth)
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 swift run
+LOCALLM_SDK_VERSION=0.8.0 swift run
 ```
 
 Fast, but **cannot** get real Calendar/Reminders access (no code signing means TCC denies bare CLI
@@ -41,7 +41,7 @@ The only way to actually exercise the Calendar/Reminders TCC prompts or the Todo
 both require a properly signed `.app` with entitlements and Info.plist usage-description keys.
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 \
+LOCALLM_SDK_VERSION=0.8.0 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -70,7 +70,7 @@ exact pipeline has been run for real: Transporter accepted the upload and the bu
 internal TestFlight testing.
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 VERSION=0.7.0 ./packaging/build-and-sign-mas.sh
+LOCALLM_SDK_VERSION=0.8.0 VERSION=0.8.0 ./packaging/build-and-sign-mas.sh
 ```
 
 `APP_SIGN_IDENTITY` (an "Apple Distribution" identity), `INSTALLER_SIGN_IDENTITY` (a "3rd Party
