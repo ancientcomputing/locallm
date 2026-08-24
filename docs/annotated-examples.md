@@ -17,7 +17,9 @@ companion "show me the whole thing at once" reference.
 ## `examples/plate-today/Sources/PlateToday/PlateTodayApp.swift`
 
 Demonstrates `Core` directly: Calendar/Reminders connectors, the MCP client, Keychain-backed OAuth
-— no `Components` involved.
+— no `Components` involved. This is "Path B" — a hand-written `Tool` adapter per connector; see
+[`plate-today-tools`](#examplesplate-today-toolssourcesplatetodaytoolsplatetodaytoolsappswift)
+below for the same app rebuilt on Core's ready-made "Path A" `Tool`s instead.
 
 ```swift
 // "What's on my plate today" — v1: Todoist (via Core's MCP client) + Calendar + Reminders (also
