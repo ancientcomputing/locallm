@@ -6,7 +6,8 @@ tool-calling — system connectors (Calendar, Reminders, Contacts, Location), an
 exercised against real signed apps and real live MCP servers, not just written from the API
 surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
 [`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
-ready-made Tools instead of hand-written ones, see §7a) and
+ready-made Tools instead of hand-written ones, see §7a), [`examples/repo-qa`](../examples/repo-qa)
+(a minimal command-line `MCPTool` example against a no-auth server), and
 [`examples/components-demo`](../examples/components-demo) for the working reference apps this
 guide is drawn from.
 

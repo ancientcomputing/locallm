@@ -5,7 +5,9 @@ The full source of every reference app, with every line that actually touches th
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
-read back to back; see §7a of `sdk-guide.md` for the framing.
+read back to back; see §7a of `sdk-guide.md` for the framing. `repo-qa` is Path A again, but on
+its own, smaller and differently-shaped: a plain CLI tool showing `MCPTool` against a no-auth
+server, distinct from `plate-today-tools`' OAuth-gated Todoist case.
 
 (GitHub-flavored Markdown doesn't apply bold/inline formatting inside fenced code blocks, so a
 trailing comment is used instead of `**bold**` — it survives being read as a comment in the real
@@ -493,6 +495,101 @@ Location/Contacts is gone, replaced by a single `Core` type each. The MCP integr
 same line count either way (`MCPTool(descriptor:manager:)` vs. a hand-written `TodoistTasksTool`
 struct), but trades pinned arguments for a raw, server-defined tool surface — see the
 `buildTodoistTool()` comment above.
+
+## `examples/repo-qa/Sources/RepoQA/main.swift`
+
+A third, deliberately different shape: a plain command-line tool, not a signed GUI `.app` — MCP
+touches nothing TCC-gated, so there's no permission prompt to need a real bundle for. Builds an
+`MCPTool` for every tool a server offers, in a loop, entirely from that server's own live schema.
+
+```swift
+// Repo Q&A — a third reference app, deliberately different in shape from plate-today/
+// plate-today-tools: a plain command-line tool, not a signed GUI .app. MCP network calls need no
+// macOS permission, so a bare `swift run` binary works end to end.
+//
+// Narrative: ask a free-form question about any public GitHub repository's own documentation,
+// answered by Apple's on-device model calling Deepwiki's real hosted MCP server, no auth, no API
+// key — MCPTool built at runtime directly from Deepwiki's own JSON Schema, no hand-written
+// Arguments struct for any of its three tools.
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+
+@available(macOS 26.0, *)
+@MainActor
+func run() async {
+    let arguments = CommandLine.arguments.dropFirst()
+    guard let repoName = arguments.first, !repoName.isEmpty else {
+        FileHandle.standardError.write(Data("usage: swift run RepoQA <owner/repo> [question]\n".utf8))
+        exit(1)
+    }
+    let question = arguments.dropFirst().joined(separator: " ")
+    let effectiveQuestion = question.isEmpty ? "What does this repository do, in a couple sentences?" : question
+
+    let model = SystemLanguageModel.default
+    guard case .available = model.availability else {
+        print("On-device model unavailable: \(model.availability)")
+        return
+    }
+
+    // No requestAccess() call anywhere in this file — MCP is the one connector type that was
+    // never TCC-gated, so there's no permission step to request before connecting. Contrast with
+    // plate-today-tools' requestConnectorAccess(), needed there specifically because Calendar/
+    // Reminders are gated and this file's equivalent tools aren't.
+    let manager = MCPServerManager()                                  // ← SDK
+    let connectResult = await manager.addServer(                      // ← SDK
+        url: URL(string: "https://mcp.deepwiki.com/mcp")!,
+        displayName: "Deepwiki"
+    )
+    guard case .success(let state) = connectResult else {
+        print("Could not connect to Deepwiki: \(connectResult)")
+        return
+    }
+
+    // Builds a Tool for every tool Deepwiki actually offers, from its own live schema — nothing
+    // here names "ask_question" specifically, or knows its argument shapes in advance. A tool
+    // whose schema doesn't build (MCPTool's init throws) is skipped rather than aborting the
+    // whole run.
+    var tools: [any Tool] = []
+    for descriptor in state.tools {
+        do {
+            tools.append(try MCPTool(descriptor: descriptor, manager: manager))  // ← SDK (Path A)
+        } catch {
+            print("Skipping \(descriptor.name): \(error)")
+        }
+    }
+    guard !tools.isEmpty else {
+        print("Deepwiki didn't offer any usable tools.")
+        return
+    }
+
+    let session = LanguageModelSession(tools: tools) {
+        "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
+    }
+
+    let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
+    do {
+        let response = try await session.respond(to: prompt)
+        print(response.content)
+    } catch {
+        print("Error: \(await GenerationErrorDescription.describe(error))")  // ← SDK
+    }
+}
+
+if #available(macOS 26.0, *) {
+    await run()
+} else {
+    print("Requires macOS 26 or later.")
+}
+```
+
+**Tally**: of ~70 lines of actual code, five touch the SDK — this is the entire surface area
+needed to go from nothing to "the on-device model calling a real, remote MCP tool it's never seen
+before." No `Arguments` struct, no `Tool`-conforming type of this app's own — `ask_question`'s
+real schema (including a `repoName: string | string[]` union JSON Schema doesn't have a single
+Swift equivalent for) converts automatically, degrading the union to a plain string leaf per
+`MCPToolAdapter`'s documented behavior for constructs past the common case.
 
 ## `examples/components-demo/Sources/ComponentsDemo/ComponentsDemoApp.swift`
 
