@@ -1014,6 +1014,144 @@ final class LocationAccess {
 }
 ```
 
+### Ready-made connector Tools (Path A)
+
+Thin `Tool`-conforming wrappers around the connectors above — see §7a for the framing. Each takes
+an optional custom `description` at init, same pattern as `ClockTool`/`WeatherTool` below.
+
+```swift
+// Calendar
+struct GetUpcomingEventsTool: Tool {
+    let name = "getUpcomingEvents"
+    init(description: String? = nil)
+    struct Arguments { var days: Int? }             // defaults to 7, capped at 30
+}
+struct AddCalendarEventTool: Tool {
+    let name = "addCalendarEvent"
+    init(description: String? = nil)
+    struct Arguments { var title: String; var date: String; var time: String; var durationMinutes: Int? }
+}
+struct UpdateCalendarEventTool: Tool {
+    let name = "updateCalendarEvent"
+    init(description: String? = nil)
+    // currentDate locates the event; each new* field is independently optional
+    struct Arguments { var title: String; var currentDate: String; var newTitle: String?; var newDate: String?; var newTime: String?; var durationMinutes: Int? }
+}
+struct DeleteCalendarEventTool: Tool {
+    let name = "deleteCalendarEvent"
+    init(description: String? = nil)
+    struct Arguments { var title: String; var currentDate: String }
+}
+
+// Reminders — same title/currentDate/new* shape as Calendar; currentDate is optional here
+// (a reminder may have no due date, unlike a Calendar event)
+struct GetUpcomingRemindersTool: Tool {
+    let name = "getUpcomingReminders"
+    init(description: String? = nil)
+    struct Arguments { var days: Int? }
+}
+struct AddReminderTool: Tool {
+    let name = "addReminder"
+    init(description: String? = nil)
+    struct Arguments { var title: String; var date: String?; var time: String? }
+}
+struct UpdateReminderTool: Tool {
+    let name = "updateReminder"
+    init(description: String? = nil)
+    struct Arguments { var title: String; var currentDate: String?; var newTitle: String?; var newDate: String?; var newTime: String?; var isCompleted: Bool? }
+}
+struct DeleteReminderTool: Tool {
+    let name = "deleteReminder"
+    init(description: String? = nil)
+    struct Arguments { var title: String; var currentDate: String? }
+}
+
+// Contacts — currentGivenName/currentFamilyName locate the contact; each new* field is
+// independently optional. newPhoneNumbers/newEmails, when provided, replace the entire list.
+struct SearchContactsTool: Tool {
+    let name = "searchContacts"
+    init(description: String? = nil)
+    struct Arguments { var query: String; var limit: Int? }  // defaults to 10, capped at 50
+}
+struct ListContactsTool: Tool {
+    let name = "listContacts"
+    init(description: String? = nil)
+    struct Arguments { var limit: Int? }                     // defaults to 50, capped at 200
+}
+struct AddContactTool: Tool {
+    let name = "addContact"
+    init(description: String? = nil)
+    struct Arguments { var givenName: String; var familyName: String?; var organization: String?; var phoneNumbers: [String]?; var emails: [String]? }
+}
+struct UpdateContactTool: Tool {
+    let name = "updateContact"
+    init(description: String? = nil)
+    struct Arguments { var currentGivenName: String; var currentFamilyName: String?; var newGivenName: String?; var newFamilyName: String?; var newOrganization: String?; var newPhoneNumbers: [String]?; var newEmails: [String]? }
+}
+struct DeleteContactTool: Tool {
+    let name = "deleteContact"
+    init(description: String? = nil)
+    struct Arguments { var currentGivenName: String; var currentFamilyName: String? }
+}
+
+// Location — the one connector Tool with no writable counterpart
+struct GetCurrentLocationTool: Tool {
+    let name = "getCurrentLocation"
+    init(description: String? = nil)
+    struct Arguments {}
+}
+```
+
+### Filesystem workspace (`WorkspaceAccess`/`WorkspaceTools`)
+
+Not a connector — no `requestAccess()`, no OS permission dialog. Operates on a root `URL` your
+app already resolved via a security-scoped bookmark (§8); the picker itself is the one-time
+consent. `WorkspaceAccess` is the raw data layer; `WorkspaceTools` are the matching Path A `Tool`s,
+each taking the resolved root `URL` at init.
+
+```swift
+enum WorkspaceAccess {
+    struct WorkspaceError: Error { var message: String }
+    struct WorkspaceEntry: Codable, Sendable { var name: String; var isDirectory: Bool; var modifiedDate: Date?; var size: Int? }
+
+    static func listFiles(in root: URL, subpath: String?) -> Result<[WorkspaceEntry], WorkspaceError>
+    static func readFile(in root: URL, path: String) -> Result<String, WorkspaceError>
+    // create-only — fails if the file already exists; use editFile to modify an existing one
+    static func writeFile(in root: URL, path: String, contents: String) -> Result<Void, WorkspaceError>
+    // search-and-replace, not a unified-diff format — oldString must match exactly once unless replaceAll
+    static func editFile(in root: URL, path: String, oldString: String, newString: String, replaceAll: Bool) -> Result<Void, WorkspaceError>
+    static func deleteFile(in root: URL, path: String) -> Result<Void, WorkspaceError>
+}
+
+struct ListWorkspaceFilesTool: Tool {
+    let name = "listWorkspaceFiles"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String? }
+}
+struct ReadWorkspaceFileTool: Tool {
+    let name = "readWorkspaceFile"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String }
+}
+struct WriteWorkspaceFileTool: Tool {
+    let name = "writeWorkspaceFile"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String; var contents: String }
+}
+struct EditWorkspaceFileTool: Tool {
+    let name = "editWorkspaceFile"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String; var oldString: String; var newString: String; var replaceAll: Bool? }
+}
+// Not included in workspace-buddy's default tool list — see that example's README. Available
+// here for a host app that explicitly wants a delete-capable coding assistant.
+struct DeleteWorkspaceFileTool: Tool {
+    let name = "deleteWorkspaceFile"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String }
+}
+```
+
 ### No-permission tools
 
 ```swift
@@ -1174,6 +1312,36 @@ final class MCPOAuthRedirectListener {
 internally (`initialize()`, `listTools()`, `callTool(name:arguments:)`, resource/prompt
 equivalents, `close()`). You won't need this unless you're replacing the transport layer itself —
 everything above already goes through it for you.
+
+### `MCPTool` (Path A for MCP)
+
+Builds a `Tool` at runtime directly from an `MCPToolDescriptor`'s real JSON Schema — no
+hand-written `Arguments` struct. `Arguments` is `GeneratedContent` (not a static type), and
+`parameters` is computed from the tool's schema rather than derived from `Arguments` the usual
+way. The initializer is throwing — a tool whose schema doesn't build should be skipped, not let
+crash your whole tool list; see §7a for the recommended loop shape.
+
+```swift
+struct MCPTool: Tool {
+    let name: String
+    let description: String
+    let parameters: GenerationSchema   // built from descriptor.rawSchema, not from Arguments
+    // Arguments == GeneratedContent
+
+    init(descriptor: MCPToolDescriptor, manager: MCPServerManager) throws
+    func call(arguments: GeneratedContent) async throws -> String
+}
+
+enum MCPToolAdapterError: Error, CustomStringConvertible {
+    case invalidRawSchema           // rawSchema wasn't valid JSON
+    case unbuildableSchema(String)  // FoundationModels rejected the resulting GenerationSchema
+}
+```
+
+Common JSON Schema shapes (object/properties/required, array/items, string/number/integer/
+boolean, string enums) convert cleanly. Anything past that — `oneOf`/`anyOf` unions, `$ref`,
+`const`, regex `pattern` — degrades to a free-form string leaf rather than failing the whole tool,
+since the remote server is still the real source of argument validation.
 
 ### Components (`LocalLMLabSDKComponents`)
 
