@@ -10,7 +10,8 @@
 // Narrative: ask a free-form question about any public GitHub repository's own documentation,
 // answered by Apple's on-device model calling Deepwiki's real hosted MCP server
 // (https://mcp.deepwiki.com/mcp, no auth, no API key) — MCPTool built at runtime directly from
-// Deepwiki's own JSON Schema, no hand-written Arguments struct for any of its three tools.
+// Deepwiki's own JSON Schema, no hand-written Arguments struct for either tool actually offered
+// (see the tool-building loop below for why only two of Deepwiki's three tools are offered).
 //
 //   swift run RepoQA anthropics/claude-code "What is the plugin system?"
 //   swift run RepoQA facebook/react                      # defaults to a general "what is this?" question
@@ -56,15 +57,27 @@ func run() async {
         return
     }
 
-    // Builds a Tool for every tool Deepwiki actually offers, from its own live schema — nothing
-    // here names "ask_question" or "read_wiki_structure" specifically, or knows their argument
-    // shapes in advance. Deepwiki happens to expose three tools today (ask_question,
-    // read_wiki_contents, read_wiki_structure); this loop would adapt to two or ten just as well.
-    // A tool whose schema doesn't build (MCPTool's init throws) is skipped with a warning rather
-    // than aborting the whole run — see docs/sdk-guide.md §7a's note on why that's the right
-    // default for a loop like this.
+    // Builds a Tool for each of Deepwiki's tools from its own live schema — nothing here knows
+    // ask_question's or read_wiki_structure's argument shapes in advance, MCPTool derives both
+    // from the server's real JSON Schema at runtime. One deliberate exclusion, not a schema
+    // failure: read_wiki_contents dumps a repo's ENTIRE wiki, unscoped, no pagination — confirmed
+    // live against anthropics/claude-code at 541,359 characters (~165,000 tokens) for a single
+    // call, ~40x this model's whole 4096-token context window. The on-device model has no way to
+    // know that in advance from the tool's name/description alone, and picked it for a plain
+    // "what is the plugin system?" question in real testing, hard-failing the whole session. This
+    // is exactly the risk docs/sdk-guide.md §3 already warns about ("don't naively pass all of
+    // them into a LanguageModelSession without picking the ones your prompt actually needs") —
+    // MCPTool itself has no way to know a tool's real-world response size from its schema, since
+    // JSON Schema describes shape, not payload size; that judgment call is the integrating app's
+    // to make, same as everywhere else Core hands you a raw capability and leaves the curation to
+    // you. A tool whose schema doesn't build (MCPTool's init throws) is still skipped with a
+    // warning rather than aborting the whole run.
     var tools: [any Tool] = []
     for descriptor in state.tools {
+        guard descriptor.name != "read_wiki_contents" else {
+            print("Skipping \(descriptor.name): excluded by this example — see the comment above.")
+            continue
+        }
         do {
             tools.append(try MCPTool(descriptor: descriptor, manager: manager))
         } catch {

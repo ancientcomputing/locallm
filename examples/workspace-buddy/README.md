@@ -51,7 +51,11 @@ relaunches, and the example wouldn't prove anything about the SDK's real guidanc
 - **Delete is not wired in by default** — `DeleteWorkspaceFileTool` exists in Core, but a coding
   assistant that can delete files unprompted is a meaningfully bigger risk than one that can only
   read/create/edit. Add it to the `tools` array in `WorkspaceBuddyApp.swift` yourself if you want
-  it.
+  it. Asked to delete a file without it, the model correctly refuses — but confirmed live, its
+  stated *reason* can be a little confused (e.g. claiming the file "already exists" as the reason
+  it can't delete it, apparently reaching for `writeWorkspaceFile`'s create-only error since
+  that's the closest tool it actually has). The refusal itself is reliable; don't read too much
+  into its explanation of why.
 - **Single-turn per request** — type a request, get a response, type another. Not a full
   multi-turn chat with conversation history; a straightforward extension if you want one.
 
