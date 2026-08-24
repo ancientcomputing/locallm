@@ -14,6 +14,8 @@ dist/
 .nuget/
 *.iconset/
 examples/plate-today/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
+examples/plate-today-tools/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
+examples/workspace-buddy/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
 examples/components-demo/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
 tmp/
 %SystemDrive%/

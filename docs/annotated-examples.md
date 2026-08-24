@@ -1,8 +1,13 @@
 # Annotated example source
 
-The full source of both reference apps, with every line that actually touches the SDK marked
+The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core) or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
+`plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
+written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
+read back to back; see §7a of `sdk-guide.md` for the framing. `repo-qa` is Path A again, but on
+its own, smaller and differently-shaped: a plain CLI tool showing `MCPTool` against a no-auth
+server, distinct from `plate-today-tools`' OAuth-gated Todoist case.
 
 (GitHub-flavored Markdown doesn't apply bold/inline formatting inside fenced code blocks, so a
 trailing comment is used instead of `**bold**` — it survives being read as a comment in the real
@@ -14,7 +19,9 @@ companion "show me the whole thing at once" reference.
 ## `examples/plate-today/Sources/PlateToday/PlateTodayApp.swift`
 
 Demonstrates `Core` directly: Calendar/Reminders connectors, the MCP client, Keychain-backed OAuth
-— no `Components` involved.
+— no `Components` involved. This is "Path B" — a hand-written `Tool` adapter per connector; see
+[`plate-today-tools`](#examplesplate-today-toolssourcesplatetodaytoolsplatetodaytoolsappswift)
+below for the same app rebuilt on Core's ready-made "Path A" `Tool`s instead.
 
 ```swift
 // "What's on my plate today" — v1: Todoist (via Core's MCP client) + Calendar + Reminders (also
@@ -335,6 +342,406 @@ struct PlateTodayApp: App {
 **Tally**: of ~230 lines of actual code (excluding comments/blank lines), roughly a dozen touch the
 SDK directly — everything else is ordinary SwiftUI state/view code and FoundationModels session
 setup that would look the same regardless of where the tools' data comes from.
+
+## `examples/plate-today-tools/Sources/PlateTodayTools/PlateTodayToolsApp.swift`
+
+The Path A twin of plate-today above — same app, same UI, same connectors, rebuilt on Core's
+ready-made FoundationModels Tools (§7a of `sdk-guide.md`) instead of hand-writing a `Tool` struct
+per connector. Marked the same way, plus `// ← SDK (Path A)` specifically on lines that only exist
+*because* a ready-made Tool replaces what used to be a whole hand-written struct — diff this
+against the section above to see the two approaches side by side.
+
+```swift
+// "What's on my plate today" — Tools edition. The exact same app as examples/plate-today (same
+// UI, same prompt, same connectors), rebuilt on Core's ready-made FoundationModels Tools instead
+// of hand-writing a Tool struct per connector. Diff this file against plate-today's
+// PlateTodayApp.swift to see the "Path A vs Path B" difference described in
+// docs/sdk-guide.md §7a in actual code, not just prose — every place the two files diverge is
+// called out below with a `DIFF FROM plate-today:` comment.
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import SwiftUI
+
+// MARK: - Calendar, Reminders, Location, Contacts tools
+
+// DIFF FROM plate-today: no TodaysEventsTool/TodaysRemindersTool/TodaysLocationTool/
+// SearchContactsTool structs here at all — GetUpcomingEventsTool, GetUpcomingRemindersTool,
+// GetCurrentLocationTool, and SearchContactsTool are Core types, instantiated directly in
+// fetch() below. ~130 fewer lines than the section above, in exchange for one real behavioral
+// difference: these ready-made Tools don't call requestAccess() lazily inside call() the way
+// plate-today's hand-written ones do, so this app requests access up front instead — see
+// requestConnectorAccess() below.
+
+// MARK: - View model driving the launch -> fetch -> show -> Done flow
+
+@available(macOS 26.0, *)
+@MainActor
+final class PlateTodayToolsModel: ObservableObject {
+    enum State {
+        case idle
+        case fetching
+        case ready(String)
+        case failed(String)
+    }
+
+    @Published private(set) var state: State = .idle
+
+    let manager = MCPServerManager()                                  // ← SDK
+    private let todoistURL = URL(string: ProcessInfo.processInfo.environment["TODOIST_MCP_URL"] ?? "https://ai.todoist.net/mcp")!
+
+    func start() {
+        guard case .idle = state else { return }
+        state = .fetching
+        Task { await fetch() }
+    }
+
+    func cleanUpBeforeQuit() {
+        manager.removeServer(MCPServerID(rawValue: todoistURL.absoluteString))  // ← SDK
+    }
+
+    // DIFF FROM plate-today: request access up front, before any Tool exists — Path A's
+    // ready-made Tools need this instead of requesting lazily inside call().
+    private func requestConnectorAccess() async -> String? {
+        let calendarAccess = await CalendarAccess.requestAccess()      // ← SDK
+        guard calendarAccess.granted else { return calendarAccess.error ?? "Calendar access not granted." }
+        let remindersAccess = await RemindersAccess.requestAccess()    // ← SDK
+        guard remindersAccess.granted else { return remindersAccess.error ?? "Reminders access not granted." }
+        #if PLATETODAYTOOLS_INCLUDE_LOCATION_WEATHER
+        let locationAccess = await Connectors.requestAccess(.location) // ← SDK
+        guard locationAccess.granted else { return locationAccess.error ?? "Location access not granted." }
+        #endif
+        #if PLATETODAYTOOLS_INCLUDE_CONTACTS
+        let contactsAccess = await Connectors.requestAccess(.contacts) // ← SDK
+        guard contactsAccess.granted else { return contactsAccess.error ?? "Contacts access not granted." }
+        #endif
+        return nil
+    }
+
+    // DIFF FROM plate-today's TodoistTasksTool: that hand-written tool pinned specific arguments
+    // on every call regardless of what the model asked for, and gave the tool its own curated
+    // name/description independent of the real server. MCPTool exposes the tool exactly as
+    // Todoist's own server defines it — real name, real description, real full argument schema
+    // (built at runtime from the server's JSON Schema) — and leaves every argument up to the
+    // model. A real tradeoff, not just less code: see the prompt below, which now has to ask
+    // explicitly for "excluding anything overdue" to compensate.
+    private func buildTodoistTool() async -> (any Tool)? {
+        let connectResult = await manager.addServer(url: todoistURL, displayName: "Todoist")  // ← SDK
+        guard case .success(let state) = connectResult else { return nil }
+        guard let descriptor = state.tools.first(where: { $0.name == "find-tasks-by-date" }) else { return nil }
+        return try? MCPTool(descriptor: descriptor, manager: manager)  // ← SDK (Path A)
+    }
+
+    private func fetch() async {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else {
+            state = .failed("On-device model unavailable: \(model.availability)")
+            return
+        }
+
+        if let accessError = await requestConnectorAccess() {
+            state = .failed(accessError)
+            return
+        }
+
+        // DIFF FROM plate-today: GetUpcomingEventsTool()/GetUpcomingRemindersTool() straight
+        // from Core, no local struct definitions above to instantiate instead.
+        var tools: [any Tool] = [
+            ClockTool(),                                              // ← SDK
+            GetUpcomingEventsTool(),                                  // ← SDK (Path A)
+            GetUpcomingRemindersTool(),                               // ← SDK (Path A)
+        ]
+        var checks = ["the current time", "calendar events", "reminders"]
+        var summarizeNote = ""
+        #if PLATETODAYTOOLS_INCLUDE_TODOIST
+        if let todoistTool = await buildTodoistTool() {
+            tools.append(todoistTool)
+            checks.append("Todoist tasks due today, excluding anything overdue")
+        }
+        #endif
+        #if PLATETODAYTOOLS_INCLUDE_LOCATION_WEATHER
+        tools.append(GetCurrentLocationTool())                        // ← SDK (Path A)
+        tools.append(WeatherTool())                                   // ← SDK
+        checks.append("the user's current location and today's weather there (getCurrentLocation, then getWeather with that place)")
+        summarizeNote = ", including the weather"
+        #endif
+        #if PLATETODAYTOOLS_INCLUDE_CONTACTS
+        tools.append(SearchContactsTool())                            // ← SDK (Path A)
+        #endif
+        let prompt = """
+        What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
+        friendly, concise way\(summarizeNote).
+        """
+        let session = LanguageModelSession(tools: tools)
+
+        do {
+            let response = try await session.respond(to: prompt)
+            state = .ready(response.content)
+        } catch {
+            state = .failed(await GenerationErrorDescription.describe(error))  // ← SDK
+        }
+    }
+}
+
+// MARK: - UI, AppDelegate, App (identical in shape to plate-today's — nothing here changes
+// between Path A and Path B, only the OAuth URL scheme differs: "platetodaytools" instead of
+// "platetoday", so both apps' OAuth callbacks can coexist on the same Mac)
+```
+
+**Tally**: essentially the same line count as plate-today for UI/plumbing, but roughly 130 fewer
+lines overall — every hand-written `Tool` struct plate-today needed for Calendar/Reminders/
+Location/Contacts is gone, replaced by a single `Core` type each. The MCP integration keeps the
+same line count either way (`MCPTool(descriptor:manager:)` vs. a hand-written `TodoistTasksTool`
+struct), but trades pinned arguments for a raw, server-defined tool surface — see the
+`buildTodoistTool()` comment above.
+
+## `examples/repo-qa/Sources/RepoQA/main.swift`
+
+A third, deliberately different shape: a plain command-line tool, not a signed GUI `.app` — MCP
+touches nothing TCC-gated, so there's no permission prompt to need a real bundle for. Builds an
+`MCPTool` for every tool a server offers, in a loop, entirely from that server's own live schema.
+
+```swift
+// Repo Q&A — a third reference app, deliberately different in shape from plate-today/
+// plate-today-tools: a plain command-line tool, not a signed GUI .app. MCP network calls need no
+// macOS permission, so a bare `swift run` binary works end to end.
+//
+// Narrative: ask a free-form question about any public GitHub repository's own documentation,
+// answered by Apple's on-device model calling Deepwiki's real hosted MCP server, no auth, no API
+// key — MCPTool built at runtime directly from Deepwiki's own JSON Schema, no hand-written
+// Arguments struct for any of its three tools.
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+
+@available(macOS 26.0, *)
+@MainActor
+func run() async {
+    let arguments = CommandLine.arguments.dropFirst()
+    guard let repoName = arguments.first, !repoName.isEmpty else {
+        FileHandle.standardError.write(Data("usage: swift run RepoQA <owner/repo> [question]\n".utf8))
+        exit(1)
+    }
+    let question = arguments.dropFirst().joined(separator: " ")
+    let effectiveQuestion = question.isEmpty ? "What does this repository do, in a couple sentences?" : question
+
+    let model = SystemLanguageModel.default
+    guard case .available = model.availability else {
+        print("On-device model unavailable: \(model.availability)")
+        return
+    }
+
+    // No requestAccess() call anywhere in this file — MCP is the one connector type that was
+    // never TCC-gated, so there's no permission step to request before connecting. Contrast with
+    // plate-today-tools' requestConnectorAccess(), needed there specifically because Calendar/
+    // Reminders are gated and this file's equivalent tools aren't.
+    let manager = MCPServerManager()                                  // ← SDK
+    let connectResult = await manager.addServer(                      // ← SDK
+        url: URL(string: "https://mcp.deepwiki.com/mcp")!,
+        displayName: "Deepwiki"
+    )
+    guard case .success(let state) = connectResult else {
+        print("Could not connect to Deepwiki: \(connectResult)")
+        return
+    }
+
+    // Builds a Tool for every tool Deepwiki actually offers, from its own live schema — nothing
+    // here names "ask_question" specifically, or knows its argument shapes in advance. A tool
+    // whose schema doesn't build (MCPTool's init throws) is skipped rather than aborting the
+    // whole run.
+    var tools: [any Tool] = []
+    for descriptor in state.tools {
+        do {
+            tools.append(try MCPTool(descriptor: descriptor, manager: manager))  // ← SDK (Path A)
+        } catch {
+            print("Skipping \(descriptor.name): \(error)")
+        }
+    }
+    guard !tools.isEmpty else {
+        print("Deepwiki didn't offer any usable tools.")
+        return
+    }
+
+    let session = LanguageModelSession(tools: tools) {
+        "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
+    }
+
+    let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
+    do {
+        let response = try await session.respond(to: prompt)
+        print(response.content)
+    } catch {
+        print("Error: \(await GenerationErrorDescription.describe(error))")  // ← SDK
+    }
+}
+
+if #available(macOS 26.0, *) {
+    await run()
+} else {
+    print("Requires macOS 26 or later.")
+}
+```
+
+**Tally**: of ~70 lines of actual code, five touch the SDK — this is the entire surface area
+needed to go from nothing to "the on-device model calling a real, remote MCP tool it's never seen
+before." No `Arguments` struct, no `Tool`-conforming type of this app's own — `ask_question`'s
+real schema (including a `repoName: string | string[]` union JSON Schema doesn't have a single
+Swift equivalent for) converts automatically, degrading the union to a plain string leaf per
+`MCPToolAdapter`'s documented behavior for constructs past the common case.
+
+## `examples/workspace-buddy/Sources/WorkspaceBuddy/WorkspaceBuddyApp.swift`
+
+A fourth shape again: the first reference app that writes to disk, and the first sandboxed by
+default. Pick a folder, describe a change, the on-device model reads/creates/edits files in it via
+`WorkspaceTools` (Path A). The folder-picker/bookmark code (`FolderAccess`) is §8's own documented
+pattern, extended with one real addition — see the `// ← SDK` markers below and the inline comment
+on `withFolderAccessAsync`.
+
+```swift
+// Workspace Buddy — pick a folder, type a request, the on-device model reads/creates/edits files
+// in it via Core's WorkspaceTools.swift (Path A). Single-turn per request, same minimal shape as
+// plate-today/repo-qa.
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import SwiftUI
+
+// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8)
+
+// Verbatim from §8's documented pattern, with one real addition not covered there: an
+// async-aware access wrapper. §8's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —
+// fine for a single read, but this app's actual file access happens inside
+// LanguageModelSession.respond(to:), which can invoke several tool calls over one async call.
+// The security-scoped access window has to stay open for that whole call, not just a synchronous
+// setup step.
+enum FolderAccess {
+    private static let bookmarkKey = "workspaceFolderBookmark"
+
+    @MainActor
+    static func pickFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Grant Access"
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+
+        guard let bookmark = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ) else { return nil }
+        UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
+        return url
+    }
+
+    static func resolveBookmarkedFolder() -> URL? {
+        guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var isStale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: bookmark,
+            options: .withSecurityScope,
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) else { return nil }
+        if isStale {
+            if let refreshed = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
+            }
+        }
+        return url
+    }
+
+    // DIFF FROM §8's synchronous withFolderAccess<T>(_:): brackets an ASYNC body, so the access
+    // window stays open for a whole LanguageModelSession.respond(to:) call.
+    @MainActor
+    static func withFolderAccessAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T? {
+        guard let url = resolveBookmarkedFolder() else { return nil }
+        guard url.startAccessingSecurityScopedResource() else { return nil }
+        defer { url.stopAccessingSecurityScopedResource() }
+        return try await body(url)
+    }
+}
+
+// MARK: - View model
+
+@available(macOS 26.0, *)
+@MainActor
+final class WorkspaceBuddyModel: ObservableObject {
+    enum State { case idle, working, ready(String), failed(String) }
+
+    @Published private(set) var folderURL: URL?
+    @Published private(set) var state: State = .idle
+
+    init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
+
+    func chooseFolder() {
+        guard let url = FolderAccess.pickFolder() else { return }
+        folderURL = url
+    }
+
+    func submit(_ request: String) {
+        let trimmed = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if case .working = state { return }
+        state = .working
+        Task { await run(trimmed) }
+    }
+
+    private func run(_ request: String) async {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else {
+            state = .failed("On-device model unavailable: \(model.availability)")
+            return
+        }
+
+        let result: String? = await FolderAccess.withFolderAccessAsync { root in
+            // No DeleteWorkspaceFileTool here — available in Core (see WorkspaceTools.swift) for
+            // a host app that explicitly wants it, just not wired in by default.
+            let tools: [any Tool] = [
+                ListWorkspaceFilesTool(root: root),                   // ← SDK (Path A)
+                ReadWorkspaceFileTool(root: root),                    // ← SDK (Path A)
+                WriteWorkspaceFileTool(root: root),                   // ← SDK (Path A)
+                EditWorkspaceFileTool(root: root),                    // ← SDK (Path A)
+            ]
+            let session = LanguageModelSession(tools: tools) {
+                """
+                You are a coding assistant working in a single project folder. Use \
+                listWorkspaceFiles to see what's there and readWorkspaceFile before editing \
+                anything — never guess a file's contents. Prefer editWorkspaceFile (a targeted \
+                find-and-replace) over writeWorkspaceFile for changes to files that already \
+                exist; writeWorkspaceFile only creates brand-new files and fails if the file is \
+                already there. Explain what you changed and why, briefly.
+                """
+            }
+            do {
+                let response = try await session.respond(to: request)
+                return response.content
+            } catch {
+                return "Error: \(await GenerationErrorDescription.describe(error))"  // ← SDK
+            }
+        }
+
+        guard let result else {
+            state = .failed("Could not access the workspace folder — try choosing it again.")
+            return
+        }
+        state = .ready(result)
+    }
+}
+
+// MARK: - UI (ordinary SwiftUI — folder path display, a text field, a Go button, a result view)
+```
+
+**Tally**: of ~150 lines of actual code (excluding the UI section, which is plain SwiftUI with no
+SDK touchpoints), five lines touch the SDK directly — four Tool instantiations and one error
+formatter. The folder-picker/bookmark machinery is entirely `FolderAccess`, §8's own documented
+pattern rather than Core code — the point being made here isn't "look how much SDK code this
+needs," it's the opposite: given a resolved URL, actually reading/writing files safely inside a
+sandbox is four one-line Tool instantiations, not a filesystem library to write yourself.
 
 ## `examples/components-demo/Sources/ComponentsDemo/ComponentsDemoApp.swift`
 

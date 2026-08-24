@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Identical to plate-today's PlateToday.entitlements — see that file's comment for the full
+	     multi-step TCC failure mode this guards against. The entitlement is a property of the
+	     connector being accessed (Calendar/Reminders, via EventKit), not of which Tool wrapper
+	     (hand-written vs Core's ready-made GetUpcomingEventsTool/GetUpcomingRemindersTool)
+	     happens to call into it. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+</dict>
+</plist>

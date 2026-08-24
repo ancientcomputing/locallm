@@ -2,29 +2,21 @@
 import Foundation
 import PackageDescription
 
-// LocalLMLabSDKComponents — the open-source, Apache 2.0-licensed companion package: prebuilt
-// SwiftUI pieces (MCP server picker, OAuth waiting view, resource/prompt browsing) built on
-// LocalLMLabSDKCore's public API only.
+// Workspace Buddy — the public copy of the SDK's fourth reference app (this source is maintained
+// privately and copied here, same as the other examples). Depends on Core as a BINARY
+// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift
+// for the fuller explanation of that one real difference the copy process accounts for.
 //
-// Depends on Core as a BINARY (LocalLMLabSDKCore.xcframework via a GitHub Release asset), same as
-// examples/plate-today/Package.swift — copied verbatim from that file's
-// SDKRelease/knownSDKReleases/failManifest pattern rather than reinvented, per that file's own
-// comment pointing here.
+// Same as plate-today-tools/repo-qa, same reason: this app's whole point is
+// WorkspaceAccess/WorkspaceTools (docs/sdk-guide.md §8a), which shipped starting with 0.8.0.
+// Building against 0.7.0/0.7.1 fails to compile (`cannot find 'ListWorkspaceFilesTool' in
+// scope`), not run with reduced functionality.
 
-// MARK: - Which SDK version to build against
-
-// Deliberately NOT implicit, and deliberately NOT silently defaulted — same reasoning as
-// examples/plate-today/Package.swift. Set LOCALLM_SDK_VERSION explicitly, e.g.
-// `LOCALLM_SDK_VERSION=0.7.0 swift build`, or this manifest fails fast with a clear message
-// instead of silently resolving to whichever version happened to be hardcoded.
 struct SDKRelease {
     let url: String
     let checksum: String
 }
 
-// The source of truth for which SDK versions this Package.swift knows how to build against — add
-// a new entry here whenever a new Core.xcframework release is published. Keep in sync with
-// examples/plate-today/Package.swift's own table.
 let knownSDKReleases: [String: SDKRelease] = [
     "0.7.0": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
@@ -49,8 +41,10 @@ guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK
     failManifest("""
     error: LOCALLM_SDK_VERSION is not set.
     Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.7.0 swift build
+        LOCALLM_SDK_VERSION=0.8.0 swift build
     Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
+    NOTE: this example needs 0.8.0 or later — it depends on WorkspaceAccess/WorkspaceTools
+    (docs/sdk-guide.md §8a), which 0.7.0/0.7.1 predate.
     """)
 }
 
@@ -62,17 +56,17 @@ guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
 }
 
 let package = Package(
-    name: "LocalLMLabSDKComponents",
+    name: "WorkspaceBuddy",
     platforms: [.macOS("26.0")],
-    products: [
-        .library(name: "LocalLMLabSDKComponents", targets: ["LocalLMLabSDKComponents"])
-    ],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
             url: sdkRelease.url,
             checksum: sdkRelease.checksum
         ),
-        .target(name: "LocalLMLabSDKComponents", dependencies: ["LocalLMLabSDKCore"])
+        .executableTarget(
+            name: "WorkspaceBuddy",
+            dependencies: ["LocalLMLabSDKCore"]
+        )
     ]
 )

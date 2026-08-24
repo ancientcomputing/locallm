@@ -21,13 +21,13 @@ sibling [`Components`](../../Components/) package it depends on) requires an exp
 `LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency:
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 swift build
+LOCALLM_SDK_VERSION=0.8.0 swift build
 ```
 
 ## Quick dev-loop run
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 swift run
+LOCALLM_SDK_VERSION=0.8.0 swift run
 ```
 
 Unlike `plate-today`, this app needs no TCC entitlements to function — the MCP server picker
@@ -38,7 +38,7 @@ the packaged build below to test it as a real, distributable `.app`.
 ## Real build: `packaging/build-and-sign.sh`
 
 ```bash
-LOCALLM_SDK_VERSION=0.7.0 \
+LOCALLM_SDK_VERSION=0.8.0 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh

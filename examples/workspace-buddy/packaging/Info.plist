@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key><string>Workspace Buddy</string>
+	<key>CFBundleExecutable</key><string>WorkspaceBuddy</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIconName</key><string>AppIcon</string>
+	<key>CFBundleIdentifier</key><string>lab.locallm.sdk.reference.workspacebuddy</string>
+	<key>CFBundleName</key><string>Workspace Buddy</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+	<key>LSMinimumSystemVersion</key><string>26.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<!-- No NS*UsageDescription key needed — unlike Calendar/Reminders/Contacts/Location, folder
+	     access has no TCC usage-description requirement. NSOpenPanel and the
+	     files.user-selected.read-write entitlement (see WorkspaceBuddy.entitlements) are
+	     sufficient on their own. -->
+</dict>
+</plist>

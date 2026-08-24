@@ -4,7 +4,12 @@ Audience: a Swift developer linking `LocalLMLabSDKCore` into their own macOS app
 tool-calling — system connectors (Calendar, Reminders, Contacts, Location), an MCP client, and
 (via `Components`) prebuilt SwiftUI for managing MCP server connections. Everything here has been
 exercised against real signed apps and real live MCP servers, not just written from the API
-surface — see [`examples/plate-today`](../examples/plate-today) and
+surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
+[`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
+ready-made Tools instead of hand-written ones, see §7a), [`examples/repo-qa`](../examples/repo-qa)
+(a minimal command-line `MCPTool` example against a no-auth server),
+[`examples/workspace-buddy`](../examples/workspace-buddy) (a local AI-assisted coding example —
+pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, §8a), and
 [`examples/components-demo`](../examples/components-demo) for the working reference apps this
 guide is drawn from.
 
@@ -486,12 +491,55 @@ let contacts = ContactsAccess.search(query: "Jane", limit: 10)
 let location = await LocationAccess.shared.currentLocation()
 ```
 
+**Calendar, Reminders, and Contacts also have write methods.** `CalendarAccess.addEvent(title:
+start:end:)` creates a new event; `.updateEvent`/`.deleteEvent` locate an *existing* one by its
+exact title plus the day it's currently on — not an identifier. `RemindersAccess.addReminder`
+creates a new reminder; `.updateReminder`/`.deleteReminder` (both `async`) locate an existing one
+by title, with an optional current due date to disambiguate reminders sharing a title (a reminder
+may have no due date at all, unlike an event's date, which is required). `ContactsAccess.
+addContact` creates a new contact; `.updateContact`/`.deleteContact` locate an existing one by
+given name, with an optional current family name to disambiguate. `newPhoneNumbers`/`newEmails`
+on `updateContact`, when provided, replace that contact's entire existing list rather than adding
+to it. Full signatures are in §12 below.
+
+**Why name-based lookup, not an identifier** (`EventSummary`/`ReminderSummary`/`ContactSummary`
+still carry `eventIdentifier`/`calendarItemIdentifier`/`identifier` for any consumer that wants
+the raw token, but `update*`/`delete*` no longer take it): two real problems with identifier-based
+lookup, found the hard way. Some calendar backends (Exchange/Outlook-synced calendars especially)
+return identifiers long enough to meaningfully bloat an LLM's context just by appearing in a
+listing; and, separately, a small on-device model calling these as tools proved unreliable at
+faithfully copying an opaque identifier string across two tool calls. Locating by the same
+title/name a person actually thinks in terms of fixed both. The one honest cost: for Contacts,
+name collisions are common enough in a real address book that the "found more than one match"
+error fires more often than it would for Calendar/Reminders (same-titled events on the same day
+are rare) — an accepted tradeoff, not a bug; the error tells the caller to add a family name or
+search first.
+
+**If you're building your own model-callable tools on Core**, carry forward one naming lesson:
+keep lookup parameters (`onDate`, `dueDate`, `familyName`, …) and change parameters
+(`newDate`, `newTime`, `newFamilyName`, …) under clearly distinct names — never a bare
+`date`/`familyName` serving double duty as both "search by" and "change to." A bare shared name
+was tried first here and shipped a real bug: asked to "change the date," the model put the *new*
+date into the field literally named `date` instead of a separate change field, so the lookup
+searched on the wrong date and failed.
+
+**There is no built-in gate on any of this beyond the TCC grant itself.** Unlike LocalLM Lab the
+product, which has its own app-specific "Full Access" toggle deciding whether a given session
+exposes update/delete as tools the model can call at all, Core has no equivalent concept — that's
+UI/IPC behavior specific to that app, not something this SDK provides or enforces. The moment a
+user grants Calendar/Reminders/Contacts access, every method above (read and write) is callable
+unconditionally. Whether and how to expose update/delete to a model — as a `Tool` at all, behind
+your own confirmation UI, restricted by your own app-level setting — is entirely your design
+decision as the integrating developer.
+
 Each connector requires its own Info.plist usage-description key and entitlement, same pattern as
 section 2a/2b — see that section for Calendar/Reminders; Contacts needs
 `NSContactsUsageDescription` + `com.apple.security.personal-information.addressbook`, Location
 needs `NSLocationUsageDescription` + `com.apple.security.personal-information.location`.
 `examples/plate-today`'s `SearchContactsTool` and (build-time opt-in) location/weather tools are
-working examples of each, including the exact packaging-script changes each one needs.
+working examples of each, including the exact packaging-script changes each one needs — note that
+the reference app only wires up the read methods; the write methods above are equally available
+but not currently demonstrated there.
 
 **One real side effect worth knowing about**: requesting Location access briefly switches your
 app's own `NSApplication.ActivationPolicy` to `.regular` for the duration of the fetch, then
@@ -524,6 +572,79 @@ let session = LanguageModelSession(tools: tools)
 Both accept an optional custom `description` in their initializer (`ClockTool(description:
 "...")`) if you want to override how the model sees the tool — otherwise each falls back to its own
 `defaultDescription`.
+
+### 7a. Two paths to tool-calling: ready-made Tools, or write your own
+
+Everything above (`CalendarAccess`, `RemindersAccess`, `ContactsAccess`, `LocationAccess`,
+`MCPServerManager`) is a plain data-access layer — calling `CalendarAccess.updateEvent(...)`
+doesn't require FoundationModels at all. Turning one into something a `LanguageModelSession` can
+call is a separate decision, and Core gives you two ways to make it:
+
+**Path A — ready-made `Tool`s (recommended default).** Every connector above also has a
+ready-to-use `Tool`-conforming wrapper in Core, same one-line drop-in as `ClockTool`/`WeatherTool`:
+
+```swift
+let tools: [any Tool] = [
+    ClockTool(),
+    GetUpcomingEventsTool(), AddCalendarEventTool(),
+    GetUpcomingRemindersTool(), AddReminderTool(),
+    SearchContactsTool(), ListContactsTool(),
+    GetCurrentLocationTool(),
+]
+let session = LanguageModelSession(tools: tools)
+```
+
+The mutating ones — `UpdateCalendarEventTool`/`DeleteCalendarEventTool`,
+`UpdateReminderTool`/`DeleteReminderTool`, `AddContactTool`/`UpdateContactTool`/
+`DeleteContactTool` — take no permission gate of their own (no "Full Access" flag, matching this
+section's already-stated SDK philosophy: that decision is entirely yours). Whether to expose them
+at all is a plain array-membership choice — include them in `tools` when your UI is ready to let
+the model delete something, don't when it isn't.
+
+These wrappers exist because real, observed on-device model failures shaped their design, and
+that guidance is baked in verbatim rather than left for you to rediscover independently:
+- **Lookup by title/name + date, never by identifier.** Some calendar backends' identifiers are
+  long enough to blow the model's context window just by appearing in a listing, and the model
+  proved unreliable at copying one faithfully across two tool calls. A human thinks "the Birthday
+  event on Aug 25," not a per-backend token — so do these tools.
+- **`current*` vs `new*` are always distinct field names, never shared.** A single field doing
+  double duty as both "find by" and "change to" (e.g. a bare `date`) invites the model to put a
+  *new* date where the *lookup* date belongs — confirmed as a real, reproduced bug before the
+  split existed.
+- **Contacts' `search`/`list` output shows `givenName`/`familyName` as separate labeled fields.**
+  A caller only ever seeing a composed display name has no reliable way to know where to split it
+  for `updateContact`/`deleteContact`'s separate name fields.
+- **`RemindersTools`' date handling carries a caveat, not a fix**: the model has no built-in
+  notion of "today" — Core stays raw in/raw out and doesn't inject anything into your session on
+  its own — so a relative phrase like "tomorrow" can resolve to the wrong day, or the wrong year
+  entirely, unless your app's system prompt/session state grounds it (pairing these with
+  `ClockTool` is the practical mitigation, not a guarantee).
+
+**Path B — write your own adapter**, exactly as section 5 Step 4 walks through by hand: call
+`CalendarAccess`/`RemindersAccess`/`ContactsAccess`/`LocationAccess` directly, choose your own
+tool names, schemas, and descriptions. Full control, but you're on your own for the pitfalls
+above. Both paths coexist — Path A is a thin wrapper over Path B, not a replacement for it, so
+mixing (ready-made Calendar tools alongside a hand-written Contacts adapter, say) is fine.
+
+**MCP gets the same two paths.** Section 5 Step 5 is Path B for MCP: match a tool by name out of
+`state.tools`, inspect its `rawSchema` yourself, hand-write a matching `@Generable` `Arguments`
+struct. `MCPTool` is Path A — it builds a `Tool` at runtime directly from an `MCPToolDescriptor`,
+no `Arguments` struct required:
+
+```swift
+let descriptor = state.tools.first { $0.name == "search_issues" }!
+let tool = try MCPTool(descriptor: descriptor, manager: manager)
+let session = LanguageModelSession(tools: [tool])
+```
+
+It works by turning the tool's real JSON Schema (`rawSchema`) into a FoundationModels
+`DynamicGenerationSchema` at init time — the common, well-behaved subset real MCP servers emit
+(object/properties/required, array/items, string/number/integer/boolean, string enums) converts
+cleanly; anything past that (`oneOf`/`anyOf` unions, `$ref`, `const`, regex `pattern`) degrades to
+a free-form string leaf rather than failing the whole tool, since the remote server is still the
+real source of argument validation. `MCPTool(descriptor:manager:)` is a throwing initializer —
+call it per-tool inside a loop and skip (or fall back to a hand-written Path B adapter for) any
+tool whose schema doesn't build, rather than letting one malformed tool take down your whole list.
 
 ## 8. Filesystem access: security-scoped bookmarks (example, not in Core)
 
@@ -607,14 +728,54 @@ Required entitlements for this to work under App Sandbox:
 <true/>
 ```
 
+### 8a. WorkspaceAccess/WorkspaceTools: what Core gives you once you have that URL
+
+Once you have a resolved, access-bracketed root `URL` from the pattern above,
+`WorkspaceAccess` — an ordinary Core type, not a permission-gated connector — is what actually
+reads and writes inside it: `listFiles`/`readFile`/`writeFile`/`editFile`/`deleteFile`, each
+scoped to the root with the same symlink-escape check the picker pattern itself doesn't need to
+worry about. No `requestAccess()` here — there's no OS dialog for this, the picker *is* the
+consent, entirely on your side.
+
+`editFile` — the one write operation actually meant for AI-assisted modification of an existing
+file — is search-and-replace, not a unified-diff/patch format: `oldString`/`newString`, and it
+fails loudly if `oldString` isn't found or isn't unique in the file (pass `replaceAll` if you
+really mean every occurrence). This was a deliberate choice, not an obvious one: a small on-device
+model reliably producing correct line numbers and context lines for a real diff format is a much
+harder ask than quoting one exact, minimal, uniquely-identifying snippet — and it's a much simpler,
+safer thing for Core to validate and apply. `writeFile` is create-only (fails if the file already
+exists) — use `editFile` to modify something that's already there, same add-vs-update split
+Calendar/Reminders/Contacts already use.
+
+Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWorkspaceFilesTool`,
+`ReadWorkspaceFileTool`, `WriteWorkspaceFileTool`, `EditWorkspaceFileTool`, `DeleteWorkspaceFileTool`
+— each takes the root `URL` at init. `DeleteWorkspaceFileTool` isn't wired into
+`examples/workspace-buddy`'s default tool list — a coding assistant that can delete files
+unprompted is a meaningfully bigger risk than one that can only read/create/edit — but it's there
+if your own app wants it.
+
+**One real gotcha, not covered by §8's own example**: that section's `withFolderAccess<T>(_:)` is
+synchronous, bracketing a single, quick access. If you're handing these tools to a
+`LanguageModelSession` — which can invoke several of them over the course of one
+`respond(to:)` call — the security-scoped access window has to stay open for that *whole* async
+call, not just a synchronous setup step. `examples/workspace-buddy` shows the async-aware version
+(`withFolderAccessAsync<T>(_:)`) this actually requires.
+
 ## 9. What's NOT in Core yet
 
-- **No filesystem connector.** See section 8 — deliberately, not planned, since the picker UI has
-  to live in the host app anyway.
+- **Still no filesystem picker/bookmark UI, and still not planned** — that has to live in the
+  host app, see section 8. What *is* in Core now: `WorkspaceAccess`/`WorkspaceTools` (section 8a),
+  the read/write/edit logic for once you already have a resolved folder URL.
+- ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
+  see section 7a.
 - **No public API stability guarantee.** Access levels have been fixed reactively, as real usage
   surfaced gaps. If you hit a "X is inaccessible due to internal protection level" error on
   something that looks like it should obviously be public, it probably should be — that's a real
   gap, not a step you're missing. File an issue.
+- **No logging of prompts, responses, or tool calls, on by default or otherwise.** Core doesn't
+  write a persisted trace of what the model saw or said anywhere, and gives you nothing to opt out
+  of — there's simply nothing there. If your app wants that kind of record, you build and own it
+  yourself.
 
 ## 10. App Sandbox — building for the Mac App Store
 
@@ -785,44 +946,57 @@ enum Connectors {
 
 // CalendarAccess
 enum CalendarAccess {
-    static let store: EKEventStore  // the raw EventKit store, for anything the wrapper below doesn't cover
+    static var store: EKEventStore { get }  // raw EventKit store, for anything the wrapper below doesn't cover; refreshed internally after a fresh grant
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct EventSummary: Codable { var title: String; var start: String; var end: String; var calendar: String; var location: String?; var isAllDay: Bool }
+    struct EventSummary: Codable { var eventIdentifier: String; var title: String; var start: String; var end: String; var calendar: String; var location: String?; var isAllDay: Bool }
     static func upcomingEvents(days: Int) -> [EventSummary]
     struct AddEventResult { var success: Bool; var error: String? }
     static func addEvent(title: String, start: Date, end: Date) -> AddEventResult
+    struct MutateEventResult { var success: Bool; var error: String? }
+    // locates the event by title + the day it's currently on, not eventIdentifier; nil new* parameters leave that field unchanged
+    static func updateEvent(title: String, onDate: DateComponents, newTitle: String?, newDate: DateComponents?, newTime: DateComponents?, durationMinutes: Int?) -> MutateEventResult
+    static func deleteEvent(title: String, onDate: DateComponents) -> MutateEventResult
 }
 
 // RemindersAccess — same shape as CalendarAccess, also backed by EventKit (EKEventStore
 // handles both calendar events and reminders)
 enum RemindersAccess {
-    static let store: EKEventStore
+    static var store: EKEventStore { get }
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct ReminderSummary: Codable, Sendable { var title: String; var dueDate: String?; var list: String; var isCompleted: Bool; var priority: Int }
+    struct ReminderSummary: Codable, Sendable { var calendarItemIdentifier: String; var title: String; var dueDate: String?; var list: String; var isCompleted: Bool; var priority: Int }
     static func upcomingReminders(days: Int) async -> [ReminderSummary]
     struct AddReminderResult { var success: Bool; var error: String? }
     static func addReminder(title: String, dueDateComponents: DateComponents?) -> AddReminderResult
+    struct MutateReminderResult { var success: Bool; var error: String? }
+    // locates the reminder by title, optionally narrowed by its current due date; nil new* parameters leave that field unchanged
+    static func updateReminder(title: String, dueDate: DateComponents?, newTitle: String?, newDate: DateComponents?, newTime: DateComponents?, isCompleted: Bool?) async -> MutateReminderResult
+    static func deleteReminder(title: String, dueDate: DateComponents?) async -> MutateReminderResult
 }
 
 // ContactsAccess
 enum ContactsAccess {
-    static let store: CNContactStore  // the raw Contacts store, for anything the wrapper below doesn't cover
+    static var store: CNContactStore { get }  // raw Contacts store, for anything the wrapper below doesn't cover; refreshed internally after a fresh grant
     static var authorizationStatus: CNAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
     static func requestAccess() async -> AccessResult
     static func openSystemSettings()
-    struct ContactSummary: Codable { var name: String; var organization: String?; var phoneNumbers: [String]; var emails: [String] }
+    struct ContactSummary: Codable { var identifier: String; var name: String; var givenName: String; var familyName: String?; var organization: String?; var phoneNumbers: [String]; var emails: [String] }
     static func search(query: String, limit: Int) -> [ContactSummary]
     static func list(limit: Int) -> [ContactSummary]
+    struct MutateContactResult { var success: Bool; var error: String? }
+    static func addContact(givenName: String, familyName: String, organization: String?, phoneNumbers: [String], emails: [String]) -> MutateContactResult
+    // locates the contact by givenName, optionally narrowed by its current familyName; nil new* parameters leave that field unchanged, non-nil newPhoneNumbers/newEmails replace the contact's entire existing list
+    static func updateContact(givenName: String, familyName: String?, newGivenName: String?, newFamilyName: String?, newOrganization: String?, newPhoneNumbers: [String]?, newEmails: [String]?) -> MutateContactResult
+    static func deleteContact(givenName: String, familyName: String?) -> MutateContactResult
 }
 
 // LocationAccess — a class (LocationAccess.shared), not a static enum, since it holds

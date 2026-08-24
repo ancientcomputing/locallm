@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key><string>Plate Today (Tools)</string>
+	<key>CFBundleExecutable</key><string>PlateTodayTools</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIconName</key><string>AppIcon</string>
+	<key>CFBundleIdentifier</key><string>lab.locallm.sdk.reference.platetodaytools</string>
+	<key>CFBundleName</key><string>Plate Today (Tools)</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key><string>26.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<!-- Same two usage-description keys as plate-today's Info.plist — this app requests the same
+	     two TCC-gated connectors, just through Core's ready-made GetUpcomingEventsTool/
+	     GetUpcomingRemindersTool instead of a hand-written wrapper. The usage-description
+	     requirement is unchanged either way: it's a property of the underlying
+	     CalendarAccess/RemindersAccess call, not of whichever Tool happens to invoke it. -->
+	<key>NSCalendarsFullAccessUsageDescription</key><string>Plate Today (Tools) reads your calendar events for today to summarize what's on your plate.</string>
+	<key>NSRemindersFullAccessUsageDescription</key><string>Plate Today (Tools) reads your reminders due today to summarize what's on your plate.</string>
+	<!-- NSLocationUsageDescription is intentionally NOT here by default — see Package.swift's
+	     PLATETODAYTOOLS_INCLUDE_LOCATION_WEATHER comment; build-and-sign.sh adds it via
+	     PlistBuddy only when that flag is set. -->
+	<!-- Distinct scheme from both LocalLM Lab's "locallmlab" and plate-today's "platetoday", so
+	     all three can be installed side by side without OAuth callback collisions. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key><string>lab.locallm.sdk.reference.platetodaytools.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>platetodaytools</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
