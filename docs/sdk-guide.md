@@ -7,7 +7,9 @@ exercised against real signed apps and real live MCP servers, not just written f
 surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
 [`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
 ready-made Tools instead of hand-written ones, see §7a), [`examples/repo-qa`](../examples/repo-qa)
-(a minimal command-line `MCPTool` example against a no-auth server), and
+(a minimal command-line `MCPTool` example against a no-auth server),
+[`examples/workspace-buddy`](../examples/workspace-buddy) (a local AI-assisted coding example —
+pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, §8a), and
 [`examples/components-demo`](../examples/components-demo) for the working reference apps this
 guide is drawn from.
 
@@ -726,10 +728,44 @@ Required entitlements for this to work under App Sandbox:
 <true/>
 ```
 
+### 8a. WorkspaceAccess/WorkspaceTools: what Core gives you once you have that URL
+
+Once you have a resolved, access-bracketed root `URL` from the pattern above,
+`WorkspaceAccess` — an ordinary Core type, not a permission-gated connector — is what actually
+reads and writes inside it: `listFiles`/`readFile`/`writeFile`/`editFile`/`deleteFile`, each
+scoped to the root with the same symlink-escape check the picker pattern itself doesn't need to
+worry about. No `requestAccess()` here — there's no OS dialog for this, the picker *is* the
+consent, entirely on your side.
+
+`editFile` — the one write operation actually meant for AI-assisted modification of an existing
+file — is search-and-replace, not a unified-diff/patch format: `oldString`/`newString`, and it
+fails loudly if `oldString` isn't found or isn't unique in the file (pass `replaceAll` if you
+really mean every occurrence). This was a deliberate choice, not an obvious one: a small on-device
+model reliably producing correct line numbers and context lines for a real diff format is a much
+harder ask than quoting one exact, minimal, uniquely-identifying snippet — and it's a much simpler,
+safer thing for Core to validate and apply. `writeFile` is create-only (fails if the file already
+exists) — use `editFile` to modify something that's already there, same add-vs-update split
+Calendar/Reminders/Contacts already use.
+
+Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWorkspaceFilesTool`,
+`ReadWorkspaceFileTool`, `WriteWorkspaceFileTool`, `EditWorkspaceFileTool`, `DeleteWorkspaceFileTool`
+— each takes the root `URL` at init. `DeleteWorkspaceFileTool` isn't wired into
+`examples/workspace-buddy`'s default tool list — a coding assistant that can delete files
+unprompted is a meaningfully bigger risk than one that can only read/create/edit — but it's there
+if your own app wants it.
+
+**One real gotcha, not covered by §8's own example**: that section's `withFolderAccess<T>(_:)` is
+synchronous, bracketing a single, quick access. If you're handing these tools to a
+`LanguageModelSession` — which can invoke several of them over the course of one
+`respond(to:)` call — the security-scoped access window has to stay open for that *whole* async
+call, not just a synchronous setup step. `examples/workspace-buddy` shows the async-aware version
+(`withFolderAccessAsync<T>(_:)`) this actually requires.
+
 ## 9. What's NOT in Core yet
 
-- **No filesystem connector.** See section 8 — deliberately, not planned, since the picker UI has
-  to live in the host app anyway.
+- **Still no filesystem picker/bookmark UI, and still not planned** — that has to live in the
+  host app, see section 8. What *is* in Core now: `WorkspaceAccess`/`WorkspaceTools` (section 8a),
+  the read/write/edit logic for once you already have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
   see section 7a.
 - **No public API stability guarantee.** Access levels have been fixed reactively, as real usage

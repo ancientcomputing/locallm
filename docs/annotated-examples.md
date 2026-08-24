@@ -591,6 +591,158 @@ real schema (including a `repoName: string | string[]` union JSON Schema doesn't
 Swift equivalent for) converts automatically, degrading the union to a plain string leaf per
 `MCPToolAdapter`'s documented behavior for constructs past the common case.
 
+## `examples/workspace-buddy/Sources/WorkspaceBuddy/WorkspaceBuddyApp.swift`
+
+A fourth shape again: the first reference app that writes to disk, and the first sandboxed by
+default. Pick a folder, describe a change, the on-device model reads/creates/edits files in it via
+`WorkspaceTools` (Path A). The folder-picker/bookmark code (`FolderAccess`) is §8's own documented
+pattern, extended with one real addition — see the `// ← SDK` markers below and the inline comment
+on `withFolderAccessAsync`.
+
+```swift
+// Workspace Buddy — pick a folder, type a request, the on-device model reads/creates/edits files
+// in it via Core's WorkspaceTools.swift (Path A). Single-turn per request, same minimal shape as
+// plate-today/repo-qa.
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import SwiftUI
+
+// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8)
+
+// Verbatim from §8's documented pattern, with one real addition not covered there: an
+// async-aware access wrapper. §8's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —
+// fine for a single read, but this app's actual file access happens inside
+// LanguageModelSession.respond(to:), which can invoke several tool calls over one async call.
+// The security-scoped access window has to stay open for that whole call, not just a synchronous
+// setup step.
+enum FolderAccess {
+    private static let bookmarkKey = "workspaceFolderBookmark"
+
+    @MainActor
+    static func pickFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Grant Access"
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+
+        guard let bookmark = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ) else { return nil }
+        UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
+        return url
+    }
+
+    static func resolveBookmarkedFolder() -> URL? {
+        guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var isStale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: bookmark,
+            options: .withSecurityScope,
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) else { return nil }
+        if isStale {
+            if let refreshed = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
+            }
+        }
+        return url
+    }
+
+    // DIFF FROM §8's synchronous withFolderAccess<T>(_:): brackets an ASYNC body, so the access
+    // window stays open for a whole LanguageModelSession.respond(to:) call.
+    @MainActor
+    static func withFolderAccessAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T? {
+        guard let url = resolveBookmarkedFolder() else { return nil }
+        guard url.startAccessingSecurityScopedResource() else { return nil }
+        defer { url.stopAccessingSecurityScopedResource() }
+        return try await body(url)
+    }
+}
+
+// MARK: - View model
+
+@available(macOS 26.0, *)
+@MainActor
+final class WorkspaceBuddyModel: ObservableObject {
+    enum State { case idle, working, ready(String), failed(String) }
+
+    @Published private(set) var folderURL: URL?
+    @Published private(set) var state: State = .idle
+
+    init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
+
+    func chooseFolder() {
+        guard let url = FolderAccess.pickFolder() else { return }
+        folderURL = url
+    }
+
+    func submit(_ request: String) {
+        let trimmed = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if case .working = state { return }
+        state = .working
+        Task { await run(trimmed) }
+    }
+
+    private func run(_ request: String) async {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else {
+            state = .failed("On-device model unavailable: \(model.availability)")
+            return
+        }
+
+        let result: String? = await FolderAccess.withFolderAccessAsync { root in
+            // No DeleteWorkspaceFileTool here — available in Core (see WorkspaceTools.swift) for
+            // a host app that explicitly wants it, just not wired in by default.
+            let tools: [any Tool] = [
+                ListWorkspaceFilesTool(root: root),                   // ← SDK (Path A)
+                ReadWorkspaceFileTool(root: root),                    // ← SDK (Path A)
+                WriteWorkspaceFileTool(root: root),                   // ← SDK (Path A)
+                EditWorkspaceFileTool(root: root),                    // ← SDK (Path A)
+            ]
+            let session = LanguageModelSession(tools: tools) {
+                """
+                You are a coding assistant working in a single project folder. Use \
+                listWorkspaceFiles to see what's there and readWorkspaceFile before editing \
+                anything — never guess a file's contents. Prefer editWorkspaceFile (a targeted \
+                find-and-replace) over writeWorkspaceFile for changes to files that already \
+                exist; writeWorkspaceFile only creates brand-new files and fails if the file is \
+                already there. Explain what you changed and why, briefly.
+                """
+            }
+            do {
+                let response = try await session.respond(to: request)
+                return response.content
+            } catch {
+                return "Error: \(await GenerationErrorDescription.describe(error))"  // ← SDK
+            }
+        }
+
+        guard let result else {
+            state = .failed("Could not access the workspace folder — try choosing it again.")
+            return
+        }
+        state = .ready(result)
+    }
+}
+
+// MARK: - UI (ordinary SwiftUI — folder path display, a text field, a Go button, a result view)
+```
+
+**Tally**: of ~150 lines of actual code (excluding the UI section, which is plain SwiftUI with no
+SDK touchpoints), five lines touch the SDK directly — four Tool instantiations and one error
+formatter. The folder-picker/bookmark machinery is entirely `FolderAccess`, §8's own documented
+pattern rather than Core code — the point being made here isn't "look how much SDK code this
+needs," it's the opposite: given a resolved URL, actually reading/writing files safely inside a
+sandbox is four one-line Tool instantiations, not a filesystem library to write yourself.
+
 ## `examples/components-demo/Sources/ComponentsDemo/ComponentsDemoApp.swift`
 
 Demonstrates `Components`: the prebuilt server picker, resource/prompt browsing — no hand-written
