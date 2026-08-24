@@ -568,6 +568,79 @@ Both accept an optional custom `description` in their initializer (`ClockTool(de
 "...")`) if you want to override how the model sees the tool — otherwise each falls back to its own
 `defaultDescription`.
 
+### 7a. Two paths to tool-calling: ready-made Tools, or write your own
+
+Everything above (`CalendarAccess`, `RemindersAccess`, `ContactsAccess`, `LocationAccess`,
+`MCPServerManager`) is a plain data-access layer — calling `CalendarAccess.updateEvent(...)`
+doesn't require FoundationModels at all. Turning one into something a `LanguageModelSession` can
+call is a separate decision, and Core gives you two ways to make it:
+
+**Path A — ready-made `Tool`s (recommended default).** Every connector above also has a
+ready-to-use `Tool`-conforming wrapper in Core, same one-line drop-in as `ClockTool`/`WeatherTool`:
+
+```swift
+let tools: [any Tool] = [
+    ClockTool(),
+    GetUpcomingEventsTool(), AddCalendarEventTool(),
+    GetUpcomingRemindersTool(), AddReminderTool(),
+    SearchContactsTool(), ListContactsTool(),
+    GetCurrentLocationTool(),
+]
+let session = LanguageModelSession(tools: tools)
+```
+
+The mutating ones — `UpdateCalendarEventTool`/`DeleteCalendarEventTool`,
+`UpdateReminderTool`/`DeleteReminderTool`, `AddContactTool`/`UpdateContactTool`/
+`DeleteContactTool` — take no permission gate of their own (no "Full Access" flag, matching this
+section's already-stated SDK philosophy: that decision is entirely yours). Whether to expose them
+at all is a plain array-membership choice — include them in `tools` when your UI is ready to let
+the model delete something, don't when it isn't.
+
+These wrappers exist because real, observed on-device model failures shaped their design, and
+that guidance is baked in verbatim rather than left for you to rediscover independently:
+- **Lookup by title/name + date, never by identifier.** Some calendar backends' identifiers are
+  long enough to blow the model's context window just by appearing in a listing, and the model
+  proved unreliable at copying one faithfully across two tool calls. A human thinks "the Birthday
+  event on Aug 25," not a per-backend token — so do these tools.
+- **`current*` vs `new*` are always distinct field names, never shared.** A single field doing
+  double duty as both "find by" and "change to" (e.g. a bare `date`) invites the model to put a
+  *new* date where the *lookup* date belongs — confirmed as a real, reproduced bug before the
+  split existed.
+- **Contacts' `search`/`list` output shows `givenName`/`familyName` as separate labeled fields.**
+  A caller only ever seeing a composed display name has no reliable way to know where to split it
+  for `updateContact`/`deleteContact`'s separate name fields.
+- **`RemindersTools`' date handling carries a caveat, not a fix**: the model has no built-in
+  notion of "today" — Core stays raw in/raw out and doesn't inject anything into your session on
+  its own — so a relative phrase like "tomorrow" can resolve to the wrong day, or the wrong year
+  entirely, unless your app's system prompt/session state grounds it (pairing these with
+  `ClockTool` is the practical mitigation, not a guarantee).
+
+**Path B — write your own adapter**, exactly as section 5 Step 4 walks through by hand: call
+`CalendarAccess`/`RemindersAccess`/`ContactsAccess`/`LocationAccess` directly, choose your own
+tool names, schemas, and descriptions. Full control, but you're on your own for the pitfalls
+above. Both paths coexist — Path A is a thin wrapper over Path B, not a replacement for it, so
+mixing (ready-made Calendar tools alongside a hand-written Contacts adapter, say) is fine.
+
+**MCP gets the same two paths.** Section 5 Step 5 is Path B for MCP: match a tool by name out of
+`state.tools`, inspect its `rawSchema` yourself, hand-write a matching `@Generable` `Arguments`
+struct. `MCPTool` is Path A — it builds a `Tool` at runtime directly from an `MCPToolDescriptor`,
+no `Arguments` struct required:
+
+```swift
+let descriptor = state.tools.first { $0.name == "search_issues" }!
+let tool = try MCPTool(descriptor: descriptor, manager: manager)
+let session = LanguageModelSession(tools: [tool])
+```
+
+It works by turning the tool's real JSON Schema (`rawSchema`) into a FoundationModels
+`DynamicGenerationSchema` at init time — the common, well-behaved subset real MCP servers emit
+(object/properties/required, array/items, string/number/integer/boolean, string enums) converts
+cleanly; anything past that (`oneOf`/`anyOf` unions, `$ref`, `const`, regex `pattern`) degrades to
+a free-form string leaf rather than failing the whole tool, since the remote server is still the
+real source of argument validation. `MCPTool(descriptor:manager:)` is a throwing initializer —
+call it per-tool inside a loop and skip (or fall back to a hand-written Path B adapter for) any
+tool whose schema doesn't build, rather than letting one malformed tool take down your whole list.
+
 ## 8. Filesystem access: security-scoped bookmarks (example, not in Core)
 
 Unlike the four connectors above, filesystem access to a user-picked file or folder is **not**
@@ -654,6 +727,8 @@ Required entitlements for this to work under App Sandbox:
 
 - **No filesystem connector.** See section 8 — deliberately, not planned, since the picker UI has
   to live in the host app anyway.
+- ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
+  see section 7a.
 - **No public API stability guarantee.** Access levels have been fixed reactively, as real usage
   surfaced gaps. If you hit a "X is inaccessible due to internal protection level" error on
   something that looks like it should obviously be public, it probably should be — that's a real
