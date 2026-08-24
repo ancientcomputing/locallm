@@ -4,7 +4,9 @@ Audience: a Swift developer linking `LocalLMLabSDKCore` into their own macOS app
 tool-calling — system connectors (Calendar, Reminders, Contacts, Location), an MCP client, and
 (via `Components`) prebuilt SwiftUI for managing MCP server connections. Everything here has been
 exercised against real signed apps and real live MCP servers, not just written from the API
-surface — see [`examples/plate-today`](../examples/plate-today) and
+surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
+[`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
+ready-made Tools instead of hand-written ones, see §7a) and
 [`examples/components-demo`](../examples/components-demo) for the working reference apps this
 guide is drawn from.
 

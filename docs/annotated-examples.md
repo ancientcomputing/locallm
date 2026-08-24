@@ -1,8 +1,11 @@
 # Annotated example source
 
-The full source of both reference apps, with every line that actually touches the SDK marked
+The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core) or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
+`plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
+written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
+read back to back; see §7a of `sdk-guide.md` for the framing.
 
 (GitHub-flavored Markdown doesn't apply bold/inline formatting inside fenced code blocks, so a
 trailing comment is used instead of `**bold**` — it survives being read as a comment in the real
@@ -335,6 +338,159 @@ struct PlateTodayApp: App {
 **Tally**: of ~230 lines of actual code (excluding comments/blank lines), roughly a dozen touch the
 SDK directly — everything else is ordinary SwiftUI state/view code and FoundationModels session
 setup that would look the same regardless of where the tools' data comes from.
+
+## `examples/plate-today-tools/Sources/PlateTodayTools/PlateTodayToolsApp.swift`
+
+The Path A twin of plate-today above — same app, same UI, same connectors, rebuilt on Core's
+ready-made FoundationModels Tools (§7a of `sdk-guide.md`) instead of hand-writing a `Tool` struct
+per connector. Marked the same way, plus `// ← SDK (Path A)` specifically on lines that only exist
+*because* a ready-made Tool replaces what used to be a whole hand-written struct — diff this
+against the section above to see the two approaches side by side.
+
+```swift
+// "What's on my plate today" — Tools edition. The exact same app as examples/plate-today (same
+// UI, same prompt, same connectors), rebuilt on Core's ready-made FoundationModels Tools instead
+// of hand-writing a Tool struct per connector. Diff this file against plate-today's
+// PlateTodayApp.swift to see the "Path A vs Path B" difference described in
+// docs/sdk-guide.md §7a in actual code, not just prose — every place the two files diverge is
+// called out below with a `DIFF FROM plate-today:` comment.
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import SwiftUI
+
+// MARK: - Calendar, Reminders, Location, Contacts tools
+
+// DIFF FROM plate-today: no TodaysEventsTool/TodaysRemindersTool/TodaysLocationTool/
+// SearchContactsTool structs here at all — GetUpcomingEventsTool, GetUpcomingRemindersTool,
+// GetCurrentLocationTool, and SearchContactsTool are Core types, instantiated directly in
+// fetch() below. ~130 fewer lines than the section above, in exchange for one real behavioral
+// difference: these ready-made Tools don't call requestAccess() lazily inside call() the way
+// plate-today's hand-written ones do, so this app requests access up front instead — see
+// requestConnectorAccess() below.
+
+// MARK: - View model driving the launch -> fetch -> show -> Done flow
+
+@available(macOS 26.0, *)
+@MainActor
+final class PlateTodayToolsModel: ObservableObject {
+    enum State {
+        case idle
+        case fetching
+        case ready(String)
+        case failed(String)
+    }
+
+    @Published private(set) var state: State = .idle
+
+    let manager = MCPServerManager()                                  // ← SDK
+    private let todoistURL = URL(string: ProcessInfo.processInfo.environment["TODOIST_MCP_URL"] ?? "https://ai.todoist.net/mcp")!
+
+    func start() {
+        guard case .idle = state else { return }
+        state = .fetching
+        Task { await fetch() }
+    }
+
+    func cleanUpBeforeQuit() {
+        manager.removeServer(MCPServerID(rawValue: todoistURL.absoluteString))  // ← SDK
+    }
+
+    // DIFF FROM plate-today: request access up front, before any Tool exists — Path A's
+    // ready-made Tools need this instead of requesting lazily inside call().
+    private func requestConnectorAccess() async -> String? {
+        let calendarAccess = await CalendarAccess.requestAccess()      // ← SDK
+        guard calendarAccess.granted else { return calendarAccess.error ?? "Calendar access not granted." }
+        let remindersAccess = await RemindersAccess.requestAccess()    // ← SDK
+        guard remindersAccess.granted else { return remindersAccess.error ?? "Reminders access not granted." }
+        #if PLATETODAYTOOLS_INCLUDE_LOCATION_WEATHER
+        let locationAccess = await Connectors.requestAccess(.location) // ← SDK
+        guard locationAccess.granted else { return locationAccess.error ?? "Location access not granted." }
+        #endif
+        #if PLATETODAYTOOLS_INCLUDE_CONTACTS
+        let contactsAccess = await Connectors.requestAccess(.contacts) // ← SDK
+        guard contactsAccess.granted else { return contactsAccess.error ?? "Contacts access not granted." }
+        #endif
+        return nil
+    }
+
+    // DIFF FROM plate-today's TodoistTasksTool: that hand-written tool pinned specific arguments
+    // on every call regardless of what the model asked for, and gave the tool its own curated
+    // name/description independent of the real server. MCPTool exposes the tool exactly as
+    // Todoist's own server defines it — real name, real description, real full argument schema
+    // (built at runtime from the server's JSON Schema) — and leaves every argument up to the
+    // model. A real tradeoff, not just less code: see the prompt below, which now has to ask
+    // explicitly for "excluding anything overdue" to compensate.
+    private func buildTodoistTool() async -> (any Tool)? {
+        let connectResult = await manager.addServer(url: todoistURL, displayName: "Todoist")  // ← SDK
+        guard case .success(let state) = connectResult else { return nil }
+        guard let descriptor = state.tools.first(where: { $0.name == "find-tasks-by-date" }) else { return nil }
+        return try? MCPTool(descriptor: descriptor, manager: manager)  // ← SDK (Path A)
+    }
+
+    private func fetch() async {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else {
+            state = .failed("On-device model unavailable: \(model.availability)")
+            return
+        }
+
+        if let accessError = await requestConnectorAccess() {
+            state = .failed(accessError)
+            return
+        }
+
+        // DIFF FROM plate-today: GetUpcomingEventsTool()/GetUpcomingRemindersTool() straight
+        // from Core, no local struct definitions above to instantiate instead.
+        var tools: [any Tool] = [
+            ClockTool(),                                              // ← SDK
+            GetUpcomingEventsTool(),                                  // ← SDK (Path A)
+            GetUpcomingRemindersTool(),                               // ← SDK (Path A)
+        ]
+        var checks = ["the current time", "calendar events", "reminders"]
+        var summarizeNote = ""
+        #if PLATETODAYTOOLS_INCLUDE_TODOIST
+        if let todoistTool = await buildTodoistTool() {
+            tools.append(todoistTool)
+            checks.append("Todoist tasks due today, excluding anything overdue")
+        }
+        #endif
+        #if PLATETODAYTOOLS_INCLUDE_LOCATION_WEATHER
+        tools.append(GetCurrentLocationTool())                        // ← SDK (Path A)
+        tools.append(WeatherTool())                                   // ← SDK
+        checks.append("the user's current location and today's weather there (getCurrentLocation, then getWeather with that place)")
+        summarizeNote = ", including the weather"
+        #endif
+        #if PLATETODAYTOOLS_INCLUDE_CONTACTS
+        tools.append(SearchContactsTool())                            // ← SDK (Path A)
+        #endif
+        let prompt = """
+        What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
+        friendly, concise way\(summarizeNote).
+        """
+        let session = LanguageModelSession(tools: tools)
+
+        do {
+            let response = try await session.respond(to: prompt)
+            state = .ready(response.content)
+        } catch {
+            state = .failed(await GenerationErrorDescription.describe(error))  // ← SDK
+        }
+    }
+}
+
+// MARK: - UI, AppDelegate, App (identical in shape to plate-today's — nothing here changes
+// between Path A and Path B, only the OAuth URL scheme differs: "platetodaytools" instead of
+// "platetoday", so both apps' OAuth callbacks can coexist on the same Mac)
+```
+
+**Tally**: essentially the same line count as plate-today for UI/plumbing, but roughly 130 fewer
+lines overall — every hand-written `Tool` struct plate-today needed for Calendar/Reminders/
+Location/Contacts is gone, replaced by a single `Core` type each. The MCP integration keeps the
+same line count either way (`MCPTool(descriptor:manager:)` vs. a hand-written `TodoistTasksTool`
+struct), but trades pinned arguments for a raw, server-defined tool surface — see the
+`buildTodoistTool()` comment above.
 
 ## `examples/components-demo/Sources/ComponentsDemo/ComponentsDemoApp.swift`
 
