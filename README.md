@@ -9,7 +9,7 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 ## What's in this repo
 
 - **[toolkit/](toolkit/)** — The `localai-cli` CLI toolkit release (zip +
-  checksum) for LocalLM Lab 0.6.0. Download, verify, and install
+  checksum) for LocalLM Lab 0.7.0. Download, verify, and install
   instructions live there. Full CLI reference:
   [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
 - **[examples/](examples/)** — Code samples, split by feature:
@@ -18,8 +18,8 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
   - **localai-cli/** — Python examples calling the `localai-cli` toolkit
     directly (no HTTP server, subprocess + JSON on stdin/stdout).
   - **localai-cli-swift/** — The same examples in Swift.
-  - **plate-today/** and **components-demo/** — reference apps for the
-    LocalLM Lab SDK, see below.
+  - **plate-today/**, **plate-today-tools/**, **repo-qa/**, **workspace-buddy/**,
+    and **components-demo/** — reference apps for the LocalLM Lab SDK, see below.
 - **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
   managing MCP servers, built on the SDK's public API.
 
@@ -31,14 +31,32 @@ OAuth, Keychain-backed token storage), proven under App Sandbox with a signed pa
 Developer ID distribution and the Mac App Store (cleared for internal TestFlight testing). It's
 not a demo dependency — LocalLM Lab itself runs on this SDK.
 
+Two ways to turn a connector or MCP server into something the on-device model can actually call as
+a tool. **Path A**: drop in a ready-made `Tool` Core already ships for it —
+`GetUpcomingEventsTool`, `SearchContactsTool`, `MCPTool` (built at runtime from any MCP server's
+own schema), and the rest — correctness lessons from real, observed on-device model failures
+already baked into their descriptions. **Path B**: hand-write your own adapter directly against
+the underlying connector call (`CalendarAccess`, `MCPServerManager`, etc.) for full control over
+tool names, schemas, and descriptions. Neither is the "real" one — both ship in Core, and an app
+can mix them. See [`docs/sdk-guide.md` §7a](docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
+for the full framing.
+
 - **[docs/sdk-guide.md](docs/sdk-guide.md)** — the full developer guide: linking Core,
-  entitlements, all three MCP auth types, Keychain storage, App Sandbox/MAS signing, and a full
-  function/type reference.
-- **[examples/plate-today/](examples/plate-today/)** — a reference app linking Core directly.
+  entitlements, all three MCP auth types, Keychain storage, App Sandbox/MAS signing, ready-made
+  vs. hand-written tool-calling (§7a), and a full function/type reference.
+- **[examples/plate-today/](examples/plate-today/)** — Calendar + Reminders + the Todoist MCP
+  server, Path B: a hand-written `Tool` adapter per connector.
+- **[examples/plate-today-tools/](examples/plate-today-tools/)** — the exact same app, rebuilt on
+  Core's ready-made Tools (Path A) instead — diff the two to see precisely what changes.
+- **[examples/repo-qa/](examples/repo-qa/)** — a minimal command-line tool, Path A for MCP: builds
+  a `Tool` for a real no-auth MCP server's (Deepwiki's) own tools straight from their live schema.
+- **[examples/workspace-buddy/](examples/workspace-buddy/)** — a local AI-assisted coding example:
+  pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`
+  (Path A).
 - **[examples/components-demo/](examples/components-demo/)** — a reference app built on
-  `Components`' prebuilt MCP server picker UI instead.
-- **[docs/annotated-examples.md](docs/annotated-examples.md)** — both reference apps' full source,
-  every SDK touchpoint marked.
+  `Components`' prebuilt MCP server picker UI instead of wiring one tool programmatically.
+- **[docs/annotated-examples.md](docs/annotated-examples.md)** — every reference app's full
+  source, with every SDK touchpoint marked inline.
 
 ## Roadmap
 
