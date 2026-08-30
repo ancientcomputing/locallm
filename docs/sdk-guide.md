@@ -88,7 +88,7 @@ failure (a silent TCC denial, or a crash on a missing entitlement) rather than a
 
 ### 2a. Info.plist usage-description strings
 
-For every connector you use (Calendar/Reminders shown here — see section 7 for the full connector
+For every connector you use (Calendar/Reminders shown here — see §7 for the full connector
 list and its Info.plist/entitlement requirements):
 
 ```xml
@@ -197,7 +197,7 @@ scene instance unless told otherwise.
 > `Components`' `MCPServerPickerView`).
 
 Adding an MCP server involves one of three auth types, exposed as `MCPAuthType`. `Components`'
-`MCPServerPickerView` (see section 11) already builds a UI over all three if you'd rather not build
+`MCPServerPickerView` (see §11, the Components package) already builds a UI over all three if you'd rather not build
 your own — this section explains what each requires, either way.
 
 | `MCPAuthType` | Real-world example | What your UI must collect |
@@ -253,7 +253,7 @@ your own UI; it's already the most specific information available.
 
 If you write user-facing setup instructions for a Slack-shaped (`.oauthManual`) server — registering
 an app and setting a redirect URL on the *server's* side — that redirect URL must be **your app's
-own scheme** (`yourapp://oauth/callback`, from section 2c). Copying another app's setup
+own scheme** (`yourapp://oauth/callback`, from §2c — the OAuth redirect URI). Copying another app's setup
 instructions verbatim into your own documentation would silently misconfigure every user who
 follows it — their server-side app would try to redirect back into the wrong app (or nowhere)
 instead of yours.
@@ -277,8 +277,8 @@ linking Core on the same Mac.
 Both stores also use the native Keychain Services API (`SecItemAdd`/`SecItemCopyMatching`/etc.)
 directly, not a shell-out to a system command-line tool — safe to use from a sandboxed app
 (including one distributed through the Mac App Store), where shelling out to system binaries is
-unreliable or outright unavailable. Confirmed live under App Sandbox, not just by code review — see
-section 10.
+unreliable or outright unavailable. Confirmed live under App Sandbox, not just by code review —
+see §10 (App Sandbox — building for the Mac App Store).
 
 The one thing to know: if `Bundle.main.bundleIdentifier` is `nil` (an unbundled CLI/test target,
 not a real `.app`), storage falls back to a fixed, non-isolating string — this is expected and fine
@@ -319,8 +319,8 @@ init() {
 ```
 
 This is the single most important line to copy correctly into your own app — the OAuth scheme
-override from section 2c, set before any `connect`/`addServer` call could possibly need it. Your
-`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler (section 2d) at this
+override from §2c (the OAuth redirect URI), set before any `connect`/`addServer` call could possibly need it. Your
+`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler (§2d) at this
 point, and `.handlesExternalEvents(matching: [])` is declared as part of the `Scene` body that
 follows — both need to be in place *before* the window is shown, not bolted on reactively later.
 
@@ -366,10 +366,10 @@ don't write it, but it fires at the same moment — the first time the model inv
 let access = await Connectors.requestAccess(.calendar)
 ```
 
-Core's `Connectors.requestAccess` (see section 7) handles the no-Info.plist-key and
+Core's `Connectors.requestAccess` (see §7) handles the no-Info.plist-key and
 previously-denied cases with clearer errors than calling EventKit directly yourself. The system
 prompt macOS shows here is only possible because of the entitlement + Info.plist usage string from
-section 2a/2b; without those, this call fails silently rather than prompting (see section 2's
+§2a/2b; without those, this call fails silently rather than prompting (see §2's
 failure-sequence writeup). If the user denies, a well-behaved tool returns a plain string like
 `"Calendar access not granted."` — not an error/throw — so the model receives that as the tool's
 result and can reason about it in its final summary, rather than the whole request failing. A
@@ -384,7 +384,7 @@ let connectResult = await manager.addServer(url: serverURL, displayName: "My Ser
 ```
 
 This single call does capability negotiation *and* auth. If the server has no valid cached token
-for this app (see section 4 — checked under `Bundle.main.bundleIdentifier`-scoped Keychain
+for this app (see §4 — checked under `Bundle.main.bundleIdentifier`-scoped Keychain
 storage), `addServer` internally triggers the OAuth authorize flow, which opens the system browser
 — this is the moment a real browser window appears on the user's screen. The call suspends until
 either the user completes sign-in (the browser redirects back to your app's own scheme, which your
@@ -464,7 +464,7 @@ for await servers in manager.serverChanges {
 }
 
 // Or, if you're in a SwiftUI app and want @Published-style reactivity, Components already ships
-// this wrapper — MCPServerManagerObservable, see section 11 — so you don't need to write it
+// this wrapper — MCPServerManagerObservable, see §11 (Components) — so you don't need to write it
 // yourself unless you want to.
 
 // Post-use
@@ -477,7 +477,7 @@ tools to actually pass to your AI engine (context-budget management) is entirely
 SDK doesn't filter this for you. Real servers can expose 40+ tools; don't naively pass all of them
 into a `LanguageModelSession` without picking the ones your prompt actually needs. See
 `MCPToolDescriptor.estimatedTokens` if you want to reason about this quantitatively, or use
-`Components`' `MCPServerPickerView` (section 11), which already builds a per-tool enable/disable UI
+`Components`' `MCPServerPickerView` (§11), which already builds a per-tool enable/disable UI
 over exactly this.
 
 **On tool-calling from FoundationModels**: Core's tools are plain data (`MCPToolDescriptor`,
@@ -522,7 +522,7 @@ above to find out which real `GenerationError` case is actually firing.
 content, e.g. a document or dataset) and **prompts** (server-defined templates). `manager.
 resourcesForSession()`/`.promptsForSession()` list what's currently enabled;
 `manager.readResource(server:uri:)`/`manager.getPrompt(server:name:arguments:)` fetch the real
-content. `Components`' `MCPResourcesView`/`MCPPromptsView` (section 11) already build a UI over
+content. `Components`' `MCPResourcesView`/`MCPPromptsView` (§11) already build a UI over
 both if you don't want to write your own.
 
 ## 6a. The model layer: local models, routing, sessions
@@ -805,7 +805,7 @@ your own confirmation UI, restricted by your own app-level setting — is entire
 decision as the integrating developer.
 
 Each connector requires its own Info.plist usage-description key and entitlement, same pattern as
-section 2a/2b — see that section for Calendar/Reminders; Contacts needs
+§2a/2b — see there for Calendar/Reminders; Contacts needs
 `NSContactsUsageDescription` + `com.apple.security.personal-information.addressbook`, Location
 needs `NSLocationUsageDescription` + `com.apple.security.personal-information.location`.
 `examples/plate-today`'s `SearchContactsTool` and (build-time opt-in) location/weather tools are
@@ -910,13 +910,13 @@ that guidance is baked in verbatim rather than left for you to rediscover indepe
   entirely, unless your app's system prompt/session state grounds it (pairing these with
   `ClockTool` is the practical mitigation, not a guarantee).
 
-**Path B — write your own adapter**, exactly as section 5 Step 4 walks through by hand: call
+**Path B — write your own adapter**, exactly as §5 Step 4 walks through by hand: call
 `CalendarAccess`/`RemindersAccess`/`ContactsAccess`/`LocationAccess` directly, choose your own
 tool names, schemas, and descriptions. Full control, but you're on your own for the pitfalls
 above. Both paths coexist — Path A is a thin wrapper over Path B, not a replacement for it, so
 mixing (ready-made Calendar tools alongside a hand-written Contacts adapter, say) is fine.
 
-**MCP gets the same two paths.** Section 5 Step 5 is Path B for MCP: match a tool by name out of
+**MCP gets the same two paths.** §5 Step 5 is Path B for MCP: match a tool by name out of
 `state.tools`, inspect its `rawSchema` yourself, hand-write a matching `@Generable` `Arguments`
 struct. `MCPTool` is Path A — it builds a `Tool` at runtime directly from an `MCPToolDescriptor`,
 no `Arguments` struct required:
@@ -951,7 +951,7 @@ tool whose schema doesn't build, rather than letting one malformed tool take dow
 Unlike the four connectors above, filesystem access to a user-picked file or folder is **not**
 part of Core, and isn't planned to be. The reason is structural, not an oversight: the actual
 picker UI (`NSOpenPanel`) has to live in your app — Core has no UI of its own, by design, same as
-the MCP server connect/auth UI in section 3. There's no meaningful "unified API" to offer here the
+the MCP server connect/auth UI in §3. There's no meaningful "unified API" to offer here the
 way there is for the four TCC-gated connectors, since the picker itself is host-app UI, not
 something a library call can produce.
 
@@ -1071,7 +1071,7 @@ call, not just a synchronous setup step. `examples/workspace-buddy` shows the as
   this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` (§8a) — the read/write/edit logic
   for once you have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
-  see section 7a.
+  see §7a (ready-made vs. hand-written tools).
 - ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ The 1.0 line adds
   the model layer (§6a): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
   `LocalLMLabSDKInference`) / `makeSession`. Still optional — the MCP-only path is unchanged.
@@ -1094,7 +1094,7 @@ Here's exactly what's needed and what was actually verified.
 
 ### 10a. Entitlements
 
-Add `com.apple.security.app-sandbox` alongside whichever connector entitlements from section 2b
+Add `com.apple.security.app-sandbox` alongside whichever connector entitlements from §2b
 you're already using:
 
 ```xml
@@ -1120,9 +1120,9 @@ specific connector).
   see the caution below).
 - **The MCP client, end-to-end**, including OAuth: connect, sign in via the system browser,
   redirect back into the app, tool calls. No entitlement needed beyond `network.client` — the
-  OAuth redirect is a URL-scheme handoff (section 2c/2d), not a local HTTP listener, so
+  OAuth redirect is a URL-scheme handoff (§2c–2d, the OAuth redirect/callback), not a local HTTP listener, so
   `com.apple.security.network.server` is not needed for this.
-- **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, section 4) — round-tripped
+- **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, §4) — round-tripped
   correctly under the sandboxed per-app-container Keychain access group.
 
 **Not yet tested under sandbox**: Contacts, Location's accuracy/reverse-geocoding behavior beyond
@@ -1141,7 +1141,7 @@ no prompt" result while testing a newly-sandboxed build, reset first:
 tccutil reset Calendar <your-bundle-id>
 tccutil reset Reminders <your-bundle-id>
 tccutil reset AddressBook <your-bundle-id>
-tccutil reset All <your-bundle-id>   # Location can't be reset individually, see section 7
+tccutil reset All <your-bundle-id>   # Location can't be reset individually, see §7 (Connectors)
 ```
 
 ### 10d. One-time Apple Developer Portal setup for MAS signing
@@ -1232,9 +1232,9 @@ for a working reference app using all of it.
 
 - **`MCPServerManagerObservable`** — an `ObservableObject` wrapper around `MCPServerManager`, for
   SwiftUI apps that want `@Published`-style reactivity without writing the wrapper themselves (see
-  section 6's note).
+  §6's note).
 - **`MCPServerPickerView`** — add/list/reconnect/disconnect/remove MCP servers, all three auth
-  types from section 3, per-tool and per-resource enable/disable, and a "Save As…" action that
+  types from §3, per-tool and per-resource enable/disable, and a "Save As…" action that
   exports a server's tools/resources/prompts to a text file.
 - **`MCPOAuthWaitingView`** — shown while an OAuth sign-in is in flight in the system browser;
   `MCPServerPickerView` already uses this internally during its own add-server flow.
@@ -1555,7 +1555,7 @@ final class LocationAccess {
 
 ### Ready-made connector Tools (Path A)
 
-Thin `Tool`-conforming wrappers around the connectors above — see §7a for the framing. Each takes
+Thin `Tool`-conforming wrappers around the connectors above — see §7a (Path A vs Path B) for the framing. Each takes
 an optional custom `description` at init, same pattern as `ClockTool`/`WeatherTool` below.
 
 ```swift
@@ -1837,7 +1837,7 @@ enum MCPServerError: Error, Codable, Sendable {
 }
 ```
 
-**OAuth setup** (section 2c/2d):
+**OAuth setup** (§2c–2d):
 
 ```swift
 enum MCPOAuthFlow {
