@@ -6,32 +6,35 @@ see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspa
 A local, more modest take on AI-assisted coding — not Claude Code, but a real demonstration of
 what's possible entirely on-device.
 
-Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled.
+Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
 
-## Requires SDK 0.8.0+
+## The macOS 27 line
 
-Same situation as `plate-today-tools`/`repo-qa`, same reason: this app's whole point is
-`WorkspaceAccess`/`WorkspaceTools`, which shipped starting with `0.8.0`. Building against
-`0.7.0`/`0.7.1` **fails to compile** — `cannot find 'ListWorkspaceFilesTool' in scope` — not
-"runs with less functionality."
+This branch tracks `1.0.0-beta.1` (the macOS 27 line — `Package.swift` is
+`platforms: [.macOS("27.0")]`). Build with the **Xcode 27 beta**
+(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`); a stable Xcode fails with
+`'v27' is unavailable`. (`WorkspaceAccess`/`WorkspaceTools`, this app's whole point, first
+shipped in `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)
 
 ## Getting the SDK
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
 ```
 
 ## Real build: `packaging/build-and-sign.sh`
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 \
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
 ```
 
 Unlike `plate-today`, sandboxing here is **not** a build-time opt-in — this app is sandboxed
-unconditionally. That's what actually makes the security-scoped bookmark pattern in §8 necessary
+unconditionally. That's what actually makes the security-scoped bookmark pattern in §8 (Filesystem access) necessary
 to demonstrate: unsandboxed, a plainly-remembered folder path would just keep working across
 relaunches, and the example wouldn't prove anything about the SDK's real guidance. No
 `NS*UsageDescription` key or TCC prompt is involved — `NSOpenPanel` plus the

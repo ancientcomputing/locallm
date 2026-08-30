@@ -12,22 +12,26 @@ OAuth), per-tool/per-resource enable toggles, live "Tools available this session
 [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-for-mcp-server-management)
 for what `Components` provides and how it's meant to be dropped into your own app.
 
-Requires macOS 26+ on Apple Silicon.
+Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta to build).
 
 ## Getting the SDK
 
-Same as `plate-today` — nothing to download by hand, `Package.swift` (both this app's and the
+This branch tracks `1.0.0-beta.1` (the macOS 27 line). Build with the **Xcode 27 beta**
+(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
+`'v27' is unavailable`. Nothing to download by hand — `Package.swift` (both this app's and the
 sibling [`Components`](../../Components/) package it depends on) requires an explicit
 `LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency:
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
 ```
 
 ## Quick dev-loop run
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 swift run
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run
 ```
 
 Unlike `plate-today`, this app needs no TCC entitlements to function — the MCP server picker
@@ -38,7 +42,8 @@ the packaged build below to test it as a real, distributable `.app`.
 ## Real build: `packaging/build-and-sign.sh`
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 \
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -54,7 +59,7 @@ NOTARIZE_APP=0 \
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set; usually unneeded if your `KEYCHAIN_PROFILE` already implies one team. |
-| `DEVELOPER_DIR` | No | `/Applications/Xcode.app/Contents/Developer` | Only needed with multiple Xcode installs. |
+| `DEVELOPER_DIR` | Yes (macOS 27 line) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
 
 There's no MAS-signing script for this app (no equivalent of `plate-today`'s
 `build-and-sign-mas.sh`) — the standard `build-and-sign.sh` above is Developer ID / Gatekeeper

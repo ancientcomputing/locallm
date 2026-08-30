@@ -11,19 +11,21 @@ not just prose. Every divergence is marked inline with a `DIFF FROM plate-today:
 including the annotated walkthrough in
 [`docs/annotated-examples.md`](../../docs/annotated-examples.md).
 
-Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled.
+Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
 
-## Requires SDK 0.8.0+
+## The macOS 27 line
 
-`GetUpcomingEventsTool`/`RemindersTools`/`ContactsTools`/`LocationTools`/`MCPToolAdapter` shipped
-in Core starting with `0.8.0` — building this example against `0.7.0`/`0.7.1` fails to compile
-(`cannot find 'GetUpcomingEventsTool' in scope`), not "runs with less functionality." `0.8.0` and
-later are fine.
+This branch tracks `1.0.0-beta.1` (the macOS 27 line — `Package.swift` is
+`platforms: [.macOS("27.0")]`). Build with the **Xcode 27 beta**
+(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`); a stable Xcode fails with
+`'v27' is unavailable`. (The ready-made connector `Tool`s this example depends on first shipped
+in `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)
 
 ## Getting the SDK
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
 ```
 
 Same `LOCALLM_SDK_VERSION` mechanism as `plate-today` — see that example's README for the general
@@ -36,7 +38,8 @@ Same script shape as `plate-today`'s — Calendar/Reminders TCC prompts and the 
 both require a properly signed `.app`, not a bare `swift build` binary.
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 \
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.1 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh

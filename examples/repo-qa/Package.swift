@@ -72,7 +72,15 @@ let package = Package(
         ),
         .executableTarget(
             name: "RepoQA",
-            dependencies: ["LocalLMLabSDKCore"]
+            dependencies: ["LocalLMLabSDKCore"],
+            linkerSettings: [
+                // SwiftPM's Swift Build system (default in the Xcode 27 toolchain) gives a bare
+                // executable target no LC_RPATH, so `@rpath/LocalLMLabSDKCore.framework/...`
+                // resolves to nothing and the tool aborts at launch ("no LC_RPATH's found").
+                // SwiftPM extracts the framework next to the built binary, so point rpath at
+                // @executable_path. Same fix as code-buddy.
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])
+            ]
         )
     ]
 )
