@@ -1063,9 +1063,13 @@ call, not just a synchronous setup step. `examples/workspace-buddy` shows the as
 
 ## 9. What's NOT in Core yet
 
-- **Still no filesystem picker/bookmark UI, and still not planned** — that has to live in the
-  host app, see section 8. What *is* in Core now: `WorkspaceAccess`/`WorkspaceTools` (section 8a),
-  the read/write/edit logic for once you already have a resolved folder URL.
+- **No filesystem picker/bookmark UI in Core, and not planned** — a folder picker is host-app
+  UI and Core ships no UI at all. But you're not writing it from scratch: §8 has a complete,
+  copy-pasteable `FolderAccess` (`NSOpenPanel` + security-scoped bookmark persistence +
+  the async-aware access window a `LanguageModelSession` needs), and
+  [`workspace-buddy`](../examples/workspace-buddy/) is a full reference app that does exactly
+  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` (§8a) — the read/write/edit logic
+  for once you have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
   see section 7a.
 - ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ The 1.0 line adds
