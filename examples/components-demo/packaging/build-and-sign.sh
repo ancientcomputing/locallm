@@ -106,15 +106,21 @@ xcrun actool --output-format human-readable-text --notices --warnings --errors \
 echo "Building Components Demo for arm64..."
 swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift"
 
-BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/ComponentsDemo"
+# Ask SwiftPM where it actually put the products rather than hardcoding a triple subdir. The
+# classic build system uses `<build-path>/<triple>/release`; the Swift Build system (default in
+# the Xcode 27 toolchain) uses `<build-path>/out/Products/Release`. --show-bin-path is correct
+# for whichever ran, and doesn't rebuild.
+BIN_DIR="$(swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift" --show-bin-path)"
+
+BINARY="$BIN_DIR/ComponentsDemo"
 # Components links against Core (a binaryTarget in Components' own Package.swift) via @rpath, same
 # as plate-today's binaryTarget path — see that script's comment for the full "Library not loaded"
 # failure-mode writeup. Unlike plate-today, THIS app only ever depends on Core through Components'
 # binary boundary (never as source), so it only ever produces the framework shape below, never the
 # flat-dylib shape — still detecting both for consistency with the other packaging script, and in
 # case that ever changes.
-CORE_DYLIB="$BUILD_DIR/swift/arm64-apple-macosx/release/libLocalLMLabSDKCore.dylib"
-CORE_FRAMEWORK="$BUILD_DIR/swift/arm64-apple-macosx/release/LocalLMLabSDKCore.framework"
+CORE_DYLIB="$BIN_DIR/libLocalLMLabSDKCore.dylib"
+CORE_FRAMEWORK="$BIN_DIR/LocalLMLabSDKCore.framework"
 if [[ -f "$CORE_DYLIB" ]]; then
   CORE_ARTIFACT_NAME="libLocalLMLabSDKCore.dylib"
   CORE_ARTIFACT_SRC="$CORE_DYLIB"
@@ -147,6 +153,11 @@ cp "$ICON_BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$ICON_BUILD_DIR/Assets.car" "$RESOURCES_DIR/Assets.car"
 cp "$BINARY" "$MACOS_DIR/ComponentsDemo"
 cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
+# The published Core.xcframework zip currently carries AppleDouble (`._*`) sidecar files and
+# stray xattrs; codesign --deep --strict rejects a bundle containing that "detritus". Strip it
+# from the copy we're about to sign. (Root fix belongs in the SDK's xcframework zip step.)
+find "$MACOS_DIR/$CORE_ARTIFACT_NAME" -name '._*' -delete
+xattr -cr "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 chmod +x "$MACOS_DIR/ComponentsDemo"
 

@@ -103,14 +103,20 @@ xcrun actool --output-format human-readable-text --notices --warnings --errors \
 echo "Building Workspace Buddy for arm64..."
 swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift"
 
-BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/WorkspaceBuddy"
+# Ask SwiftPM where it actually put the products rather than hardcoding a triple subdir. The
+# classic build system uses `<build-path>/<triple>/release`; the Swift Build system (default in
+# the Xcode 27 toolchain) uses `<build-path>/out/Products/Release`. --show-bin-path is correct
+# for whichever ran, and doesn't rebuild.
+BIN_DIR="$(swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift" --show-bin-path)"
+
+BINARY="$BIN_DIR/WorkspaceBuddy"
 # Core is built as a dynamic library product, so WorkspaceBuddy links against it via @rpath at
 # runtime rather than statically — see plate-today-tools' build-and-sign.sh for the fuller
 # writeup of why a packaged .app needs the Core artifact copied in explicitly and re-signed, and
 # why the on-disk shape (flat dylib vs. framework bundle) differs between this private repo's
 # path-dependency build and the public locallm copy's binaryTarget build.
-CORE_DYLIB="$BUILD_DIR/swift/arm64-apple-macosx/release/libLocalLMLabSDKCore.dylib"
-CORE_FRAMEWORK="$BUILD_DIR/swift/arm64-apple-macosx/release/LocalLMLabSDKCore.framework"
+CORE_DYLIB="$BIN_DIR/libLocalLMLabSDKCore.dylib"
+CORE_FRAMEWORK="$BIN_DIR/LocalLMLabSDKCore.framework"
 if [[ -f "$CORE_DYLIB" ]]; then
   CORE_ARTIFACT_NAME="libLocalLMLabSDKCore.dylib"
   CORE_ARTIFACT_SRC="$CORE_DYLIB"
@@ -136,6 +142,11 @@ cp "$ICON_BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$ICON_BUILD_DIR/Assets.car" "$RESOURCES_DIR/Assets.car"
 cp "$BINARY" "$MACOS_DIR/WorkspaceBuddy"
 cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
+# The published Core.xcframework zip currently carries AppleDouble (`._*`) sidecar files and
+# stray xattrs; codesign --deep --strict rejects a bundle containing that "detritus". Strip it
+# from the copy we're about to sign. (Root fix belongs in the SDK's xcframework zip step.)
+find "$MACOS_DIR/$CORE_ARTIFACT_NAME" -name '._*' -delete
+xattr -cr "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 chmod +x "$MACOS_DIR/WorkspaceBuddy"
 
