@@ -183,6 +183,19 @@ scene instance unless told otherwise.
 
 ## 3. Connecting to an MCP server: three auth options, and how to pick between them
 
+> **Reach for this when** your app's pitch is "connect your own tools" — Todoist, GitHub,
+> Linear, an internal MCP server — rather than you hardcoding every integration one by one.
+> `MCPServerManager.addServer` discovers a server's tools at connect time and hands you back
+> plain descriptors; *you* decide which become model tools (§6, §7a). The auth handling below
+> is the entire reason connecting isn't a one-liner: a server needs no auth, a static token,
+> or a browser OAuth round-trip, and you usually can't tell which up front.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
+> [`plate-today-tools`](../examples/plate-today-tools/) (Todoist over OAuth),
+> [`repo-qa`](../examples/repo-qa/) (DeepWiki, `.none`),
+> [`components-demo`](../examples/components-demo/) (all three auth types, via
+> `Components`' `MCPServerPickerView`).
+
 Adding an MCP server involves one of three auth types, exposed as `MCPAuthType`. `Components`'
 `MCPServerPickerView` (see section 11) already builds a UI over all three if you'd rather not build
 your own — this section explains what each requires, either way.
@@ -246,6 +259,16 @@ follows it — their server-side app would try to redirect back into the wrong a
 instead of yours.
 
 ## 4. Keychain storage — automatic isolation, native API, sandbox-safe
+
+> **You don't reach for this — you get it for free.** There is no "set up credential storage"
+> step: `MCPServerManager` persists OAuth tokens and PATs to the Keychain for you, scoped to
+> your bundle ID, through the native Security API (so it works under App Sandbox and on the
+> Mac App Store). **Read this section only if** you're auditing what lands in the Keychain,
+> shipping an unbundled CLI (isolation degrades — see the last paragraph), or want to confirm
+> you really don't need to write this yourself.
+>
+> **Examples that rely on it:** every MCP example; `plate-today`'s Todoist OAuth is the one
+> that exercises the token round-trip end to end.
 
 `MCPOAuthTokenStore`/`MCPPATStore` scope their Keychain storage to `Bundle.main.bundleIdentifier`
 automatically — you don't need to do anything for isolation between your app and any other app
@@ -380,6 +403,17 @@ nothing at all, letting the cached token persist across launches the way a norma
 signed in" behavior works.
 
 ## 6. General API reference
+
+> **This is the MCP client's mechanics** — connect, list tools, call a tool, observe state
+> changes, tear down, plus resources and prompts. Use `MCPServerManager` directly when you're
+> building your own server-management UI or a headless/CLI integration; if you want a
+> ready-made UI over exactly this, `Components` (§11) wraps all of it. The **resources /
+> prompts** methods at the end matter only for servers that expose readable content or
+> prompt templates, not just tools.
+>
+> **Examples that use it:** [`repo-qa`](../examples/repo-qa/) is the smallest end-to-end use
+> (connect → build tools → run a turn); [`components-demo`](../examples/components-demo/)
+> additionally exercises resources and prompts.
 
 ```swift
 let manager = MCPServerManager()  // NOT a singleton — you own the instance
@@ -668,6 +702,20 @@ are FoundationModels `Tool`s you drop straight into `makeSession`. → *`code-bu
 
 ## 7. Connectors: Calendar, Reminders, Contacts, Location
 
+> **Reach for these when** your app's value is "the model can see — or change — my calendar,
+> reminders, contacts, or where I am," and you don't want to hand-roll the EventKit /
+> Contacts / CoreLocation permission dance and its error/settings-redirect edge cases. Core
+> gives you one uniform request/status/error lifecycle (`Connectors`) across all four, plus
+> per-connector read *and* write methods. **Exposing the write methods to a model is entirely
+> your decision** — Core enforces nothing beyond the OS's own TCC grant (see the "no built-in
+> gate" note below).
+>
+> **Examples that use them:** [`plate-today`](../examples/plate-today/) reads Calendar +
+> Reminders + Contacts via hand-written `Tool` adapters (Path B);
+> [`plate-today-tools`](../examples/plate-today-tools/) is the identical app rebuilt on
+> Core's ready-made connector `Tool`s (Path A) — diff the two. Neither wires the write
+> methods; those ship but aren't demonstrated in an example yet.
+
 Core ships four permission-gated connectors, each wrapping the relevant system framework
 (EventKit for Calendar/Reminders, Contacts, CoreLocation) with the request/status/error handling
 already worked out. A unified `Connectors` facade covers the permission lifecycle (identical in
@@ -774,7 +822,25 @@ Both accept an optional custom `description` in their initializer (`ClockTool(de
 "...")`) if you want to override how the model sees the tool — otherwise each falls back to its own
 `defaultDescription`.
 
+**Reach for `ClockTool` specifically** whenever a session deals in relative dates ("tomorrow",
+"next week") — no local model has a built-in notion of "now", and pairing it with the
+Calendar/Reminders tools is the practical fix for their date-grounding caveat above.
+`ClockTool` is used by nearly every example; `code-buddy` and `repo-qa` include it as a
+cross-check that tool-calling works at all.
+
 ### 7a. Two paths to tool-calling: ready-made Tools, or write your own
+
+> **This is the decision you hit** the moment you want a `LanguageModelSession` to actually
+> *call* a connector or MCP tool. **Path A** (Core's ready-made `Tool`s / `MCPTool`) is the
+> default — drop them in an array, done, with hard-won on-device-model guidance baked into
+> their descriptions. **Path B** (hand-write the adapter) is for when you need control over a
+> tool's name, schema, or description. They mix freely.
+>
+> **Examples per path:** Path A — [`plate-today-tools`](../examples/plate-today-tools/)
+> (connectors), [`repo-qa`](../examples/repo-qa/) (`MCPTool`),
+> [`workspace-buddy`](../examples/workspace-buddy/) / [`code-buddy`](../examples/code-buddy/)
+> (Workspace tools). Path B — [`plate-today`](../examples/plate-today/) (connectors) and §5
+> Step 5 (MCP, by hand).
 
 Everything above (`CalendarAccess`, `RemindersAccess`, `ContactsAccess`, `LocationAccess`,
 `MCPServerManager`) is a plain data-access layer — calling `CalendarAccess.updateEvent(...)`
@@ -848,6 +914,16 @@ call it per-tool inside a loop and skip (or fall back to a hand-written Path B a
 tool whose schema doesn't build, rather than letting one malformed tool take down your whole list.
 
 ## 8. Filesystem access: security-scoped bookmarks (example, not in Core)
+
+> **You hit this when** you want the model to read or edit files in a folder the user picks —
+> a coding assistant, a "summarize this project" tool, a notes agent. Two halves: getting a
+> usable URL that survives relaunch under sandboxing (this section — **copy-paste example
+> code, not a Core API**) and then acting on it (§8a — that half *is* Core:
+> `WorkspaceAccess` + the Workspace `Tool`s).
+>
+> **Examples:** [`workspace-buddy`](../examples/workspace-buddy/) is the sandboxed folder
+> picker + `WorkspaceTools` end to end; [`code-buddy`](../examples/code-buddy/) skips the
+> picker (a CLI passes a path) and goes straight to the Workspace tools.
 
 Unlike the four connectors above, filesystem access to a user-picked file or folder is **not**
 part of Core, and isn't planned to be. The reason is structural, not an oversight: the actual
@@ -1107,6 +1183,17 @@ notarization is the other supported path (`build-and-sign.sh`), for distributing
 App Store.
 
 ## 11. Components: prebuilt SwiftUI for MCP server management
+
+> **Reach for this when** you want a working "manage MCP servers" screen — add / remove /
+> reconnect, all three auth types from §3, per-tool and per-resource enable/disable,
+> resource + prompt browsing — without building that UI yourself. It's SwiftUI, entirely
+> optional, and layered strictly on Core's public API (nothing here you couldn't write). Also
+> ships `ModelPickerView` / `ClaudeAuthField` for the model layer (§6a). **Skip it if** your
+> app has no user-facing server management, or your design is too bespoke to reuse these views
+> — go straight to `MCPServerManager` (§6).
+>
+> **Example that uses it:** [`components-demo`](../examples/components-demo/) — essentially
+> the whole app is these views.
 
 See [`annotated-examples.md`](annotated-examples.md) for `components-demo`'s full source with
 every `Components`/`Core` touchpoint marked.
@@ -1659,6 +1746,9 @@ struct MCPServerState: Codable, Sendable {
 
 enum MCPAuthType: String, Codable, Sendable { case none, pat, oauthManual }
 enum MCPConnectionStatus: String, Codable, Sendable { case connected, disconnected, connecting, failed }
+// MCPConnectionStatus and MCPServerError are non-frozen (1.0) — an exhaustive switch needs
+// `@unknown default`. This is the only source-break for an MCP-only 0.8.x consumer; see
+// migrating-to-1.0.md.
 
 struct MCPToolDescriptor: Codable, Sendable {
     var serverID: MCPServerID
