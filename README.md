@@ -25,11 +25,17 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 
 ## LocalLM Lab SDK
 
+> **1.0.0-beta (macOS 27 line)** — adds the model layer: offer Apple's on-device model, Claude,
+> and locally-run open-weight (MLX) models behind one API. Requires the macOS 27 + Xcode 27
+> betas. Coming from `0.8.x`? See **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** —
+> it's mostly additive, with one enum-resilience compile caveat.
+
 Building your own native macOS app instead? `LocalLMLabSDKCore` links directly into your app's
-binary — Calendar/Reminders/Contacts/Location access plus a full MCP client (tool discovery,
-OAuth, Keychain-backed token storage), proven under App Sandbox with a signed path to both
-Developer ID distribution and the Mac App Store (cleared for internal TestFlight testing). It's
-not a demo dependency — LocalLM Lab itself runs on this SDK.
+binary — Calendar/Reminders/Contacts/Location access, a full MCP client (tool discovery, OAuth,
+Keychain-backed token storage), Core's Workspace tools, and (1.0) the model layer — routing +
+residency across `SystemModelProvider` / `ClaudeModelProvider` / `MLXModelProvider`. Proven under
+App Sandbox with a signed path to both Developer ID distribution and the Mac App Store. It's not
+a demo dependency — LocalLM Lab itself runs on this SDK.
 
 Two ways to turn a connector or MCP server into something the on-device model can actually call as
 a tool. **Path A**: drop in a ready-made `Tool` Core already ships for it —
@@ -41,9 +47,12 @@ tool names, schemas, and descriptions. Neither is the "real" one — both ship i
 can mix them. See [`docs/sdk-guide.md` §7a](docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
 for the full framing.
 
-- **[docs/sdk-guide.md](docs/sdk-guide.md)** — the full developer guide: linking Core,
-  entitlements, all three MCP auth types, Keychain storage, App Sandbox/MAS signing, ready-made
-  vs. hand-written tool-calling (§7a), and a full function/type reference.
+- **[docs/sdk-guide.md](docs/sdk-guide.md)** — the full developer guide: linking Core, the model
+  layer (§6a), entitlements, all three MCP auth types, Keychain storage, App Sandbox/MAS signing,
+  ready-made vs. hand-written tool-calling (§7a), and a full function/type reference (§12).
+- **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** — `0.8.x` → `1.0` (macOS 27).
+- **[docs/api-surface.md](docs/api-surface.md)** — machine-generated public API list (the check
+  behind §12).
 - **[examples/plate-today/](examples/plate-today/)** — Calendar + Reminders + the Todoist MCP
   server, Path B: a hand-written `Tool` adapter per connector.
 - **[examples/plate-today-tools/](examples/plate-today-tools/)** — the exact same app, rebuilt on
