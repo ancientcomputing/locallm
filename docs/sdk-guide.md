@@ -9,7 +9,7 @@ surface — see [`examples/plate-today`](../examples/plate-today) (and its Path 
 ready-made Tools instead of hand-written ones, see §7a), [`examples/repo-qa`](../examples/repo-qa)
 (a minimal command-line `MCPTool` example against a no-auth server),
 [`examples/workspace-buddy`](../examples/workspace-buddy) (a local AI-assisted coding example —
-pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, §8a), and
+pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, §8a — WorkspaceAccess/WorkspaceTools), and
 [`examples/components-demo`](../examples/components-demo) for the working reference apps this
 guide is drawn from.
 
@@ -88,7 +88,7 @@ failure (a silent TCC denial, or a crash on a missing entitlement) rather than a
 
 ### 2a. Info.plist usage-description strings
 
-For every connector you use (Calendar/Reminders shown here — see §7 for the full connector
+For every connector you use (Calendar/Reminders shown here — see §7 (Connectors) for the full connector
 list and its Info.plist/entitlement requirements):
 
 ```xml
@@ -320,7 +320,7 @@ init() {
 
 This is the single most important line to copy correctly into your own app — the OAuth scheme
 override from §2c (the OAuth redirect URI), set before any `connect`/`addServer` call could possibly need it. Your
-`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler (§2d) at this
+`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler (§2d — wiring the OAuth callback) at this
 point, and `.handlesExternalEvents(matching: [])` is declared as part of the `Scene` body that
 follows — both need to be in place *before* the window is shown, not bolted on reactively later.
 
@@ -384,7 +384,7 @@ let connectResult = await manager.addServer(url: serverURL, displayName: "My Ser
 ```
 
 This single call does capability negotiation *and* auth. If the server has no valid cached token
-for this app (see §4 — checked under `Bundle.main.bundleIdentifier`-scoped Keychain
+for this app (see §4, Keychain storage — checked under `Bundle.main.bundleIdentifier`-scoped
 storage), `addServer` internally triggers the OAuth authorize flow, which opens the system browser
 — this is the moment a real browser window appears on the user's screen. The call suspends until
 either the user completes sign-in (the browser redirects back to your app's own scheme, which your
@@ -477,7 +477,7 @@ tools to actually pass to your AI engine (context-budget management) is entirely
 SDK doesn't filter this for you. Real servers can expose 40+ tools; don't naively pass all of them
 into a `LanguageModelSession` without picking the ones your prompt actually needs. See
 `MCPToolDescriptor.estimatedTokens` if you want to reason about this quantitatively, or use
-`Components`' `MCPServerPickerView` (§11), which already builds a per-tool enable/disable UI
+`Components`' `MCPServerPickerView` (§11 — Components), which already builds a per-tool enable/disable UI
 over exactly this.
 
 **On tool-calling from FoundationModels**: Core's tools are plain data (`MCPToolDescriptor`,
@@ -522,7 +522,7 @@ above to find out which real `GenerationError` case is actually firing.
 content, e.g. a document or dataset) and **prompts** (server-defined templates). `manager.
 resourcesForSession()`/`.promptsForSession()` list what's currently enabled;
 `manager.readResource(server:uri:)`/`manager.getPrompt(server:name:arguments:)` fetch the real
-content. `Components`' `MCPResourcesView`/`MCPPromptsView` (§11) already build a UI over
+content. `Components`' `MCPResourcesView`/`MCPPromptsView` (§11 — Components) already build a UI over
 both if you don't want to write your own.
 
 ## 6a. The model layer: local models, routing, sessions
@@ -772,7 +772,7 @@ may have no due date at all, unlike an event's date, which is required). `Contac
 addContact` creates a new contact; `.updateContact`/`.deleteContact` locate an existing one by
 given name, with an optional current family name to disambiguate. `newPhoneNumbers`/`newEmails`
 on `updateContact`, when provided, replace that contact's entire existing list rather than adding
-to it. Full signatures are in §12 below.
+to it. Full signatures are in §12 (the full function/type reference) below.
 
 **Why name-based lookup, not an identifier** (`EventSummary`/`ReminderSummary`/`ContactSummary`
 still carry `eventIdentifier`/`calendarItemIdentifier`/`identifier` for any consumer that wants
@@ -951,7 +951,7 @@ tool whose schema doesn't build, rather than letting one malformed tool take dow
 Unlike the four connectors above, filesystem access to a user-picked file or folder is **not**
 part of Core, and isn't planned to be. The reason is structural, not an oversight: the actual
 picker UI (`NSOpenPanel`) has to live in your app — Core has no UI of its own, by design, same as
-the MCP server connect/auth UI in §3. There's no meaningful "unified API" to offer here the
+the MCP server connect/auth UI in §3 (MCP auth options). There's no meaningful "unified API" to offer here the
 way there is for the four TCC-gated connectors, since the picker itself is host-app UI, not
 something a library call can produce.
 
@@ -1069,7 +1069,7 @@ call, not just a synchronous setup step. `examples/workspace-buddy` shows the as
   (`NSOpenPanel` + security-scoped bookmark persistence + the async-aware access window a
   `LanguageModelSession` needs), and
   [`workspace-buddy`](../examples/workspace-buddy/) is a full reference app that does exactly
-  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` (§8a) — the read/write/edit logic
+  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` (§8a — Workspace tools) — the read/write/edit logic
   for once you have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
   see §7a (ready-made vs. hand-written tools).
@@ -1218,7 +1218,7 @@ App Store.
 > optional, and layered strictly on Core's public API (nothing here you couldn't write). Also
 > ships `ModelPickerView` / `ClaudeAuthField` for the model layer (§6a). **Skip it if** your
 > app has no user-facing server management, or your design is too bespoke to reuse these views
-> — go straight to `MCPServerManager` (§6).
+> — go straight to `MCPServerManager` (§6 — the MCP client API).
 >
 > **Example that uses it:** [`components-demo`](../examples/components-demo/) — essentially
 > the whole app is these views.
@@ -1645,7 +1645,7 @@ struct GetCurrentLocationTool: Tool {
 ### Filesystem workspace (`WorkspaceAccess`/`WorkspaceTools`)
 
 Not a connector — no `requestAccess()`, no OS permission dialog. Operates on a root `URL` your
-app already resolved via a security-scoped bookmark (§8); the picker itself is the one-time
+app already resolved via a security-scoped bookmark (§8 — Filesystem access); the picker itself is the one-time
 consent. `WorkspaceAccess` is the raw data layer; `WorkspaceTools` are the matching Path A `Tool`s,
 each taking the resolved root `URL` at init.
 
@@ -1862,7 +1862,7 @@ Builds a `Tool` at runtime directly from an `MCPToolDescriptor`'s real JSON Sche
 hand-written `Arguments` struct. `Arguments` is `GeneratedContent` (not a static type), and
 `parameters` is computed from the tool's schema rather than derived from `Arguments` the usual
 way. The initializer is throwing — a tool whose schema doesn't build should be skipped, not let
-crash your whole tool list; see §7a for the recommended loop shape.
+crash your whole tool list; see §7a (the two tool-calling paths) for the recommended loop shape.
 
 ```swift
 struct MCPTool: Tool {
