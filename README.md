@@ -53,6 +53,8 @@ for the full framing.
 - **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** — `0.8.x` → `1.0` (macOS 27).
 - **[docs/api-surface.md](docs/api-surface.md)** — machine-generated public API list (the check
   behind §12).
+- **[docs/tested-models.md](docs/tested-models.md)** — a point-in-time snapshot of which
+  open-weight (MLX) models actually tool-call, and why several don't.
 - **[examples/plate-today/](examples/plate-today/)** — Calendar + Reminders + the Todoist MCP
   server, Path B: a hand-written `Tool` adapter per connector.
 - **[examples/plate-today-tools/](examples/plate-today-tools/)** — the exact same app, rebuilt on

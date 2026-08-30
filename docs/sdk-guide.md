@@ -569,6 +569,8 @@ for try await event in mlx.download("mlx-community/Qwen3-8B-4bit") {
 // Post-download smoke test — a real prompt + a trivial tool call. Authoritative for
 // that model's ModelCapabilities (some downloaded models can't reliably tool-call).
 let report = await mlx.capabilityProbe(installed.id)   // ModelCapabilityReport
+// This is authoritative. For a starting shortlist of what tool-calls and what doesn't,
+// see docs/tested-models.md — but always confirm your own model with capabilityProbe.
 
 mlx.installed        // [InstalledModel] — what's on disk now
 mlx.storageUsed      // total bytes of weights
