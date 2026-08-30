@@ -949,10 +949,11 @@ of whether it uses `Components` or not.
 
 ## `examples/code-buddy/Sources/CodeBuddy/main.swift`
 
-The one example that exercises the **model layer** — and the only one linking a second binary,
-`LocalLMLabSDKInference.xcframework` (the MLX runtime). Lines that touch it are marked
-`// ← SDK (Inference)`; `// ← SDK` is Core as elsewhere. A CLI coding agent: point it at a repo
-and a task, it downloads an open-weight MLX model on first run, then drives Core's Workspace
+The fullest **model-layer** example (see also [`repo-qa-local`](../examples/repo-qa-local/) for
+the minimal one), and one of two linking a second binary, `LocalLMLabSDKInference.xcframework`
+(the MLX runtime). Lines that touch it are marked `// ← SDK (Inference)`; `// ← SDK` is Core as
+elsewhere. A CLI coding agent: point it at a repo and a task, it downloads an open-weight MLX
+model on first run, then drives Core's Workspace
 tools + host `Process` tools + (auto) MCP tools through a routed `LocalLMLabSession`. See
 [`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) for the prose.
 

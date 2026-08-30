@@ -1,7 +1,8 @@
 # Repo Q&A
 
 The SDK's third reference app, and its simplest: a plain command-line tool that answers questions
-about a GitHub repository's own documentation, using Apple's on-device model and
+about a GitHub repository's own documentation, using **Apple's on-device model**
+(`SystemLanguageModel.default` + a plain `LanguageModelSession` — no model layer) and
 [Deepwiki](https://deepwiki.com)'s real, no-auth hosted MCP server
 (`https://mcp.deepwiki.com/mcp`) — entirely through Core's `MCPTool` (Path A, see
 [`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)).
@@ -9,6 +10,12 @@ about a GitHub repository's own documentation, using Apple's on-device model and
 ```
 swift run RepoQA anthropics/claude-code "What is the plugin system?"
 ```
+
+> **Want to run this against a model you download and run locally instead?** See
+> [`repo-qa-local`](../repo-qa-local) — the same tool, the same Deepwiki `MCPTool` setup, but the
+> answer comes from an open-weight MLX model (`mlx-community/Qwen3-8B-4bit` by default) routed
+> through the 1.0 model layer. It's the smallest possible model-layer + MLX example; diff the two
+> `main.swift`s to see exactly what the model layer adds.
 
 Different narrative from `plate-today`/`plate-today-tools` on purpose: those two demonstrate
 Calendar/Reminders/Todoist, all either TCC-gated or OAuth-gated, needing a signed `.app` bundle

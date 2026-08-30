@@ -68,9 +68,12 @@ for the full framing.
   (Path A).
 - **[examples/components-demo/](examples/components-demo/)** — a reference app built on
   `Components`' prebuilt MCP server picker UI instead of wiring one tool programmatically.
+- **[examples/repo-qa-local/](examples/repo-qa-local/)** — `repo-qa` with the answer coming from
+  a locally-run open-weight MLX model instead of Apple's on-device one. The smallest model-layer
+  + `LocalLMLabSDKInference` example.
 - **[examples/code-buddy/](examples/code-buddy/)** — the model layer end to end: a CLI coding
   agent routing `.heavy` / `.light` to locally-run MLX models, with Core's Workspace tools and
-  an MCP docs server. The only example linking `LocalLMLabSDKInference`.
+  an MCP docs server.
 - **[docs/annotated-examples.md](docs/annotated-examples.md)** — every reference app's full
   source, with every SDK touchpoint marked inline.
 

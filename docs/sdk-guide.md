@@ -1260,12 +1260,12 @@ and gotchas — use this one when you just need to check a signature.
 
 | API area | Example | Path |
 |---|---|---|
-| The model layer — `LocalLMLab`, routing, `MLXModelProvider`, sessions, residency, `ContextBudget` | [`code-buddy`](../examples/code-buddy/) | — |
+| The model layer — `LocalLMLab`, routing, `MLXModelProvider`, sessions, residency, `ContextBudget` | [`code-buddy`](../examples/code-buddy/) (full) · [`repo-qa-local`](../examples/repo-qa-local/) (minimal) | — |
 | Workspace tools (`WorkspaceAccess` / `SearchWorkspaceTool` / `ApplyPatchTool` / …) | [`workspace-buddy`](../examples/workspace-buddy/) (Core-only) · `code-buddy` | A |
 | Connectors + ready-made connector `Tool`s | [`plate-today-tools`](../examples/plate-today-tools/) | A |
 | Connectors via hand-written `Tool` adapters | [`plate-today`](../examples/plate-today/) | B |
 | MCP client + OAuth (Todoist) + Keychain | `plate-today` / `plate-today-tools` | — |
-| `MCPTool` built from a live server schema (no hand-written `Arguments`) | [`repo-qa`](../examples/repo-qa/) | A |
+| `MCPTool` built from a live server schema (no hand-written `Arguments`) | [`repo-qa`](../examples/repo-qa/) · [`repo-qa-local`](../examples/repo-qa-local/) | A |
 | `Components` — `MCPServerPickerView` / `MCPServerManagerObservable` / resources / prompts | [`components-demo`](../examples/components-demo/) | — |
 
 ### The model layer (`LocalLMLab`, routing, providers, sessions)
