@@ -296,6 +296,18 @@ the result → clean up. Use this as the template for wiring your own app; the s
 the tools differ. The actual source is right there in this repo if you want to read or run it
 directly rather than following along in prose.
 
+> **This is your first look at tools + connectors — and there's a shortcut.** Core gives a model
+> a tool two ways ([§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)):
+> **Path A** — drop a ready-made `Tool` into the array (`GetUpcomingEventsTool()`,
+> `SearchContactsTool()`, `MCPTool(descriptor:)`, …), one line each, with hard-won
+> on-device-model correctness lessons already baked into their descriptions; or **Path B** —
+> hand-write a `Tool` struct per connector for full control over its name/schema/description.
+> `plate-today` (and this walkthrough) is Path B, deliberately: doing it by hand once makes the
+> `requestAccess` → fetch → return-a-string shape visible. **For your own app, reach for Path A
+> first** — it's the same permission timing and the same TCC prompts below, with far less code.
+> The matched example [`plate-today-tools`](../examples/plate-today-tools/) is this exact app
+> rebuilt on Path A — diff the two.
+
 ### Step 1 — user double-clicks the app icon
 
 Your app's `init()` should run, before any window exists, as early as possible:
@@ -339,9 +351,16 @@ Assuming it's available, your `Tool`-conforming structs are instantiated and han
 yet** — FoundationModels doesn't invoke a tool's `call()` until it decides, during generation,
 that it needs that tool's output.
 
+`plate-today` builds this list from its own hand-written structs (Path B). The Path A equivalent
+is `let tools: [any Tool] = [GetUpcomingEventsTool(), GetUpcomingRemindersTool(), /* … */]` —
+Core's ready-made tools, no structs of your own to write; everything below (the availability
+gate, the deferred `call()`, the permission timing) is identical.
+
 ### Step 4 — the model calls your Calendar tool, which is where the TCC prompt actually happens
 
-The permission prompt is triggered by exactly one line inside that tool's `call(arguments:)`:
+The permission prompt is triggered by exactly one line — inside your hand-written tool's
+`call(arguments:)` on Path B, or inside `GetUpcomingEventsTool`'s own `call()` on Path A (you
+don't write it, but it fires at the same moment — the first time the model invokes the tool):
 
 ```swift
 let access = await Connectors.requestAccess(.calendar)
@@ -378,6 +397,10 @@ exact tool name, not a loose substring guess. Before calling it, inspect that to
 schema (`tool.rawSchema`) rather than assuming its parameters — some tools have defaults that don't
 match what their name/description implies (e.g. a "due today" query tool whose own default
 silently also includes overdue items unless you explicitly opt out).
+
+That hand-matching + schema-inspection is Path B for MCP. Path A is `MCPTool(descriptor:manager:)` —
+hand it one of `state.tools` and it builds a working `Tool` from the live schema, no `Arguments`
+struct of your own. [`repo-qa`](../examples/repo-qa/) is that in ~70 lines; see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own).
 
 ### Step 6 — the model synthesizes a summary, the UI shows it
 
