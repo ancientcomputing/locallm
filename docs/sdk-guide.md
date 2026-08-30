@@ -32,7 +32,10 @@ Both are supported, and neither supersedes the other — they solve different pr
   runtime — your app owns its own TCC grants, its own MCP connections, its own Keychain-stored
   tokens. More setup (entitlements, Info.plist keys, your own OAuth redirect scheme — see below),
   but no external process to depend on, and full control over the resulting `.app`'s distribution
-  (Developer ID + notarization, or Mac App Store).
+  (Developer ID + notarization, or Mac App Store). The 1.0 line also adds the **model layer**
+  ([§6a](#6a-the-model-layer-local-models-routing-sessions)) — offer Apple's on-device model,
+  Claude, and locally-run open-weight (MLX) models behind one API, with routing and residency
+  the SDK owns. Add `LocalLMLabSDKInference` too for the MLX runtime.
 
 If you're not sure which fits, `examples/localai-cli/plate_today.py` and this SDK's
 `examples/plate-today` are the same "what's on my plate today" feature built both ways — a direct,
@@ -465,6 +468,202 @@ resourcesForSession()`/`.promptsForSession()` list what's currently enabled;
 content. `Components`' `MCPResourcesView`/`MCPPromptsView` (section 11) already build a UI over
 both if you don't want to write your own.
 
+## 6a. The model layer: local models, routing, sessions
+
+New in the 1.0 (macOS 27) line. Everything above is the MCP client — usable on its own with
+Apple's `SystemLanguageModel` and nothing else. The **model layer** is what you reach for when
+"which model" becomes a real question in your app: you want to offer a locally-run open-weight
+model *and* Apple's on-device model *and* Claude behind one API, let the user (or your own
+logic) switch between them, keep one warm between turns, and show download / memory state in
+your UI — without your app hand-rolling a provider abstraction.
+
+If your app only ever uses Apple's on-device model, you don't need any of this — construct a
+`LanguageModelSession` directly and pass it Core's tools. The rest of this section is for apps
+that want more than one model.
+
+> **The one example that exercises all of it: [`code-buddy`](../examples/code-buddy/).** A CLI
+> coding agent with a `.heavy` and a `.light` route to locally-run MLX models, Core's Workspace
+> tools, an MCP docs server, and streamed output. Every API below has a "→ code-buddy" pointer
+> to where it's used for real.
+
+### `LocalLMLab` — the front door (optional)
+
+**Use it when** you want one object that wires the model registry, the MCP manager, and the
+connector/workspace facades together, and hands you a ready session. It's entirely optional —
+every bare type (`MCPServerManager`, `Connectors`, `WorkspaceAccess`, the providers) stays
+public and usable without it.
+
+```swift
+let lab = LocalLMLab(configuration: .init(providers: [
+    SystemModelProvider(),
+    ClaudeModelProvider(auth: .apiKey(myKeyFromKeychain)),
+    MLXModelProvider(),                     // from LocalLMLabSDKInference — see below
+]))
+
+lab.models      // the @Observable ModelRegistry — providers, routes, residency, downloads
+lab.mcp         // MCPServerManager, unchanged from the MCP-only line
+lab.workspace   // security-scoped workspace access + ready-made tools
+lab.connectors  // Calendar / Reminders / Contacts / Location
+```
+
+`lab.snapshot() -> LocalLMLabState` gives you a `Codable` snapshot of the route map + residency
+policy + installed-model records to persist wherever you like (the SDK writes nothing to disk);
+`lab.restore(from:)` re-applies one. **Use it when** you want the user's model choices to
+survive a relaunch. → *code-buddy builds `LocalLMLab` with two providers and maps `.heavy` /
+`.light` before the first turn.*
+
+### `ModelProvider` and the built-in providers
+
+**Use a provider when** you're deciding *what models your app can offer at all.* A provider is
+"a source of language models" — you register the ones you want, and the registry resolves a
+`ModelID` to whichever provider owns its `scheme`:
+
+| Provider | Ships in | `scheme` | For |
+|---|---|---|---|
+| `SystemModelProvider` | Core | `system` | Apple's on-device model — always there on an Apple-Intelligence Mac |
+| `PCCModelProvider` | Core | `pcc` | Apple's Private Cloud Compute model |
+| `ClaudeModelProvider(auth:)` | Core | `claude` | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
+| `MLXModelProvider` | **Inference** | `mlx` | Locally-run open-weight models (Qwen, Llama, …) via MLX |
+
+`ModelProvider` is a protocol — **implement it yourself when** you have a model source the SDK
+doesn't ship (a remote inference endpoint, a different local runtime). The registry only ever
+talks to the protocol.
+
+### `RouteName` + routing — pick a model without hardcoding one
+
+**Use routes when** you don't want `"mlx:mlx-community/Qwen3-8B-4bit"` sprinkled through your
+code. A `RouteName` (`.heavy`, `.light`, `.draft`, or any string you like) is a name your app
+maps to a `ModelID`; you pick a route per session. **The SDK owns model residency, never
+routing policy** — your app decides which route a given task uses.
+
+```swift
+lab.models.route(.heavy, to: ModelID("mlx:mlx-community/Qwen3-8B-4bit")!)
+lab.models.route(.light, to: .system)
+// later, per task:
+let session = try lab.makeSession(route: heavyTask ? .heavy : .light, tools: myTools, instructions: sys)
+```
+
+→ *code-buddy's `--route heavy|light` flag flips exactly this; `--heavy` / `--light` override
+the model each route points at.*
+
+### `MLXModelProvider` — run open-weight models locally (`LocalLMLabSDKInference`)
+
+**Use it when** you want the model to run entirely on the user's Mac with no API key and no
+network at inference time. It's a `DownloadableModelProvider`, so on top of the provider basics
+it adds the runtime lifecycle:
+
+```swift
+let mlx = MLXModelProvider(residentModelLimit: 1)   // 1 model resident at a time
+
+// Before you download: is this model sane for this machine? (no weights pulled)
+let check = try await mlx.validate("mlx-community/Qwen3-8B-4bit")   // PreflightResult
+//   → repo reachable? MLX format? architecture supported? weight size vs this Mac's RAM?
+//     each failure names its stage.
+
+// Download, tracking progress
+for try await event in mlx.download("mlx-community/Qwen3-8B-4bit") {
+    if case .progress(_, _, let fraction) = event { updateBar(fraction) }
+    if case .completed(let installed) = event { /* InstalledModel */ }
+}
+
+// Post-download smoke test — a real prompt + a trivial tool call. Authoritative for
+// that model's ModelCapabilities (some downloaded models can't reliably tool-call).
+let report = await mlx.capabilityProbe(installed.id)   // ModelCapabilityReport
+
+mlx.installed        // [InstalledModel] — what's on disk now
+mlx.storageUsed      // total bytes of weights
+try mlx.remove(id)   // delete weights
+```
+
+**The memory story** — the whole reason `MLXModelProvider` isn't just "load and go":
+
+- `residentModelLimit` caps how many models stay in RAM. Switching routes evicts the other.
+- `MLXPreflightLimits(maxWeightFractionOfRAM: 0.7)` — `validate` fails a model whose weights
+  would exceed this fraction of physical memory, *before* the download.
+- `mlx.residencyEventStream` (also forwarded onto `lab.models.events`) emits
+  `.warmed` / `.evicted(reason:)` / `.loadProgress` — **use it when** you want a status line
+  that shows "loading 45%" vs "reusing warm model", or to tell the user the OS evicted the
+  model under memory pressure.
+- `unloadResident(_:)` / `unloadAllResident()` — drop weights explicitly (e.g. before a
+  memory-heavy operation elsewhere in your app).
+
+→ *code-buddy calls `validate` before its first run, streams `download` progress, and prints
+`residencyEventStream` transitions to stderr. Its README has the small-RAM-Mac walkthrough.*
+
+### `makeSession` + `LocalLMLabSession` — a session with your tools + MCP tools merged
+
+**Use it instead of constructing `LanguageModelSession` yourself when** you want the SDK to:
+resolve the route → model, build the model, and assemble the tool list (your `tools` **plus**
+the enabled MCP session tools from `lab.mcp`, unless `includeMCPTools: false`).
+
+```swift
+let session = try lab.makeSession(
+    route: .heavy,
+    tools: [SearchWorkspaceTool(), ApplyPatchTool(), myGitTool],
+    instructions: "You are a coding assistant.",
+)
+// Drive the tool loop yourself — nothing here runs an agent loop:
+let answer = try await session.respond(to: task)
+// or opt out of the SDK's retry wrapper and use Apple's session directly:
+for try await snapshot in session.languageModelSession.streamResponse(to: task) { … }
+```
+
+`session.route` / `session.modelID` tell you what actually backs it. → *code-buddy's whole
+`makeSession(route:tools:instructions:)` call, tools = Workspace tools + its host-owned
+`GitTool` / `RunTestsTool`.*
+
+### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
+
+**Use it when** your UI needs to show what's happening *around* generation — a spinner per
+tool call, a "compacting context…" notice. Token streaming stays on
+`languageModelSession.streamResponse`; `events` carries only the rest:
+
+```swift
+for await event in session.events {
+    switch event {
+    case .toolCallStarted(let id, let name):   showRunning(name)
+    case .toolCallFinished(let id, let name, let failed): clearRunning(name, failed: failed)
+    case .contextCompacted(let removed):       toast("Trimmed \(removed) old messages")
+    case .modelLoadProgress(let fraction):     updateBar(fraction)   // with a local model
+    @unknown default: break
+    }
+}
+```
+
+→ *code-buddy's `→ tool` / `✓ tool` stderr trace is this stream.*
+
+### `ContextBudget` + `RetryPolicy` — surviving a long session
+
+**Use these when** your app has long-running sessions (a coding agent, a chat that goes for
+hours) that will eventually fill the model's context window.
+
+- `session.contextBudget` — `windowTokens`, `lastInputTokens`, `fractionUsed` (best-effort).
+  Show a "context 78% full" gauge; decide when to start a fresh session.
+- `session.retryOnContextOverflow = RetryPolicy(maxRetries: 2, compact: { transcript in
+  myTrim(transcript) })` — when a turn throws `contextSizeExceeded`, the SDK calls your
+  `compact` hook, rebuilds the session with the smaller transcript, emits `.contextCompacted`,
+  and retries. Only applies to the SDK's `respond` wrappers; with no `compact` hook it just
+  rethrows. → *code-buddy prints `contextBudget` after each run.*
+
+### `ModelAvailability` — gray out a model and say why
+
+**Use it when** you're building a model picker and need to disable an entry with a reason.
+`lab.models.availability(for: id)` (or `provider.availability(for:)`) returns:
+`.available` · `.notDownloaded` (offer a download button) · `.needsCredential` (prompt for the
+API key) · `.unavailable(kind:detail:)` where `kind` is machine-readable
+(`.ineligibleHardware`, `.notEnabled`, `.modelNotReady`, `.unsupportedModel`, `.providerError`,
+`.noProvider`) so you can branch without parsing `detail`. Components' `ModelPickerView` binds
+to this directly.
+
+### `WorkspaceAccess` + the Workspace tools — let the model touch files
+
+**Use it when** the model needs to read or edit files in a folder the user picked. `WorkspaceAccess`
+owns the security-scoped-bookmark bracket; the ready-made tools (`SearchWorkspaceTool`,
+`WorkspaceTreeTool`, `ReadWorkspaceFileTool`, `ReadFileRangeTool`, `ListWorkspaceFilesTool`,
+`ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`, `DeleteWorkspaceFileTool`)
+are FoundationModels `Tool`s you drop straight into `makeSession`. → *`code-buddy` and
+[`workspace-buddy`](../examples/workspace-buddy/) (the Core-only, no-MLX version) both use these.*
+
 ## 7. Connectors: Calendar, Reminders, Contacts, Location
 
 Core ships four permission-gated connectors, each wrapping the relevant system framework
@@ -768,10 +967,15 @@ call, not just a synchronous setup step. `examples/workspace-buddy` shows the as
   the read/write/edit logic for once you already have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
   see section 7a.
-- **No public API stability guarantee.** Access levels have been fixed reactively, as real usage
-  surfaced gaps. If you hit a "X is inaccessible due to internal protection level" error on
-  something that looks like it should obviously be public, it probably should be — that's a real
-  gap, not a step you're missing. File an issue.
+- ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ The 1.0 line adds
+  the model layer (§6a): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
+  `LocalLMLabSDKInference`) / `makeSession`. Still optional — the MCP-only path is unchanged.
+- **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need
+  an `@unknown default` — new cases can land in a minor version. (Same for `ResidencyEvent` /
+  `SessionEvent` / `DownloadEvent` / `MCPConnectionStatus` / `MCPServerError`.)
+- **No public API stability guarantee.** `1.0.0-beta.N` makes none. Access levels have been fixed
+  reactively as real usage surfaced gaps — if you hit "X is inaccessible due to internal
+  protection level" on something that looks like it should be public, it probably should. File it.
 - **No logging of prompts, responses, or tool calls, on by default or otherwise.** Core doesn't
   write a persisted trace of what the model saw or said anywhere, and gives you nothing to opt out
   of — there's simply nothing there. If your app wants that kind of record, you build and own it
@@ -928,9 +1132,228 @@ method describes.
 
 ## 12. Full function/type reference
 
-Everything public in `LocalLMLabSDKCore` and `LocalLMLabSDKComponents`, grouped by area. This is
-the flat list; sections 1–11 above are the narrative version with context and gotchas — use this
-one when you just need to check a signature.
+Everything public in `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`,
+grouped by area. This is the flat list; sections 1–11 above are the narrative version with context
+and gotchas — use this one when you just need to check a signature.
+
+> The machine-checked source of truth is [`api-surface.md`](api-surface.md) (regenerated from the
+> compiled `.swiftinterface`s). If this section and that one disagree, that one is right — file it.
+
+**Which example shows each area** (source you can read + run):
+
+| API area | Example | Path |
+|---|---|---|
+| The model layer — `LocalLMLab`, routing, `MLXModelProvider`, sessions, residency, `ContextBudget` | [`code-buddy`](../examples/code-buddy/) | — |
+| Workspace tools (`WorkspaceAccess` / `SearchWorkspaceTool` / `ApplyPatchTool` / …) | [`workspace-buddy`](../examples/workspace-buddy/) (Core-only) · `code-buddy` | A |
+| Connectors + ready-made connector `Tool`s | [`plate-today-tools`](../examples/plate-today-tools/) | A |
+| Connectors via hand-written `Tool` adapters | [`plate-today`](../examples/plate-today/) | B |
+| MCP client + OAuth (Todoist) + Keychain | `plate-today` / `plate-today-tools` | — |
+| `MCPTool` built from a live server schema (no hand-written `Arguments`) | [`repo-qa`](../examples/repo-qa/) | A |
+| `Components` — `MCPServerPickerView` / `MCPServerManagerObservable` / resources / prompts | [`components-demo`](../examples/components-demo/) | — |
+
+### The model layer (`LocalLMLab`, routing, providers, sessions)
+
+```swift
+// --- front door ---------------------------------------------------------------
+@MainActor final class LocalLMLab {
+    struct Configuration { var providers: [any ModelProvider]; var state: LocalLMLabState? ; init(providers: [any ModelProvider] = [], state: LocalLMLabState? = nil) }
+    let models: ModelRegistry
+    let mcp: MCPServerManager
+    let connectors: ConnectorsFacade    // .calendar/.reminders/.contacts/.location permission lifecycle
+    let workspace: WorkspaceFacade
+    init(configuration: Configuration = .init())
+    func snapshot() -> LocalLMLabState                 // route map + residency + installed records; NOT weights
+    func restore(from state: LocalLMLabState)
+    // from LocalLMLab+makeSession:
+    func makeSession(route: RouteName, tools: [any Tool] = [], instructions: String? = nil, includeMCPTools: Bool = true) throws -> LocalLMLabSession
+}
+
+struct LocalLMLabState: Codable, Sendable, Equatable {
+    static let currentVersion = 1
+    var version: Int
+    var routes: [RouteName: ModelID]
+    var residency: ModelResidency
+    // + installed-model records
+}
+
+// --- registry ----------------------------------------------------------------
+@MainActor final class ModelRegistry {
+    var providers: [any ModelProvider] { get }
+    var routes: [RouteName: ModelID] { get }
+    var residency: ModelResidency                       // set .keepWarm(routes) to prewarm + hold
+    let events: AsyncStream<ResidencyEvent>
+    func applyResidency() async
+    func route(_ route: RouteName, to id: ModelID)
+    func modelID(for route: RouteName) -> ModelID?
+    func register(_ provider: any ModelProvider) throws  // throws .schemeAlreadyRegistered
+    func provider(for id: ModelID) -> (any ModelProvider)?
+    func availability(for id: ModelID) -> ModelAvailability
+    var downloadableProviders: [any DownloadableModelProvider] { get }
+    var installedModels: [InstalledModel] { get }
+    var knownModels: [ModelID] { get }                  // union of providers' advertisedModels
+    var downloads: [ModelID: Double] { get }            // in-flight, fraction 0...1
+    func startDownload(_ repoID: String) async throws -> InstalledModel
+}
+enum ModelRegistryError: Error, Equatable, CustomStringConvertible { case schemeAlreadyRegistered(String); case noDownloadableProvider }
+
+// --- providers -------------------------------------------------------------
+protocol ModelProvider: Sendable {
+    static var scheme: String { get }
+    func owns(_ id: ModelID) -> Bool                    // default: id.scheme == Self.scheme
+    func languageModel(for id: ModelID) throws -> any LanguageModel
+    func availability(for id: ModelID) -> ModelAvailability
+    func prewarm(_ id: ModelID) async                   // no-op default
+    var advertisedModels: [ModelID] { get }             // [] default
+}
+protocol DownloadableModelProvider: ModelProvider {
+    var installed: [InstalledModel] { get }
+    func download(_ repoID: String) -> AsyncThrowingStream<DownloadEvent, any Error>   // 0+ .progress, then exactly one .completed, or throws
+    func validate(_ repoID: String) async throws -> PreflightResult                    // no weights pulled
+    func capabilityProbe(_ id: ModelID) async -> ModelCapabilityReport                 // authoritative for that model's ModelCapabilities
+    func remove(_ id: ModelID) throws
+    var storageUsed: Int64 { get }
+    var residencyEventStream: AsyncStream<ResidencyEvent>? { get }                      // nil default
+}
+struct SystemModelProvider: ModelProvider { init() }
+struct PCCModelProvider: ModelProvider { init() }
+struct ClaudeModelProvider: ModelProvider {
+    enum Auth: Sendable { case apiKey(String); case appAttest(clientID: String) }
+    init(auth: ClaudeModelProvider.Auth, extraModels: [String: ClaudeModelSpec] = [:])
+}
+struct ClaudeModelSpec: Sendable, Hashable { /* one Claude model — id, display name, context window */ }
+
+// --- MLXModelProvider — LocalLMLabSDKInference (separate xcframework) ---------
+struct MLXModelProvider: DownloadableModelProvider {
+    static var scheme: String { "mlx" }
+    init(cacheDirectory: URL? = nil, residentModelLimit: Int = 1, preflightLimits: MLXPreflightLimits = .init())
+    var residencyEventStream: AsyncStream<ResidencyEvent>?
+    var advertisedModels: [ModelID] { get }
+    var installed: [InstalledModel] { get }
+    var storageUsed: Int64 { get }
+    func languageModel(for id: ModelID) throws -> any LanguageModel
+    func availability(for id: ModelID) -> ModelAvailability
+    func prewarm(_ id: ModelID) async
+    func download(_ repoID: String) -> AsyncThrowingStream<DownloadEvent, any Error>
+    func validate(_ repoID: String) async throws -> PreflightResult
+    func capabilityProbe(_ id: ModelID) async -> ModelCapabilityReport
+    func remove(_ id: ModelID) throws
+    func unloadResident(_ id: ModelID, reason: String = "idleTimeout") async
+    func unloadAllResident(reason: String = "idleTimeout") async
+}
+struct MLXPreflightLimits: Sendable, Equatable {
+    var maxWeightFractionOfRAM: Double     // default 0.7
+    init(maxWeightFractionOfRAM: Double = 0.7)
+}
+
+// --- model identity + capability ------------------------------------------
+struct ModelID: Hashable, Sendable, Codable, CustomStringConvertible, LosslessStringConvertible {
+    let scheme: String        // token before the first ':' — [a-z][a-z0-9]*
+    let rest: String          // after the first ':'; empty for bare ids
+    var rawValue: String      // "scheme" or "scheme:rest"
+    init?(_ raw: String)
+    init?(scheme: String, rest: String = "")
+    static let system: ModelID    // "system"
+    static let pcc: ModelID       // "pcc"
+}
+enum ModelAvailability: Sendable, Equatable {
+    case available
+    case notDownloaded
+    case needsCredential
+    case unavailable(kind: UnavailableKind, detail: String)
+    enum UnavailableKind: Sendable, Equatable {
+        case ineligibleHardware, notEnabled, modelNotReady, unsupportedModel, providerError, noProvider
+    }
+    var isAvailable: Bool { get }
+}
+struct ModelCapabilities: OptionSet, Sendable, Hashable, Codable {
+    static let toolCalling: ModelCapabilities        // 1 << 0
+    static let guidedGeneration: ModelCapabilities   // 1 << 1
+}
+struct ModelCapabilityReport: Sendable, Equatable {
+    var id: ModelID
+    var capabilities: ModelCapabilities
+    var notes: [String]
+    var blocked: String?          // non-nil = the model downloaded but can't run at all (load error, image-required VLM, empty output)
+    var isUsable: Bool { get }
+}
+struct InstalledModel: Sendable, Hashable, Codable, Identifiable {
+    var id: ModelID
+    var repoID: String
+    var capabilities: ModelCapabilities       // empty until capabilityProbe
+    var sizeBytes: Int64?
+    var contextTokens: Int?
+    init(id: ModelID, repoID: String, capabilities: ModelCapabilities = [], sizeBytes: Int64? = nil, contextTokens: Int? = nil)
+}
+struct PreflightResult: Sendable, Equatable {
+    enum Stage: String, Sendable, Codable { /* repoReachable / mlxFormat / architecture / size / … */ }
+    var failedStage: Stage?       // nil = passed
+    var detail: String?
+    var weightBytes: Int64?
+    var ramBytes: Int64?          // this Mac's physical memory, for the size check
+    var passed: Bool { get }
+    static let ok: PreflightResult
+}
+
+// --- routing + residency + events ----------------------------------------
+struct RouteName: Hashable, Sendable, Codable, CustomStringConvertible, ExpressibleByStringLiteral {
+    let rawValue: String
+    init(_ rawValue: String); init(stringLiteral: String)
+    static let heavy: RouteName   // "heavy"
+    static let light: RouteName   // "light"
+    static let local: RouteName   // "local"
+}
+enum ModelResidency: Sendable, Equatable, Codable { case lastUsedOnly; case keepWarm([RouteName]) }
+enum ResidencyEvent: Sendable {
+    case warmed(ModelID)
+    case evicted(ModelID, reason: String)          // "capacity", "memoryPressure", …
+    case loadProgress(ModelID, fraction: Double)
+}
+
+// --- session -------------------------------------------------------------
+struct LocalLMLabSession: Sendable {
+    let route: RouteName
+    let modelID: ModelID
+    var retryOnContextOverflow: RetryPolicy         // .disabled by default; set before respond()
+    var languageModelSession: LanguageModelSession { get }   // Apple's session — use directly to opt out of the retry wrapper
+    var events: AsyncStream<SessionEvent> { get }
+    var contextBudget: ContextBudget { get }
+    func cancel()
+    // + respond(...) / streamResponse(...) wrappers (LocalLMLabSession+respond) that apply retryOnContextOverflow
+}
+enum SessionEvent: Sendable {
+    case modelLoadProgress(fraction: Double)
+    case routeSwitched(ModelID)
+    case contextCompacted(removedEntries: Int)
+    case toolCallStarted(id: String, name: String)
+    case toolCallFinished(id: String, name: String, failed: Bool)
+}
+struct RetryPolicy: Sendable {
+    var maxRetries: Int                                          // 0 disables
+    var compact: (@Sendable (Transcript) -> Transcript)?
+    init(maxRetries: Int = 0, compact: (@Sendable (Transcript) -> Transcript)? = nil)
+    static let disabled: RetryPolicy
+}
+struct ContextBudget: Sendable, Equatable {
+    let windowTokens: Int?          // nil for arbitrary downloaded weights
+    let lastInputTokens: Int
+    let lastOutputTokens: Int
+    var fractionUsed: Double?
+    static func windowHint(for id: ModelID) -> Int?
+}
+enum LocalLMLabError: Error, LocalizedError {   // the one public error type the model layer throws
+    case modelUnavailable(reason: String)
+    case download(stage: String, underlying: (any Error)?)
+    case validation(stage: PreflightResult.Stage, detail: String)
+    case generation(underlying: any Error)      // wrap; use GenerationErrorDescription.describe for the message
+    case context(detail: String)
+    case mcp(detail: String)
+    case connector(detail: String)
+}
+enum LocalLMLabSDKVersion { static let current: String }   // "1.0.0-beta.N", "1.0.0" at GA
+```
+
+`MLXModelProvider` / `MLXPreflightLimits` are in **`LocalLMLabSDKInference`** (a separate
+xcframework — §1); `ModelPickerView` / `ClaudeAuthField` are in **`LocalLMLabSDKComponents`** (§11).
 
 ### Connectors (Calendar, Reminders, Contacts, Location)
 
@@ -1371,5 +1794,17 @@ struct MCPResourcesView: View {
 
 struct MCPPromptsView: View {
     init(manager: MCPServerManagerObservable, onUse: @escaping (MCPPromptDescriptor, [MCPPromptMessage]) -> Void)
+}
+
+// Model layer (1.0)
+struct ModelPickerView: View {
+    init(registry: ModelRegistry, selection: Binding<ModelID?>)
+    // Lists registry.knownModels; each row shows availability (grayed + reason for .unavailable),
+    // a download button + progress for .notDownloaded, storage size. Binds to the @Observable
+    // registry directly — no polling.
+}
+struct ClaudeAuthField: View {
+    init(apiKey: Binding<String>, onCommit: @escaping () -> Void = {})
+    // A ready-made secure field for the Claude API key that ClaudeModelProvider(auth: .apiKey(_:)) needs.
 }
 ```
