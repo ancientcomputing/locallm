@@ -3,3 +3,51 @@ Copyright 2026 ThisBrainAI LLC
 
 This product includes software developed by ThisBrainAI LLC
 (https://thisbrain.ai).
+
+---
+
+Bundled third-party components
+==============================
+
+The binary xcframeworks distributed on this repository's Releases statically link
+the open-source components below. Each is used under its own license. Build-time-only
+dependencies that are not present in any distributed binary (swift-syntax, a compiler
+plugin) are omitted.
+
+LocalLMLabSDKCore.xcframework
+----------------------------
+
+  Apache License 2.0:
+    * ClaudeForFoundationModels — Anthropic
+      https://github.com/anthropics/ClaudeForFoundationModels
+
+LocalLMLabSDKInference.xcframework  (also links everything in Core, above)
+---------------------------------
+
+  MIT License:
+    * mlx-swift     — Copyright (c) 2023 ml-explore   https://github.com/ml-explore/mlx-swift
+    * mlx-swift-lm  — Copyright (c) 2024 ml-explore   https://github.com/ml-explore/mlx-swift-lm
+    * MLX (array core, vendored by mlx-swift) — Copyright (c) 2023 Apple Inc.  https://github.com/ml-explore/mlx
+    * EventSource   — Copyright 2025 Mattt            https://github.com/mattt/EventSource
+    * yyjson        — Copyright (c) 2020 YaoYuan       https://github.com/ibireme/yyjson
+
+  Apache License 2.0:
+    * swift-transformers    — The HuggingFace Swift project authors  https://github.com/huggingface/swift-transformers
+    * swift-jinja           — The HuggingFace Swift project authors  https://github.com/huggingface/swift-jinja
+    * swift-huggingface     — The HuggingFace Swift project authors  https://github.com/huggingface/swift-huggingface
+    * swift-argument-parser — Apple Inc. and the Swift project authors           https://github.com/apple/swift-argument-parser
+    * swift-numerics        — Apple Inc. and the Swift Numerics project authors  https://github.com/apple/swift-numerics
+    * swift-collections     — Apple Inc. and the Swift project authors           https://github.com/apple/swift-collections
+    * swift-crypto          — The SwiftCrypto Project authors                    https://github.com/apple/swift-crypto
+    * swift-asn1            — The SwiftASN1 Project authors                      https://github.com/apple/swift-asn1
+
+The full Apache License 2.0 text is at https://www.apache.org/licenses/LICENSE-2.0
+and the MIT License text at https://opensource.org/license/mit. The additional
+attribution notices in swift-crypto's and swift-asn1's own NOTICE.txt files apply
+in full:
+
+  * https://github.com/apple/swift-crypto/blob/main/NOTICE.txt
+  * https://github.com/apple/swift-asn1/blob/main/NOTICE.txt
+
+The LocalLM Lab application and its localai-cli toolkit bundle a broader set of
+components; their attributions ship as THIRD-PARTY-NOTICES.md inside those artifacts.
