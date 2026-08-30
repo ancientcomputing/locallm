@@ -1,7 +1,8 @@
 # Annotated example source
 
 The full source of every reference app, with every line that actually touches the SDK marked
-`// ← SDK` (Core) or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
+`// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime, `code-buddy` only), or
+`// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
@@ -945,3 +946,282 @@ in the prebuilt views (`MCPServerPickerView`, `MCPResourcesView`, `MCPPromptsVie
 this app's own UI around them (the tools panel, the attached-text display) and the small amount of
 glue (`toolsForSession()`, the OAuth scheme/callback wiring) any Core-linked app needs regardless
 of whether it uses `Components` or not.
+
+## `examples/code-buddy/Sources/CodeBuddy/main.swift`
+
+The one example that exercises the **model layer** — and the only one linking a second binary,
+`LocalLMLabSDKInference.xcframework` (the MLX runtime). Lines that touch it are marked
+`// ← SDK (Inference)`; `// ← SDK` is Core as elsewhere. A CLI coding agent: point it at a repo
+and a task, it downloads an open-weight MLX model on first run, then drives Core's Workspace
+tools + host `Process` tools + (auto) MCP tools through a routed `LocalLMLabSession`. See
+[`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) for the prose.
+
+```swift
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKInference                                         // ← SDK (Inference)
+
+// code-buddy — a minimal coding agent on the LocalLM Lab SDK.
+//   code-buddy [--route heavy|light] [--heavy <repo>] [--light <repo>]
+//              [--test-cmd "<cmd>"] [--no-mcp] <workspace-dir> <task...>
+
+struct Options {
+    var route: RouteName = .heavy                                     // ← SDK
+    var heavy = "mlx-community/Qwen3-8B-4bit"
+    var light = "mlx-community/Qwen2.5-3B-Instruct-4bit"
+    var testCommand = ["swift", "test"]
+    var useMCP = true
+    var workspace = ""
+    var task = ""
+}
+
+func parseArgs() -> Options {
+    var o = Options()
+    var rest: [String] = []
+    var it = CommandLine.arguments.dropFirst().makeIterator()
+    while let a = it.next() {
+        switch a {
+        case "--route": if let v = it.next() { o.route = RouteName(v) }   // ← SDK
+        case "--heavy": if let v = it.next() { o.heavy = v }
+        case "--light": if let v = it.next() { o.light = v }
+        case "--test-cmd": if let v = it.next() { o.testCommand = v.split(separator: " ").map(String.init) }
+        case "--no-mcp": o.useMCP = false
+        default: rest.append(a)
+        }
+    }
+    guard rest.count >= 2 else {
+        FileHandle.standardError.write(Data("usage: code-buddy [options] <workspace-dir> <task...>\n".utf8))
+        exit(2)
+    }
+    o.workspace = rest[0]
+    o.task = rest.dropFirst().joined(separator: " ")
+    return o
+}
+
+func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
+
+@MainActor
+func run() async {
+    let opts = parseArgs()
+    let root = URL(fileURLWithPath: opts.workspace, isDirectory: true)
+    guard FileManager.default.fileExists(atPath: root.path) else {
+        note("workspace \(root.path) does not exist"); exit(1)
+    }
+
+    // The whole model layer, wired in four lines: an MLX provider capped at one resident model
+    // (the memory story for a constrained Mac), a LocalLMLab bundling it with Apple's on-device
+    // provider as fallback, and two named routes.
+    let mlx = MLXModelProvider(residentModelLimit: 1)                 // ← SDK (Inference)
+    let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
+    lab.models.route(.heavy, to: ModelID(scheme: "mlx", rest: opts.heavy)!)   // ← SDK
+    lab.models.route(.light, to: ModelID(scheme: "mlx", rest: opts.light)!)   // ← SDK
+
+    let modelID = lab.models.modelID(for: opts.route)!               // ← SDK
+    note("SDK \(LocalLMLabSDKVersion.current) · route .\(opts.route) → \(modelID)")   // ← SDK
+
+    // Pre-flight (no download) then a streamed download if the weights aren't local yet.
+    if case .notDownloaded = lab.models.availability(for: modelID) {  // ← SDK
+        let repo = modelID.rest
+        let pre = try? await mlx.validate(repo)                       // ← SDK (Inference)
+        if let pre, !pre.passed {
+            note("pre-flight failed (\(pre.failedStage!.rawValue)): \(pre.detail ?? "")"); exit(1)
+        }
+        note("downloading \(repo)…")
+        do {
+            for try await event in mlx.download(repo) {              // ← SDK (Inference)
+                if case .progress(_, _, let f) = event {
+                    FileHandle.standardError.write(Data("\u{1B}[2K\r  \(Int(f * 100))%".utf8))
+                }
+            }
+            note("\u{1B}[2K\r  done")
+        } catch {
+            note("download failed: \(error)"); exit(1)
+        }
+    }
+
+    // Tools: Core's ready-made Workspace tools (Path A) …
+    var tools: [any Tool] = [
+        WorkspaceTreeTool(root: root),                               // ← SDK
+        SearchWorkspaceTool(root: root),                             // ← SDK
+        ReadWorkspaceFileTool(root: root),                           // ← SDK
+        ReadFileRangeTool(root: root),                               // ← SDK
+        ApplyPatchTool(root: root),                                  // ← SDK
+        EditWorkspaceFileTool(root: root),                           // ← SDK
+        WriteWorkspaceFileTool(root: root),                          // ← SDK
+        ListWorkspaceFilesTool(root: root),                          // ← SDK
+        GitTool(root: root),                    // host-owned — see ProcessTools.swift below
+        RunTestsTool(root: root, command: opts.testCommand),         // host-owned
+    ]
+
+    // … plus (auto) MCP tools: add a no-auth server and its tools merge into the session.
+    if opts.useMCP {
+        note("connecting DeepWiki (docs lookup)…")
+        let result = await lab.mcp.addServer(url: URL(string: "https://mcp.deepwiki.com/mcp")!, displayName: "DeepWiki")   // ← SDK
+        if case .success(let state) = result {
+            for tool in state.tools where tool.name == "read_wiki_contents" {
+                lab.mcp.setToolEnabled(server: state.id, tool: tool.name, enabled: false)   // ← SDK
+            }
+            note("  \(lab.mcp.toolsForSession().count) MCP tool(s)")   // ← SDK
+        } else {
+            note("  MCP unavailable — continuing without it")
+        }
+    }
+
+    let instructions = """
+        You are a coding agent working in the user's repository. Use the tools to explore and \
+        change the code … Make the smallest change that solves the task. After editing, run the \
+        tests. Explain what you changed and why.
+        """
+
+    // One call: a session on the chosen route, with these tools AND the enabled MCP tools merged.
+    let session: LocalLMLabSession                                   // ← SDK
+    do {
+        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions)   // ← SDK
+    } catch {
+        note("makeSession failed: \(error)"); exit(1)
+    }
+
+    // .events is the tool-call / compaction progress stream — this is the whole trace UI.
+    let events = Task { @MainActor in
+        for await event in session.events {                          // ← SDK
+            switch event {
+            case .toolCallStarted(_, let name): note("  → \(name)")
+            case .toolCallFinished(_, let name, let failed): note("  \(failed ? "✗" : "✓") \(name)")
+            case .contextCompacted(let n): note("  (compacted \(n) transcript entries)")
+            @unknown default: break                                  // non-frozen — see sdk-guide §9
+            }
+        }
+    }
+
+    note("\n--- task: \(opts.task) ---\n")
+    do {
+        var printed = 0
+        // The session exposes a plain FoundationModels LanguageModelSession — stream as usual.
+        for try await partial in session.languageModelSession.streamResponse(to: opts.task) {   // ← SDK
+            let content = partial.content
+            if content.count > printed {
+                let start = content.index(content.startIndex, offsetBy: printed)
+                print(content[start...], terminator: "")
+                fflush(stdout)
+                printed = content.count
+            }
+        }
+        print()
+    } catch {
+        note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+    }
+
+    session.cancel()                                                 // ← SDK
+    await events.value
+    note("\ncontext: \(session.contextBudget)")                      // ← SDK
+}
+
+await run()
+```
+
+**Tally**: of ~120 lines of actual code, ~22 touch the SDK — and that ~22 is the *entire* model
+layer: pick providers, name routes, preflight/download, make a session, stream it, watch
+`.events`. Everything MLX-specific is four lines (`MLXModelProvider`, `validate`, `download`,
+and the import); swap those for `ClaudeModelProvider` and the rest of the file is unchanged.
+`RouteName` is the only new type the caller names by hand.
+
+## `examples/code-buddy/Sources/CodeBuddy/ProcessTools.swift`
+
+Not SDK code at all — this is the worked example of the **host-owned `Process` tool** pattern
+that `sdk-guide.md` §7 calls out: the SDK deliberately does **not** ship shell/git/test-runner
+tools (App Sandbox + Mac App Store can't run `Process`), so a Developer-ID CLI like this one
+implements them itself, scoped to the workspace, with its own safety policy. Zero `// ← SDK`
+marks — it's here to show the boundary, not a touchpoint.
+
+```swift
+import Foundation
+import FoundationModels                    // only for the `Tool` / `@Generable` protocols
+
+/// Runs `exe args` in `cwd`, capturing stdout+stderr, with a timeout and a truncation cap.
+func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval = 240) -> String {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: exe)
+    process.arguments = args
+    process.currentDirectoryURL = cwd
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    do { try process.run() }
+    catch { return "Failed to launch \(exe): \(error.localizedDescription)" }
+
+    let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
+    DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    deadline.cancel()
+
+    var output = String(decoding: data, as: UTF8.self)
+    let cap = 20_000
+    if output.count > cap {
+        output = String(output.prefix(cap)) + "\n…[truncated, \(output.count) chars total]"
+    }
+    let status = process.terminationStatus
+    return output.isEmpty ? "(no output; exit \(status))" : "\(output)\n[exit \(status)]"
+}
+
+/// Read-only git. Mutating subcommands are refused — the host's policy, not the SDK's.
+struct GitTool: Tool {
+    let root: URL
+    static let readOnlySubcommands: Set<String> = [
+        "status", "diff", "log", "show", "branch", "blame", "ls-files", "ls-tree",
+        "rev-parse", "describe", "remote", "tag", "shortlog", "grep", "cat-file", "reflog",
+    ]
+    @Generable struct Arguments {
+        @Guide(description: "A read-only git subcommand with its args, e.g. \"status\", \"log --oneline -10\".")
+        var command: String
+    }
+    let name = "git"
+    var description: String {
+        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands are refused — make edits with applyPatch instead."
+    }
+    func call(arguments: Arguments) async throws -> String {
+        let parts = arguments.command
+            .split(whereSeparator: { $0 == " " || $0 == "\n" }).map(String.init)
+        guard let sub = parts.first else { return "No git subcommand given." }
+        guard Self.readOnlySubcommands.contains(sub) else {
+            return "Refused: '\(sub)' is not an allowed read-only git subcommand."
+        }
+        return runProcess("/usr/bin/git", parts, cwd: root)
+    }
+}
+
+/// Runs the workspace's test command (host-configured — not inferred).
+struct RunTestsTool: Tool {
+    let root: URL
+    let command: [String]                  // e.g. ["swift", "test"] or ["npm", "test", "--silent"]
+    @Generable struct Arguments {
+        @Guide(description: "Optional substring to pass to the test runner's filter, to run a subset.")
+        var filter: String?
+    }
+    let name = "run_tests"
+    var description: String {
+        "Runs the project's test suite (`\(command.joined(separator: " "))`) in the workspace and returns the output."
+    }
+    func call(arguments: Arguments) async throws -> String {
+        guard let exe = command.first else { return "No test command configured." }
+        var args = Array(command.dropFirst())
+        if let filter = arguments.filter, !filter.isEmpty { args += ["--filter", filter] }
+        let resolved = exe.hasPrefix("/") ? exe : (which(exe) ?? "/usr/bin/env")
+        let finalArgs = resolved == "/usr/bin/env" ? [exe] + args : args
+        return runProcess(resolved, finalArgs, cwd: root)
+    }
+    private func which(_ name: String) -> String? {
+        for dir in ["/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin"] {
+            let path = "\(dir)/\(name)"
+            if FileManager.default.isExecutableFile(atPath: path) { return path }
+        }
+        return nil
+    }
+}
+```
+
+**Tally**: zero SDK lines. `GitTool` / `RunTestsTool` conform to FoundationModels' `Tool` exactly
+like Core's own tools do, and get merged into the session by the same `makeSession(tools:)` call —
+the SDK neither knows nor cares that these ones shell out. The safety policy (read-only git
+allow-list, workspace-scoped `cwd`, output cap, timeout) is entirely the host's to write.
