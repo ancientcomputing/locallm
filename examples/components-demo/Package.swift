@@ -15,7 +15,7 @@ import PackageDescription
 
 let package = Package(
     name: "ComponentsDemo",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("27.0")],
     dependencies: [
         .package(path: "../../Components")
     ],

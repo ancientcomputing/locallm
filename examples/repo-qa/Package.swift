@@ -31,6 +31,10 @@ let knownSDKReleases: [String: SDKRelease] = [
     "0.8.0": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v0.8.0/LocalLMLabSDKCore-0.8.0.xcframework.zip",
         checksum: "3a7369e3fbd88de0bcf5cbe2e0a4202b2b919b67c20f364fb8bb2572fd1b9703"
+    ),
+    "1.0.0-beta.1": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.1/LocalLMLabSDKCore-1.0.0-beta.1.xcframework.zip",
+        checksum: "cbc23cf85d3be0421279f65cd0f73aedd71cb773b981a7b107a7d4c3e445cd41"
     )
 ]
 
@@ -59,7 +63,7 @@ guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
 
 let package = Package(
     name: "RepoQA",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("27.0")],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
