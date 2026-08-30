@@ -83,5 +83,5 @@ works exactly as in `0.8.x`.
 
 - **Requires the macOS 27 beta** (and Xcode 27 beta) until both GA.
 - `1.0.0-beta.N` makes **no API-stability guarantee** — signatures can move between betas.
-- `LocalLMLabSDKInference.xcframework` in the beta is not yet Developer-ID-signed/notarized
-  (SwiftPM verifies it by checksum; a consumer embedding it in a notarized app should re-sign).
+- Both xcframeworks are Developer-ID-signed and notarized. SwiftPM still verifies them by
+  checksum; a consumer embedding them in a notarized app re-signs as part of its own build.
