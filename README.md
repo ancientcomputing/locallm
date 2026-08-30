@@ -8,9 +8,9 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 
 ## What's in this repo
 
-- **[toolkit/](toolkit/)** — The `localai-cli` CLI toolkit release (zip +
-  checksum) for LocalLM Lab 0.7.0. Download, verify, and install
-  instructions live there. Full CLI reference:
+- **[toolkit/](toolkit/)** — Archived `localai-cli` toolkit releases (zip +
+  checksum) for the 0.6–0.8 line. From `1.0.0-beta.1` on, the toolkit ships as an
+  asset on the same GitHub Release as the SDK. Full CLI reference:
   [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
 - **[examples/](examples/)** — Code samples, split by feature:
   - **api-lab/** — Scripts and a sample chat app for the API Lab feature
@@ -19,7 +19,8 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
     directly (no HTTP server, subprocess + JSON on stdin/stdout).
   - **localai-cli-swift/** — The same examples in Swift.
   - **plate-today/**, **plate-today-tools/**, **repo-qa/**, **workspace-buddy/**,
-    and **components-demo/** — reference apps for the LocalLM Lab SDK, see below.
+    **components-demo/**, and **code-buddy/** — reference apps for the LocalLM Lab
+    SDK, see below.
 - **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
   managing MCP servers, built on the SDK's public API.
 
@@ -55,6 +56,7 @@ for the full framing.
   behind §12).
 - **[docs/tested-models.md](docs/tested-models.md)** — a point-in-time snapshot of which
   open-weight (MLX) models actually tool-call, and why several don't.
+- **[CHANGELOG.md](CHANGELOG.md)** — the public SDK surface, version by version.
 - **[examples/plate-today/](examples/plate-today/)** — Calendar + Reminders + the Todoist MCP
   server, Path B: a hand-written `Tool` adapter per connector.
 - **[examples/plate-today-tools/](examples/plate-today-tools/)** — the exact same app, rebuilt on
@@ -66,6 +68,9 @@ for the full framing.
   (Path A).
 - **[examples/components-demo/](examples/components-demo/)** — a reference app built on
   `Components`' prebuilt MCP server picker UI instead of wiring one tool programmatically.
+- **[examples/code-buddy/](examples/code-buddy/)** — the model layer end to end: a CLI coding
+  agent routing `.heavy` / `.light` to locally-run MLX models, with Core's Workspace tools and
+  an MCP docs server. The only example linking `LocalLMLabSDKInference`.
 - **[docs/annotated-examples.md](docs/annotated-examples.md)** — every reference app's full
   source, with every SDK touchpoint marked inline.
 
