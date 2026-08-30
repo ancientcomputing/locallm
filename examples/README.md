@@ -11,6 +11,7 @@ Code samples for LocalLM Lab, split by which feature they use.
 | [plate-today-tools/](plate-today-tools/) | LocalLM Lab SDK (Core), Path A | The exact same app as `plate-today/`, rebuilt on Core's ready-made `Tool`s (`GetUpcomingEventsTool`, `MCPTool`, etc.) instead of hand-written adapters — diff the two to see precisely what changes. |
 | [repo-qa/](repo-qa/) | LocalLM Lab SDK (Core), Path A | A minimal command-line tool — no signing, no macOS permission needed. Builds a `Tool` for a real MCP server's (Deepwiki's) own tools straight from their live schema, no hand-written `Arguments` struct. |
 | [workspace-buddy/](workspace-buddy/) | LocalLM Lab SDK (Core), Path A | A local AI-assisted coding example: pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`. |
+| [code-buddy/](code-buddy/) | LocalLM Lab SDK (Core **+ Inference**) | The full model layer: a CLI coding agent running **locally-run MLX models** through `LocalLMLab` + `MLXModelProvider` (heavy/light routes, one resident at a time), Core's Workspace tools, a no-auth MCP server, and two **host-owned** `Process` tools (git, run-tests) the SDK deliberately doesn't ship. The only example linking `LocalLMLabSDKInference.xcframework`. |
 | [components-demo/](components-demo/) | LocalLM Lab SDK (`Components`) | The same SDK, via the prebuilt `LocalLMLabSDKComponents` MCP server picker UI instead of building your own. |
 
 **Path A vs Path B**, for the four Core-based examples above: two ways to turn a connector or MCP
