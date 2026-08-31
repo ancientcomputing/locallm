@@ -5,7 +5,7 @@ WHAT THIS SCRIPT DOES
     Calls the local AI with the "clock" connector — the only connector that
     needs zero macOS permission dialogs (see web/connectors.html) — and asks
     it the current time. Nothing to configure below: no server URL, no
-    tool name, no OAuth. If Local AI Settings has System Clock turned on,
+    tool name, no OAuth. If the Connectors screen has System Clock turned on,
     running this script just works.
 
     Unlike run_localai.py (which explains the general pattern), this script
@@ -14,7 +14,7 @@ WHAT THIS SCRIPT DOES
 
 SETUP (about 30 seconds)
     1. Run LocalLM Lab at least once.
-    2. Open Local AI Settings and turn on the "System Clock" connector.
+    2. Open the Connectors screen and turn on the "System Clock" connector.
        No permission prompt appears for this one — it's read-only, on-device,
        and doesn't touch Calendar/Reminders/Contacts/Location.
     3. Download localai-toolkit-<version>-arm64.zip, unzip it, and place
@@ -40,7 +40,7 @@ LOCALAI_CLI_PATH = os.environ.get(
 )
 LOCALAI_CONFIG_PATH = os.environ.get(
     "LOCALAI_CONFIG_PATH",
-    os.path.expanduser("~/Library/Application Support/LocalLM Lab/localai-config.json"),
+    os.path.expanduser("~/Library/Application Support/LocalLM Lab/app-config.json"),
 )
 
 
@@ -73,7 +73,7 @@ def main():
     if response.get("error"):
         print(f"FAIL — {response['error']}")
         if "not enabled" in response["error"]:
-            print('\nFix: open Local AI Settings in LocalLM Lab and turn on "System Clock".')
+            print('\nFix: open the Connectors screen in LocalLM Lab and turn on "System Clock".')
         sys.exit(1)
 
     print(response.get("answer", ""))

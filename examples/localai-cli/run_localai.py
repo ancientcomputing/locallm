@@ -1,21 +1,23 @@
 """
-run_localai.py — call localai-cli from Python, no LocalLM Lab server running
+run_localai.py — call localai-cli from Python — no HTTP server
 
 WHAT THIS SCRIPT DOES
     Shows the pattern a 3rd-party app (e.g. OrbAI RPG) would use to reach the
     local AI directly: spawn `localai-cli` as a subprocess, pipe a JSON
-    request on stdin, read its JSON response from stdout. This does NOT talk
-    to LocalLM Lab's Go server or its HTTP API at all — localai-cli and
-    localai-playground-run are self-contained binaries.
+    request on stdin, read its JSON response from stdout. No HTTP server is
+    involved — this does NOT use LocalLM Lab's API Lab endpoint. localai-cli
+    and localai-playground-run are self-contained binaries; LocalLM Lab only
+    needs to be running so connector/MCP calls can execute inside it.
 
-    localai-cli reads a config file (localai-config.json, authored by
-    LocalLM Lab's Local AI Settings screen) that lists which connectors
+    localai-cli reads a config file (app-config.json, authored by
+    LocalLM Lab's Connectors / MCP Servers / AI Models screens) that lists
+    which connectors
     (tools the model can call, e.g. a system clock or read-only filesystem
     access) the user has granted. Every request to localai-cli then
     explicitly lists which of those already-granted connectors it wants
     active for that one call, via a "connectors" field:
         - A connector named in the request must already be enabled in
-          localai-config.json, or localai-cli rejects the request with a
+          app-config.json, or localai-cli rejects the request with a
           JSON {"error": "..."} before ever invoking the model.
         - Connectors enabled in the config but not named in a given request
           simply aren't given to that call — no error, just a narrower
@@ -30,9 +32,9 @@ REQUIREMENTS
       localai-toolkit-<version>-arm64.zip release asset and unzipped
       somewhere. Both must sit in the same directory (localai-cli's default
       --helper-path assumes "next to me"), or pass --helper-path explicitly.
-    - A localai-config.json produced by running LocalLM Lab at least once
+    - An app-config.json produced by running LocalLM Lab at least once
       and enabling whichever connectors you plan to request below — see
-      Local AI Settings in the app. localai-cli only reads this file, it
+      the Connectors screen in the app. localai-cli only reads this file, it
       never creates or edits it.
 
 EXPECTED BEHAVIOR (if everything is working)
@@ -45,7 +47,7 @@ WHAT FAILURE LOOKS LIKE
       the binary where this script expects it.
     - {"error": "config file not found: ..."} — fix LOCALAI_CONFIG_PATH.
     - {"error": "connector '...' is not enabled in the config"} — the
-      connector requested below isn't turned on in Local AI Settings; either
+      connector requested below isn't turned on in the Connectors screen; either
       enable it there, or remove it from CONNECTORS below.
     - {"error": "The operation couldn't be completed.
       (FoundationModels.LanguageModelSession.GenerationError error -1.)"} — a
@@ -70,10 +72,10 @@ LOCALAI_CLI_PATH = os.environ.get(
 )
 LOCALAI_CONFIG_PATH = os.environ.get(
     "LOCALAI_CONFIG_PATH",
-    os.path.expanduser("~/Library/Application Support/LocalLM Lab/localai-config.json"),
+    os.path.expanduser("~/Library/Application Support/LocalLM Lab/app-config.json"),
 )
 # Which connectors this particular call wants active — must already be
-# enabled in localai-config.json, or localai-cli rejects the request before
+# enabled in app-config.json, or localai-cli rejects the request before
 # ever invoking the model. Omitting this list entirely means NO connectors
 # are made available to the call — a deliberate least-privilege default.
 CONNECTORS = ["clock"]
