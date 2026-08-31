@@ -1,23 +1,45 @@
 # code-buddy
 
-A minimal CLI coding agent built on the **full** LocalLM Lab SDK — the worked example of
-**every** model-layer surface (local MLX models through `LocalLMLab`), and of the pattern
-where **the host implements process execution itself**, not the SDK.
+**code-buddy is a small command-line coding assistant that runs entirely on your Mac.** A local
+open-weight model — downloaded once from Hugging Face — reads and edits files in a project
+directory you point it at. No cloud service, no API key, nothing leaves the machine.
 
-It's a **plain command-line tool** — no signing, no `.app`, no `packaging/` directory.
-`swift run` is the whole build. Being unsandboxed is also what lets it run `git` and your test
-command — see [The `git` and `run_tests` tools](#the-git-and-run_tests-tools-this-example-provides-them-not-the-sdk).
+It exists as a **reference example for the LocalLM Lab SDK**. If you're thinking about building
+your own Mac app where a local model does real work — not just chat, but calling tools, editing
+files, running commands — this is that whole pattern end to end, in a few hundred lines of Swift
+you can read in one sitting. Concretely it shows:
 
-## What it does
+- **Running an open-weight model locally** through the SDK's *model layer* — you name a Hugging
+  Face repo, the SDK checks it against this Mac's memory, downloads it with a progress bar, and
+  runs it. Swappable per run (`--route heavy` / `--route light`).
+- **Giving the model tools it can call** — the file tools the SDK ships (read, search, patch,
+  write a file), *plus* two tools this example writes itself (`git`, `run_tests`) to demonstrate
+  how your own app adds abilities the SDK deliberately doesn't include.
+- **Driving one task to completion** — stream the model's output, print a trace of every tool
+  call, stop when the model says it's finished.
 
-You give it a **directory** and a **task in plain English**. It loads a local open-weight model
-(nothing leaves your Mac), lets that model explore the directory and edit files in it through a
-fixed set of tools — list/search/read files, apply a patch, write a file, run `git status`/`diff`,
-run your test command — and stops when the model says the task is done. Think "one focused coding
-task, run to completion," not an interactive chat.
+It is **not a product and not an interactive chatbot**: you give it one task, it runs, it stops.
 
-It **edits files in place.** Point it at a directory that's committed to git (or a throwaway
-copy) so you can `git diff` the result and `git checkout .` if you don't like it.
+Mechanically it's a **plain command-line tool** — no signing, no `.app`, no `packaging/`
+directory; `swift run` is the whole build. Being an ordinary unsandboxed CLI is also what lets it
+run `git` and your test command — see
+[The `git` and `run_tests` tools](#the-git-and-run_tests-tools-this-example-provides-them-not-the-sdk).
+
+## How you use it
+
+You run it with two arguments: a **directory** and a **task in plain English**.
+
+```
+swift run CodeBuddy <directory> "<task>"
+```
+
+The model may only read and edit files *inside that directory*, using a fixed set of tools —
+list / search / read files, apply a patch, write a file, run read-only `git`, run your test
+command. It works the task, narrating as it goes, and stops on its own when it's done.
+
+It **edits files in place.** Always point it at a directory that's committed to git (the
+walkthrough below uses a throwaway copy) so you can see the changes with `git diff` and undo them
+with `git checkout .`.
 
 ## Walkthrough
 
