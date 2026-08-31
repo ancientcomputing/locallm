@@ -21,28 +21,36 @@ copy) so you can `git diff` the result and `git checkout .` if you don't like it
 
 ## Walkthrough
 
-Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time),
-then run these from `examples/code-buddy/`. The repo ships a
-[`sample-workspace/`](sample-workspace/) with one undocumented Swift file to practice on.
+Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time).
 
-**1. Make a throwaway copy of the sample workspace and put it under git.** code-buddy edits files
-in place; a git repo is how you review and undo its changes. (Copy it *out* of this repo so the
-diff isn't tangled with `locallm`'s own git.)
+**About `swift run`:** it must be run from **this package directory**
+(`locallm/examples/code-buddy/`, the one with `Package.swift`) — that's how SwiftPM finds and
+builds the `CodeBuddy` executable. `CodeBuddy` is the *target name*, not a path. The workspace
+you want it to work on is a separate argument and can be anywhere. Every command below shows its
+directory as a `# in …` comment.
+
+**1. Copy the sample workspace out of this repo and put it under its own git.** The repo ships a
+[`sample-workspace/`](sample-workspace/) with one undocumented Swift file. code-buddy edits files
+in place, and a git repo is how you review and undo that — copy it *out* of `locallm` so its diff
+isn't tangled with this repo's own git.
 
 ```bash
+# in locallm/examples/code-buddy/
 cp -R sample-workspace /tmp/cb-demo
-cd /tmp/cb-demo && git init -q && git add -A && git commit -qm "before code-buddy" && cd -
+git -C /tmp/cb-demo init -q && git -C /tmp/cb-demo add -A && git -C /tmp/cb-demo commit -qm "before code-buddy"
 ```
 
 **2. Look at what you're starting with** — `/tmp/cb-demo/Geometry.swift` has `Rectangle` plus a
 few `public` functions, none with doc comments.
 
-**3. Run code-buddy at that directory** with a plain-English task:
+**3. From the package directory, run code-buddy, pointing it at that copy:**
 
 ```bash
+# in locallm/examples/code-buddy/
 LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declaration"
 ```
 
+- `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
 - `/tmp/cb-demo` — the **workspace**: the only directory the model can read or edit.
 - the quoted string — the **task**. One shot: it lists files, reads `Geometry.swift`, applies a
   patch, and reports back.
@@ -52,15 +60,16 @@ verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, 
 goes to **stderr**. First run also downloads the two xcframeworks and the model (~4.5 GB for the
 default `heavy` route).
 
-**4. Review what it did** — this is the real output, not the model's summary:
+**4. Review what it did** in the workspace — this is the real result, not the model's summary:
 
 ```bash
-cd /tmp/cb-demo && git diff
+# anywhere
+git -C /tmp/cb-demo diff
 ```
 
 You should see `///` lines added above `area`, `perimeter`, `isSquare(_:)`, `scaled(_:by:)`, etc.
-Keep it (`git add -A && git commit`), tweak it, or throw it away (`git checkout .`). Re-run step 3
-with a different task to keep experimenting.
+Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
+(`git -C /tmp/cb-demo checkout .`). Re-run step 3 with a different task to keep experimenting.
 
 ### All options
 
