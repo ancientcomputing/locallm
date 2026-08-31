@@ -31,14 +31,29 @@ directory as a `# in …` comment.
 
 **1. Copy the sample workspace out of this repo and put it under its own git.** The repo ships a
 [`sample-workspace/`](sample-workspace/) with one undocumented Swift file. code-buddy edits files
-in place, and a git repo is how you review and undo that — copy it *out* of `locallm` so its diff
-isn't tangled with this repo's own git.
+in place, and a fresh one-commit git repo is how you'll see exactly what it changed (step 4).
 
 ```bash
 # in locallm/examples/code-buddy/
+rm -rf /tmp/cb-demo                       # start clean (safe: /tmp is throwaway)
 cp -R sample-workspace /tmp/cb-demo
 git -C /tmp/cb-demo init -q && git -C /tmp/cb-demo add -A && git -C /tmp/cb-demo commit -qm "before code-buddy"
 ```
+
+What those three lines do, and don't do:
+
+- **`rm -rf /tmp/cb-demo`** clears any leftover from a previous run. `/tmp` is scratch space the
+  OS wipes on reboot — nothing you care about lives there.
+- **`cp -R`** makes a plain copy of `sample-workspace/` at `/tmp/cb-demo`. Your checkout of
+  `locallm` is untouched from here on; the walkthrough only ever writes to `/tmp/cb-demo`.
+- **`git -C /tmp/cb-demo init`** creates a `.git/` folder *inside `/tmp/cb-demo`* and nothing
+  else — it's a brand-new, empty, entirely local repo. It doesn't contact a server, doesn't
+  touch the `locallm` repo (that's a different directory tree), and can't "clobber" another repo.
+  If you somehow re-ran it on a dir that already had a `.git/`, git would just say
+  "Reinitialized" and leave your history intact — but the `rm -rf` above means you always get a
+  clean one here.
+- **`git add -A` + `git commit`** record the copied file as commit #1. That baseline is the
+  before-picture `git diff` compares against in step 4.
 
 **2. Look at what you're starting with** — `/tmp/cb-demo/Geometry.swift` has `Rectangle` plus a
 few `public` functions, none with doc comments.
