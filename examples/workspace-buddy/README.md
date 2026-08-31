@@ -6,39 +6,66 @@ see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspa
 A local, more modest take on AI-assisted coding — not Claude Code, but a real demonstration of
 what's possible entirely on-device.
 
-Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
+Requires macOS 27 on Apple Silicon with Apple Intelligence enabled.
 
-## Requires macOS 27 + the Xcode 27 beta
+## Getting the SDK & toolchain
 
-This branch tracks `1.0.0-beta.1`. `Package.swift` is
-`platforms: [.macOS("27.0")]`. Build with the **Xcode 27 beta**
-(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`); a stable Xcode fails with
-`'v27' is unavailable`. (`WorkspaceAccess`/`WorkspaceTools`, this app's whole point, first
-shipped in `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)
+Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
+(re-run it in every new terminal).
 
-## Getting the SDK
+**1. Install the Xcode 27 beta.** Download it from
+[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
+(it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
+Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+
+**2. Set two environment variables** in the terminal you'll build from:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
 
-## Real build: `packaging/build-and-sign.sh`
+- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
+  alone).
+- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download
+  `LocalLMLabSDKCore.xcframework` from. Omitting it fails fast with a clear error. (`WorkspaceAccess`/
+  `WorkspaceTools`, this app's whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use
+  `1.0.0-beta.1+`.)
+
+These last only for the current terminal — re-run step 2 in each new terminal (or add both
+`export` lines to your `~/.zshrc`).
+
+**3. Compile-check:**
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
+swift build
+```
+
+This just proves it builds. To *actually run* it you need a signed `.app` — see below.
+
+## Running it
+
+Unlike the CLI examples, this is a sandboxed SwiftUI `.app`, and the whole point — a
+security-scoped bookmark surviving relaunch — only means anything with the sandbox on and the
+`com.apple.security.files.user-selected.read-write` entitlement in place. A bare `swift run`
+gets neither, so it's compile-only. The real build is `packaging/build-and-sign.sh`, which needs
+a **Developer ID Application** signing identity in your keychain
+(`security find-identity -v -p codesigning`):
+
+```bash
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
-./packaging/build-and-sign.sh
+  ./packaging/build-and-sign.sh
 ```
 
-Unlike `plate-today`, sandboxing here is **not** a build-time opt-in — this app is sandboxed
-unconditionally. That's what actually makes the security-scoped bookmark pattern in §8 (Filesystem access) necessary
-to demonstrate: unsandboxed, a plainly-remembered folder path would just keep working across
-relaunches, and the example wouldn't prove anything about the SDK's real guidance. No
-`NS*UsageDescription` key or TCC prompt is involved — `NSOpenPanel` plus the
-`com.apple.security.files.user-selected.read-write` entitlement is the whole story.
+(`NOTARIZE_APP=0` skips the Apple notarization round-trip — fine for launching the result
+yourself, not for handing it to another Mac. `DEVELOPER_DIR` and `LOCALLM_SDK_VERSION` come from
+step 2.) The signed `.app` lands in `dist/`; open it, click **Choose Folder…**, pick a throwaway
+directory, type a request in the box, and hit **Go**.
+
+Sandboxing here is **not** a build-time opt-in the way it is for `plate-today` — this app is
+always sandboxed. No `NS*UsageDescription` key or TCC prompt is involved; `NSOpenPanel` plus that
+one entitlement is the whole story.
 
 ## What this app does, and doesn't, do
 
@@ -56,14 +83,13 @@ relaunches, and the example wouldn't prove anything about the SDK's real guidanc
 - **Single-turn per request** — type a request, get a response, type another. Not a full
   multi-turn chat with conversation history; a straightforward extension if you want one.
 
-## Verified live (private repo, source dependency)
+## Verified live
 
-Built, Developer-ID signed, launched as a real sandboxed `.app`; picked a real throwaway scratch
-folder via the actual `NSOpenPanel`; asked it, in plain English, to change one string in an
-existing file — the on-device model called `readWorkspaceFile` then `editWorkspaceFile`, and the
-change landed correctly on disk (verified byte-for-byte afterward). A separate request asking it
-to create a new file with specific content also worked, and a follow-up read of the earlier-edited
-file correctly reflected the change, confirming no stale-cache issues.
+Built, Developer-ID signed, launched as a real sandboxed `.app`; picked a throwaway scratch folder
+via the actual `NSOpenPanel`; asked it, in plain English, to change one string in an existing file
+— the on-device model called `readWorkspaceFile` then `editWorkspaceFile`, and the change landed
+correctly on disk (verified byte-for-byte afterward). A separate request to create a new file also
+worked, and a follow-up read reflected the earlier edit — no stale-cache issues.
 
 ## More
 
