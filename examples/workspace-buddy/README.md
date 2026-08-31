@@ -31,6 +31,21 @@ with `git diff` or your editor.
 
 Requires macOS 27 on Apple Silicon with Apple Intelligence enabled.
 
+## About the model
+
+This app uses **Apple's on-device Foundation model** — the small language model built into macOS,
+the same one Apple Intelligence features use. It runs locally with zero setup, but it's modest:
+a few billion parameters, tuned for short well-scoped tasks, with a context window of only
+~8,000 tokens (so it can't hold a large file, let alone a whole project, at once).
+
+Realistic asks: "rename `oldName` to `newName` in this file", "add a doc comment to each
+function", "convert this JSON to YAML". It will struggle with big files, many files in one
+request, or open-ended refactors, and it tool-calls less reliably than a larger model.
+
+For more capability while staying local, [`workspace-buddy-local`](../workspace-buddy-local) is
+this same app running a downloadable open-weight model (e.g. an 8B). The SDK can also route to
+Claude if a cloud model is acceptable — see [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
+
 ## Getting the SDK & toolchain
 
 Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
@@ -116,10 +131,12 @@ worked, and a follow-up read reflected the earlier edit — no stale-cache issue
 
 ## More
 
+- [`workspace-buddy-local`](../workspace-buddy-local) — this same app running a **downloadable
+  open-weight model** (e.g. an 8B) instead of Apple's, inside App Sandbox.
+- [`plate-today-tools`](../plate-today-tools) — another Path-A app (ready-made Tools), also
+  sandbox-capable, also a GUI.
 - [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) —
-  the prose walkthrough of `WorkspaceAccess`/`WorkspaceTools` and why `editFile` is
-  search-and-replace rather than a diff format.
+  `WorkspaceAccess` / `WorkspaceTools`, and why `editFile` is search-and-replace, not a diff
+  format. §10 — App Sandbox.
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
   every SDK touchpoint marked.
-- [`plate-today-tools`](../plate-today-tools) — the other sandboxed-by-default-capable example, for
-  comparison (there, sandboxing is opt-in).

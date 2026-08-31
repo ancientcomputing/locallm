@@ -136,8 +136,13 @@ reliably. `MLXModelProvider.validate` refuses a model whose weights exceed ~70% 
 
 ## More
 
-- [`workspace-buddy`](../workspace-buddy) — the on-device-model original this is a twin of.
-- [`code-buddy`](../code-buddy) — the model layer end to end, as a CLI (unsandboxed).
-- [`repo-qa-local`](../repo-qa-local) — the minimal model-layer + MLX example (a CLI).
+- [`workspace-buddy`](../workspace-buddy) — this same app running **Apple's built-in model** (no
+  download, no network entitlement).
+- [`repo-qa-local`](../repo-qa-local) — the minimal model-layer + MLX example (a CLI): the same
+  Apple → open-weight swap, on `repo-qa`.
+- [`code-buddy`](../code-buddy) — the model layer end to end (two models, routing between them,
+  an agent loop), a CLI.
 - [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) —
-  the model layer, in prose. §10 — App Sandbox.
+  the model layer, in prose. §8a — `WorkspaceTools`. §10 — App Sandbox.
+- [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
+  every SDK touchpoint marked.
