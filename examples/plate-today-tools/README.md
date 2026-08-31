@@ -1,15 +1,42 @@
 # Plate Today (Tools)
 
-The same app as [`plate-today`](../plate-today), rebuilt on the SDK's ready-made FoundationModels
-Tools (`GetUpcomingEventsTool`, `GetUpcomingRemindersTool`, `MCPTool`, etc. — see
-[`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own))
-instead of hand-writing a `Tool` struct per connector. Same UI, same prompt, same connectors —
-diff [`Sources/PlateTodayTools/PlateTodayToolsApp.swift`](Sources/PlateTodayTools/PlateTodayToolsApp.swift)
+**Plate Today (Tools)** is [`plate-today`](../plate-today) built a second way. Same app — it reads
+your Calendar, Reminders, and Todoist and asks the on-device model for a summary of your day — but
+it connects those data sources to the model differently. The two versions exist to be compared.
+
+## Giving a model tools — Path A vs Path B
+
+When you let an on-device model use the SDK, you can hand it **tools**: small pieces of code the
+model is allowed to call to fetch data or take an action — read the calendar, query an online
+service, and so on. Each tool carries a short text **description**; the model reads those
+descriptions and decides for itself when to call a tool. Your app runs the call and passes the
+result back to the model.
+
+Before the model can use a data source, that source has to be wrapped in a tool. There are two
+ways to do it, and this pair of examples is the same app built each way:
+
+- **Path A — use the tools the SDK already ships.** For the common connectors, Core provides
+  ready-made tools: `GetUpcomingEventsTool()`, `GetUpcomingRemindersTool()`, `MCPTool(...)` for
+  any MCP server, and more — one line each. The SDK wrote both the code and the descriptions the
+  model reads, and those descriptions are tuned from watching real on-device models get tool use
+  wrong. Least code, least to get wrong. **← this app.**
+- **Path B — write each tool yourself.** A small `Tool` struct per source, where you set the
+  name, the arguments the model is allowed to pass, and the description. More code, but full
+  control — for example, you can fix an argument's value so the model can't change it.
+  **← [`plate-today`](../plate-today).**
+
+Neither is the "real" one — Core ships both and an app can mix them. Because the two apps are
+otherwise identical, you can diff
+[`Sources/PlateTodayTools/PlateTodayToolsApp.swift`](Sources/PlateTodayTools/PlateTodayToolsApp.swift)
 against [`plate-today`'s `PlateTodayApp.swift`](../plate-today/Sources/PlateToday/PlateTodayApp.swift)
-to see exactly what changes between "Path A" (this app) and "Path B" (plate-today) in real code,
-not just prose. Every divergence is marked inline with a `DIFF FROM plate-today:` comment,
-including the annotated walkthrough in
-[`docs/annotated-examples.md`](../../docs/annotated-examples.md).
+and see exactly what Path A saves and what it costs — every difference is marked with a
+`DIFF FROM plate-today:` comment. The longer prose version is
+[`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own);
+[`docs/annotated-examples.md`](../../docs/annotated-examples.md) walks both apps' full source.
+
+**What you'll see** is identical to `plate-today` — the same permission prompts, Todoist sign-in,
+and paragraph summary. See
+[that README's "What you'll see"](../plate-today/README.md#what-youll-see).
 
 Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
 
