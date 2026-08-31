@@ -22,7 +22,10 @@ BIN_NAME="WorkspaceBuddyLocal"
 VERSION="${VERSION:-0.1.0}"
 APP_IDENTITY="${APP_IDENTITY:-${SIGN_IDENTITY:-}}"
 KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE:-${NOTARY_PROFILE:-}}"
-DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+# This example's Package.swift is swift-tools-version 6.4 (macOS 27 + the two-binary SDK), so it
+# needs the Xcode 27 beta — the stable Xcode ships an older Swift. Prefer the beta if it's there.
+DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+[[ -d "$DEVELOPER_DIR" ]] || DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
 TEAM_ID="${TEAM_ID:-}"
 NOTARIZE_APP="${NOTARIZE_APP:-1}"
 
@@ -36,6 +39,16 @@ APP_ZIP="$BUILD_DIR/${APP_NAME}-${VERSION}.zip"
 ENTITLEMENTS="$BUILD_DIR/${BIN_NAME}.entitlements"
 
 export DEVELOPER_DIR
+
+# Fail early with an actionable message rather than SwiftPM's cryptic
+# "using Swift tools version 6.4.0 but the installed version is 6.3.3".
+_swift_ver="$(swift --version 2>/dev/null | grep -oE 'Swift version [0-9]+\.[0-9]+' | awk '{print $3}')"
+_major="${_swift_ver%%.*}"; _minor="${_swift_ver##*.}"
+if [[ -z "$_swift_ver" ]] || (( _major < 6 || (_major == 6 && _minor < 4) )); then
+  echo "error: needs Swift 6.4+ (Xcode 27 beta). DEVELOPER_DIR=$DEVELOPER_DIR -> Swift ${_swift_ver:-unknown}." >&2
+  echo "       re-run with: DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer $0" >&2
+  exit 1
+fi
 
 require_env()     { [[ -n "$2" ]] || { echo "$1 is required" >&2; exit 1; }; }
 require_command() { command -v "$1" >/dev/null 2>&1 || { echo "$1 is required" >&2; exit 1; }; }
