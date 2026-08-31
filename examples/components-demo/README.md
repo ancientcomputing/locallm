@@ -16,7 +16,7 @@ Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta 
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.1` (the macOS 27 line). Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.1`, which needs macOS 27. Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
 `'v27' is unavailable`. Nothing to download by hand — `Package.swift` (both this app's and the
 sibling [`Components`](../../Components/) package it depends on) requires an explicit
@@ -59,7 +59,7 @@ NOTARIZE_APP=0 \
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set; usually unneeded if your `KEYCHAIN_PROFILE` already implies one team. |
-| `DEVELOPER_DIR` | Yes (macOS 27 line) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
+| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
 
 There's no MAS-signing script for this app (no equivalent of `plate-today`'s
 `build-and-sign-mas.sh`) — the standard `build-and-sign.sh` above is Developer ID / Gatekeeper

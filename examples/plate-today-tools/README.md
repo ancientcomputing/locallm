@@ -13,10 +13,10 @@ including the annotated walkthrough in
 
 Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
 
-## The macOS 27 line
+## Requires macOS 27 + the Xcode 27 beta
 
-This branch tracks `1.0.0-beta.1` (the macOS 27 line — `Package.swift` is
-`platforms: [.macOS("27.0")]`). Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.1`. `Package.swift` is
+`platforms: [.macOS("27.0")]`. Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`); a stable Xcode fails with
 `'v27' is unavailable`. (The ready-made connector `Tool`s this example depends on first shipped
 in `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)

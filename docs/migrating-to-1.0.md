@@ -1,7 +1,7 @@
-# Migrating to the LocalLM Lab SDK 1.0 line
+# Migrating to the LocalLM Lab SDK 1.0
 
-The 1.0 line (`1.0.0-beta.N`, `1.0.0` at GA) is the **macOS 27** line. The macOS 26 MCP-only
-line continues separately as `0.8.x` — if you don't need macOS 27, stay there.
+1.0 (`1.0.0-beta.N`, `1.0.0` at GA) **requires macOS 27**. The macOS 26, MCP-only `0.8.x`
+releases continue separately — if you don't need macOS 27, stay there.
 
 The jump from `0.8.x` is **mostly additive**: the MCP client, the connectors, and Keychain
 storage work the same. What's new is the model layer; what can break your build is one

@@ -5,11 +5,11 @@ This tracks the **public SDK surface** (`LocalLMLabSDKCore`, `LocalLMLabSDKInfer
 maps to a GitHub Release on `ancientcomputing/locallm` (tag `v<version>`); the xcframework
 checksums live on the release, not here.
 
-The **1.0 line is the macOS 27 line**. The macOS 26 MCP-only line continues as `0.8.x`.
+**1.0 requires macOS 27.** The macOS 26 `0.8.x` line (MCP client + connectors, no model layer) continues separately.
 
 ## 1.0.0-beta.1 — 2026-08-30
 
-First release of the macOS 27 line. **Requires the macOS 27 + Xcode 27 betas.** Coming from
+First release requiring macOS 27. **Requires the macOS 27 + Xcode 27 betas.** Coming from
 `0.8.x`? See [`docs/migrating-to-1.0.md`](docs/migrating-to-1.0.md) — the jump is mostly
 additive.
 
@@ -71,8 +71,8 @@ been here since `0.7.0`. Full walkthrough: [`docs/sdk-guide.md` §6a](docs/sdk-g
 
 ## 0.8.0 — 2026-08-24
 
-- macOS 26 line. MCP client + connectors + Keychain storage. `LocalLMLabSDKCore` only.
-- This line continues for consumers that don't need macOS 27.
+- The macOS 26 `0.8.x` line. MCP client + connectors + Keychain storage. `LocalLMLabSDKCore` only.
+- Continues for consumers that don't need macOS 27.
 
 ## 0.7.1 — 2026-08-16
 

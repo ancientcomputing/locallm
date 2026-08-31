@@ -31,7 +31,7 @@ it's local and offline.
   Xcode fails with `'v27' is unavailable`. Point `DEVELOPER_DIR` at the beta:
   `export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
 - **`LOCALLM_SDK_VERSION`** — `Package.swift` resolves the SDK xcframeworks from a GitHub Release
-  keyed on this env var. Set it to `1.0.0-beta.1` (this branch's version); omitting it, or an
+  keyed on this env var. Set it to `1.0.0-beta.1`; omitting it, or an
   unknown value, fails fast with a clear error.
 - **Two SDK binaries.** Unlike `repo-qa` (Core only), this links `LocalLMLabSDKCore.xcframework`
   **and** `LocalLMLabSDKInference.xcframework` (the MLX runtime), both from the same Release —

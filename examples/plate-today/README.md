@@ -14,7 +14,7 @@ Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently t
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.1` (the macOS 27 line). Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.1`, which needs macOS 27. Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
 `'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` requires an
 explicit `LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency from there:
@@ -62,7 +62,7 @@ NOTARIZE_APP=0 \
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set; usually unneeded if your `KEYCHAIN_PROFILE` already implies one team. |
-| `DEVELOPER_DIR` | Yes (macOS 27 line) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
+| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
 | `PLATETODAY_INCLUDE_LOCATION_WEATHER` | No | `0` | Build-time opt-in for the Location + Weather tools. Off by default — Location Services can be flaky, and unlike Calendar/Reminders/Contacts, its TCC grant can't be cleanly reset with `tccutil reset Location <bundle-id>` (only `tccutil reset All` or a manual System Settings removal works). |
 | `PLATETODAY_INCLUDE_CONTACTS` | No | `0` | Build-time opt-in for the Contacts connector (on-demand enrichment, not part of the default daily-summary flow — avoids an extra TCC prompt by default). |
 | `PLATETODAY_APP_SANDBOX` | No | `0` | Build-time opt-in for an App Sandbox build (proof-of-concept for Mac App Store compatibility — see `docs/sdk-guide.md` §10 for what's confirmed working under sandbox). |

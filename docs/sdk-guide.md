@@ -32,7 +32,7 @@ Both are supported, and neither supersedes the other — they solve different pr
   runtime — your app owns its own TCC grants, its own MCP connections, its own Keychain-stored
   tokens. More setup (entitlements, Info.plist keys, your own OAuth redirect scheme — see below),
   but no external process to depend on, and full control over the resulting `.app`'s distribution
-  (Developer ID + notarization, or Mac App Store). The 1.0 line also adds the **model layer**
+  (Developer ID + notarization, or Mac App Store). 1.0 also adds the **model layer**
   ([§6a](#6a-the-model-layer-local-models-routing-sessions)) — offer Apple's on-device model,
   Claude, and locally-run open-weight (MLX) models behind one API, with routing and residency
   the SDK owns. Add `LocalLMLabSDKInference` too for the MLX runtime.
@@ -527,7 +527,7 @@ both if you don't want to write your own.
 
 ## 6a. The model layer: local models, routing, sessions
 
-New in the 1.0 (macOS 27) line. Everything above is the MCP client — usable on its own with
+New in 1.0 (which requires macOS 27). Everything above is the MCP client — usable on its own with
 Apple's `SystemLanguageModel` and nothing else. The **model layer** is what you reach for when
 "which model" becomes a real question in your app: you want to offer a locally-run open-weight
 model *and* Apple's on-device model *and* Claude behind one API, let the user (or your own
@@ -558,7 +558,7 @@ let lab = LocalLMLab(configuration: .init(providers: [
 ]))
 
 lab.models      // the @Observable ModelRegistry — providers, routes, residency, downloads
-lab.mcp         // MCPServerManager, unchanged from the MCP-only line
+lab.mcp         // MCPServerManager, unchanged from 0.8.x
 lab.workspace   // security-scoped workspace access + ready-made tools
 lab.connectors  // Calendar / Reminders / Contacts / Location
 ```
@@ -1073,7 +1073,7 @@ call, not just a synchronous setup step. `examples/workspace-buddy` shows the as
   for once you have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
   see §7a (ready-made vs. hand-written tools).
-- ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ The 1.0 line adds
+- ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ 1.0 adds
   the model layer (§6a): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
   `LocalLMLabSDKInference`) / `makeSession`. Still optional — the MCP-only path is unchanged.
 - **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need

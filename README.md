@@ -26,7 +26,7 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 
 ## LocalLM Lab SDK
 
-> **1.0.0-beta (macOS 27 line)** — adds the model layer: offer Apple's on-device model, Claude,
+> **1.0.0-beta — requires macOS 27** — adds the model layer: offer Apple's on-device model, Claude,
 > and locally-run open-weight (MLX) models behind one API. Requires the macOS 27 + Xcode 27
 > betas. Coming from `0.8.x`? See **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** —
 > it's mostly additive, with one enum-resilience compile caveat.

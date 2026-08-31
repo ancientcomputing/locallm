@@ -32,7 +32,7 @@ LOCALLM_SDK_VERSION=1.0.0-beta.1 \
   Xcode fails with `'v27' is unavailable`. Point `DEVELOPER_DIR` at the beta:
   `export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
 - **`LOCALLM_SDK_VERSION`** — `Package.swift` resolves `LocalLMLabSDKCore.xcframework` from a
-  GitHub Release keyed on this env var. Set it to `1.0.0-beta.1` (this branch's version);
+  GitHub Release keyed on this env var. Set it to `1.0.0-beta.1`;
   omitting it, or an unknown value, fails fast with a clear error listing what it knows.
   (`MCPTool`, this app's whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use
   `1.0.0-beta.1+`.)

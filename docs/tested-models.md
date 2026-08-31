@@ -2,7 +2,7 @@
 
 > **Point-in-time, not maintained.** This is a snapshot of what we saw on our hardware,
 > our SDK build, and one specific tool-calling prompt, as of **2026-08-27** (SDK
-> `1.0.0-beta`, macOS 27 line). Model conversions, chat templates, and the MLX stack all
+> `1.0.0-beta`, requires macOS 27). Model conversions, chat templates, and the MLX stack all
 > move. **Validate your own model with `MLXModelProvider.capabilityProbe` — that result is
 > authoritative, this table is a starting point.** Distilled from an internal record of
 > 15+ rounds of real traces.
