@@ -1,14 +1,23 @@
 # Components Demo
 
-The SDK's second reference app. Where [`plate-today`](../plate-today/) shows "build a real
-feature on top of Core's API directly," this shows the other integration path: drop in
-`LocalLMLabSDKComponents`' prebuilt SwiftUI MCP server picker with a few lines of glue code, no
-custom MCP UI of your own to write.
+`LocalLMLabSDKComponents` is a small SwiftUI package shipped alongside the SDK that gives you a
+**ready-made UI for MCP server management** — the screen where a user adds an MCP server by URL,
+authenticates it (all three MCP auth styles: none, personal access token, OAuth), and turns
+individual tools and resources on or off. It's built entirely on the SDK's public API, and it
+handles the parts that are genuinely fiddly to get right: the OAuth flow, Keychain-backed token
+storage, rendering a server's live schema, and tracking which tools are actually available in the
+current session.
 
-It has no TCC-gated connectors (no Calendar/Reminders/Location) and no build-time feature flags —
-just an "Add a server" screen supporting all three MCP auth types (none, personal access token,
-OAuth), per-tool/per-resource enable toggles, live "Tools available this session" tracking, and a
-"Save As…" export of what a connected server offers. See
+This demo is the thin wrapper that shows the payoff: a few lines of glue embed that prebuilt
+picker and you have a working "connect your own MCP servers" feature — no MCP UI of your own to
+design, build, or maintain. **If your app lets users bring their own MCP servers, start here** and
+see how little you write. If you'd rather build that surface yourself against Core's MCP API, the
+other examples do it that way.
+
+Beyond the picker, the app has no TCC-gated connectors (no Calendar/Reminders/Location) and no
+build-time feature flags — just the "Add a server" screen, per-tool/per-resource enable toggles,
+live "Tools available this session" tracking, and a "Save As…" export of what a connected server
+offers. See
 [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-for-mcp-server-management)
 for what `Components` provides and how it's meant to be dropped into your own app.
 
