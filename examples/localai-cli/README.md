@@ -71,33 +71,59 @@ for that one call, via `connectors` and `mcp_tools` fields:
 All commands below use `python3` — plain `python` isn't guaranteed to exist
 on current macOS.
 
-## Scripts
+## The example scripts
 
-| Script | Requests | Setup needed before running | Run |
-|---|---|---|---|
-| `quickstart_clock.py` | `clock` connector | Enable "System Clock" in the Connectors screen (no permission dialog) | `python3 quickstart_clock.py` |
-| `quickstart_mcp_deepwiki.py` | DeepWiki's `read_wiki_structure` tool, via `--run` | Connect DeepWiki in MCP Servers, auth `None`, enable that one tool | `python3 quickstart_mcp_deepwiki.py` |
-| `quickstart_mcp_deepwiki_chat.py` | Same, via `--chat` instead of `--run` | Same as above | `python3 quickstart_mcp_deepwiki_chat.py` |
-| `run_localai.py` | Whatever's in `CONNECTORS` (edit the script) | Enable each connector listed in `CONNECTORS` | `python3 run_localai.py` |
-| `run_localai_mcp.py` | Whatever's in `MCP_SERVER`/`MCP_TOOL` (edit the script, or set env vars) | Connect and enable that server/tool | `python3 run_localai_mcp.py` |
-| `plate_today.py` | `clock`/`calendar`/`reminders` connectors + Todoist's `find-tasks-by-date` MCP tool | Enable "System Clock", "Calendar", and "Reminders" in the Connectors screen; connect Todoist in MCP Servers with that tool enabled | `python3 plate_today.py` |
+These scripts aren't a product. Each one is a **worked example of one way to use
+`localai-cli`**, written to be read and copied into your own code — together they cover the
+request shapes, the connector and MCP fields, and the least-privilege validation.
 
-The `quickstart_*` scripts run as-is — every value is already filled in with
-something guaranteed to work with no setup beyond one toggle/connection (see
-`web/connectors.html` and `web/mcp-servers.html` for why those two were
-picked: `clock` is the only connector with no macOS permission dialog, and
-DeepWiki is the only MCP server here with no OAuth). **Start with those if
-you just want to see it work.**
+### Start here — copy-paste, one toggle each
 
-`run_localai.py` and `run_localai_mcp.py` are templates: they default to
-requesting the same `clock`/DeepWiki setup, but the whole point is editing
-`CONNECTORS`, `MCP_SERVER`, `MCP_TOOL`, or the prompt itself for your own use
-case, so failures there usually mean *your* edit doesn't match what's
-enabled in `app-config.json` — check the `{"error": "..."}` message
-first, it names exactly what's missing.
+- **`quickstart_clock.py`** — the smallest possible demo. Sends one `--run` prompt ("what time
+  is it?") using the `clock` connector, the only connector with no macOS permission dialog.
+  **Shows** the whole round trip — spawn the binary, JSON in on stdin, JSON out on stdout — with
+  nothing to configure.
+  *Setup:* enable **System Clock** in **Connectors**. *Run:* `python3 quickstart_clock.py`
+- **`quickstart_mcp_deepwiki.py`** — the same round trip, but the tool is an **MCP server tool**
+  (`read_wiki_structure`, from DeepWiki) instead of a built-in connector. **Shows** the
+  `mcp_tools` request field, and that MCP tools are requested and validated exactly like
+  connectors. DeepWiki needs no auth.
+  *Setup:* in **MCP Servers**, add `https://mcp.deepwiki.com/mcp` (auth None), enable that one
+  tool. *Run:* `python3 quickstart_mcp_deepwiki.py`
+- **`quickstart_mcp_deepwiki_chat.py`** — identical to the one above except it uses **`--chat`**
+  (a `messages` list) instead of **`--run`** (`system_prompt` + `user_input`). **Shows** the two
+  request shapes side by side — mixing them up is the most common cause of the generic-looking
+  "The data couldn't be read because it is missing." error.
+  *Setup:* same as above. *Run:* `python3 quickstart_mcp_deepwiki_chat.py`
 
-Override the CLI/config paths with environment variables instead of editing
-a script directly:
+### Templates to adapt
+
+- **`run_localai.py`** — the general connector pattern with the connector list and prompt lifted
+  into constants at the top. **Shows** how you'd wire `localai-cli` into a real app, and what a
+  rejection looks like when a request names a connector that isn't enabled (a JSON `{"error":
+  …}`, before the model ever runs). Defaults to the `clock` setup, so it works unchanged.
+  *Setup:* enable each connector in `CONNECTORS`. *Run:* `python3 run_localai.py`
+- **`run_localai_mcp.py`** — the same, for MCP tools: `MCP_SERVER` / `MCP_TOOL` constants (also
+  read from `LOCALAI_MCP_SERVER` / `LOCALAI_MCP_TOOL`). **Shows** the `mcp_tools` entry shape
+  (`{"server": …, "tool": …}`) and its "must already be connected *and* enabled" validation.
+  *Setup:* connect + enable that server/tool. *Run:* `python3 run_localai_mcp.py`
+
+### A fuller example
+
+- **`plate_today.py`** — a `localai-cli` port of the [`plate-today`](../plate-today/) SDK
+  reference app: it pulls in Calendar, Reminders, and Todoist and asks the model to summarize
+  your day. **Shows** several connectors plus an MCP tool in one request; the pattern of reading
+  `app-config.json` yourself first, to hand the user a precise "enable X" checklist before
+  spending a model call; and why you pass the `clock` connector for anything date-sensitive —
+  the on-device model has no idea what today's date is. It reads `LOCALAI_MCP_SERVER` /
+  `LOCALAI_MCP_TOOL` too, if your Todoist server URL or tool name differ from the defaults
+  (`https://ai.todoist.net/mcp` / `find-tasks-by-date`).
+  *Setup:* enable **System Clock**, **Calendar**, **Reminders** in **Connectors**; connect
+  **Todoist** in **MCP Servers** with `find-tasks-by-date` enabled. *Run:* `python3 plate_today.py`
+
+### Overriding paths without editing a script
+
+Every script reads these:
 
 ```bash
 export LOCALAI_CLI_PATH=/path/to/localai-cli
@@ -105,32 +131,13 @@ export LOCALAI_CONFIG_PATH=/path/to/app-config.json
 python3 run_localai.py
 ```
 
-`run_localai_mcp.py` additionally reads `LOCALAI_MCP_SERVER`/`LOCALAI_MCP_TOOL`:
+`run_localai_mcp.py` and `plate_today.py` also read the MCP server/tool from the environment:
 
 ```bash
 export LOCALAI_MCP_SERVER=https://your-mcp-server.example.com/mcp
 export LOCALAI_MCP_TOOL=your_tool_name
 python3 run_localai_mcp.py
 ```
-
-### `plate_today.py`
-
-Checks Calendar, Reminders and Todoist (www.todoist.com) for what's due today and asks the model to summarize the day.
-
-It also requests the `clock` connector (`getCurrentTime`) and instructs the
-model to look up the real current date first, rather than guessing or
-relying on a stale/training notion of "today" — FoundationModels has no live
-wall-clock awareness on its own, so without this the model can (and did)
-get today's date wrong when matching it against calendar/reminders/Todoist.
-
-Before calling `localai-cli` at all, it reads `app-config.json` itself
-and prints a checklist of all four sources (`clock`/`calendar`/`reminders`
-connectors enabled; Todoist server connected, enabled, and its
-`find-tasks-by-date` tool enabled) — if anything's missing, it names the
-exact panel/toggle to fix and exits without ever invoking the model. It also
-reads `LOCALAI_MCP_SERVER`/`LOCALAI_MCP_TOOL` if you connected Todoist under
-a different URL or want a different tool name (defaults:
-`https://ai.todoist.net/mcp` / `find-tasks-by-date`).
 
 ## Troubleshooting
 
