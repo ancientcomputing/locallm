@@ -19,25 +19,48 @@ task, run to completion," not an interactive chat.
 It **edits files in place.** Point it at a directory that's committed to git (or a throwaway
 copy) so you can `git diff` the result and `git checkout .` if you don't like it.
 
-## Quick start
+## Walkthrough
 
-Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time).
-Then, from a directory you don't mind it changing:
+Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time),
+then run these from `examples/code-buddy/`. The repo ships a
+[`sample-workspace/`](sample-workspace/) with one undocumented Swift file to practice on.
+
+**1. Make a throwaway copy of the sample workspace and put it under git.** code-buddy edits files
+in place; a git repo is how you review and undo its changes. (Copy it *out* of this repo so the
+diff isn't tangled with `locallm`'s own git.)
 
 ```bash
-# in some scratch git repo — e.g. a fresh `swift package init`
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy . "add a doc comment to every public function"
+cp -R sample-workspace /tmp/cb-demo
+cd /tmp/cb-demo && git init -q && git add -A && git commit -qm "before code-buddy" && cd -
 ```
 
-- `.` — the **workspace**: the directory the model may read and edit. It can't touch anything
-  outside it.
-- `"add a doc comment…"` — the **task**. One shot; it plans, calls tools, and reports back.
+**2. Look at what you're starting with** — `/tmp/cb-demo/Geometry.swift` has `Rectangle` plus a
+few `public` functions, none with doc comments.
 
-While it runs, the model's answer streams to **stdout** and a live tool-call trace
-(`→ readWorkspaceFile`, `✓ applyPatch`, …) goes to **stderr**. When it finishes, inspect what it
-did with `git diff`.
+**3. Run code-buddy at that directory** with a plain-English task:
 
-First run downloads the two xcframeworks, then the model (~4.5 GB for the default `heavy` route).
+```bash
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declaration"
+```
+
+- `/tmp/cb-demo` — the **workspace**: the only directory the model can read or edit.
+- the quoted string — the **task**. One shot: it lists files, reads `Geometry.swift`, applies a
+  patch, and reports back.
+
+While it runs, its narration (including a lot of visible "thinking" — these small models are
+verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ applyPatch`, …)
+goes to **stderr**. First run also downloads the two xcframeworks and the model (~4.5 GB for the
+default `heavy` route).
+
+**4. Review what it did** — this is the real output, not the model's summary:
+
+```bash
+cd /tmp/cb-demo && git diff
+```
+
+You should see `///` lines added above `area`, `perimeter`, `isSquare(_:)`, `scaled(_:by:)`, etc.
+Keep it (`git add -A && git commit`), tweak it, or throw it away (`git checkout .`). Re-run step 3
+with a different task to keep experimenting.
 
 ### All options
 
