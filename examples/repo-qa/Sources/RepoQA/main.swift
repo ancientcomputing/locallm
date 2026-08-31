@@ -20,16 +20,19 @@ import Foundation
 import FoundationModels
 import LocalLMLabSDKCore
 
+// Status/progress goes to stderr; only the model's final answer goes to stdout, so
+// `swift run RepoQA … 2>/dev/null` gives you just the answer. (repo-qa-local does the same.)
+func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
+
 @available(macOS 26.0, *)
 @MainActor
 func run() async {
     let arguments = CommandLine.arguments.dropFirst()
     guard let repoName = arguments.first, !repoName.isEmpty else {
-        FileHandle.standardError.write(Data("""
+        note("""
         usage: swift run RepoQA <owner/repo> [question]
         example: swift run RepoQA anthropics/claude-code "What is the plugin system?"
-
-        """.utf8))
+        """)
         exit(1)
     }
     let question = arguments.dropFirst().joined(separator: " ")
@@ -37,7 +40,7 @@ func run() async {
 
     let model = SystemLanguageModel.default
     guard case .available = model.availability else {
-        print("On-device model unavailable: \(model.availability)")
+        note("On-device model unavailable: \(model.availability)")
         return
     }
 
@@ -47,13 +50,13 @@ func run() async {
     // plate-today-tools' requestConnectorAccess(), needed there specifically because Calendar/
     // Reminders are gated and this file's equivalent tools aren't.
     let manager = MCPServerManager()
-    print("Connecting to Deepwiki...")
+    note("Connecting to Deepwiki…")
     let connectResult = await manager.addServer(
         url: URL(string: "https://mcp.deepwiki.com/mcp")!,
         displayName: "Deepwiki"
     )
     guard case .success(let state) = connectResult else {
-        print("Could not connect to Deepwiki: \(connectResult)")
+        note("Could not connect to Deepwiki: \(connectResult)")
         return
     }
 
@@ -62,7 +65,7 @@ func run() async {
     // from the server's real JSON Schema at runtime. One deliberate exclusion, not a schema
     // failure: read_wiki_contents dumps a repo's ENTIRE wiki, unscoped, no pagination — confirmed
     // live against anthropics/claude-code at 541,359 characters (~165,000 tokens) for a single
-    // call, ~40x this model's whole 4096-token context window. The on-device model has no way to
+    // call, ~20x this model's whole ~8,000-token context window. The on-device model has no way to
     // know that in advance from the tool's name/description alone, and picked it for a plain
     // "what is the plugin system?" question in real testing, hard-failing the whole session. This
     // is exactly the risk docs/sdk-guide.md §3 already warns about ("don't naively pass all of
@@ -75,33 +78,33 @@ func run() async {
     var tools: [any Tool] = []
     for descriptor in state.tools {
         guard descriptor.name != "read_wiki_contents" else {
-            print("Skipping \(descriptor.name): excluded by this example — see the comment above.")
+            note("Skipping \(descriptor.name): excluded by this example — see the comment above.")
             continue
         }
         do {
             tools.append(try MCPTool(descriptor: descriptor, manager: manager))
         } catch {
-            print("Skipping \(descriptor.name): \(error)")
+            note("Skipping \(descriptor.name): \(error)")
         }
     }
     guard !tools.isEmpty else {
-        print("Deepwiki didn't offer any usable tools.")
+        note("Deepwiki didn't offer any usable tools.")
         return
     }
-    print("Built \(tools.count) tool(s) from Deepwiki's live schema: \(tools.map(\.name).joined(separator: ", "))")
+    note("Built \(tools.count) tool(s) from Deepwiki's live schema: \(tools.map(\.name).joined(separator: ", "))")
 
     let session = LanguageModelSession(tools: tools) {
         "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     }
 
     let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
-    print("\nAsking: \(prompt)\n")
+    note("\nAsking: \(prompt)\n")
 
     do {
         let response = try await session.respond(to: prompt)
         print(response.content)
     } catch {
-        print("Error: \(await GenerationErrorDescription.describe(error))")
+        note("Error: \(await GenerationErrorDescription.describe(error))")
     }
 }
 
