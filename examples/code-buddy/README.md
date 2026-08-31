@@ -148,22 +148,30 @@ runs it, and the result goes back to the model. code-buddy's `tools:` array (see
      and imply it's blessed.
 3. **MCP tools** — added automatically from the DeepWiki server (unless `--no-mcp`).
 
-**So code-buddy — a plain, unsandboxed command-line tool — writes `git` and `run_tests`
-itself**, in `Sources/CodeBuddy/ProcessTools.swift` (~100 lines, in the example so you can copy
-them). "The policy is the host's" just means *code-buddy* decides what these tools allow,
-because *code-buddy* wrote them:
+**So `git` and `run_tests` are implemented in this example's own source**, not in the SDK.
+`Sources/CodeBuddy/ProcessTools.swift` (~100 lines) defines two ordinary structs, `GitTool` and
+`RunTestsTool`, that conform to `Tool` and call `Process`. `main.swift` creates one of each and
+puts them in the `tools:` array. Nothing is generated at runtime and the model has no say in
+what they do — the behaviour is fixed Swift code compiled into the `CodeBuddy` binary. When the
+docs say *"the policy is the host's,"* "the host" means **the application that links the SDK**
+(here, this example), and "the policy" means **rules written into that application's source by
+whoever builds it** — for instance, in `ProcessTools.swift`:
 
-- **`git`** — only read-only subcommands run (`status`, `diff`, `log`, `show`, `blame`, …). Ask
-  it to `commit`, `push`, `checkout`, or `reset` and the tool returns *"Refused: not an allowed
-  read-only git subcommand."* The model changes files through `ApplyPatchTool`, never by running
-  git. Your commit history is never touched.
+- **`git`** — the allowed subcommands are a hardcoded `Set<String>` (`status`, `diff`, `log`,
+  `show`, `blame`, …). If the model asks to run `commit`, `push`, `checkout`, or `reset`, the
+  `call(...)` method checks that set, doesn't run git, and returns the string *"Refused: not an
+  allowed read-only git subcommand."* The model can only pick a subcommand and its arguments; it
+  can't add to the set. It changes files through `ApplyPatchTool`, never through git, so your
+  commit history is never touched.
 - **`run_tests`** — runs *exactly* the command you passed as `--test-cmd` (default `swift test`),
-  in the workspace directory, with a 4-minute timeout and output truncated at 20 000 characters.
-  It can't run anything else.
-- Both set the subprocess's working directory to the workspace; neither can reach outside it.
+  in the workspace directory, with a 4-minute timeout and output truncated at 20 000 characters,
+  all set as constants in that struct. The model can pass an optional test-name filter and
+  nothing else.
+- Both set the subprocess's working directory to the workspace path; neither builds a command
+  from a free-form string the model supplied.
 
-Want different rules — more git subcommands, a longer timeout, a `swiftformat` tool? Edit
-`ProcessTools.swift`. The SDK is not involved.
+Want different rules — more git subcommands, a longer timeout, an extra `swiftformat` tool? You
+(the developer) edit `ProcessTools.swift` and rebuild. The SDK is not involved either way.
 
 **Building a Mac App Store app?** You can't ship `git` / `run_tests` this way — the sandbox
 blocks it. Drop those two from the `tools:` array; the model keeps every workspace file tool and
