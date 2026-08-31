@@ -8,7 +8,7 @@
 //
 // SETUP (about 30 seconds)
 //     1. Run LocalLM Lab at least once.
-//     2. Open Local AI Settings and turn on the "System Clock" connector.
+//     2. Open the Connectors screen and turn on the "System Clock" connector.
 //        No permission prompt appears for this one.
 //     3. Download localai-toolkit-<version>-arm64.zip, unzip it, and place
 //        localai-cli + localai-playground-run next to this script (or set
@@ -36,7 +36,7 @@ let env = ProcessInfo.processInfo.environment
 let localaiCLIPath = env["LOCALAI_CLI_PATH"]
     ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("localai-cli").path
 let localaiConfigPath = env["LOCALAI_CONFIG_PATH"]
-    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/localai-config.json"
+    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/app-config.json"
 
 func main() throws {
     guard FileManager.default.isExecutableFile(atPath: localaiCLIPath) else {
@@ -78,7 +78,7 @@ func main() throws {
     if let errorMessage = response["error"] as? String, !errorMessage.isEmpty {
         print("FAIL - \(errorMessage)")
         if errorMessage.contains("not enabled") {
-            print("\nFix: open Local AI Settings in LocalLM Lab and turn on \"System Clock\".")
+            print("\nFix: open the Connectors screen in LocalLM Lab and turn on \"System Clock\".")
         }
         exit(1)
     }

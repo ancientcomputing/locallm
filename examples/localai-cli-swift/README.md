@@ -1,196 +1,193 @@
 # localai-cli Swift examples
 
-## Never compiled anything or used Terminal before? Start here.
+The Swift counterpart of [`examples/localai-cli/`](../localai-cli/) — the same
+ideas, called from Swift instead of Python.
 
-You don't need Xcode, and you don't need to "compile" anything by hand —
-`swift <file>.swift` runs a Swift file directly, the same way you'd run a
-Python script. Step by step, for `quickstart_mcp_deepwiki.swift`:
+`localai-cli` is a small command-line binary, shipped in the LocalLM Lab
+toolkit, that lets your own code run a prompt through the AI model LocalLM
+Lab is set up to use — locally, with no HTTP server involved. You spawn it
+as a subprocess (`Process` / `Pipe`): a JSON request on stdin, the model's
+reply on stdout.
 
-1. **Open Terminal.** It's already on your Mac — press `Cmd+Space`, type
-   `Terminal`, hit Return. A window with a text prompt opens.
-2. **Check Swift is installed.** Type this and press Return:
+**Your Swift app can call `localai-cli` to:**
+
+- send a one-shot prompt (`--run`) or a multi-turn conversation (`--chat`)
+  and get the model's answer back;
+- have that answer come from tools the user has already granted in LocalLM
+  Lab — **connectors** (Calendar, Reminders, Contacts, Location, a system
+  clock, read-only filesystem access) and any **MCP server** tools they've
+  connected — without your code touching Calendar, Keychain, OAuth, or the
+  MCP protocol itself;
+- do all of this offline (for the on-device model) and without shipping or
+  managing an API key.
+
+This is the *quick* way to reach the local model. If you're building a
+native macOS app and want the model layer, connectors, and MCP client linked
+directly into your binary, use the **LocalLM Lab SDK** instead (see
+[`examples/plate-today`](../plate-today/) and the others).
+
+### Which model answers
+
+Since 1.0, LocalLM Lab can put four kinds of model behind that one call, and
+the user picks which in the **AI Models** screen:
+
+| In the app | What it is |
+|---|---|
+| **Apple on-device** (`system`, the default) | Runs entirely on the Mac, offline, no setup. |
+| **Apple Private Cloud Compute** (`pcc`) | Apple's server-side model, still private; no key needed. |
+| **Claude** (`claude`) | Anthropic's Claude, once an API key is set in the app. |
+| **A local open-weight model** (`mlx:<hf-repo>`) | Any MLX-format Hugging Face model the user adds via **AI Models → Add model**; downloaded once, then run locally. |
+
+`localai-cli` reads that choice from `app-config.json` — there is no
+`--model` flag. To change which model your scripts use, change the default
+in **AI Models**.
+
+### How connector / MCP access works
+
+`localai-cli` takes a `--config` path pointing at LocalLM Lab's
+`app-config.json` (it only ever *reads* this file — the app writes it), plus
+the per-call request on stdin. The config lists every connector and MCP tool
+the user has granted; each request then names which of those it wants active
+for that one call, via `connectors` and `mcp_tools` fields:
+
+- Anything named in the request must already be enabled in `app-config.json`,
+  or `localai-cli` rejects the request with a JSON `{"error": "..."}` before
+  ever invoking the model.
+- Anything enabled but *not* named in a request simply isn't given to that
+  call — no error, just a narrower toolset.
+- Omitting a field entirely means **nothing from that category is active** —
+  a deliberate least-privilege default. Every tool a call can use must be
+  listed explicitly in that call's own request.
+
+## The example scripts
+
+These aren't a product. Each `.swift` file is a **worked example of one way
+to use `localai-cli`**, meant to be read and copied. They're plain top-level
+scripts (`swift <file>.swift`) — see *Copying it into a real app* below for
+what actually goes into your project.
+
+- **`quickstart_clock.swift`** — the smallest possible demo. Sends one
+  `--run` prompt ("what time is it?") using the `clock` connector, the only
+  connector with no macOS permission dialog. **Shows** the whole round trip —
+  spawn the binary with `Process`/`Pipe`, JSON in, JSON out — with nothing to
+  configure.
+  *Setup:* enable **System Clock** in **Connectors**. *Run:* `swift quickstart_clock.swift`
+- **`quickstart_mcp_deepwiki.swift`** — the same round trip, but the tool is
+  an **MCP server tool** (`read_wiki_structure`, from DeepWiki) instead of a
+  built-in connector. **Shows** the `mcp_tools` request field, and that MCP
+  tools are requested and validated exactly like connectors. DeepWiki needs
+  no auth.
+  *Setup:* in **MCP Servers**, add `https://mcp.deepwiki.com/mcp` (auth None),
+  enable that one tool. *Run:* `swift quickstart_mcp_deepwiki.swift`
+- **`run_localai.swift`** — the general pattern with the prompt, connector,
+  and MCP server/tool lifted into variables at the top. **Shows** how you'd
+  wire `localai-cli` into a real app (the reusable `runLocalAI(...)`
+  function), and what a rejection looks like when a request names something
+  that isn't enabled. Defaults to the `clock` connector; pass `--mcp` (with
+  `LOCALAI_MCP_SERVER` / `LOCALAI_MCP_TOOL` set) to request an MCP tool
+  instead.
+  *Setup:* enable the connector(s) you request. *Run:* `swift run_localai.swift`
+- **`plate_today.swift`** — a port of the Python
+  [`plate_today.py`](../localai-cli/plate_today.py), itself a port of the
+  [`plate-today`](../plate-today/) SDK app: pulls in Calendar, Reminders, and
+  Todoist and asks the model to summarize your day. **Shows** several
+  connectors plus an MCP tool in one request; reading `app-config.json`
+  yourself first to give the user a precise "enable X" checklist before
+  spending a model call; and why you pass the `clock` connector for anything
+  date-sensitive — the on-device model has no idea what today's date is.
+  *Setup:* enable **System Clock**, **Calendar**, **Reminders** in
+  **Connectors**; connect **Todoist** in **MCP Servers** with
+  `find-tasks-by-date` enabled (override the URL/tool with
+  `LOCALAI_MCP_SERVER` / `LOCALAI_MCP_TOOL`).
+  *Run:* `swift plate_today.swift`
+
+## Never used Terminal before? Start here
+
+You don't need Xcode, and you don't "compile" anything by hand —
+`swift <file>.swift` runs a Swift file directly, like a Python script. Step
+by step, for `quickstart_clock.swift`:
+
+1. **Open Terminal** — `Cmd+Space`, type `Terminal`, Return.
+2. **Check Swift is installed:**
    ```bash
    swift --version
    ```
-   If you see a version number, you're set. If you see "command not found,"
-   install Xcode's Command Line Tools first:
-   ```bash
-   xcode-select --install
-   ```
-   A dialog will pop up — click Install, wait for it to finish, then retry
-   `swift --version`.
-3. **Navigate to this folder.** If you downloaded/cloned this repo to, say,
-   your Downloads folder, type (adjusting the path to wherever you put it):
+   If you see "command not found," run `xcode-select --install`, click
+   Install in the dialog, wait, then retry.
+3. **Go to this folder** (adjust the path to wherever you cloned the repo):
    ```bash
    cd ~/Downloads/localai-playground/examples/localai-cli-swift
    ```
-   `cd` means "change directory" — it moves Terminal into that folder so the
-   next command can find the script.
-4. **Do the one-time MCP setup** in LocalLM Lab described under Setup below
-   (connect DeepWiki, enable its `read_wiki_structure` tool) — this is a
-   couple of clicks in the app, not in Terminal.
-5. **Get the toolkit binaries into this folder.** Download
-   `localai-toolkit-<version>-arm64.zip` (see Setup below), double-click it
-   to unzip, then drag the two files it contains — `localai-cli` and
-   `localai-playground-run` — into this same `localai-cli-swift` folder in
-   Finder.
+4. **One-time app setup:** run LocalLM Lab, open **Connectors**, turn on
+   **System Clock** (no permission prompt for this one).
+5. **Get the toolkit binaries into this folder:** download
+   `localai-toolkit-<version>-arm64.zip` (see Setup), double-click to unzip,
+   drag `localai-cli` and `localai-playground-run` into this folder.
 6. **Run it:**
    ```bash
-   swift quickstart_mcp_deepwiki.swift
+   swift quickstart_clock.swift
    ```
-   The first run may take a few seconds longer than usual — Swift is
-   compiling the script in the background before running it, you don't have
-   to do anything for that. After that, you should see the model's answer
-   printed in Terminal.
+   The first run takes a few seconds longer — Swift compiles the script
+   first. Then you should see the model's answer.
 
-If a step fails, the printed message says what to fix (e.g. "localai-cli
-not found" means step 5 didn't happen, or the files ended up in the wrong
-folder) — see Troubleshooting further down for what each message means.
+If a step fails, the printed message says what to fix — see Troubleshooting.
 
-`quickstart_clock.swift` works exactly the same way, minus step 4 (it needs
-no MCP setup, just turning on "System Clock" in Local AI Settings).
+## Copying it into a real app
 
----
-
-**Building a real app, not just trying this out?** All three files here are
-standalone scripts (`swift <file>.swift`), not Xcode-project code — they use
-top-level executable statements, which only compile in a script file like
-these, not in a regular `.swift` file inside an app target. What you
-actually want to copy into your project is the `runLocalAI(...)` function
-defined in `run_localai.swift` — an ordinary throwing function with no
-top-level statements, safe to paste into any Swift file. Everything below
-`func main()` in `run_localai.swift` (and in the `quickstart_*.swift` files)
-is just this repo's own script-runner boilerplate, not something to copy.
-
-**New here? Start with `quickstart_clock.swift`** — zero setup beyond one
-toggle in Local AI Settings, no permission dialog, no OAuth, prints a real
-answer in one command:
-
-```bash
-swift quickstart_clock.swift
-```
-
-For an MCP version of the same instant-gratification idea (a real, public
-MCP server, zero auth required), see `quickstart_mcp_deepwiki.swift`.
-
----
-
-Shows the Swift-side equivalent of `examples/localai-cli/run_localai.py`:
-spawn `localai-cli` as a subprocess (`Process`/`Pipe`), write a JSON request
-to its stdin, read its JSON response from stdout. No LocalLM Lab server, no
-HTTP — just the two toolkit binaries.
-
-Kept as a plain top-level Swift script (`swift run_localai.swift`), not a
-SwiftPM package, so it's a minimal copy-paste starting point rather than a
-project to set up.
+All the files here are standalone scripts, not Xcode-project code — they use
+top-level executable statements, which only compile in a script file, not in
+a `.swift` file inside an app target. What you copy into your project is the
+**`runLocalAI(...)` function** in `run_localai.swift` — an ordinary throwing
+function with no top-level statements. Everything below `func main()` in each
+file is this repo's script-runner boilerplate, not something to copy.
 
 ## Setup
 
-Same as the Python example (see `examples/localai-cli/README.md`):
-
-1. Run LocalLM Lab at least once and use **Local AI Settings** to enable
-   whichever connectors you want to call with, and/or **MCP Servers** to
-   connect and enable an MCP server + tool.
-2. Download the `localai-toolkit-<version>-arm64.zip` release asset and
-   unzip it — it contains `localai-cli` and `localai-playground-run` as a
-   matched pair.
+1. Run LocalLM Lab at least once and keep it running. Use **Connectors** to
+   enable the connectors you want, **MCP Servers** to connect a server, and
+   **AI Models** to pick a non-default model. These write
+   `~/Library/Application Support/LocalLM Lab/app-config.json` — `localai-cli`
+   only reads it. Connector and MCP calls run inside LocalLM Lab's own
+   process, so the app must be **running**, not just installed.
+2. Download the `localai-toolkit-<version>-arm64.zip` release asset and unzip
+   it — `localai-cli` and `localai-playground-run` are a matched pair.
 3. Put both binaries in this folder (or set `LOCALAI_CLI_PATH`).
 
 ## Run
 
 ```bash
-swift run_localai.swift
+swift run_localai.swift                 # requests the `clock` connector
+swift run_localai.swift --mcp           # requests an MCP tool (set the env vars first)
 ```
 
-Requests a built-in connector (`clock` by default). To request an MCP
-server tool instead:
+Override paths / MCP target without editing the script:
 
 ```bash
+export LOCALAI_CLI_PATH=/path/to/localai-cli
+export LOCALAI_CONFIG_PATH=/path/to/app-config.json
 export LOCALAI_MCP_SERVER=https://your-mcp-server.example.com/mcp
 export LOCALAI_MCP_TOOL=your_tool_name
 swift run_localai.swift --mcp
 ```
 
-Or override the config/CLI paths the same way as the Python example:
-
-```bash
-export LOCALAI_CLI_PATH=/path/to/localai-cli
-export LOCALAI_CONFIG_PATH=/path/to/localai-config.json
-swift run_localai.swift
-```
-
-## What it checks
-
-Sends one `--run` request and prints the model's reply. Both the
-`connectors` and `mcp_tools` request fields follow the same
-"requested ⊆ enabled" rejection contract `localai-cli` enforces for
-Python callers — see `run_localai.swift`'s header comment for the full list
-of possible `{"error": "..."}` messages.
-
-## `quickstart_clock.swift` / `quickstart_mcp_deepwiki.swift` — nothing to fill in
-
-`run_localai.swift` above is a template — you're expected to edit
-`connectors`/`mcpServer`/`mcpTool` for your own use case. The two
-`quickstart_*.swift` scripts instead run as-is: `quickstart_clock.swift`
-uses the "clock" connector (the one connector with no macOS permission
-dialog at all — see `web/connectors.html`), and
-`quickstart_mcp_deepwiki.swift` uses DeepWiki (auth type `None`, "connects
-immediately" — see `web/mcp-servers.html`), with the exact server URL,
-tool, and prompt from that page already filled in. The only setup either
-needs is the one-time toggle/connection in LocalLM Lab described in each
-script's own header comment — no OAuth, no API key, no editing.
-
-## `plate_today.swift`
-
-The Swift port of `examples/localai-cli/plate_today.py` — checks Calendar,
-Reminders, and Todoist (www.todoist.com) for what's due today and asks the model to summarize
-the day:
-
-```bash
-swift plate_today.swift
-```
-
-Also requests the `clock` connector (`getCurrentTime`) and instructs the
-model to look up the real current date first, rather than guessing or
-relying on a stale/training notion of "today" — FoundationModels has no live
-wall-clock awareness on its own.
-
-Before calling `localai-cli` at all, it reads `localai-config.json` itself
-and prints a checklist of all four sources (`clock`/`calendar`/`reminders`
-connectors enabled; Todoist server connected, enabled, and its
-`find-tasks-by-date` tool enabled) — if anything's missing, it names the
-exact panel/toggle to fix and exits without ever invoking the model.
-
-Setup: enable "System Clock", "Calendar", and "Reminders" in Local AI
-Settings, and connect Todoist in MCP Servers with `find-tasks-by-date`
-enabled (defaults to `https://ai.todoist.net/mcp` — override with
-`LOCALAI_MCP_SERVER`/`LOCALAI_MCP_TOOL` if you connected it differently).
-
 ## Troubleshooting
 
 - `swift: command not found` — install Xcode's Command Line Tools:
   `xcode-select --install`, then retry.
-- `FAIL - localai-cli not found at ...` — the `localai-cli` binary isn't in
-  this folder. Either move it here (alongside `localai-playground-run`), or
-  set `LOCALAI_CLI_PATH` to wherever it actually is.
-- `permission denied` when running `swift <file>.swift` — this shouldn't
-  happen (the `swift` command reads and runs the file, it doesn't need the
-  file itself to be executable), but if it does, run
-  `chmod +x quickstart_mcp_deepwiki.swift` first.
-- `{"error": "connector '...' is not enabled in the config"}` — turn it on
-  in Local AI Settings.
+- `FAIL - localai-cli not found at ...` — the binary isn't in this folder.
+  Move it here (next to `localai-playground-run`) or set `LOCALAI_CLI_PATH`.
+- `{"error": "connector '...' is not enabled in the config"}` — turn it on in
+  the **Connectors** screen.
 - `{"error": "MCP server \"...\" is not configured"}` — add the server (URL
-  must match exactly) in the MCP Servers panel.
-- `{"error": "MCP server \"...\" is not enabled"}` / `"MCP tool \"...\" ...
-  is not enabled"` — the server or that specific tool's toggle is off in the
-  MCP Servers panel.
-- `{"error": "MCP tool \"...\" is not known on server \"...\""}` — tool
-  names are case-sensitive and come directly from the server.
-- No output, or a connection-style failure that isn't a JSON
-  `{"error": ...}` — make sure LocalLM Lab is actually **running** (not
-  just installed): these scripts relay through its chooser process, which
-  must be up.
+  must match exactly) in the **MCP Servers** screen.
+- `{"error": "MCP server \"...\" is not enabled"}` / `"MCP tool \"...\" ... is
+  not enabled"` — the server or that tool's toggle is off in **MCP Servers**.
+- `{"error": "MCP tool \"...\" is not known on server \"...\""}` — tool names
+  are case-sensitive and come straight from the server.
+- No output, or a connection-style failure that isn't a JSON `{"error": ...}`
+  — make sure LocalLM Lab is actually **running** (not just installed):
+  connector and MCP calls execute inside it.
 - `{"error": "The operation couldn't be completed.
   (FoundationModels.LanguageModelSession.GenerationError error -1.)"}` — a
-  generic, occasionally transient on-device generation failure, unrelated
-  to your setup. Just retry.
+  generic, occasionally transient on-device generation failure, unrelated to
+  your setup. Just retry.

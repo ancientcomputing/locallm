@@ -13,7 +13,7 @@
 //     already has permission for:
 //         - Calendar and Reminders come in as the "calendar"/"reminders"
 //           connectors (same as run_localai.swift's "clock", just two more
-//           built-ins — see Local AI Settings).
+//           built-ins — see the Connectors screen).
 //         - Todoist comes in as an MCP tool call (same pattern as
 //           run_localai.swift's --mcp mode) against Todoist's hosted MCP
 //           server, find-tasks-by-date.
@@ -25,7 +25,7 @@
 //     reminders/Todoist using that date — rather than guessing or using a
 //     stale/training notion of "today".
 //
-//     Before ever calling localai-cli, this script reads localai-config.json
+//     Before ever calling localai-cli, this script reads app-config.json
 //     itself and checks all four sources are actually usable: the three
 //     connectors enabled, and the Todoist server connected + enabled with
 //     find-tasks-by-date enabled on it. This is a deliberate preflight, not
@@ -40,8 +40,8 @@
 //     - Everything run_localai.swift requires: localai-cli +
 //       localai-playground-run next to this script (or LOCALAI_CLI_PATH
 //       set), LocalLM Lab running (connector/MCP calls relay through its
-//       chooser process over a local socket).
-//     - In LocalLM Lab's Local AI Settings: "System Clock", "Calendar", and
+//       LocalLM Lab's own process over a local socket).
+//     - In LocalLM Lab's Connectors screen: "System Clock", "Calendar", and
 //       "Reminders" connectors enabled (Calendar/Reminders each prompt for
 //       their own TCC grant the first time; System Clock has no permission
 //       dialog).
@@ -62,8 +62,8 @@
 // WHAT FAILURE LOOKS LIKE
 //     - "localai-cli not found at ..." - same fix as run_localai.swift.
 //     - {"error": "config file not found: ..."} at the very first check - no
-//       localai-config.json exists yet; run LocalLM Lab at least once and
-//       open Local AI Settings/MCP Servers so it gets created.
+//       app-config.json exists yet; run LocalLM Lab at least once and
+//       open the Connectors and MCP Servers screens so it gets created.
 //     - A preflight checklist with one or more "MISSING" lines and no model
 //       call at all - this is the expected, helpful-message path when
 //       something isn't set up yet. Each line names the exact panel/toggle
@@ -83,19 +83,19 @@ let localaiCLIPath = env["LOCALAI_CLI_PATH"]
     ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("localai-cli").path
 
 let localaiConfigPath = env["LOCALAI_CONFIG_PATH"]
-    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/localai-config.json"
+    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/app-config.json"
 
 // Same default Todoist hosted MCP server + tool the Python version and the
 // SDK's Plate Today example use. Override if you connected Todoist at a
 // different URL, or want a different tool (both need to match what's in
-// localai-config.json's "mcp_servers" array exactly — see MCP Servers in
+// app-config.json's "mcp_servers" array exactly — see MCP Servers in
 // LocalLM Lab).
 let todoistMCPURL = env["LOCALAI_MCP_SERVER"] ?? "https://ai.todoist.net/mcp"
 let todoistMCPTool = env["LOCALAI_MCP_TOOL"] ?? "find-tasks-by-date"
 // ------------------------------------------------------------------------
 
 // Panel labels for the message printed when a connector isn't enabled —
-// "clock" shows up in Local AI Settings as "System Clock", not "Clock".
+// "clock" shows up in the Connectors screen as "System Clock", not "Clock".
 let connectorLabels = ["clock": "System Clock", "calendar": "Calendar", "reminders": "Reminders"]
 let requiredConnectors = ["clock", "calendar", "reminders"]
 
@@ -109,7 +109,7 @@ struct PreflightCheck {
     let detail: String
 }
 
-/// Loads localai-config.json as a loose JSON dictionary. Throws if the file
+/// Loads app-config.json as a loose JSON dictionary. Throws if the file
 /// doesn't exist or isn't valid JSON — every downstream read from the
 /// result is a defensive optional-cast, never a force-cast, so an
 /// unexpected shape reads as "missing/not enabled" rather than crashing.
@@ -117,7 +117,7 @@ func loadConfig(path: String) throws -> [String: Any] {
     guard FileManager.default.fileExists(atPath: path) else {
         throw LocalAIError(description:
             "config file not found: \(path)\n" +
-            "Run LocalLM Lab at least once and open Local AI Settings/MCP " +
+            "Run LocalLM Lab at least once and open the Connectors and MCP Servers screens " +
             "Servers so it gets created.")
     }
     let data = try Data(contentsOf: URL(fileURLWithPath: path))
@@ -142,7 +142,7 @@ func preflight(config: [String: Any]) -> [PreflightCheck] {
             let label = connectorLabels[connector] ?? connector
             results.append(PreflightCheck(
                 source: connector, ok: false,
-                detail: "not enabled — turn on \"\(label)\" in Local AI Settings"
+                detail: "not enabled — turn on \"\(label)\" in the Connectors screen"
             ))
         }
     }
