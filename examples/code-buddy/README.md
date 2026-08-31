@@ -8,17 +8,38 @@ It's a **plain command-line tool** — no signing, no `.app`, no `packaging/` di
 `swift run` is the whole build. (It's unsandboxed, which is what lets it own `Process`
 execution — see [The host-owned `Process` tools](#the-host-owned-process-tools).)
 
+## What it does
+
+You give it a **directory** and a **task in plain English**. It loads a local open-weight model
+(nothing leaves your Mac), lets that model explore the directory and edit files in it through a
+fixed set of tools — list/search/read files, apply a patch, write a file, run `git status`/`diff`,
+run your test command — and stops when the model says the task is done. Think "one focused coding
+task, run to completion," not an interactive chat.
+
+It **edits files in place.** Point it at a directory that's committed to git (or a throwaway
+copy) so you can `git diff` the result and `git checkout .` if you don't like it.
+
 ## Quick start
 
 Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time).
-Then, from this directory:
+Then, from a directory you don't mind it changing:
 
 ```bash
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy . "add a docstring to the main entry point"
+# in some scratch git repo — e.g. a fresh `swift package init`
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy . "add a doc comment to every public function"
 ```
 
-First run downloads the two xcframeworks, then the chosen model (~4.5 GB for the default
-`heavy`). The answer streams to stdout; a tool-call trace goes to stderr.
+- `.` — the **workspace**: the directory the model may read and edit. It can't touch anything
+  outside it.
+- `"add a doc comment…"` — the **task**. One shot; it plans, calls tools, and reports back.
+
+While it runs, the model's answer streams to **stdout** and a live tool-call trace
+(`→ readWorkspaceFile`, `✓ applyPatch`, …) goes to **stderr**. When it finishes, inspect what it
+did with `git diff`.
+
+First run downloads the two xcframeworks, then the model (~4.5 GB for the default `heavy` route).
+
+### All options
 
 ```
 LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> <task...>
@@ -29,6 +50,8 @@ LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> <
   --test-cmd "<cmd>"    command for run_tests (default: "swift test")
   --no-mcp             skip the DeepWiki docs-lookup server
 ```
+
+`--route light` uses a smaller ~2 GB model instead of ~4.5 GB — start there on a tighter Mac.
 
 ## Getting the SDK & toolchain
 
