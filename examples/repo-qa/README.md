@@ -1,17 +1,35 @@
 # Repo Q&A
 
-The SDK's simplest reference app: a plain command-line tool that answers questions about a GitHub
-repository's own documentation, through [Deepwiki](https://deepwiki.com)'s real, no-auth hosted
-MCP server (`https://mcp.deepwiki.com/mcp`) and Core's `MCPTool` (Path A — see
-[`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)).
-The answer comes from **Apple's on-device model** (`SystemLanguageModel.default` + a plain
-`LanguageModelSession` — no model layer).
+**Repo Q&A** is a tiny command-line program: you give it a GitHub repository and a question, and
+it answers *from that repo's own documentation* — not from whatever the model happened to pick up
+in training.
 
-No `packaging/` directory, no code signing, no Info.plist — MCP is a plain network call, no macOS
-permission involved, so a bare `swift run` works end to end. (Contrast `plate-today`, whose
-Calendar/Reminders access needs a signed `.app` just to get a permission prompt.) It shows
-`MCPTool` adapting to a server it's never seen before: `ask_question` and `read_wiki_structure`
-are wrapped from Deepwiki's own live JSON Schema in a loop, nothing hand-coded per tool.
+It does this by connecting to **[Deepwiki](https://deepwiki.com)**, a public service that has
+already read and indexed thousands of GitHub repos. Deepwiki exposes that as an **MCP server** —
+a standard way for an online service to offer an AI model a set of callable "tools" (here: "look
+up this repo's structure", "ask a question about this repo"). Repo Q&A hands your question to
+Apple's on-device model and lets it call those tools to look things up. The model runs entirely
+on your Mac; only the Deepwiki lookups go over the network, and Deepwiki needs no account or API
+key.
+
+**What it highlights for SDK developers:**
+
+- **The smallest possible SDK program.** No `packaging/` directory, no code signing, no
+  `Info.plist`, no macOS permission prompt — talking to a public MCP server is just a network
+  call, so a bare `swift run` runs it end to end. (Compare [`plate-today`](../plate-today), which
+  needs a signed `.app` just to ask for Calendar access.)
+- **`MCPTool` — using a server you didn't build.** You write no per-tool code. The SDK reads the
+  server's own live description of its tools and builds a callable tool for each one, in a loop —
+  point the same code at a different MCP server and it adapts. (This is "Path A" — ready-made
+  tools from Core; see [`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own).)
+- **Why you still choose which tools to expose.** Deepwiki offers three tools; this app
+  deliberately wires up only two. The third returns an entire repo wiki in one go — far more
+  text than the model can hold — and nothing in the tool's description says so. Deciding which
+  tools your prompt actually needs is the app's job, not the SDK's (details in
+  [*Why only two of Deepwiki's three tools*](#why-only-two-of-deepwikis-three-tools) below).
+
+The answer comes from Apple's on-device model — no model download, works offline apart from the
+Deepwiki calls.
 
 > **Want the answer to come from a model you download and run locally instead?**
 > [`repo-qa-local`](../repo-qa-local) is this exact tool with an open-weight MLX model
