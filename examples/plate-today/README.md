@@ -1,15 +1,15 @@
 # Plate Today
 
-**The idea.** A local AI model can read across the places your day is scattered — Calendar,
-Reminders, an online to-do list — and hand you one short summary, instead of you opening three
-apps and stitching it together yourself. Because the model runs on your Mac, none of that
-personal data leaves the machine.
+**The idea.** Your plans for the day live in several apps at once — some meetings in Calendar, a
+few things in Reminders, more tasks in an online to-do list. A local AI model can look at all of
+them and write you one short summary, so you don't have to check each app and combine the answers
+in your head. And because the model runs on your Mac, none of that personal data is sent anywhere.
 
-**Plate Today** is a small SwiftUI app that does exactly that, for one question: *what's on my
-plate today?* It pulls today's events from **Calendar**, open items from **Reminders**, and tasks
-from **Todoist** (through Todoist's hosted server), and asks Apple's on-device model to write the
-summary. "Done" then clears everything, including the Todoist sign-in — it's a demo, not
-something that should hold standing access to your accounts.
+**Plate Today** is a small SwiftUI app that does this for one question: *what's on my plate
+today?* It reads today's events from **Calendar**, open items from **Reminders**, and tasks from
+**Todoist** (via Todoist's MCP server), then asks Apple's on-device model to write the summary.
+"Done" clears everything, including the Todoist sign-in — it's a demo, not something that should
+keep access to your accounts after you close it.
 
 **What it illustrates for SDK developers.** A native app that links `LocalLMLabSDKCore` directly
 and feeds three real data sources into one model call — two Apple connectors (Calendar,
