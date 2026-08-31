@@ -1,14 +1,31 @@
 # Repo Q&A (local model)
 
-[`repo-qa`](../repo-qa)'s exact setup — a command-line tool that answers questions about a GitHub
-repository's own documentation, through [Deepwiki](https://deepwiki.com)'s real, no-auth hosted
-MCP server (`https://mcp.deepwiki.com/mcp`) and Core's `MCPTool` (Path A — see
-[`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)).
-The one difference: the answer comes from an **open-weight model you download and run locally**
-(via MLX), routed through the 1.0 **model layer**, instead of Apple's on-device model.
+**Repo Q&A (local model)** is the same command-line tool as [`repo-qa`](../repo-qa) — give it a
+GitHub repo and a question, get an answer from that repo's documentation via
+[Deepwiki](https://deepwiki.com)'s MCP server. The one change: instead of Apple's built-in model,
+the answer comes from an **open-weight model you download and run on your own Mac**.
 
-It's the smallest possible model-layer + MLX example. For the full version — routing between
-models, Workspace tools, streamed output, a real agent loop — see [`code-buddy`](../code-buddy).
+"Open-weight" means the model's weights are published — here, on Hugging Face — for anyone to
+download. "Run locally" means it executes on your Mac's GPU through Apple's MLX framework, with
+nothing sent to a server. The default is `mlx-community/Qwen3-8B-4bit`, about 4.5 GB, downloaded
+once on first run.
+
+The part of the SDK that makes this manageable is the **model layer**: you name a model, and it
+checks the model fits in this Mac's memory, downloads it with a progress bar, loads and unloads
+it as needed, and hands you a chat session — the *same* session API you'd use for Apple's model
+or Claude. Moving from `repo-qa` to this version is about 20 lines of change; the Deepwiki / MCP
+half of the code is byte-for-byte identical.
+
+**What it highlights for SDK developers:**
+
+- **The smallest model-layer example.** Just the essential calls — check the model fits, download
+  it, point a name at it, open a session. [`code-buddy`](../code-buddy) is the full version (two
+  models, routing between them, streamed output, an agent loop).
+- **The model layer is a swap-in, not a rewrite.** Diff this `main.swift` against `repo-qa`'s:
+  the tool-building code is unchanged; only how the session is created differs
+  ([table below](#what-the-model-layer-adds-diff-against-repo-qa)).
+- **Any MLX model, or fall back to Apple's.** `--model <hf-repo>` runs a different open-weight
+  model; `--apple` uses Apple's on-device model instead — the same code path handles all of them.
 
 > **Want the on-device-model version instead?** [`repo-qa`](../repo-qa) is this exact tool with
 > `SystemLanguageModel.default` and no model layer. Diff the two `main.swift`s to see what the
