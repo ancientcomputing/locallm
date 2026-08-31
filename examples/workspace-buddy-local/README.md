@@ -1,21 +1,31 @@
 # Workspace Buddy (local model)
 
-[`workspace-buddy`](../workspace-buddy)'s exact setup — a sandboxed SwiftUI `.app`: pick a folder
-(via `NSOpenPanel` + a security-scoped bookmark), describe a change, the model reads/creates/edits
-files in it via Core's `WorkspaceTools` (Path A, see
-[`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
-The one difference: the model is an **open-weight MLX model you download and run locally**
-(`mlx-community/Qwen3-8B-4bit` by default), routed through the 1.0 **model layer**, instead of
-Apple's on-device model.
+**Workspace Buddy (local model)** is the [`workspace-buddy`](../workspace-buddy) app — pick a
+folder, type a request, the on-device model reads and edits the files in it — with one change:
+instead of Apple's built-in model, it runs an **open-weight model you download from Hugging Face
+and run on your Mac's GPU** (`mlx-community/Qwen3-8B-4bit` by default, about 4.5 GB). That's the
+same swap [`repo-qa-local`](../repo-qa-local) makes over `repo-qa`, using the SDK's **model
+layer**: you name a model, and it checks the model fits in memory, downloads it with a progress
+bar, loads it, and hands you a chat session.
 
-> **This is the one example running the model layer inside App Sandbox** — verified end to end:
-> the download, the on-disk cache, and the Metal shader load all work under sandbox. It needs the
-> `com.apple.security.network.client` entitlement (to fetch the model from Hugging Face on first
-> run) on top of workspace-buddy's `files.user-selected.read-write`. The weights download into
-> **this app's sandbox container**, not `~/.cache` — see [Where the model is stored](#where-the-model-is-stored).
+**What it highlights for SDK developers.** It's the one example that runs a downloaded model
+**inside the App Sandbox** — the combination you need for a Mac App Store app that ships local
+inference. Two things follow from that, both shown working here:
+
+- **The model download needs a network entitlement.** A sandboxed app can't make outbound
+  connections without `com.apple.security.network.client`; add it, and `MLXModelProvider.download`
+  fetches the weights from Hugging Face normally. (`workspace-buddy` needs no network entitlement
+  — Apple's model is already on the machine.)
+- **The weights land in the app's sandbox container, not `~/.cache`.** swift-huggingface detects
+  the sandbox and redirects the cache automatically. The ~4.5 GB counts against this app's
+  container and is removed when the app is — details in
+  [Where the model is stored](#where-the-model-is-stored).
+
+Verified end to end on a real signed build: the download, the on-disk cache, and the Metal shader
+load all work under the sandbox, and the second run starts generating immediately.
 
 > **Want the on-device-model version instead?** [`workspace-buddy`](../workspace-buddy) is this
-> exact app with `SystemLanguageModel.default` and no model layer, no network entitlement.
+> exact app with Apple's built-in model — no model layer, no download, no network entitlement.
 
 ## Getting the SDK & toolchain
 
