@@ -578,7 +578,7 @@ survive a relaunch. → *code-buddy builds `LocalLMLab` with two providers and m
 | Provider | Ships in | `scheme` | For |
 |---|---|---|---|
 | `SystemModelProvider` | Core | `system` | Apple's on-device model — always there on an Apple-Intelligence Mac |
-| `PCCModelProvider` | Core | `pcc` | Apple's Private Cloud Compute model |
+| `PCCModelProvider` | Core | `pcc` | Apple's Private Cloud Compute model — **not functional in `1.0.0-beta.1`**; a session routed to `pcc` fails. Fix targeted for a later release. |
 | `ClaudeModelProvider(auth:)` | Core | `claude` | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
 | `MLXModelProvider` | **Inference** | `mlx` | Locally-run open-weight models (Qwen, Llama, …) via MLX |
 

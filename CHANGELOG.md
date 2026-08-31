@@ -25,7 +25,9 @@ been here since `0.7.0`. Full walkthrough: [`docs/sdk-guide.md` §6a](docs/sdk-g
 - **`LocalLMLab`** — optional front door bundling the model registry, MCP manager, and
   connector/workspace facades behind one object.
 - **`ModelProvider`** protocol + built-ins: `SystemModelProvider` / `PCCModelProvider` /
-  `ClaudeModelProvider` (Core) and `MLXModelProvider` (Inference).
+  `ClaudeModelProvider` (Core) and `MLXModelProvider` (Inference). **`PCCModelProvider` is not
+  functional in `1.0.0-beta.1`** — a session routed to `pcc` fails; fix targeted for a later
+  release. The other three work.
 - **`RouteName`** + `lab.models.route(_:to:)` — name a model (`.heavy` / `.light` / …) and
   pick one per session.
 - **`lab.makeSession(route:tools:instructions:)`** → `LocalLMLabSession` — a session with
