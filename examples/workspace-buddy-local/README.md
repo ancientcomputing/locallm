@@ -8,11 +8,11 @@ The one difference: the model is an **open-weight MLX model you download and run
 (`mlx-community/Qwen3-8B-4bit` by default), routed through the 1.0 **model layer**, instead of
 Apple's on-device model.
 
-> **This is the one example running the model layer inside App Sandbox.** It needs the
+> **This is the one example running the model layer inside App Sandbox** — verified end to end:
+> the download, the on-disk cache, and the Metal shader load all work under sandbox. It needs the
 > `com.apple.security.network.client` entitlement (to fetch the model from Hugging Face on first
-> run) on top of workspace-buddy's `files.user-selected.read-write`, and the model downloads into
-> this app's sandbox container. **That combination is not yet verified end to end** — if the
-> download or the Metal shader load fails under sandbox, that's a real finding worth reporting.
+> run) on top of workspace-buddy's `files.user-selected.read-write`. The weights download into
+> **this app's sandbox container**, not `~/.cache` — see [Where the model is stored](#where-the-model-is-stored).
 
 > **Want the on-device-model version instead?** [`workspace-buddy`](../workspace-buddy) is this
 > exact app with `SystemLanguageModel.default` and no model layer, no network entitlement.
@@ -73,9 +73,32 @@ NOTARIZE_APP=0 \
 
 (`DEVELOPER_DIR` and `LOCALLM_SDK_VERSION` come from step 3.) The signed `.app` lands in `dist/`;
 open it, click **Choose Folder…**, pick a throwaway directory, type a request, and hit **Go**.
-**First Go downloads the model** (~4.5 GB for the default — into
-`~/Library/Containers/lab.locallm.sdk.reference.workspacebuddylocal/Data/`), with a progress bar.
-After that it's local and offline.
+**First Go downloads the model** (~4.5 GB for the default), with a progress bar. After that it's
+local and offline — the second run starts generating immediately.
+
+## Where the model is stored
+
+Because this app is sandboxed, the Hugging Face cache is redirected into its container — the
+weights do **not** go to `~/.cache/huggingface`:
+
+```
+~/Library/Containers/lab.locallm.sdk.reference.workspacebuddylocal/Data/Library/Caches/huggingface/hub/
+    models--mlx-community--Qwen3-8B-4bit/
+        snapshots/<commit-sha>/        # config.json, *.safetensors, tokenizer…
+        blobs/                          # the actual bytes (snapshot files symlink here)
+```
+
+swift-huggingface picks this path automatically for a sandboxed app (it keys off
+`APP_SANDBOX_CONTAINER_ID`). Consequences:
+
+- The ~4.5 GB counts against **this app's** container, and is deleted when the app is (drag to
+  Trash → "move its data too", or `rm -rf` the container path above).
+- It is **not shared** with `code-buddy` / `repo-qa-local` (those are unsandboxed and use
+  `~/.cache/huggingface/hub/`) — each downloads its own copy.
+- To point somewhere else, pass `MLXModelProvider(cacheDirectory:)` or set `HF_HUB_CACHE`.
+
+A non-sandboxed app or CLI using the same model layer stores it at `~/.cache/huggingface/hub/`
+instead. See [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
 
 ## What the model layer adds (diff against `workspace-buddy`)
 

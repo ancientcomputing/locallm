@@ -9,10 +9,10 @@ set -euo pipefail
 # Env: APP_IDENTITY (Developer ID Application), KEYCHAIN_PROFILE (notarytool profile, only if
 # NOTARIZE_APP=1), DEVELOPER_DIR (the Xcode 27 beta), LOCALLM_SDK_VERSION, VERSION, TEAM_ID.
 #
-# ⚠ The sandbox + MLX combination has not been verified end to end yet. The model download needs
-# `com.apple.security.network.client` (in WorkspaceBuddyLocal.entitlements) and lands in the app's
-# sandbox container. If the download or Metal shader load fails under sandbox, that's a finding —
-# see the README.
+# The sandbox + MLX path is verified end to end (download, on-disk cache, Metal shader load all
+# work under App Sandbox). The model download needs `com.apple.security.network.client` (in
+# WorkspaceBuddyLocal.entitlements) and lands in the app's container at
+# ~/Library/Containers/<bundle-id>/Data/Library/Caches/huggingface/hub/ — see the README.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

@@ -634,6 +634,20 @@ mlx.storageUsed      // total bytes of weights
 try mlx.remove(id)   // delete weights
 ```
 
+**Where the weights land** — a standard Hugging Face cache
+(`models--<org>--<name>/snapshots/<sha>/`, deduped `blobs/` underneath):
+
+| Context | Default location |
+|---|---|
+| CLI / non-sandboxed app | `~/.cache/huggingface/hub/` |
+| **Sandboxed app** (`com.apple.security.app-sandbox`) | `~/Library/Containers/<bundle-id>/Data/Library/Caches/huggingface/hub/` |
+
+The sandbox redirect is automatic. An 8B-4bit model is ≈4.5 GB and, for a sandboxed app, counts
+against the app's container. Relocate with `MLXModelProvider(cacheDirectory:)` or the
+`HF_HUB_CACHE` / `HF_HOME` env vars. A sandboxed app also needs `com.apple.security.network.client`
+for the download — [`examples/workspace-buddy-local`](../examples/workspace-buddy-local/) runs the
+whole model layer inside App Sandbox and is the worked example.
+
 **The memory story** — the whole reason `MLXModelProvider` isn't just "load and go":
 
 - `residentModelLimit` caps how many models stay in RAM. Switching routes evicts the other.

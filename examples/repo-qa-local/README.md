@@ -99,6 +99,23 @@ swift run RepoQALocal facebook/react 2>&1 | tee run.log     # capture the whole 
 
 (`2>/dev/null` = throw away stderr; `>` redirects stdout; `2>&1` merges stderr into stdout.)
 
+## Where the model is stored
+
+This is a CLI (not sandboxed), so the weights go to the standard Hugging Face cache:
+
+```
+~/.cache/huggingface/hub/models--mlx-community--Qwen3-8B-4bit/
+    snapshots/<commit-sha>/     # config.json, *.safetensors, tokenizer…
+    blobs/                       # the actual bytes (snapshot files symlink here)
+```
+
+- `du -sh ~/.cache/huggingface/hub/models--mlx-community--Qwen3-8B-4bit` — ~4.5 GB for the default.
+- Shared with [`code-buddy`](../code-buddy) and any other unsandboxed tool on the same model layer
+  — download once, reused everywhere. (A *sandboxed* app like [`workspace-buddy-local`](../workspace-buddy-local)
+  gets its own copy inside its container instead.)
+- `rm -rf` that directory to reclaim the space, or set `HF_HUB_CACHE` / pass
+  `MLXModelProvider(cacheDirectory:)` to put it elsewhere.
+
 ## What the model layer adds (diff against `repo-qa`)
 
 The Deepwiki / `MCPTool` half of `main.swift` is a verbatim copy of `repo-qa` — connecting,
