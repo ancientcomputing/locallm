@@ -13,8 +13,8 @@ you can read in one sitting. Concretely it shows:
   Face repo, the SDK checks it against this Mac's memory, downloads it with a progress bar, and
   runs it. Swappable per run (`--route heavy` / `--route light`).
 - **Giving the model tools it can call** — the file tools the SDK ships (read, search, patch,
-  write a file), *plus* two tools this example writes itself (`git`, `run_tests`) to demonstrate
-  how your own app adds abilities the SDK deliberately doesn't include.
+  write a file), *plus* two more (`git`, `run_tests`) that are just extra Swift files in this
+  example's source, to show how you add abilities the SDK deliberately doesn't include.
 - **Driving one task to completion** — stream the model's output, print a trace of every tool
   call, stop when the model says it's finished.
 
