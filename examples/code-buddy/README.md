@@ -4,11 +4,23 @@ A minimal CLI coding agent built on the **full** LocalLM Lab SDK — the worked 
 **every** model-layer surface (local MLX models through `LocalLMLab`), and of the pattern
 where **the host implements process execution itself**, not the SDK.
 
-Requires **macOS 27 + Xcode 27**. Links two SDK binaries: `LocalLMLabSDKCore.xcframework`
-and `LocalLMLabSDKInference.xcframework` (the MLX runtime — mlx-swift-lm + Metal statically
-linked, ~11 MB zipped, downloaded once).
+It's a **plain command-line tool** — no signing, no `.app`, no `packaging/` directory.
+`swift run` is the whole build. (It's unsandboxed, which is what lets it own `Process`
+execution — see [The host-owned `Process` tools](#the-host-owned-process-tools).)
+
+## Quick start
+
+Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time).
+Then, from this directory:
 
 ```bash
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy . "add a docstring to the main entry point"
+```
+
+First run downloads the two xcframeworks, then the chosen model (~4.5 GB for the default
+`heavy`). The answer streams to stdout; a tool-call trace goes to stderr.
+
+```
 LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> <task...>
 
   --route heavy|light   which model (default: heavy)
@@ -18,8 +30,48 @@ LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> <
   --no-mcp             skip the DeepWiki docs-lookup server
 ```
 
-First run downloads the chosen model. The answer streams to stdout; a tool-call trace goes
-to stderr.
+## Getting the SDK & toolchain
+
+Copy-paste each step. Steps 1–2 are one-time machine setup; step 3 sets up your terminal session
+(re-run it in every new terminal).
+
+**1. Install the Xcode 27 beta.** Download it from
+[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
+(it installs as `Xcode-beta.app`, alongside any stable Xcode). A stable Xcode fails with
+`'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+
+**2. Download the Metal Toolchain** — `mlx-swift` compiles Metal shaders and won't build without
+it. One-time; safe to re-run:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain
+```
+
+**3. Set two environment variables** in the terminal you'll build from:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export LOCALLM_SDK_VERSION=1.0.0-beta.1
+```
+
+- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell. Skip it only if
+  `xcode-select -p` already points at `Xcode-beta.app`.
+- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download — this example links
+  **two** binaries (`LocalLMLabSDKCore.xcframework` + `LocalLMLabSDKInference.xcframework`, the
+  MLX runtime) from that one GitHub Release. Omitting it fails fast with a clear error.
+
+These last only for the current terminal — re-run step 3 in each new terminal (or add both
+`export` lines to your `~/.zshrc`).
+
+**4. Build:**
+
+```bash
+swift build
+```
+
+The first `swift build` downloads the two xcframeworks; the first `swift run` also downloads the
+model. Weights land in `~/.cache/huggingface/hub/` — shared with
+[`repo-qa-local`](../repo-qa-local/), so a model you already pulled there isn't re-downloaded.
 
 ## What it exercises
 
