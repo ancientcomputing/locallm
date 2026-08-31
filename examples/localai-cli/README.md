@@ -61,9 +61,10 @@ for that one call, via `connectors` and `mcp_tools` fields:
    `localai-cli` only ever reads this file, never creates or edits it.
    Connector and MCP calls also run inside LocalLM Lab's own process (reached
    over a local socket), so the app must be **running**, not just installed.
-2. Download the `localai-toolkit-<version>-arm64.zip` release asset and
-   unzip it — it contains `localai-cli` and `localai-playground-run` as a
-   matched pair.
+2. Get the `localai-toolkit-<version>-arm64.zip` from
+   [`../../toolkit/`](../../toolkit/) (it's checked into the repo — see that
+   folder's README) and unzip it — `localai-cli` and `localai-playground-run`
+   are a matched pair.
 3. Put both binaries in this folder (or point `LOCALAI_CLI_PATH` at wherever
    you put `localai-cli` — it looks for `localai-playground-run` in the same
    directory as itself by default).
