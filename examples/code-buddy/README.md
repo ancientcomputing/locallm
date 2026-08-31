@@ -5,8 +5,8 @@ A minimal CLI coding agent built on the **full** LocalLM Lab SDK — the worked 
 where **the host implements process execution itself**, not the SDK.
 
 It's a **plain command-line tool** — no signing, no `.app`, no `packaging/` directory.
-`swift run` is the whole build. (It's unsandboxed, which is what lets it own `Process`
-execution — see [The host-owned `Process` tools](#the-host-owned-process-tools).)
+`swift run` is the whole build. Being unsandboxed is also what lets it run `git` and your test
+command — see [The `git` and `run_tests` tools](#the-git-and-run_tests-tools-this-example-provides-them-not-the-sdk).
 
 ## What it does
 
@@ -125,13 +125,47 @@ the other on switch) and splits work across `--route heavy` / `--route light`:
 The LocalLM Lab app's AI Models panel surfaces the same signals (a memory-pressure warning per
 model, a Compact/Balanced/Full tool-result preset) if you'd rather see it in a UI first.
 
-## The host-owned `Process` tools
+## The `git` and `run_tests` tools (this example provides them, not the SDK)
 
-`Sources/CodeBuddy/ProcessTools.swift` — **not SDK API**. The SDK deliberately ships no
-run-command tool (sandbox + Mac App Store incompatibility). A Developer-ID host implements it:
+**Background.** A "tool" here is a small Swift type conforming to `Tool` that you put in the
+`tools:` array you hand to `lab.makeSession(...)`. The model never runs code itself — when it
+wants to use a tool it emits a structured request ("call `git` with `status`"), *your program*
+runs it, and the result goes back to the model. code-buddy's `tools:` array (see
+`Sources/CodeBuddy/main.swift`) has three kinds:
 
-- **`GitTool`** — runs git in the workspace, but only a read-only subcommand safelist
-  (`status` / `diff` / `log` / …). Mutating commands are refused; edits go through `applyPatch`.
-  The policy is the host's, not the SDK's.
-- **`RunTestsTool`** — runs the host-configured test command (`--test-cmd`), captured with a
-  timeout and an output cap.
+1. **Workspace file tools from the SDK** — `ReadWorkspaceFileTool`, `ApplyPatchTool`,
+   `SearchWorkspaceTool`, and the rest. These only touch files (via `FileManager`), scoped to
+   the workspace directory. The SDK ships them because they're safe to run anywhere, including
+   inside the App Sandbox and the Mac App Store.
+2. **`git` and `run_tests`** — these *launch other programs* (`/usr/bin/git`, `swift test`)
+   using Swift's `Process`. The SDK does **not** ship these, for two reasons:
+   - **The App Sandbox forbids launching subprocesses.** Any app shipped through the Mac App
+     Store must run in the sandbox, and a sandboxed app calling `Process` to run `git` is
+     blocked by the OS. If the SDK shipped a "run a command" tool it would be broken code for
+     every App Store app — so it leaves that to you.
+   - **It's a safety decision that should be yours.** Letting an LLM run commands on your
+     machine needs limits, and those limits depend on your app. The SDK doesn't hand you one
+     and imply it's blessed.
+3. **MCP tools** — added automatically from the DeepWiki server (unless `--no-mcp`).
+
+**So code-buddy — a plain, unsandboxed command-line tool — writes `git` and `run_tests`
+itself**, in `Sources/CodeBuddy/ProcessTools.swift` (~100 lines, in the example so you can copy
+them). "The policy is the host's" just means *code-buddy* decides what these tools allow,
+because *code-buddy* wrote them:
+
+- **`git`** — only read-only subcommands run (`status`, `diff`, `log`, `show`, `blame`, …). Ask
+  it to `commit`, `push`, `checkout`, or `reset` and the tool returns *"Refused: not an allowed
+  read-only git subcommand."* The model changes files through `ApplyPatchTool`, never by running
+  git. Your commit history is never touched.
+- **`run_tests`** — runs *exactly* the command you passed as `--test-cmd` (default `swift test`),
+  in the workspace directory, with a 4-minute timeout and output truncated at 20 000 characters.
+  It can't run anything else.
+- Both set the subprocess's working directory to the workspace; neither can reach outside it.
+
+Want different rules — more git subcommands, a longer timeout, a `swiftformat` tool? Edit
+`ProcessTools.swift`. The SDK is not involved.
+
+**Building a Mac App Store app?** You can't ship `git` / `run_tests` this way — the sandbox
+blocks it. Drop those two from the `tools:` array; the model keeps every workspace file tool and
+can still read, search, and patch. Running tests or git from a sandboxed app needs a separate
+design (a helper process outside the sandbox), which is beyond this example.
