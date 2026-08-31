@@ -71,6 +71,8 @@ for the full framing.
 - **[examples/repo-qa-local/](examples/repo-qa-local/)** — `repo-qa` with the answer coming from
   a locally-run open-weight MLX model instead of Apple's on-device one. The smallest model-layer
   + `LocalLMLabSDKInference` example.
+- **[examples/workspace-buddy-local/](examples/workspace-buddy-local/)** — `workspace-buddy` with
+  a downloadable MLX model. The one example running the model layer inside App Sandbox.
 - **[examples/code-buddy/](examples/code-buddy/)** — the model layer end to end: a CLI coding
   agent routing `.heavy` / `.light` to locally-run MLX models, with Core's Workspace tools and
   an MCP docs server.

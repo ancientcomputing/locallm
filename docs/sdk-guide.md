@@ -1261,7 +1261,7 @@ and gotchas — use this one when you just need to check a signature.
 | API area | Example | Path |
 |---|---|---|
 | The model layer — `LocalLMLab`, routing, `MLXModelProvider`, sessions, residency, `ContextBudget` | [`code-buddy`](../examples/code-buddy/) (full) · [`repo-qa-local`](../examples/repo-qa-local/) (minimal) | — |
-| Workspace tools (`WorkspaceAccess` / `SearchWorkspaceTool` / `ApplyPatchTool` / …) | [`workspace-buddy`](../examples/workspace-buddy/) (Core-only) · `code-buddy` | A |
+| Workspace tools (`WorkspaceAccess` / `SearchWorkspaceTool` / `ApplyPatchTool` / …) | [`workspace-buddy`](../examples/workspace-buddy/) (on-device) · [`workspace-buddy-local`](../examples/workspace-buddy-local/) (MLX, sandboxed) · `code-buddy` | A |
 | Connectors + ready-made connector `Tool`s | [`plate-today-tools`](../examples/plate-today-tools/) | A |
 | Connectors via hand-written `Tool` adapters | [`plate-today`](../examples/plate-today/) | B |
 | MCP client + OAuth (Todoist) + Keychain | `plate-today` / `plate-today-tools` | — |

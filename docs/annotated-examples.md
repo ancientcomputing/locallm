@@ -950,7 +950,7 @@ of whether it uses `Components` or not.
 ## `examples/code-buddy/Sources/CodeBuddy/main.swift`
 
 The fullest **model-layer** example (see also [`repo-qa-local`](../examples/repo-qa-local/) for
-the minimal one), and one of two linking a second binary, `LocalLMLabSDKInference.xcframework`
+the minimal one; workspace-buddy-local is the sandboxed one), and one of three linking a second binary, `LocalLMLabSDKInference.xcframework`
 (the MLX runtime). Lines that touch it are marked `// ← SDK (Inference)`; `// ← SDK` is Core as
 elsewhere. A CLI coding agent: point it at a repo and a task, it downloads an open-weight MLX
 model on first run, then drives Core's Workspace
