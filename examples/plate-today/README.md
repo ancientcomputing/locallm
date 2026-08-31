@@ -1,14 +1,37 @@
 # Plate Today
 
-A minimal SwiftUI reference app built on the LocalLM Lab SDK: launch → request Calendar/Reminders
-access → connect to Todoist's real hosted MCP server (OAuth) → ask Apple's on-device model for a
-"what's on my plate today" summary → Done (which also clears the Todoist OAuth token, since this
-is a dev/demo app that shouldn't accumulate standing access across runs).
+**The idea.** A local AI model can read across the places your day is scattered — Calendar,
+Reminders, an online to-do list — and hand you one short summary, instead of you opening three
+apps and stitching it together yourself. Because the model runs on your Mac, none of that
+personal data leaves the machine.
 
-It exercises the SDK's Calendar and Reminders connectors plus its MCP client — real OAuth, real
-tool calls, real on-device inference, no mocking. For the full step-by-step walkthrough of what
-happens at each stage (including where each TCC prompt and the OAuth browser flow actually fire),
-see [`docs/sdk-guide.md` §5](../../docs/sdk-guide.md#5-walking-through-a-reference-apps-user-experience-step-by-step).
+**Plate Today** is a small SwiftUI app that does exactly that, for one question: *what's on my
+plate today?* It pulls today's events from **Calendar**, open items from **Reminders**, and tasks
+from **Todoist** (through Todoist's hosted server), and asks Apple's on-device model to write the
+summary. "Done" then clears everything, including the Todoist sign-in — it's a demo, not
+something that should hold standing access to your accounts.
+
+**What it illustrates for SDK developers.** A native app that links `LocalLMLabSDKCore` directly
+and feeds three real data sources into one model call — two Apple connectors (Calendar,
+Reminders) and one MCP server with a real OAuth flow (Todoist). Nothing is mocked: real TCC
+permission prompts, a real browser OAuth round trip, real on-device inference. This is the
+**"Path B"** version, where you hand-write one `Tool` adapter per source;
+[`plate-today-tools`](../plate-today-tools/) is the identical app rebuilt on the SDK's ready-made
+Tools ("Path A") — diff the two to see what changes. The blow-by-blow of where each permission
+prompt and the OAuth flow fire is in
+[`docs/sdk-guide.md` §5](../../docs/sdk-guide.md#5-walking-through-a-reference-apps-user-experience-step-by-step).
+
+## What you'll see
+
+Running a signed build (`packaging/build-and-sign.sh`, below — the plain `swift run` can't get
+real Calendar/Reminders/OAuth access):
+
+1. **Launch.** macOS asks for **Calendar** then **Reminders** access — allow both.
+2. **A browser window opens** for Todoist sign-in and consent (first run only; the token is
+   reused after that, until you press Done).
+3. **The model works for a few seconds**, then a plain-language paragraph appears: today's
+   meetings, what's due, what's overdue — drawn from all three sources at once, not one at a time.
+4. **Done** clears the screen and signs out of Todoist.
 
 Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
 
