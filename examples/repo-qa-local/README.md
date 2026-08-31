@@ -14,8 +14,8 @@ LOCALLM_SDK_VERSION=1.0.0-beta.1 \
   swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
 ```
 
-First run downloads the model (progress on stderr); after that it's local and offline. Default:
-`mlx-community/Qwen3-8B-4bit` — see [`docs/tested-models.md`](../../docs/tested-models.md) for
+First run downloads the model (~4.5 GB for the default, `mlx-community/Qwen3-8B-4bit`); after
+that it's local and offline. See [`docs/tested-models.md`](../../docs/tested-models.md) for
 which open-weight models tool-call reliably.
 
 ```bash
@@ -23,6 +23,30 @@ swift run RepoQALocal facebook/react                                   # default
 swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift-nio "..."
 swift run RepoQALocal --apple anthropics/claude-code "..."             # route to Apple's on-device model instead
 ```
+
+## Output: the answer vs. the noise
+
+Run it in a terminal and you see everything — nothing to enable. But the two streams are split
+on purpose:
+
+- **stdout** — *only* the final answer.
+- **stderr** — everything else: `model: …`, download `%`, `Connecting to Deepwiki…`, the tool
+  list, errors.
+
+So you can keep just the answer:
+
+```bash
+# just the answer to the terminal (progress/status still shows while it runs, then disappears)
+swift run RepoQALocal facebook/react 2>/dev/null
+
+# save just the answer to a file, watch progress in the terminal
+swift run RepoQALocal facebook/react > answer.md
+
+# capture the whole run (answer + status) to a log
+swift run RepoQALocal facebook/react 2>&1 | tee run.log
+```
+
+(`2>/dev/null` = "throw away stderr"; `>` redirects stdout; `2>&1` merges stderr into stdout.)
 
 ## What the model layer adds (diff against `repo-qa`)
 
