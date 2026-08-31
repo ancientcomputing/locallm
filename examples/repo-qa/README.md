@@ -20,31 +20,51 @@ are wrapped from Deepwiki's own live JSON Schema in a loop, nothing hand-coded p
 
 ## Quick start
 
+Do **Getting the SDK & toolchain** below first (you need the Xcode 27 beta — one-time). Then,
+from this directory:
+
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
-  swift run RepoQA anthropics/claude-code "What is the plugin system?"
+swift run RepoQA anthropics/claude-code "What is the plugin system?"
 ```
 
 ## Getting the SDK & toolchain
 
-- **macOS 27 + the Xcode 27 beta.** `Package.swift` is `platforms: [.macOS("27.0")]`; a stable
-  Xcode fails with `'v27' is unavailable`. Point `DEVELOPER_DIR` at the beta:
-  `export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
-- **`LOCALLM_SDK_VERSION`** — `Package.swift` resolves `LocalLMLabSDKCore.xcframework` from a
-  GitHub Release keyed on this env var. Set it to `1.0.0-beta.1`;
-  omitting it, or an unknown value, fails fast with a clear error listing what it knows.
-  (`MCPTool`, this app's whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use
-  `1.0.0-beta.1+`.)
+Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
+(re-run it in every new terminal).
+
+**1. Install the Xcode 27 beta.** Download it from
+[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
+(it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
+Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+
+**2. Set two environment variables** in the terminal you'll build from:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
+
+- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
+  alone).
+- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download `LocalLMLabSDKCore.xcframework`
+  from. Omitting it fails fast with a clear error listing what it knows. (`MCPTool`, this app's
+  whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)
+
+These last only for the current terminal — re-run step 2 in each new terminal (or add both
+`export` lines to your `~/.zshrc`).
+
+**3. Build:**
+
+```bash
+swift build
+```
+
+The first `swift build` (or `swift run`) downloads the xcframework.
 
 ## Running it
 
-A bare `swift run` is the real, intended way to use this app — not just a dev-loop shortcut.
+Assumes the two `export`s from step 2 are set in this terminal. A bare `swift run` is the real,
+intended way to use this app — not a dev-loop shortcut.
 
 ```bash
 swift run RepoQA anthropics/claude-code "What is the plugin system?"

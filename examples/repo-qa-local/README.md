@@ -16,10 +16,11 @@ models, Workspace tools, streamed output, a real agent loop — see [`code-buddy
 
 ## Quick start
 
+Do **Getting the SDK & toolchain** below first (you need the Xcode 27 beta and the Metal
+Toolchain — one-time). Then, from this directory:
+
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
-  swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
+swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
 ```
 
 First run downloads the model (~4.5 GB for the default, `mlx-community/Qwen3-8B-4bit`); after that
@@ -27,34 +28,57 @@ it's local and offline.
 
 ## Getting the SDK & toolchain
 
-- **macOS 27 + the Xcode 27 beta.** `Package.swift` is `platforms: [.macOS("27.0")]`; a stable
-  Xcode fails with `'v27' is unavailable`. Point `DEVELOPER_DIR` at the beta:
-  `export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
-- **`LOCALLM_SDK_VERSION`** — `Package.swift` resolves the SDK xcframeworks from a GitHub Release
-  keyed on this env var. Set it to `1.0.0-beta.1`; omitting it, or an
-  unknown value, fails fast with a clear error.
-- **Two SDK binaries.** Unlike `repo-qa` (Core only), this links `LocalLMLabSDKCore.xcframework`
-  **and** `LocalLMLabSDKInference.xcframework` (the MLX runtime), both from the same Release —
-  see `Package.swift`.
-- **Metal Toolchain** — `mlx-swift` compiles Metal shaders. One-time:
-  `xcodebuild -downloadComponent MetalToolchain`.
-- **Disk + RAM for the model.** `Qwen3-8B-4bit` is ~4.5 GB on disk;
-  `MLXModelProvider.validate` refuses a model whose weights exceed ~70% of physical RAM. See
-  [`docs/tested-models.md`](../../docs/tested-models.md) for which open-weight models tool-call
-  reliably.
+Copy-paste each step. Steps 1–2 are one-time machine setup; step 3 sets up your terminal session
+(re-run it in every new terminal).
+
+**1. Install the Xcode 27 beta.** Download it from
+[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
+(it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
+Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+
+**2. Download the Metal Toolchain** — `mlx-swift` compiles Metal shaders and won't build without
+it. One-time; safe to re-run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+xcodebuild -downloadComponent MetalToolchain
 ```
 
+**3. Set two environment variables** in the terminal you'll build from:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export LOCALLM_SDK_VERSION=1.0.0-beta.1
+```
+
+- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
+  alone).
+- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download. This example links
+  **two** binaries — `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the
+  MLX runtime) — from that one GitHub Release. Omitting it fails fast with a clear error.
+
+These last only for the current terminal — re-run step 3 in each new terminal (or add both
+`export` lines to your `~/.zshrc`).
+
+**4. Build:**
+
+```bash
+swift build
+```
+
+The first `swift build` downloads the two xcframeworks. The first `swift run` (below) also
+downloads the model. `MLXModelProvider.validate` refuses a model whose weights exceed ~70% of
+this Mac's RAM — see [`docs/tested-models.md`](../../docs/tested-models.md) for which open-weight
+models tool-call reliably.
+
 ## Running it
+
+Assumes the two `export`s from step 3 are set in this terminal.
 
 ```bash
 swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
 swift run RepoQALocal facebook/react                 # no question → "what does this repo do?"
-swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift-nio "..."
-swift run RepoQALocal --apple anthropics/claude-code "..."   # route to Apple's on-device model instead
+swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift-nio "how does the event loop work?"
+swift run RepoQALocal --apple anthropics/claude-code "What is the plugin system?"   # Apple's on-device model instead
 ```
 
 ## Output — answer on stdout, everything else on stderr
