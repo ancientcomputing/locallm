@@ -1,10 +1,33 @@
 # Workspace Buddy
 
-The SDK's fourth reference app, and its first that writes to disk: pick a folder, describe a
-change, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools` (Path A,
-see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
-A local, more modest take on AI-assisted coding — not Claude Code, but a real demonstration of
-what's possible entirely on-device.
+**Workspace Buddy** is a small Mac app for AI-assisted edits to a folder of files. You pick a
+folder, type a request in plain English — "add a header comment to every file", "rename `oldName`
+to `newName` throughout" — and the on-device model reads the files and makes the changes. It's a
+modest, entirely-local take on AI-assisted coding: not Claude Code, but everything runs on your
+Mac, and the model can only touch the one folder you chose.
+
+**What it highlights for SDK developers:**
+
+- **Giving a model safe, scoped access to files.** Core's `WorkspaceTools` — list, read, create,
+  and edit files — are ready-made tools you drop into the model's tool array; you write no file
+  I/O and no per-tool code. Every path they touch is confined to the folder the user picked
+  ("Path A" — see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
+- **A user-picked folder that survives relaunch, under App Sandbox.** The app is always sandboxed
+  (the Mac App Store requires it). A sandboxed app can't simply reopen a folder the user chose
+  last time — it has to save a *security-scoped bookmark*. This app shows that pattern end to
+  end: `NSOpenPanel` → bookmark → the same folder still accessible on the next launch. One
+  entitlement, no permission dialog.
+- **Choosing which tools to expose.** Core also ships a delete tool; this app deliberately leaves
+  it out — a coding assistant that can delete files unprompted is a bigger risk than one that
+  only reads, creates, and edits. (More in
+  [*What this app does, and doesn't, do*](#what-this-app-does-and-doesnt-do) below.)
+
+## What you'll see
+
+Run the signed build (`packaging/build-and-sign.sh`, below — a plain `swift run` is compile-only
+here). Open the `.app`, click **Choose Folder…**, pick a throwaway directory, type a request, hit
+**Go**. The model works for a few seconds, then the files in that folder change on disk — check
+with `git diff` or your editor.
 
 Requires macOS 27 on Apple Silicon with Apple Intelligence enabled.
 
