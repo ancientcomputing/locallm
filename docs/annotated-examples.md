@@ -1,8 +1,8 @@
 # Annotated example source
 
 The full source of every reference app, with every line that actually touches the SDK marked
-`// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime, `code-buddy` only), or
-`// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
+`// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`, and
+`workspace-buddy-local`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
@@ -949,8 +949,10 @@ of whether it uses `Components` or not.
 
 ## `examples/code-buddy/Sources/CodeBuddy/main.swift`
 
-The fullest **model-layer** example (see also [`repo-qa-local`](../examples/repo-qa-local/) for
-the minimal one; workspace-buddy-local is the sandboxed one), and one of three linking a second binary, `LocalLMLabSDKInference.xcframework`
+The fullest **model-layer** example (see also
+[`repo-qa-local`](#examplesrepo-qa-localsourcesrepoqalocalmainswift) for the minimal one, and
+[`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift)
+for the sandboxed one, both annotated below), and one of three linking a second binary, `LocalLMLabSDKInference.xcframework`
 (the MLX runtime). Lines that touch it are marked `// ← SDK (Inference)`; `// ← SDK` is Core as
 elsewhere. A CLI coding agent: point it at a repo and a task, it downloads an open-weight MLX
 model on first run, then drives Core's Workspace
@@ -1226,3 +1228,285 @@ struct RunTestsTool: Tool {
 like Core's own tools do, and get merged into the session by the same `makeSession(tools:)` call —
 the SDK neither knows nor cares that these ones shell out. The safety policy (read-only git
 allow-list, workspace-scoped `cwd`, output cap, timeout) is entirely the host's to write.
+
+## `examples/repo-qa-local/Sources/RepoQALocal/main.swift`
+
+The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qasourcesrepoqamainswift) above,
+with the ~20 lines that swap Apple's on-device model for an open-weight MLX model you download and
+run locally. The Deepwiki / `MCPTool` half is a verbatim copy of `repo-qa`'s — diff the two to see
+exactly what adopting the model layer costs. Second of the three binaries linking
+`LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as elsewhere.
+
+```swift
+// repo-qa-local — repo-qa, but the answer comes from an open-weight model you download and run
+// locally (via MLX) instead of Apple's on-device model. The Deepwiki / MCPTool half is a
+// verbatim copy of repo-qa's; the only difference is the ~20 lines that set up the 1.0 model
+// layer and swap `LanguageModelSession(tools:)` for `lab.makeSession(route:tools:)`.
+//
+//   swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
+//   swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift-nio "..."
+//   swift run RepoQALocal --apple anthropics/claude-code "..."  # route to Apple's on-device model instead
+
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKInference                                         // ← SDK (Inference)
+
+func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
+
+@available(macOS 26.0, *)
+@MainActor
+func run() async {
+    // --- args: [--model <repo>] [--apple] <owner/repo> [question...] ---
+    var modelRepo = "mlx-community/Qwen3-8B-4bit"
+    var useApple = false
+    var rest: [String] = []
+    var it = CommandLine.arguments.dropFirst().makeIterator()
+    while let a = it.next() {
+        switch a {
+        case "--model": if let v = it.next() { modelRepo = v }
+        case "--apple": useApple = true
+        default: rest.append(a)
+        }
+    }
+    guard let repoName = rest.first, !repoName.isEmpty else {
+        note("usage: swift run RepoQALocal [--model <hf-repo>] [--apple] <owner/repo> [question]")
+        exit(1)
+    }
+    let question = rest.dropFirst().joined(separator: " ")
+    let effectiveQuestion = question.isEmpty ? "What does this repository do, in a couple sentences?" : question
+
+    // --- the model layer: one MLX provider, Apple's on-device model as an alternative, one route ---
+    let mlx = MLXModelProvider(residentModelLimit: 1)                 // ← SDK (Inference)
+    let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
+    let modelID = useApple ? ModelID.system : ModelID(scheme: "mlx", rest: modelRepo)!    // ← SDK
+    lab.models.route(.local, to: modelID)                            // ← SDK
+    note("model: \(modelID)  ·  SDK \(LocalLMLabSDKVersion.current)")   // ← SDK
+
+    // Preflight + download the MLX weights on first run. (Nothing to download for `--apple`.)
+    if !useApple, case .notDownloaded = lab.models.availability(for: modelID) {   // ← SDK
+        if let pre = try? await mlx.validate(modelRepo), !pre.passed {            // ← SDK (Inference)
+            note("pre-flight failed (\(pre.failedStage?.rawValue ?? "?")): \(pre.detail ?? "")")
+            exit(1)
+        }
+        note("downloading \(modelRepo)…")
+        do {
+            for try await event in mlx.download(modelRepo) {         // ← SDK (Inference)
+                if case .progress(_, _, let f) = event {
+                    FileHandle.standardError.write(Data("\u{1B}[2K\r  \(Int(f * 100))%".utf8))
+                }
+            }
+            note("\u{1B}[2K\r  done")
+        } catch {
+            note("download failed: \(error)"); exit(1)
+        }
+    }
+
+    // --- everything below is repo-qa, unchanged ---
+
+    let manager = MCPServerManager()                                 // ← SDK
+    note("Connecting to Deepwiki…")
+    let connectResult = await manager.addServer(                     // ← SDK
+        url: URL(string: "https://mcp.deepwiki.com/mcp")!,
+        displayName: "Deepwiki"
+    )
+    guard case .success(let state) = connectResult else {
+        note("Could not connect to Deepwiki: \(connectResult)"); return
+    }
+
+    // Build a Tool for each of Deepwiki's tools from its own live schema. `read_wiki_contents` is
+    // skipped by name: it dumps a repo's entire wiki unscoped (~165K tokens for anthropics/
+    // claude-code in one call), which MCPTool can't know from the schema — that curation is the
+    // app's job (see docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal.
+    var tools: [any Tool] = []
+    for descriptor in state.tools {
+        guard descriptor.name != "read_wiki_contents" else {
+            note("Skipping \(descriptor.name): excluded by this example.")
+            continue
+        }
+        do { tools.append(try MCPTool(descriptor: descriptor, manager: manager)) }   // ← SDK (Path A)
+        catch { note("Skipping \(descriptor.name): \(error)") }
+    }
+    guard !tools.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
+
+    // The one line that changes from repo-qa: lab.makeSession(route:tools:) instead of
+    // LanguageModelSession(tools:) — same FoundationModels session underneath, just backed by
+    // whichever model the route points at. includeMCPTools: false because this app passes its
+    // MCPTools in by hand above rather than going through lab.mcp.
+    let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
+    let session: LocalLMLabSession                                   // ← SDK
+    do {
+        session = try lab.makeSession(route: .local, tools: tools, instructions: instructions, includeMCPTools: false)   // ← SDK
+    } catch {
+        note("makeSession failed: \(error)"); exit(1)
+    }
+
+    let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
+    do {
+        // Plain FoundationModels LanguageModelSession underneath — respond/streamResponse as usual.
+        let response = try await session.languageModelSession.respond(to: prompt)   // ← SDK
+        print(response.content)
+    } catch {
+        note("Error: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+    }
+    session.cancel()                                                 // ← SDK
+}
+
+if #available(macOS 26.0, *) {
+    await run()
+} else {
+    print("Requires macOS 26 or later.")
+}
+```
+
+**Tally**: of ~75 lines of actual code, ~14 touch the SDK — and everything below the
+`--- everything below is repo-qa, unchanged ---` marker is character-for-character `repo-qa`
+except the one `lab.makeSession` line. The model layer itself is ~7 lines
+(`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` / `availability` / `validate` /
+`download`); `--apple` proves the same route can point at Apple's on-device model with no other
+change.
+
+## `examples/workspace-buddy-local/Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift`
+
+[`workspace-buddy`](#examplesworkspace-buddysourcesworkspacebuddyworkspacebuddyappswift) above —
+same folder-picker, same security-scoped bookmark, same `WorkspaceTools` — but the model is an
+open-weight MLX model routed through the 1.0 model layer. It is the one example that runs the
+model layer **inside App Sandbox**, so it also needs `com.apple.security.network.client` (to fetch
+the weights on first run) on top of `workspace-buddy`'s `files.user-selected.read-write`; the
+model downloads into this app's own sandbox container. Third of the three binaries linking
+`LocalLMLabSDKInference`. The `FolderAccess` enum is verbatim from `workspace-buddy` and is
+elided here — see that section above.
+
+```swift
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKInference                                         // ← SDK (Inference)
+import SwiftUI
+
+// The model this app routes to. Any MLX-format Hugging Face repo — see docs/tested-models.md.
+let workspaceModelRepo = "mlx-community/Qwen3-8B-4bit"
+
+// MARK: - FolderAccess { pickFolder / resolveBookmarkedFolder / withFolderAccessAsync }
+//   — verbatim from workspace-buddy (docs/sdk-guide.md §8); see that section above. Elided here.
+
+// MARK: - View model
+
+@available(macOS 26.0, *)
+@MainActor
+final class WorkspaceBuddyLocalModel: ObservableObject {
+    enum State {
+        case idle
+        case downloadingModel(Double)   // 0…1
+        case working
+        case ready(String)
+        case failed(String)
+    }
+
+    @Published private(set) var folderURL: URL?
+    @Published private(set) var state: State = .idle
+
+    // The model layer: an MLX provider (one model resident at a time), Apple's on-device model
+    // kept as a fallback, and one named route pointing at the MLX model.
+    private let mlx = MLXModelProvider(residentModelLimit: 1)         // ← SDK (Inference)
+    private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
+    private lazy var modelID = ModelID(scheme: "mlx", rest: workspaceModelRepo)!   // ← SDK
+
+    init() {
+        folderURL = FolderAccess.resolveBookmarkedFolder()
+        lab.models.route(.local, to: modelID)                        // ← SDK
+    }
+
+    func chooseFolder() {
+        guard let url = FolderAccess.pickFolder() else { return }
+        folderURL = url
+    }
+
+    func submit(_ request: String) {
+        let trimmed = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        switch state {
+        case .working, .downloadingModel: return
+        default: break
+        }
+        Task { await run(trimmed) }
+    }
+
+    private func run(_ request: String) async {
+        // 1. Download the model on first use (streams progress into the UI).
+        if case .notDownloaded = lab.models.availability(for: modelID) {   // ← SDK
+            state = .downloadingModel(0)
+            if let pre = try? await mlx.validate(workspaceModelRepo), !pre.passed {   // ← SDK (Inference)
+                state = .failed("Model pre-flight failed (\(pre.failedStage?.rawValue ?? "?")): \(pre.detail ?? "")")
+                return
+            }
+            do {
+                for try await event in mlx.download(workspaceModelRepo) {   // ← SDK (Inference)
+                    if case .progress(_, _, let fraction) = event {
+                        state = .downloadingModel(fraction)
+                    }
+                }
+            } catch {
+                state = .failed("Model download failed: \(error.localizedDescription)")
+                return
+            }
+        }
+
+        // 2. Run the request, exactly as workspace-buddy does — only the session-creation line differs.
+        state = .working
+        let result: String? = await FolderAccess.withFolderAccessAsync { root in
+            let tools: [any Tool] = [
+                ListWorkspaceFilesTool(root: root),                  // ← SDK (Path A)
+                ReadWorkspaceFileTool(root: root),                   // ← SDK (Path A)
+                WriteWorkspaceFileTool(root: root),                  // ← SDK (Path A)
+                EditWorkspaceFileTool(root: root),                   // ← SDK (Path A)
+            ]
+            let instructions = """
+                You are a coding assistant working in a single project folder. Use \
+                listWorkspaceFiles to see what's there and readWorkspaceFile before editing \
+                anything — never guess a file's contents. Prefer editWorkspaceFile (a targeted \
+                find-and-replace) over writeWorkspaceFile for changes to files that already \
+                exist; writeWorkspaceFile only creates brand-new files and fails if the file is \
+                already there. Explain what you changed and why, briefly.
+                """
+            do {
+                // The only line that differs from workspace-buddy: lab.makeSession(route:) instead
+                // of LanguageModelSession(tools:). includeMCPTools: false — this app has no MCP.
+                let session = try self.lab.makeSession(              // ← SDK
+                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false
+                )
+                let response = try await session.languageModelSession.respond(to: request)   // ← SDK
+                return response.content
+            } catch {
+                return "Error: \(await GenerationErrorDescription.describe(error))"   // ← SDK
+            }
+        }
+
+        guard let result else {
+            state = .failed("Could not access the workspace folder — try choosing it again.")
+            return
+        }
+        state = .ready(result)
+    }
+}
+
+// MARK: - UI (ordinary SwiftUI — model-repo label, folder path, a text field, a Go button, a
+// download-progress bar, a result view. No SDK touchpoints; elided.)
+
+@available(macOS 26.0, *)
+@main
+struct WorkspaceBuddyLocalApp: App {
+    @StateObject private var model = WorkspaceBuddyLocalModel()
+    var body: some Scene {
+        WindowGroup { ContentView(model: model) }
+            .windowResizability(.contentMinSize)
+    }
+}
+```
+
+**Tally**: of ~90 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI UI
+section both elided), ~13 touch the SDK. Against `workspace-buddy`'s four (four Tool
+instantiations + one error formatter), the delta is entirely the model layer: the provider/lab/
+route setup, the first-run `availability` check, and the `validate` + `download` progress loop.
+The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
+sandbox changes nothing in the code, only the entitlements.
