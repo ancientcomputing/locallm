@@ -540,7 +540,9 @@ that want more than one model.
 
 > **The one example that exercises all of it: [`code-buddy`](../examples/code-buddy/).** A CLI
 > coding agent with a `.heavy` and a `.light` route to locally-run MLX models, Core's Workspace
-> tools, an MCP docs server, and streamed output. Every API below has a "→ code-buddy" pointer
+> tools, an MCP docs server, and streamed output. Run it with a task for one shot, or without a
+> task for a `>>` loop over one persistent `LocalLMLabSession` (where `contextBudget` and
+> `.contextCompacted` actually earn their place). Every API below has a "→ code-buddy" pointer
 > to where it's used for real.
 
 ### `LocalLMLab` — the front door (optional)

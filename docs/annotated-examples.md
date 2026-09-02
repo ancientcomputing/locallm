@@ -954,9 +954,11 @@ The fullest **model-layer** example (see also
 [`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift)
 for the sandboxed one, both annotated below), and one of three linking a second binary, `LocalLMLabSDKInference.xcframework`
 (the MLX runtime). Lines that touch it are marked `// ← SDK (Inference)`; `// ← SDK` is Core as
-elsewhere. A CLI coding agent: point it at a repo and a task, it downloads an open-weight MLX
-model on first run, then drives Core's Workspace
-tools + host `Process` tools + (auto) MCP tools through a routed `LocalLMLabSession`. See
+elsewhere. A CLI coding agent: point it at a repo, give it a task (one-shot) or omit the task to
+get a `>>` loop over one persistent session, and it downloads an open-weight MLX model on first
+run, then drives Core's Workspace tools + host `Process` tools + (auto) MCP tools through a routed
+`LocalLMLabSession`. Ctrl-C cancels the running turn — reaching the `Process` tools so a child
+`swift test` is terminated, not orphaned — and quits from an idle prompt. See
 [`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) for the prose.
 
 ```swift
@@ -967,7 +969,8 @@ import LocalLMLabSDKInference                                         // ← SDK
 
 // code-buddy — a minimal coding agent on the LocalLM Lab SDK.
 //   code-buddy [--route heavy|light] [--heavy <repo>] [--light <repo>]
-//              [--test-cmd "<cmd>"] [--no-mcp] <workspace-dir> <task...>
+//              [--test-cmd "<cmd>"] [--no-mcp] [--no-verbose] <workspace-dir> [task...]
+// With a task: run it and stop. Without: a >> loop over one session until `quit` / Ctrl-D.
 
 struct Options {
     var route: RouteName = .heavy                                     // ← SDK
@@ -975,6 +978,7 @@ struct Options {
     var light = "mlx-community/Qwen2.5-3B-Instruct-4bit"
     var testCommand = ["swift", "test"]
     var useMCP = true
+    var verbose = true                        // print the per-tool-call trace
     var workspace = ""
     var task = ""
 }
@@ -990,19 +994,36 @@ func parseArgs() -> Options {
         case "--light": if let v = it.next() { o.light = v }
         case "--test-cmd": if let v = it.next() { o.testCommand = v.split(separator: " ").map(String.init) }
         case "--no-mcp": o.useMCP = false
+        case "--verbose": o.verbose = true
+        case "--no-verbose": o.verbose = false
         default: rest.append(a)
         }
     }
-    guard rest.count >= 2 else {
-        FileHandle.standardError.write(Data("usage: code-buddy [options] <workspace-dir> <task...>\n".utf8))
+    guard rest.count >= 1 else {
+        FileHandle.standardError.write(Data("usage: code-buddy [options] <workspace-dir> [task...]\n".utf8))
         exit(2)
     }
     o.workspace = rest[0]
-    o.task = rest.dropFirst().joined(separator: " ")
+    o.task = rest.dropFirst().joined(separator: " ")   // empty ⇒ interactive
     return o
 }
 
 func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
+
+// Ctrl-C policy: first press during a turn cancels *that turn* and returns to the prompt;
+// a press at an idle prompt — or a second press mid-turn — quits.
+final class Interrupt: @unchecked Sendable {
+    private let lock = NSLock()
+    private var turn: Task<Void, Never>?
+    private var armed = false
+    func begin(_ t: Task<Void, Never>) { lock.lock(); turn = t; armed = false; lock.unlock() }
+    func end() { lock.lock(); turn = nil; armed = false; lock.unlock() }
+    func fire() -> Bool {   // → true means "quit now"
+        lock.lock(); defer { lock.unlock() }
+        guard let turn, !armed else { return true }
+        turn.cancel(); armed = true; return false
+    }
+}
 
 @MainActor
 func run() async {
@@ -1089,32 +1110,69 @@ func run() async {
     let events = Task { @MainActor in
         for await event in session.events {                          // ← SDK
             switch event {
-            case .toolCallStarted(_, let name): note("  → \(name)")
-            case .toolCallFinished(_, let name, let failed): note("  \(failed ? "✗" : "✓") \(name)")
+            case .toolCallStarted(_, let name): if opts.verbose { note("  → \(name)") }
+            case .toolCallFinished(_, let name, let failed): if opts.verbose { note("  \(failed ? "✗" : "✓") \(name)") }
             case .contextCompacted(let n): note("  (compacted \(n) transcript entries)")
             @unknown default: break                                  // non-frozen — see sdk-guide §9
             }
         }
     }
 
-    note("\n--- task: \(opts.task) ---\n")
-    do {
-        var printed = 0
-        // The session exposes a plain FoundationModels LanguageModelSession — stream as usual.
-        for try await partial in session.languageModelSession.streamResponse(to: opts.task) {   // ← SDK
-            let content = partial.content
-            if content.count > printed {
-                let start = content.index(content.startIndex, offsetBy: printed)
-                print(content[start...], terminator: "")
-                fflush(stdout)
-                printed = content.count
+    // Ctrl-C: SIG_IGN + a DispatchSource on a background queue, so the handler runs even
+    // while the main thread is parked in readLine().
+    let interrupt = Interrupt()
+    signal(SIGINT, SIG_IGN)
+    let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
+    sigint.setEventHandler {
+        if interrupt.fire() { note("\nquitting…"); session.cancel(); exit(130) }   // ← SDK
+        note("\n^C  interrupting this turn — Ctrl-C again to quit")
+    }
+    sigint.resume()
+
+    // One turn. streamResponse snapshots are *usually* append-only — but not across a tool
+    // call, and not when a reasoning model drops its <think> block once the answer begins.
+    // So diff against what we actually printed rather than slicing at a running offset.
+    func ask(_ prompt: String) async {
+        do {
+            var shown = ""
+            for try await partial in session.languageModelSession.streamResponse(to: prompt) {   // ← SDK
+                let content = partial.content
+                if content.isEmpty || content == shown { continue }
+                if content.hasPrefix(shown) { print(content.dropFirst(shown.count), terminator: "") }
+                else if shown.hasPrefix(content) { continue }   // snapshot shrank; already shown
+                else { print(shown.isEmpty ? content : "\n" + content, terminator: "") }
+                shown = content; fflush(stdout)
             }
+            print()
+        } catch is CancellationError {
+            note("\n(interrupted — nothing further will run)")
+        } catch {
+            note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
         }
-        print()
-    } catch {
-        note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
     }
 
+    // Run a turn as a cancellable child Task the Ctrl-C handler can reach.
+    func turn(_ prompt: String) async {
+        let t = Task { await ask(prompt) }
+        interrupt.begin(t); await t.value; interrupt.end()
+    }
+
+    if !opts.task.isEmpty {
+        note("\n--- task: \(opts.task) ---\n")
+        await turn(opts.task)
+    } else {
+        note("\ncode-buddy — interactive. Type a request; `quit`, Ctrl-D, or Ctrl-C at the prompt to exit.\n")
+        while true {
+            print(">> ", terminator: ""); fflush(stdout)
+            guard let line = readLine() else { note(""); break }     // EOF / Ctrl-D
+            let task = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if task.isEmpty { continue }
+            if task == "quit" || task == "exit" { break }
+            print(); await turn(task); print()
+        }
+    }
+
+    sigint.cancel()
     session.cancel()                                                 // ← SDK
     await events.value
     note("\ncontext: \(session.contextBudget)")                      // ← SDK
@@ -1123,11 +1181,13 @@ func run() async {
 await run()
 ```
 
-**Tally**: of ~120 lines of actual code, ~22 touch the SDK — and that ~22 is the *entire* model
+**Tally**: of ~160 lines of actual code, ~22 touch the SDK — and that ~22 is the *entire* model
 layer: pick providers, name routes, preflight/download, make a session, stream it, watch
 `.events`. Everything MLX-specific is four lines (`MLXModelProvider`, `validate`, `download`,
 and the import); swap those for `ClaudeModelProvider` and the rest of the file is unchanged.
-`RouteName` is the only new type the caller names by hand.
+`RouteName` is the only new type the caller names by hand. The REPL loop and Ctrl-C handling add
+no SDK surface — one persistent `LocalLMLabSession` spans every turn, and `session.cancel()` /
+Task cancellation is the whole cancel story.
 
 ## `examples/code-buddy/Sources/CodeBuddy/ProcessTools.swift`
 
@@ -1142,7 +1202,9 @@ import Foundation
 import FoundationModels                    // only for the `Tool` / `@Generable` protocols
 
 /// Runs `exe args` in `cwd`, capturing stdout+stderr, with a timeout and a truncation cap.
-func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval = 240) -> String {
+/// Cancellation-aware: if the calling turn is cancelled (Ctrl-C), the child gets SIGTERM
+/// rather than being left to run orphaned.
+func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval = 240) async -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: exe)
     process.arguments = args
@@ -1155,8 +1217,17 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
 
     let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
     DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
+    // Read+wait off-thread so task cancellation reaches us; on cancel, terminate the child
+    // (which closes the pipe and unblocks the read).
+    let data: Data = await withTaskCancellationHandler {
+        await withCheckedContinuation { (cont: CheckedContinuation<Data, Never>) in
+            DispatchQueue.global().async {
+                let d = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                cont.resume(returning: d)
+            }
+        }
+    } onCancel: { if process.isRunning { process.terminate() } }
     deadline.cancel()
 
     var output = String(decoding: data, as: UTF8.self)
@@ -1184,13 +1255,14 @@ struct GitTool: Tool {
         "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands are refused — make edits with applyPatch instead."
     }
     func call(arguments: Arguments) async throws -> String {
+        try Task.checkCancellation()   // a tool call queued after a Ctrl-C never launches
         let parts = arguments.command
             .split(whereSeparator: { $0 == " " || $0 == "\n" }).map(String.init)
         guard let sub = parts.first else { return "No git subcommand given." }
         guard Self.readOnlySubcommands.contains(sub) else {
             return "Refused: '\(sub)' is not an allowed read-only git subcommand."
         }
-        return runProcess("/usr/bin/git", parts, cwd: root)
+        return await runProcess("/usr/bin/git", parts, cwd: root)
     }
 }
 
@@ -1207,12 +1279,13 @@ struct RunTestsTool: Tool {
         "Runs the project's test suite (`\(command.joined(separator: " "))`) in the workspace and returns the output."
     }
     func call(arguments: Arguments) async throws -> String {
+        try Task.checkCancellation()
         guard let exe = command.first else { return "No test command configured." }
         var args = Array(command.dropFirst())
         if let filter = arguments.filter, !filter.isEmpty { args += ["--filter", filter] }
         let resolved = exe.hasPrefix("/") ? exe : (which(exe) ?? "/usr/bin/env")
         let finalArgs = resolved == "/usr/bin/env" ? [exe] + args : args
-        return runProcess(resolved, finalArgs, cwd: root)
+        return await runProcess(resolved, finalArgs, cwd: root)
     }
     private func which(_ name: String) -> String? {
         for dir in ["/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin"] {
@@ -1227,7 +1300,9 @@ struct RunTestsTool: Tool {
 **Tally**: zero SDK lines. `GitTool` / `RunTestsTool` conform to FoundationModels' `Tool` exactly
 like Core's own tools do, and get merged into the session by the same `makeSession(tools:)` call —
 the SDK neither knows nor cares that these ones shell out. The safety policy (read-only git
-allow-list, workspace-scoped `cwd`, output cap, timeout) is entirely the host's to write.
+allow-list, workspace-scoped `cwd`, output cap, timeout) is entirely the host's to write — as is
+the cancellation behaviour: `withTaskCancellationHandler` + `Task.checkCancellation()` are what
+make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it.
 
 ## `examples/repo-qa-local/Sources/RepoQALocal/main.swift`
 

@@ -17,8 +17,12 @@ you can read in one sitting. Concretely it shows:
   example's source, to show how you add abilities the SDK deliberately doesn't include.
 - **Driving one task to completion** — stream the model's output, print a trace of every tool
   call, stop when the model says it's finished.
+- **Keeping one session alive across turns** — omit the task argument and it drops into an
+  interactive `>>` loop: the transcript, the warm model, and context compaction all persist
+  from one request to the next.
 
-It is **not a product and not an interactive chatbot**: you give it one task, it runs, it stops.
+It is **not a product**: even the interactive loop has no history, no editing, no slash
+commands. It's the SDK pattern, not an assistant you'd live in.
 
 Mechanically it's a **plain command-line tool** — no signing, no `.app`, no `packaging/`
 directory; `swift run` is the whole build. Being an ordinary unsandboxed CLI is also what lets it
@@ -27,15 +31,28 @@ run `git` and your test command — see
 
 ## How you use it
 
-You run it with two arguments: a **directory** and a **task in plain English**.
+You run it with a **directory** and, optionally, a **task in plain English**.
 
 ```
-swift run CodeBuddy <directory> "<task>"
+swift run CodeBuddy <directory> "<task>"     # one-shot: run the task, stop
+swift run CodeBuddy <directory>              # interactive: a >> prompt per turn
 ```
 
 The model may only read and edit files *inside that directory*, using a fixed set of tools —
 list / search / read files, apply a patch, write a file, run read-only `git`, run your test
-command. It works the task, narrating as it goes, and stops on its own when it's done.
+command. Given a task, it works it, narrating as it goes, and stops on its own when it's done.
+
+With no task it enters an interactive loop: type a request at `>>`, watch it work, get the
+prompt back, type the next request. One `LocalLMLabSession` spans the whole loop, so later
+turns can refer to earlier ones ("now do the same for the other file"). Type `quit` (or press
+Ctrl-D) to exit; the final context budget prints on the way out.
+
+**Ctrl-C is graceful, not a kill.** Pressing it while a turn is running cancels *that turn* —
+the model stops, a running `run_tests` / `git` child is sent `SIGTERM` rather than left
+orphaned, and you drop back to `>>` with the session intact. Pressing it at an idle prompt (or
+a second time during a turn) quits. It's wired with `SIG_IGN` + a `DispatchSource` signal
+handler; the per-turn cancel reaches the process tools through `withTaskCancellationHandler` in
+[`ProcessTools.swift`](Sources/CodeBuddy/ProcessTools.swift).
 
 It **edits files in place.** Always point it at a directory that's committed to git (the
 walkthrough below uses a throwaway copy) so you can see the changes with `git diff` and undo them
@@ -111,14 +128,17 @@ Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
 ### All options
 
 ```
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> <task...>
+LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> [task...]
 
   --route heavy|light   which model (default: heavy)
   --heavy <hf-repo>     model for .heavy   (default: mlx-community/Qwen3-8B-4bit)
   --light <hf-repo>     model for .light   (default: mlx-community/Qwen2.5-3B-Instruct-4bit)
   --test-cmd "<cmd>"    command for run_tests (default: "swift test")
   --no-mcp             skip the DeepWiki docs-lookup server
+  --no-verbose         hide the per-tool-call trace (shown by default)
 ```
+
+Omit `[task...]` to enter the interactive `>>` loop instead of running one shot.
 
 `--route light` uses a smaller ~2 GB model instead of ~4.5 GB — start there on a tighter Mac.
 

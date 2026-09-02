@@ -6,7 +6,10 @@ import FoundationModels
 // scoped to the workspace, with its own safety policy. This file is that worked example.
 
 /// Runs `exe args` in `cwd`, capturing stdout+stderr, with a timeout and a truncation cap.
-func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval = 240) -> String {
+///
+/// Cancellation-aware: if the calling turn is cancelled (Ctrl-C in the interactive loop),
+/// the child gets `SIGTERM` rather than being left to run orphaned.
+func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval = 240) async -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: exe)
     process.arguments = args
@@ -24,8 +27,19 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
     let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
     DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
 
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
+    // Read + wait on a background thread so task cancellation can reach us; on cancel,
+    // terminate the child, which closes the pipe and unblocks the read.
+    let data: Data = await withTaskCancellationHandler {
+        await withCheckedContinuation { (cont: CheckedContinuation<Data, Never>) in
+            DispatchQueue.global().async {
+                let d = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                cont.resume(returning: d)
+            }
+        }
+    } onCancel: {
+        if process.isRunning { process.terminate() }
+    }
     deadline.cancel()
 
     var output = String(decoding: data, as: UTF8.self)
@@ -59,6 +73,7 @@ struct GitTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
+        try Task.checkCancellation()
         let parts = arguments.command
             .split(whereSeparator: { $0 == " " || $0 == "\n" })
             .map(String.init)
@@ -66,7 +81,7 @@ struct GitTool: Tool {
         guard Self.readOnlySubcommands.contains(sub) else {
             return "Refused: '\(sub)' is not an allowed read-only git subcommand."
         }
-        return runProcess("/usr/bin/git", parts, cwd: root)
+        return await runProcess("/usr/bin/git", parts, cwd: root)
     }
 }
 
@@ -87,6 +102,7 @@ struct RunTestsTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
+        try Task.checkCancellation()
         guard let exe = command.first else { return "No test command configured." }
         var args = Array(command.dropFirst())
         if let filter = arguments.filter, !filter.isEmpty {
@@ -94,7 +110,7 @@ struct RunTestsTool: Tool {
         }
         let resolved = exe.hasPrefix("/") ? exe : (which(exe) ?? "/usr/bin/env")
         let finalArgs = resolved == "/usr/bin/env" ? [exe] + args : args
-        return runProcess(resolved, finalArgs, cwd: root)
+        return await runProcess(resolved, finalArgs, cwd: root)
     }
 
     private func which(_ name: String) -> String? {
