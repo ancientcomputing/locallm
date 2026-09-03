@@ -5,7 +5,55 @@ This tracks the **public SDK surface** (`LocalLMLabSDKCore`, `LocalLMLabSDKInfer
 maps to a GitHub Release on `ancientcomputing/locallm` (tag `v<version>`); the xcframework
 checksums live on the release, not here.
 
-**1.0 requires macOS 27.** The macOS 26 `0.8.x` line (MCP client + connectors, no model layer) continues separately.
+**As of `1.0.0-beta.2`, the whole SDK builds for macOS 26** — the model layer works on
+macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-weight (MLX)
+models still need macOS 27. See the `1.0.0-beta.2` notes below and
+[`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
+
+## 1.0.0-beta.2 — 2026-09-02
+
+**The SDK now builds one app for macOS 26 and macOS 27.** `LocalLMLabSDKCore`,
+`LocalLMLabSDKInference`, and `LocalLMLabSDKComponents` all have a **macOS 26 deployment
+floor**. Register `SystemModelProvider()` always and the macOS-27-only providers inside one
+`if #available(macOS 27, *)` block; `makeSession`, `respond`, `events`, connectors, MCP, and
+the pickers are identical code on both OSes.
+
+### Breaking
+
+- **`ClaudeModelProvider` moved to a new `LocalLMLabSDKClaude.xcframework`** — a third binary
+  on the release. It can't live in the macOS-26-floored Core because
+  `ClaudeForFoundationModels` is hard-pinned to macOS 27. If you use Claude: add the
+  `LocalLMLabSDKClaude` binaryTarget (keyed off the same `LOCALLM_SDK_VERSION`), `import
+  LocalLMLabSDKClaude`, and accept a **macOS 27** deployment target on the target that links
+  it. To ship a macOS 26 app *and* offer Claude, put the Claude path in a separate 27-only
+  target (the LocalLM Lab app splits its `--serve` helper this way).
+- **`ModelProvider` protocol**: `languageModel(for:) -> any LanguageModel` →
+  `makeSession(for:tools:instructions:transcript:) -> LanguageModelSession`. Apple's
+  `LanguageModel` protocol is macOS 27; having the provider build its own session is what
+  lets the model layer run on macOS 26. Only affects custom `ModelProvider` conformances —
+  `lab.makeSession(route:…)` is unchanged.
+
+### Added
+
+- **`ModelAvailability.UnavailableKind.requiresOS(String)`** + **`ModelRegistry.schemesRequiringNewerOS`**.
+  On macOS 26, `lab.models.availability(for: .pcc)` returns `.requiresOS("macOS 27")`.
+- **`ModelPickerView`** shows PCC / Claude / MLX as disabled "Requires macOS 27" rows on
+  macOS 26. New `init(registry:selection:show27OnlyModels: Bool = true)` to hide them.
+- **`examples/os-matrix`** — one `.macOS("26.0")` CLI that runs on both OSes, no source `#if`.
+
+### Fixed
+
+- FoundationModels errors that surfaced as *"The operation couldn't be completed. (…error -1.)"*
+  now decode to the real cause (context overflow / guardrail / assets unavailable / …) on
+  both macOS 26 and macOS 27.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip       e3e687e503d3c563e6548b472dc8eb415475f0402845e9b4a56c58c15105c974
+LocalLMLabSDKClaude-1.0.0-beta.2.xcframework.zip     fd0489be28f6c1dc589161d978ef39718605c01483eebd0efc29e206e406525f
+LocalLMLabSDKInference-1.0.0-beta.2.xcframework.zip  728bc399a96a851f1e46c6f709684133f40dc09b067a0717e1898ab11156e8a8
+```
 
 ## 1.0.0-beta.1 — 2026-08-30
 
