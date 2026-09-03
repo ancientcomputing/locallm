@@ -25,6 +25,13 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
 LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix
 ```
 
+> **`error: package … tools version 6.4.0 … installed version is 6.3.3`** — your Swift
+> toolchain is older than the one this manifest was cut with. The tools version tracks the
+> toolchain (Xcode / swift.org), not macOS. The manifest uses no 6.4-only features, so the
+> quick fix is to edit line 1 of `Package.swift` down to your installed version
+> (`// swift-tools-version: 6.3`). The alternative is a newer toolchain — a standalone Swift
+> 6.4 toolchain from swift.org runs fine on macOS 26; no OS upgrade needed.
+
 ### On macOS 26
 
 ```
