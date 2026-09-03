@@ -16,8 +16,8 @@ The zip and its checksum are checked into this folder — one per release. Grab
 them by cloning the repo, or download a single file raw, e.g.:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.1-arm64.zip
-curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.1-arm64.zip.sha256
+curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.2-arm64.zip
+curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.2-arm64.zip.sha256
 ```
 
 Older releases (`0.6`–`0.8`) are alongside it in this folder.
@@ -25,13 +25,13 @@ Older releases (`0.6`–`0.8`) are alongside it in this folder.
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-1.0.0-beta.1-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-1.0.0-beta.2-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-1.0.0-beta.1-arm64.zip
+unzip localai-toolkit-1.0.0-beta.2-arm64.zip
 ```
 
 This produces `localai-cli` and `localai-playground-run`. Keep the two
