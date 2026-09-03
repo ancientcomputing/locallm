@@ -61,6 +61,26 @@ func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
 
 /// Ctrl-C policy: the first press during a turn cancels *that turn* and drops back to the
 /// prompt; a press at an idle prompt — or a second press during a turn — quits.
+/// Watch SIGINT on a background dispatch queue so the handler fires even while the main
+/// thread is parked in `readLine()`. Built in a *non-isolated* function on purpose: a
+/// closure formed in `@MainActor` scope gets inferred as main-actor-isolated, and the
+/// Dispatch runtime then asserts it runs on the main queue — it doesn't, so the process
+/// traps in `_dispatch_assert_queue_fail`. Keeping this here makes the handler plainly
+/// `@Sendable`. It only touches `Interrupt` (Sendable), `note`, and `exit`.
+func startSigintWatch(_ interrupt: Interrupt) -> any DispatchSourceSignal {
+    signal(SIGINT, SIG_IGN)
+    let src = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
+    src.setEventHandler {
+        if interrupt.fire() {
+            note("\nquitting…")
+            exit(130)  // process is going away; no @MainActor cleanup to do
+        }
+        note("\n^C  interrupting this turn — Ctrl-C again to quit")
+    }
+    src.resume()
+    return src
+}
+
 final class Interrupt: @unchecked Sendable {
     private let lock = NSLock()
     private var turn: Task<Void, Never>?
@@ -171,20 +191,8 @@ func run() async {
     }
 
     // Ctrl-C: first press cancels the running turn, a press at an idle prompt quits.
-    // SIG_IGN + a DispatchSource on a background queue so the handler runs even while
-    // the main thread is parked in readLine().
     let interrupt = Interrupt()
-    signal(SIGINT, SIG_IGN)
-    let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
-    sigint.setEventHandler {
-        if interrupt.fire() {
-            note("\nquitting…")
-            session.cancel()
-            exit(130)
-        }
-        note("\n^C  interrupting this turn — Ctrl-C again to quit")
-    }
-    sigint.resume()
+    let sigint = startSigintWatch(interrupt)
 
     // One turn: stream the model's answer to stdout. streamResponse yields snapshots that
     // are *usually* append-only — but not across a tool call, and not when a reasoning
