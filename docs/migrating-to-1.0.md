@@ -2,8 +2,8 @@
 
 1.0 (`1.0.0-beta.N`, `1.0.0` at GA) has a **macOS 26 deployment floor** as of `1.0.0-beta.2`.
 One app runs on macOS 26 and macOS 27 from a single build — Private Cloud Compute, Claude, and
-open-weight (MLX) models are simply absent on 26. (The MCP-only `0.8.x` line still continues
-separately for consumers that don't want the model layer at all.)
+open-weight (MLX) models are simply absent on 26. (The `0.8.x` SDK series — MCP client and
+connectors, no model layer — continues separately for consumers that don't want it.)
 
 The jump from `0.8.x` is **mostly additive**: the MCP client, the connectors, and Keychain
 storage work the same. What's new is the model layer; what can break your build is one
@@ -48,7 +48,7 @@ Several enums are now **non-frozen** — a minor version can add a case. If your
 over one of these *exhaustively* (no `default`), the compiler now requires `@unknown default`:
 
 - `MCPConnectionStatus`, `MCPServerError` — existed in `0.8.x`; **this is the only source-break
-  for an MCP-only consumer.**
+  if you use just the MCP client.**
 - `ModelAvailability`, `ResidencyEvent`, `SessionEvent`, `DownloadEvent` — new in 1.0.
   (`ModelAvailability.UnavailableKind` gained a `.requiresOS(String)` case in `1.0.0-beta.2`;
   `@unknown default` already covers it.)

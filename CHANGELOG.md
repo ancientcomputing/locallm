@@ -125,8 +125,8 @@ been here since `0.7.0`. Full walkthrough: [`docs/sdk-guide.md` §6a](docs/sdk-g
 
 ## 0.8.0 — 2026-08-24
 
-- The macOS 26 `0.8.x` line. MCP client + connectors + Keychain storage. `LocalLMLabSDKCore` only.
-- Continues for consumers that don't need macOS 27.
+- The macOS 26 `0.8.x` series. MCP client + connectors + Keychain storage. `LocalLMLabSDKCore` only.
+- Continues for consumers that don't want the model layer.
 
 ## 0.7.1 — 2026-08-16
 
