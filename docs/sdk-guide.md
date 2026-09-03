@@ -81,6 +81,52 @@ If you also want the prebuilt SwiftUI pieces (MCP server picker, OAuth waiting v
 prompt browsing), add `Components` the same way — see [`examples/components-demo`](../examples/components-demo)
 for a working example of using it.
 
+### 1a. Targeting macOS 26 and macOS 27 from one build
+
+As of `1.0.0-beta.2`, `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`
+all have a **macOS 26 deployment floor**. One app, one link, runs on both — with the model
+families that need macOS 27 (Private Cloud Compute, open-weight / MLX) simply absent on 26. The
+`#available` check is one block, at provider registration; everything after it is identical code.
+
+```swift
+import LocalLMLabSDKCore
+#if canImport(LocalLMLabSDKInference)
+import LocalLMLabSDKInference
+#endif
+
+@MainActor
+func makeLab() -> LocalLMLab {
+    var providers: [any ModelProvider] = [SystemModelProvider()]   // Apple on-device — 26 + 27
+    if #available(macOS 27, *) {
+        providers.append(PCCModelProvider())                       // Private Cloud Compute
+        #if canImport(LocalLMLabSDKInference)
+        providers.append(MLXModelProvider())                       // open-weight / MLX
+        #endif
+    }
+    return LocalLMLab(configuration: .init(providers: providers))
+}
+
+// identical on 26 and 27:
+let lab = makeLab()
+lab.models.route("chat", to: .system)
+let session = try lab.makeSession(route: "chat", tools: myTools, instructions: "…")
+let answer = try await session.respond(to: prompt)
+```
+
+- On macOS 26, `lab.models.availability(for: .pcc)` returns
+  `.unavailable(kind: .requiresOS("macOS 27"), …)`, and `lab.models.schemesRequiringNewerOS`
+  lists the schemes (`pcc`, `claude`, `mlx`) that would work on 27. `Components`'
+  `ModelPickerView` renders those as disabled "Requires macOS 27" rows automatically — pass
+  `show27OnlyModels: false` to hide them instead.
+- Linking `LocalLMLabSDKInference` on macOS 26 is fine; you just can't register
+  `MLXModelProvider` there (guard it behind `#available(macOS 27, *)`).
+- **Claude is the exception.** `LocalLMLabSDKClaude` (a separate binaryTarget on the same
+  release — see §6a) depends on `ClaudeForFoundationModels`, which is hard-pinned to macOS 27,
+  so linking it forces a **macOS 27 deployment target** on whatever links it. To ship a macOS 26
+  app *and* offer Claude, put the Claude path in a separate macOS-27-only executable/helper the
+  way the LocalLM Lab app does (its `--serve` helper is split into a 27 binary and a 26 binary,
+  chosen at launch). `Core`'s public API is identical on both sides of that boundary.
+
 ## 2. Required setup before you can use Calendar/Reminders or MCP OAuth
 
 Three things are **required**, not optional extras — skipping any one of them produces a confusing
@@ -527,8 +573,11 @@ both if you don't want to write your own.
 
 ## 6a. The model layer: local models, routing, sessions
 
-New in 1.0 (which requires macOS 27). Everything above is the MCP client — usable on its own with
-Apple's `SystemLanguageModel` and nothing else. The **model layer** is what you reach for when
+New in 1.0. Everything above is the MCP client — usable on its own with Apple's
+`SystemLanguageModel` and nothing else. The model layer builds on a **macOS 26** floor; Private
+Cloud Compute and open-weight (MLX) models need macOS 27, and Claude needs a macOS-27 target
+(see [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build)). The **model layer** is what you
+reach for when
 "which model" becomes a real question in your app: you want to offer a locally-run open-weight
 model *and* Apple's on-device model *and* Claude behind one API, let the user (or your own
 logic) switch between them, keep one warm between turns, and show download / memory state in
@@ -555,9 +604,11 @@ public and usable without it.
 ```swift
 let lab = LocalLMLab(configuration: .init(providers: [
     SystemModelProvider(),
-    ClaudeModelProvider(auth: .apiKey(myKeyFromKeychain)),
-    MLXModelProvider(),                     // from LocalLMLabSDKInference — see below
+    ClaudeModelProvider(auth: .apiKey(myKeyFromKeychain)),   // from LocalLMLabSDKClaude (macOS 27 target)
+    MLXModelProvider(),                                      // from LocalLMLabSDKInference — see below
 ]))
+// To also run on macOS 26, register only SystemModelProvider() unconditionally and the
+// rest inside `if #available(macOS 27, *)` — see §1a.
 
 lab.models      // the @Observable ModelRegistry — providers, routes, residency, downloads
 lab.mcp         // MCPServerManager, unchanged from 0.8.x
@@ -577,16 +628,26 @@ survive a relaunch. → *code-buddy builds `LocalLMLab` with two providers and m
 "a source of language models" — you register the ones you want, and the registry resolves a
 `ModelID` to whichever provider owns its `scheme`:
 
-| Provider | Ships in | `scheme` | For |
-|---|---|---|---|
-| `SystemModelProvider` | Core | `system` | Apple's on-device model — always there on an Apple-Intelligence Mac |
-| `PCCModelProvider` | Core | `pcc` | Apple's Private Cloud Compute model — **not functional in `1.0.0-beta.1`**; a session routed to `pcc` fails. Fix targeted for a later release. |
-| `ClaudeModelProvider(auth:)` | Core | `claude` | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
-| `MLXModelProvider` | **Inference** | `mlx` | Locally-run open-weight models (Qwen, Llama, …) via MLX |
+| Provider | Ships in | `scheme` | macOS | For |
+|---|---|---|---|---|
+| `SystemModelProvider` | Core | `system` | 26+ | Apple's on-device model — always there on an Apple-Intelligence Mac |
+| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model — **not functional yet**; a session routed to `pcc` fails. Fix targeted for a later release. |
+| `ClaudeModelProvider(auth:)` | **`LocalLMLabSDKClaude`** | `claude` | 27 | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
+| `MLXModelProvider` | **Inference** | `mlx` | 27 | Locally-run open-weight models (Qwen, Llama, …) via MLX |
+
+`LocalLMLabSDKClaude` is a third binaryTarget on the SDK release (`ClaudeForFoundationModels` is
+macOS-27-pinned, so it can't live in the macOS-26-floored Core). Register the 27-only providers
+inside `if #available(macOS 27, *)` — [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build).
+On macOS 26 `lab.models.availability(for:)` reports those schemes as
+`.unavailable(kind: .requiresOS("macOS 27"), …)` and `lab.models.schemesRequiringNewerOS` lists
+them.
 
 `ModelProvider` is a protocol — **implement it yourself when** you have a model source the SDK
-doesn't ship (a remote inference endpoint, a different local runtime). The registry only ever
-talks to the protocol.
+doesn't ship (a remote inference endpoint, a different local runtime). Its one core requirement
+is `makeSession(for:tools:instructions:transcript:) -> LanguageModelSession` — the provider
+builds the Apple session for its model (this is what lets the model layer run on macOS 26,
+where Apple's `LanguageModel` protocol doesn't exist). The registry only ever talks to the
+protocol.
 
 ### `RouteName` + routing — pick a model without hardcoding one
 
@@ -727,8 +788,9 @@ hours) that will eventually fill the model's context window.
 `.available` · `.notDownloaded` (offer a download button) · `.needsCredential` (prompt for the
 API key) · `.unavailable(kind:detail:)` where `kind` is machine-readable
 (`.ineligibleHardware`, `.notEnabled`, `.modelNotReady`, `.unsupportedModel`, `.providerError`,
-`.noProvider`) so you can branch without parsing `detail`. Components' `ModelPickerView` binds
-to this directly.
+`.noProvider`, `.requiresOS(String)`) so you can branch without parsing `detail`.
+`.requiresOS("macOS 27")` is what `pcc` / `claude` / `mlx` return on macOS 26. Components'
+`ModelPickerView` binds to this directly (disabled "Requires macOS 27" rows).
 
 ### `WorkspaceAccess` + the Workspace tools — let the model touch files
 
@@ -1321,6 +1383,8 @@ struct LocalLMLabState: Codable, Sendable, Equatable {
     func register(_ provider: any ModelProvider) throws  // throws .schemeAlreadyRegistered
     func provider(for id: ModelID) -> (any ModelProvider)?
     func availability(for id: ModelID) -> ModelAvailability
+    static let macOS27OnlySchemes: Set<String>          // ["pcc", "claude", "mlx"]
+    var schemesRequiringNewerOS: [String] { get }       // on macOS 26: the above, minus any registered
     var downloadableProviders: [any DownloadableModelProvider] { get }
     var installedModels: [InstalledModel] { get }
     var knownModels: [ModelID] { get }                  // union of providers' advertisedModels
@@ -1333,7 +1397,8 @@ enum ModelRegistryError: Error, Equatable, CustomStringConvertible { case scheme
 protocol ModelProvider: Sendable {
     static var scheme: String { get }
     func owns(_ id: ModelID) -> Bool                    // default: id.scheme == Self.scheme
-    func languageModel(for id: ModelID) throws -> any LanguageModel
+    func makeSession(for id: ModelID, tools: [any Tool], instructions: String?,
+                     transcript: Transcript?) throws -> LanguageModelSession
     func availability(for id: ModelID) -> ModelAvailability
     func prewarm(_ id: ModelID) async                   // no-op default
     var advertisedModels: [ModelID] { get }             // [] default
@@ -1347,15 +1412,18 @@ protocol DownloadableModelProvider: ModelProvider {
     var storageUsed: Int64 { get }
     var residencyEventStream: AsyncStream<ResidencyEvent>? { get }                      // nil default
 }
-struct SystemModelProvider: ModelProvider { init() }
-struct PCCModelProvider: ModelProvider { init() }
+struct SystemModelProvider: ModelProvider { init() }                    // Core
+@available(macOS 27, *) struct PCCModelProvider: ModelProvider { init() }   // Core
+
+// --- ClaudeModelProvider — LocalLMLabSDKClaude (separate xcframework, macOS 27) ---
 struct ClaudeModelProvider: ModelProvider {
     enum Auth: Sendable { case apiKey(String); case appAttest(clientID: String) }
     init(auth: ClaudeModelProvider.Auth, extraModels: [String: ClaudeModelSpec] = [:])
 }
 struct ClaudeModelSpec: Sendable, Hashable { /* one Claude model — id, display name, context window */ }
 
-// --- MLXModelProvider — LocalLMLabSDKInference (separate xcframework) ---------
+// --- MLXModelProvider — LocalLMLabSDKInference (separate xcframework, macOS 27) ---
+@available(macOS 27, *)
 struct MLXModelProvider: DownloadableModelProvider {
     static var scheme: String { "mlx" }
     init(cacheDirectory: URL? = nil, residentModelLimit: Int = 1, preflightLimits: MLXPreflightLimits = .init())
@@ -1363,7 +1431,8 @@ struct MLXModelProvider: DownloadableModelProvider {
     var advertisedModels: [ModelID] { get }
     var installed: [InstalledModel] { get }
     var storageUsed: Int64 { get }
-    func languageModel(for id: ModelID) throws -> any LanguageModel
+    func makeSession(for id: ModelID, tools: [any Tool], instructions: String?,
+                     transcript: Transcript?) throws -> LanguageModelSession
     func availability(for id: ModelID) -> ModelAvailability
     func prewarm(_ id: ModelID) async
     func download(_ repoID: String) -> AsyncThrowingStream<DownloadEvent, any Error>
@@ -1395,6 +1464,7 @@ enum ModelAvailability: Sendable, Equatable {
     case unavailable(kind: UnavailableKind, detail: String)
     enum UnavailableKind: Sendable, Equatable {
         case ineligibleHardware, notEnabled, modelNotReady, unsupportedModel, providerError, noProvider
+        case requiresOS(String)   // e.g. .requiresOS("macOS 27") — returned on macOS 26 for pcc/claude/mlx
     }
     var isAvailable: Bool { get }
 }
@@ -1485,8 +1555,10 @@ enum LocalLMLabError: Error, LocalizedError {   // the one public error type the
 enum LocalLMLabSDKVersion { static let current: String }   // "1.0.0-beta.N", "1.0.0" at GA
 ```
 
-`MLXModelProvider` / `MLXPreflightLimits` are in **`LocalLMLabSDKInference`** (a separate
-xcframework — §1); `ModelPickerView` / `ClaudeAuthField` are in **`LocalLMLabSDKComponents`** (§11).
+`MLXModelProvider` / `MLXPreflightLimits` are in **`LocalLMLabSDKInference`** and
+`ClaudeModelProvider` / `ClaudeModelSpec` in **`LocalLMLabSDKClaude`** (each a separate
+xcframework on the same release — §1a); `ModelPickerView` / `ClaudeAuthField` are in
+**`LocalLMLabSDKComponents`** (§11).
 
 ### Connectors (Calendar, Reminders, Contacts, Location)
 
@@ -1934,10 +2006,11 @@ struct MCPPromptsView: View {
 
 // Model layer (1.0)
 struct ModelPickerView: View {
-    init(registry: ModelRegistry, selection: Binding<ModelID?>)
+    init(registry: ModelRegistry, selection: Binding<ModelID?>, show27OnlyModels: Bool = true)
     // Lists registry.knownModels; each row shows availability (grayed + reason for .unavailable),
     // a download button + progress for .notDownloaded, storage size. Binds to the @Observable
-    // registry directly — no polling.
+    // registry directly — no polling. On macOS 26, show27OnlyModels: true adds disabled
+    // "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
 }
 struct ClaudeAuthField: View {
     init(apiKey: Binding<String>, onCommit: @escaping () -> Void = {})

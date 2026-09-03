@@ -1184,7 +1184,8 @@ await run()
 **Tally**: of ~160 lines of actual code, ~22 touch the SDK — and that ~22 is the *entire* model
 layer: pick providers, name routes, preflight/download, make a session, stream it, watch
 `.events`. Everything MLX-specific is four lines (`MLXModelProvider`, `validate`, `download`,
-and the import); swap those for `ClaudeModelProvider` and the rest of the file is unchanged.
+and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude` instead (a macOS-27
+target — see `sdk-guide.md` §1a) and the rest of the file is unchanged.
 `RouteName` is the only new type the caller names by hand. The REPL loop and Ctrl-C handling add
 no SDK surface — one persistent `LocalLMLabSession` spans every turn, and `session.cancel()` /
 Task cancellation is the whole cancel story.
