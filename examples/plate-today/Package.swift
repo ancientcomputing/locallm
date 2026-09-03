@@ -94,7 +94,7 @@ if includeTodoist { swiftSettings.append(.define("PLATETODAY_INCLUDE_TODOIST")) 
 
 let package = Package(
     name: "PlateToday",
-    platforms: [.macOS("27.0")],
+    platforms: [.macOS("26.0")],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",

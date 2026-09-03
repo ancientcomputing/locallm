@@ -76,7 +76,7 @@ if includeContacts { swiftSettings.append(.define("PLATETODAYTOOLS_INCLUDE_CONTA
 
 let package = Package(
     name: "PlateTodayTools",
-    platforms: [.macOS("27.0")],
+    platforms: [.macOS("26.0")],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",

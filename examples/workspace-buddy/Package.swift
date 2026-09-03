@@ -65,7 +65,7 @@ guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
 
 let package = Package(
     name: "WorkspaceBuddy",
-    platforms: [.macOS("27.0")],
+    platforms: [.macOS("26.0")],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",

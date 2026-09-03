@@ -46,6 +46,10 @@ the pickers are identical code on both OSes.
 - FoundationModels errors that surfaced as *"The operation couldn't be completed. (…error -1.)"*
   now decode to the real cause (context overflow / guardrail / assets unavailable / …) on
   both macOS 26 and macOS 27.
+- `plate-today`, `plate-today-tools`, `repo-qa`, `workspace-buddy` had a `.macOS("27.0")`
+  platform floor but use only the on-device system model — they now build with a
+  `.macOS("26.0")` floor and launch on macOS 26. The `*-local` examples and `code-buddy`
+  stay macOS 27 (they run open-weight models via MLX).
 
 ### Checksums (SHA-256)
 
