@@ -59,8 +59,6 @@ func parseArgs() -> Options {
 
 func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
 
-/// Ctrl-C policy: the first press during a turn cancels *that turn* and drops back to the
-/// prompt; a press at an idle prompt — or a second press during a turn — quits.
 /// Watch SIGINT on a background dispatch queue so the handler fires even while the main
 /// thread is parked in `readLine()`. Built in a *non-isolated* function on purpose: a
 /// closure formed in `@MainActor` scope gets inferred as main-actor-isolated, and the
@@ -81,6 +79,8 @@ func startSigintWatch(_ interrupt: Interrupt) -> any DispatchSourceSignal {
     return src
 }
 
+/// Ctrl-C policy: the first press during a turn cancels *that turn* and drops back to the
+/// prompt; a press at an idle prompt — or a second press during a turn — quits.
 final class Interrupt: @unchecked Sendable {
     private let lock = NSLock()
     private var turn: Task<Void, Never>?
@@ -136,7 +136,7 @@ func run() async {
     }
 
     // Tools: Core Workspace tools + host Process tools + (auto) MCP session tools.
-    var tools: [any Tool] = [
+    let tools: [any Tool] = [
         WorkspaceTreeTool(root: root),
         SearchWorkspaceTool(root: root),
         ReadWorkspaceFileTool(root: root),
