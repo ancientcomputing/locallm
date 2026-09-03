@@ -631,7 +631,7 @@ survive a relaunch. → *code-buddy builds `LocalLMLab` with two providers and m
 | Provider | Ships in | `scheme` | macOS | For |
 |---|---|---|---|---|
 | `SystemModelProvider` | Core | `system` | 26+ | Apple's on-device model — always there on an Apple-Intelligence Mac |
-| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model — **not functional yet**; a session routed to `pcc` fails. Fix targeted for a later release. |
+| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model (Apple's own models, not your weights). Needs the PCC entitlement + App Store Small Business Program — there is no paid tier. Since `1.0.0-beta.3` the provider maps availability, quota, and typed errors cleanly, and adds `probe(timeout:)` — an async liveness check (`availability(for:)` alone can say `.available` while turns still throw on a build without the entitlement). |
 | `ClaudeModelProvider(auth:)` | **`LocalLMLabSDKClaude`** | `claude` | 27 | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
 | `MLXModelProvider` | **Inference** | `mlx` | 27 | Locally-run open-weight models (Qwen, Llama, …) via MLX |
 
@@ -1413,7 +1413,10 @@ protocol DownloadableModelProvider: ModelProvider {
     var residencyEventStream: AsyncStream<ResidencyEvent>? { get }                      // nil default
 }
 struct SystemModelProvider: ModelProvider { init() }                    // Core
-@available(macOS 27, *) struct PCCModelProvider: ModelProvider { init() }   // Core
+@available(macOS 27, *) struct PCCModelProvider: ModelProvider {           // Core
+    init()
+    func probe(timeout: Duration = .seconds(8)) async -> ModelAvailability // authoritative PCC liveness check (beta.3+)
+}
 
 // --- ClaudeModelProvider — LocalLMLabSDKClaude (separate xcframework, macOS 27) ---
 struct ClaudeModelProvider: ModelProvider {

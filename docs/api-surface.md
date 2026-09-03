@@ -532,6 +532,7 @@ public var advertisedModels: [ModelID]
 public func owns(_ id: ModelID) -> Bool
 public func makeSession(for id: ModelID, tools: [any Tool], instructions: String?, transcript: Transcript?) throws -> LanguageModelSession
 public func availability(for id: ModelID) -> ModelAvailability
+public func probe(timeout: Duration = .seconds(8)) async -> ModelAvailability
 public enum RemindersAccess
 public static var authorizationStatus: EKAuthorizationStatus
 public static var isAuthorized: Bool
