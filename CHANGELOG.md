@@ -10,6 +10,39 @@ macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
 
+## 1.0.0-beta.3 — 2026-09-03
+
+**Private Cloud Compute provider, rebuilt.** `PCCModelProvider` now maps the real
+`FoundationModels.PrivateCloudComputeLanguageModel` surface (macOS 27) — availability,
+quota, and typed errors — to clean `ModelAvailability` values instead of letting an opaque
+"routed to `pcc` fails" reach the host (roadmap items 10/14).
+
+> **On PCC access:** Apple's PCC tier is free but gated — your shipping app needs the
+> **Private Cloud Compute entitlement**, enrollment in the **App Store Small Business
+> Program**, and fewer than 2M first-time downloads. There is no paid tier. See
+> [`developer.apple.com/private-cloud-compute`](https://developer.apple.com/private-cloud-compute/).
+> The SDK exposes PCC as one `ModelProvider` alongside `system` / `claude` / `mlx`; it does
+> not run your own models on PCC (Apple exposes no such API).
+
+### Added
+
+- **`PCCModelProvider.probe(timeout:)`** — an `async` liveness check. `availability(for:)`
+  reads only the synchronous `PrivateCloudComputeLanguageModel.availability`, which on some
+  Developer-ID builds reports `.available` while every turn still throws at request time.
+  `probe()` runs one minimal request and maps the outcome — a typed
+  `PrivateCloudComputeLanguageModel.Error` **or** the opaque `ModelManagerError` 1046
+  ("The model service failed") — to a `ModelAvailability`. Hosts that gate a `pcc` route
+  should call this and cache the verdict.
+- **`availability(for: .pcc)`** now folds in `PrivateCloudComputeLanguageModel.quotaUsage`:
+  a spent free-tier quota reports `.unavailable(kind: .providerError)` with the reset date
+  rather than `.available`.
+
+### Changed
+
+- **`GenerationErrorDescription`** gains a dedicated arm for
+  `PrivateCloudComputeLanguageModel.Error`: a spent-quota failure now names its reset date
+  and the Small Business Program gate instead of rendering as a thin `LocalizedError`.
+
 ## 1.0.0-beta.2 — 2026-09-02
 
 **The SDK now builds one app for macOS 26 and macOS 27.** `LocalLMLabSDKCore`,
