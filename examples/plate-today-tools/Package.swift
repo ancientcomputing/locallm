@@ -35,6 +35,10 @@ let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-beta.1": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.1/LocalLMLabSDKCore-1.0.0-beta.1.xcframework.zip",
         checksum: "0b4ab34e474d1acd725161cfb591cf3d862a7529fe7c9dbadf01eece3ad1590f"
+    ),
+    "1.0.0-beta.2": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
+        checksum: "e3e687e503d3c563e6548b472dc8eb415475f0402845e9b4a56c58c15105c974"
     )
 ]
 
@@ -72,7 +76,7 @@ if includeContacts { swiftSettings.append(.define("PLATETODAYTOOLS_INCLUDE_CONTA
 
 let package = Package(
     name: "PlateTodayTools",
-    platforms: [.macOS("27.0")],
+    platforms: [.macOS("26.0")],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
