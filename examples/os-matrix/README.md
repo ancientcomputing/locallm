@@ -47,7 +47,29 @@ macOS 26: open-weight (MLX) model download is unavailable — needs macOS 27.
 ### On macOS 27
 
 Same binary: `system` and `pcc` report `available`, `mlx` reports `not downloaded`, and the
-open-weight-model download path is offered.
+run ends by pointing at `--download`.
+
+### `--download` — pull an open-weight model (macOS 27 only)
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
+```
+
+This calls `try await lab.models.startDownload("mlx-community/Qwen3-4B-4bit")` — an `async`
+method on `lab.models` (`ModelRegistry`). **There is no CLI for it in the SDK**; you call it
+from Swift (this example runs it when you pass `--download`; a real app calls it from a
+"Download" button). It fetches the MLX-format weights from Hugging Face (2–5 GB) into the
+local cache. After it resolves, that `mlx:` id reports `.available` and you can route a
+session to it:
+
+```swift
+lab.models.route("chat", to: ModelID("mlx:mlx-community/Qwen3-4B-4bit")!)
+let session = try lab.makeSession(route: "chat")
+```
+
+`lab.models.downloads` (`[ModelID: Double]`, observable) is what a picker binds to for a
+progress bar. On macOS 26, `--download` prints "needs macOS 27" and exits.
 
 ## The four scenarios, and where each shows up here
 
