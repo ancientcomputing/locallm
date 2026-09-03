@@ -29,6 +29,9 @@ the user picks which in the **AI Models** screen:
 | **Claude** (`claude`) | Anthropic's Claude, once an API key is set in the app. |
 | **A local open-weight model** (`mlx:<hf-repo>`) | Any MLX-format Hugging Face model the user adds via **AI Models → Add model**; downloaded once, then run locally. |
 
+On **macOS 26** only **Apple on-device** (`system`) is available — Private Cloud
+Compute, Claude, and open-weight (MLX) models need macOS 27.
+
 `localai-cli` reads that choice from the config file (below) — there is no
 `--model` flag. To change which model your scripts use, change the default
 in **AI Models**; the next `localai-cli` call picks it up.

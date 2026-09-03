@@ -9,7 +9,7 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 ## What's in this repo
 
 - **[toolkit/](toolkit/)** — the `localai-cli` toolkit (zip + `.sha256`), one per
-  release, checked in here. Latest: `localai-toolkit-1.0.0-beta.1-arm64.zip`. Full CLI
+  release, checked in here. Latest: `localai-toolkit-1.0.0-beta.2-arm64.zip`. Full CLI
   reference: [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
 - **[examples/](examples/)** — Code samples, split by feature:
   - **api-lab/** — Scripts and a sample chat app for the API Lab feature
