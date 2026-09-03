@@ -67,14 +67,10 @@ func run() async throws {
 
     // ── Scenario 2 again: the hint, when --download wasn't passed ──────────────────────────
     if #available(macOS 27, *), !lab.models.downloadableProviders.isEmpty {
-        print("""
-
-        Open-weight (MLX) models are available on macOS 27. Download and run one with:
-          swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
-        In code that's `try await lab.models.startDownload("<hugging-face-repo-id>")` — an
-        async call your app makes (e.g. from a "Download" button). There is no CLI for it in
-        the SDK; `lab.models.downloads` is the observable a picker binds to for a progress bar.
-        """)
+        print("")
+        print("Open-weight (MLX) models are available on macOS 27. Download and run one with:")
+        print("  swift run OSMatrix --download mlx-community/Qwen3-4B-4bit")
+        print("In code that's `try await lab.models.startDownload(\"<hugging-face-repo-id>\")` — an async call your app makes (e.g. from a \"Download\" button). There is no CLI for it in the SDK; `lab.models.downloads` is the observable a picker binds to for a progress bar.")
     } else {
         print("\nOpen-weight (MLX) models need macOS 27 — unavailable here.")
     }
