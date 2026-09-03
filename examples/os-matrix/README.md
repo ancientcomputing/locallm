@@ -1,10 +1,33 @@
 # os-matrix — one SDK build for macOS 26 and macOS 27
 
-`swift run OSMatrix` on a macOS 26 machine and a macOS 27 machine. Same binary, different
-behaviour — no `#if os` / no separate build, just `#available` at provider registration.
+Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different behaviour — no
+`#if os`, no separate build, just one `#available` check at provider registration.
+
+## Requirements
+
+- **Apple Silicon**, macOS **26 or 27**.
+- **Xcode 27 beta to build** — `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
+  The binary *runs* on macOS 26, but it's compiled with the macOS 27 SDK (the macOS-27-only
+  symbols are weak-linked). A stable Xcode fails with `'v27' is unavailable`.
+- **Apple Intelligence enabled** (System Settings → *Apple Intelligence & Siri*). Without it,
+  `system` reports unavailable and the prompt step errors — the availability table still prints.
+- **Network** for the `getWeather` tool (it calls Open-Meteo, a public API — no key). Offline,
+  the tool returns an error and the run continues.
+- No code signing or permission prompts — `ClockTool` and `WeatherTool` need no TCC access.
+
+## Run
+
+`Package.swift` resolves the SDK as a binary dependency and **requires an explicit
+`LOCALLM_SDK_VERSION`** (it fails fast otherwise, listing the versions this copy knows about):
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix
+```
+
+### On macOS 26
 
 ```
-$ swift run OSMatrix          # on macOS 26
 Running on macOS 26.x.x
 
 Model families:
@@ -21,36 +44,37 @@ Asking the on-device model (with tools) …
 macOS 26: open-weight (MLX) model download is unavailable — needs macOS 27.
 ```
 
-On macOS 27 the same binary prints `system` + `pcc` as `available`, `mlx` as `not
-downloaded`, and offers the MLX download path.
+### On macOS 27
+
+Same binary: `system` and `pcc` report `available`, `mlx` reports `not downloaded`, and the
+open-weight-model download path is offered.
 
 ## The four scenarios, and where each shows up here
 
 | # | Scenario | In this example |
 |---|---|---|
 | 1 | **Same code, both OSes** | `lab.makeSession(route:) → session.respond(to:)` — identical on 26 and 27. |
-| 2 | **A macOS-27-only feature** | The MLX open-weight-model download, gated by `if #available(macOS 27, *)`. |
-| 3 | **A feature that works on both** | `ClockTool()` + `WeatherTool()` — Core's ready-made connector tools are all `@available(macOS 26)`. |
+| 2 | **A macOS-27-only feature** | The open-weight (MLX) model download, gated by `if #available(macOS 27, *)`. |
+| 3 | **A feature that works on both** | `ClockTool()` + `WeatherTool()` — the ready-made connector tools are all `@available(macOS 26)`. |
 | 4 | **More on 27 than on 26** | `SystemModelProvider` is registered always; `PCCModelProvider` + `MLXModelProvider` only inside the one `#available` block. `lab.models.availability(for:)` reports the rest `.requiresOS("macOS 27")`. |
 
 The `#available` check appears **once**, at registration. Everything downstream —
 `makeSession`, `respond`, `events`, `contextBudget`, the connector tools — is the same code.
 
-## Adding Claude (scenario 4, the LocalLM Lab app situation)
+## Adding Claude
 
-`LocalLMLabSDKClaude` depends on `ClaudeForFoundationModels`, which is hard-pinned to a
-macOS 27 platform floor. Linking it forces a **27 deployment target** on whatever target
-links it — so you can't add it to this `.macOS("26.0")` package directly.
+`LocalLMLabSDKClaude` depends on `ClaudeForFoundationModels`, which requires macOS 27. Linking
+it forces a **27 deployment target** on whatever target links it — so you can't add it to
+this `.macOS("26.0")` package directly.
 
-Two ways to offer Claude anyway:
+Two ways to offer Claude:
 
-1. **Your whole app is macOS 27+.** Add the `Claude` package, register
-   `ClaudeModelProvider(auth: .apiKey(key))` alongside the others. Done.
+1. **Your whole app is macOS 27+.** Add the `LocalLMLabSDKClaude` binary target (from the same
+   SDK release), `import LocalLMLabSDKClaude`, and register
+   `ClaudeModelProvider(auth: .apiKey(key))` alongside the others.
 
 2. **Your app runs on macOS 26 too** (this example's situation). Put the Claude path in a
-   separate macOS-27-only executable — a helper the main app spawns, or an
-   `@available(macOS 27)`-gated plugin bundle it `dlopen`s. The main app stays `.macOS("26.0")`;
-   `Core`'s public API (`ModelProvider`, `makeSession`, `LocalLMLabSession`) is identical on
-   both sides of that boundary, so only the *registration* differs. The LocalLM Lab app does
-   exactly this: its `--serve` helper is a 27 binary (system/PCC/Claude/MLX) and a 26 binary
-   (system only), chosen at launch.
+   separate macOS-27-only executable — a background helper the main app runs, or a 27-gated
+   bundle it loads at runtime. The main app stays `.macOS("26.0")`; the SDK's public API
+   (`ModelProvider`, `makeSession`, `LocalLMLabSession`) is identical on both sides of that
+   boundary, so only the *registration* differs.
