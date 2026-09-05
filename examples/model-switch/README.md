@@ -61,22 +61,23 @@ rough, and `⌘,` for the Providers screen may not register (use the toolbar but
 
 ## Real build: `packaging/build-and-sign.sh`
 
-Produces a signed, notarizable `Model Switch.app`. No entitlements and no TCC prompts — the app
-only makes outbound HTTPS calls — so this is purely to get a proper bundle.
+Produces a proper `Model Switch.app` bundle. No entitlements, no system-permission prompts —
+the app only makes outbound HTTPS calls — so with no `APP_IDENTITY` it signs **ad-hoc** and the
+`.app` runs on this Mac:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-NOTARIZE_APP=0 \
-./packaging/build-and-sign.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
 ```
+
+To sign it for wider use, set `APP_IDENTITY` — see the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ### Environment variables
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
-| `APP_IDENTITY` | Yes | — | A valid codesigning identity (`security find-identity -v -p codesigning`). `SIGN_IDENTITY` also works. |
+| `APP_IDENTITY` | No | ad-hoc | Any codesigning identity, or unset for a local ad-hoc build. See the [signing table](../README.md#signing-a-app--app_identity). |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | `0` skips Apple notarization for fast local sign-and-test. The output isn't Gatekeeper-approved without it (`spctl` rejects it) — fine for direct-launch testing, not distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works. |

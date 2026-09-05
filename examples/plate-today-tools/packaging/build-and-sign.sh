@@ -13,7 +13,7 @@ APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APP_NAME="Plate Today (Tools)"
 VERSION="${VERSION:-0.1.0}"
-APP_IDENTITY="${APP_IDENTITY:-${SIGN_IDENTITY:-}}"
+APP_IDENTITY="${APP_IDENTITY:-${SIGN_IDENTITY:--}}"
 KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE:-${NOTARY_PROFILE:-}}"
 DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 TEAM_ID="${TEAM_ID:-}"
@@ -77,7 +77,18 @@ notarize_and_wait() {
   fi
 }
 
-require_env APP_IDENTITY "$APP_IDENTITY"
+if [[ "$APP_IDENTITY" == "-" ]]; then
+  ADHOC=1
+  SIGN_FLAGS=""            # ad-hoc: no hardened runtime (it rejects the Team-signed SDK frameworks
+  NOTARIZE_APP=0           # under an ad-hoc outer signature) and no secure timestamp
+  echo "APP_IDENTITY not set - signing ad-hoc. The .app runs on THIS Mac only: Gatekeeper rejects"
+  echo "an ad-hoc app anywhere else, and TCC / App Sandbox grants are unreliable. Set APP_IDENTITY"
+  echo "to any codesigning identity (a free 'Apple Development' cert from Xcode > Settings >"
+  echo "Accounts works) to fix that; a Developer ID + NOTARIZE_APP=1 to distribute."
+else
+  ADHOC=0
+  SIGN_FLAGS="--options runtime --timestamp"
+fi
 if [[ "$NOTARIZE_APP" == "1" ]]; then
   require_env KEYCHAIN_PROFILE "$KEYCHAIN_PROFILE"
 fi
@@ -89,8 +100,8 @@ require_command spctl
 require_command xcrun
 require_command python3
 
-if ! security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >/dev/null 2>&1; then
-  echo "APP_IDENTITY is not installed or is not valid for codesigning: $APP_IDENTITY" >&2
+if [[ "$ADHOC" == "0" ]] && ! security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >/dev/null 2>&1; then
+  echo "APP_IDENTITY is not a valid codesigning identity: $APP_IDENTITY" >&2
   security find-identity -v -p codesigning || true
   exit 1
 fi
@@ -212,9 +223,9 @@ echo "Signing app bundle..."
 # dropping entitlements applied a moment earlier if --entitlements isn't repeated here. Confirmed
 # the hard way.
 # failure-mode writeup.
-codesign --force --options runtime --timestamp --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
-codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/PlateTodayTools"
-codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"
+codesign --force $SIGN_FLAGS --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
+codesign --force $SIGN_FLAGS --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/PlateTodayTools"
+codesign --force $SIGN_FLAGS --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"
 
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 

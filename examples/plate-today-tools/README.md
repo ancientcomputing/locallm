@@ -71,11 +71,13 @@ Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today
 ## Real build: `packaging/build-and-sign.sh`
 
 Same script shape as `plate-today`'s — Calendar/Reminders TCC prompts and the Todoist OAuth flow
-both require a properly signed `.app`, not a bare `swift build` binary.
+both need a signed `.app`. A **free "Apple Development"** identity is enough; a Developer ID is
+only for distribution. See the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
 ```

@@ -66,11 +66,14 @@ if you need to point at a different server for testing.
 ## Real build: `packaging/build-and-sign.sh`
 
 The only way to actually exercise the Calendar/Reminders TCC prompts or the Todoist OAuth flow —
-both require a properly signed `.app` with entitlements and Info.plist usage-description keys.
+both need a signed `.app` with entitlements and Info.plist keys. A **free "Apple Development"**
+identity is enough (an ad-hoc build won't hold the permission grants); a Developer ID is only
+needed to distribute. See the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
 ```
@@ -80,7 +83,7 @@ NOTARIZE_APP=0 \
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by `Package.swift` (not the script) — set it to build against a different published release. |
-| `APP_IDENTITY` | Yes | — | Must match a valid codesigning identity in your keychain (`security find-identity -v -p codesigning`). `SIGN_IDENTITY` also works as a fallback name. |
+| `APP_IDENTITY` | Yes | — | A codesigning identity — a **free** "Apple Development" one works. See the [signing table](../README.md#signing-a-app--app_identity). `SIGN_IDENTITY` also works as a fallback name. |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |

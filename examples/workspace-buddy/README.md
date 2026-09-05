@@ -82,11 +82,12 @@ Unlike the CLI examples, this is a sandboxed SwiftUI `.app`, and the whole point
 security-scoped bookmark surviving relaunch — only means anything with the sandbox on and the
 `com.apple.security.files.user-selected.read-write` entitlement in place. A bare `swift run`
 gets neither, so it's compile-only. The real build is `packaging/build-and-sign.sh`, which needs
-a **Developer ID Application** signing identity in your keychain
-(`security find-identity -v -p codesigning`):
+a signing identity — a **free "Apple Development"** one is enough (an ad-hoc build won't hold the
+sandbox grant); a Developer ID is only for distribution. See the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
   ./packaging/build-and-sign.sh
 ```

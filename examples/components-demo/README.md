@@ -52,11 +52,12 @@ the packaged build below to test it as a real, distributable `.app`.
 
 ## Real build: `packaging/build-and-sign.sh`
 
+With no `APP_IDENTITY` this signs **ad-hoc** and the `.app` runs on this Mac; set `APP_IDENTITY`
+to sign it for wider use — see the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
+
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-NOTARIZE_APP=0 \
-./packaging/build-and-sign.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
 ```
 
 ### Environment variables
@@ -64,7 +65,7 @@ NOTARIZE_APP=0 \
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
-| `APP_IDENTITY` | Yes | — | Must match a valid codesigning identity in your keychain (`security find-identity -v -p codesigning`). `SIGN_IDENTITY` also works as a fallback name. |
+| `APP_IDENTITY` | No | ad-hoc | Any codesigning identity, or unset for a local ad-hoc build. See the [signing table](../README.md#signing-a-app--app_identity). |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |

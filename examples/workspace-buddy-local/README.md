@@ -68,11 +68,12 @@ This just proves it builds. To *actually run* it you need a signed, sandboxed `.
 
 Like `workspace-buddy`, a bare `swift run` gets you neither the sandbox nor the
 `files.user-selected` entitlement, so it's compile-only. The real build is
-`packaging/build-and-sign.sh`, which needs a **Developer ID Application** signing identity in your
-keychain (`security find-identity -v -p codesigning`):
+`packaging/build-and-sign.sh`, which needs a signing identity — a **free "Apple Development"** one
+is enough (an ad-hoc build won't hold the sandbox grant); a Developer ID is only for
+distribution. See the [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
   ./packaging/build-and-sign.sh
 ```

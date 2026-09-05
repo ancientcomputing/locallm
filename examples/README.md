@@ -47,19 +47,49 @@ stable Xcode fails with `'v27' is unavailable`).
 The examples on this `1.0.0-beta` branch build against SDK **`1.0.0-beta.3`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
 
+### What each example needs
+
+| Example | Kind | `swift run` (or Xcode ▸ Run) | To get a real `.app` (`packaging/build-and-sign.sh`) |
+|---|---|---|---|
+| `repo-qa`, `code-buddy`, `os-matrix` | CLI | ✅ the whole example | — (no `packaging/`) |
+| `components-demo`, `model-switch` | SwiftUI, no system permissions | ✅ window opens (bundle-less: no Dock icon, `⌘,` may not work) | **any** identity, or **none** — see the table below |
+| `plate-today`, `plate-today-tools` | SwiftUI + Calendar / Reminders / Contacts | compiles, but the permission prompts are denied to an unsigned binary | **a signing identity is required** — a **free** "Apple Development" one works |
+| `workspace-buddy`, `workspace-buddy-local` | SwiftUI + App Sandbox | same as `plate-today` | same as `plate-today` |
+
+"Apple Development" = the free identity Xcode creates once you add any Apple ID under
+**Xcode ▸ Settings ▸ Accounts**. No paid Apple Developer account, no Developer ID certificate.
+
 ### In Xcode
 
 1. Get the code: `git clone https://github.com/ancientcomputing/locallm`, or **Code ▸ Download
    ZIP** on GitHub and unzip.
-2. **File ▸ Open** → `examples/<name>/Package.swift`. Xcode resolves the SDK binary automatically.
-3. Choose the scheme (named after the example) and press **Run**.
-   - CLI examples (`repo-qa`, `code-buddy`, `os-matrix`, …) take arguments — set them under
-     **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
-   - The SwiftUI apps (`plate-today`, `plate-today-tools`, `components-demo`, `model-switch`) open
-     a window. For the ones that touch Calendar / Reminders / Contacts, Xcode signs the run with
-     your team automatically — **a free Apple ID is enough**. A paid Apple Developer account and a
-     *Developer ID* certificate are needed only to **notarize a build for distribution** (each
-     app's `packaging/build-and-sign.sh`), never just to try it.
+2. **File ▸ Open** → `examples/<name>/Package.swift`. Xcode resolves the SDK binary automatically —
+   no `LOCALLM_SDK_VERSION`.
+3. Choose the scheme (named after the example) and press **Run**. Xcode signs the run with your
+   team automatically (add an Apple ID under **Settings ▸ Accounts** if you haven't). CLI
+   examples take arguments — **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
+
+### Signing a `.app` — `APP_IDENTITY`
+
+`packaging/build-and-sign.sh` reads `APP_IDENTITY`. What each value does:
+
+| `APP_IDENTITY` | Paid account? | Where the `.app` runs | Notarize? |
+|---|---|---|---|
+| unset (or `-`) | no | **this Mac only** — ad-hoc signature; Gatekeeper rejects it elsewhere, and Calendar / Reminders / Contacts / Sandbox grants are unreliable | no (`NOTARIZE_APP` forced to `0`) |
+| `Apple Development: NAME (TEAMID)` | no (free) | **this Mac only** — but with working system-permission prompts. `spctl` still flags it "not notarized"; harmless for your own machine | no |
+| `Developer ID Application: NAME (TEAMID)` | **yes** ($99/yr) | **anywhere**, once notarized — add `NOTARIZE_APP=1` and `KEYCHAIN_PROFILE` | yes |
+
+`security find-identity -v -p codesigning` lists the identities installed on your Mac — use one
+of those strings verbatim.
+
+```bash
+cd examples/model-switch
+# no account — local ad-hoc build:
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
+# free Apple ID:
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  APP_IDENTITY="Apple Development: Your Name (TEAMID)" NOTARIZE_APP=0 ./packaging/build-and-sign.sh
+```
 
 ### From the command line
 
