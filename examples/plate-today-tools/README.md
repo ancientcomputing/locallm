@@ -34,25 +34,35 @@ and see exactly what Path A saves and what it costs — every difference is mark
 [`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own);
 [`docs/annotated-examples.md`](../../docs/annotated-examples.md) walks both apps' full source.
 
-**What you'll see** is identical to `plate-today` — the same permission prompts, Todoist sign-in,
-and paragraph summary. See
-[that README's "What you'll see"](../plate-today/README.md#what-youll-see).
+## What you'll see
+
+Identical to `plate-today` (see [that README's "What you'll see"](../plate-today/README.md#what-youll-see)
+for the same list). Running a signed build (`packaging/build-and-sign.sh`, below — a plain
+`swift run` can't get real Calendar/Reminders/OAuth access):
+
+1. **Launch.** macOS asks for **Calendar** then **Reminders** access — allow both. (If built with
+   `PLATETODAYTOOLS_INCLUDE_CONTACTS=1`, it also asks for **Contacts** here — see below.)
+2. **A browser window opens** for Todoist sign-in and consent (first run only; the token is
+   reused until you press Done).
+3. **The model works for a few seconds**, then a plain-language paragraph appears: today's
+   meetings, what's due, what's overdue — from all sources at once, not one at a time.
+4. **Done** clears the screen and signs out of Todoist.
 
 Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
 
 ## Requires macOS 27 + the Xcode 27 beta
 
-This branch tracks `1.0.0-beta.1`. `Package.swift` is
+This branch tracks `1.0.0-beta.3`. `Package.swift` is
 `platforms: [.macOS("27.0")]`. Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`); a stable Xcode fails with
 `'v27' is unavailable`. (The ready-made connector `Tool`s this example depends on first shipped
-in `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)
+in `0.8.0`, but on macOS 27 you use `1.0.0-beta.3+`.)
 
 ## Getting the SDK
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift build
 ```
 
 Same `LOCALLM_SDK_VERSION` mechanism as `plate-today` — see that example's README for the general
@@ -66,7 +76,7 @@ both require a properly signed `.app`, not a bare `swift build` binary.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
+LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -76,6 +86,46 @@ Same environment variables as `plate-today`'s `build-and-sign.sh` (see that READ
 the `PLATETODAY_*` prefix replaced by `PLATETODAYTOOLS_*` (`PLATETODAYTOOLS_INCLUDE_LOCATION_WEATHER`,
 `PLATETODAYTOOLS_INCLUDE_CONTACTS`, `PLATETODAYTOOLS_INCLUDE_TODOIST`, `PLATETODAYTOOLS_APP_SANDBOX`)
 so both apps can be installed and configured side by side without their build-time flags colliding.
+
+## Trying the Contacts enrichment (opt-in)
+
+Like [`plate-today`](../plate-today/README.md#trying-the-contacts-enrichment-opt-in), this app has
+an opt-in Contacts tool the model calls *on its own* when a calendar event or reminder names a
+specific person — it's registered but never named in the prompt. Here it's Core's ready-made
+`SearchContactsTool()` (Path A), not a hand-written one.
+
+**The one behavioral difference from `plate-today`:** this app requests Contacts access **up
+front**, alongside Calendar and Reminders, before it builds the tools array — so the Contacts
+permission prompt appears **at launch**, not mid-run. (That's the Path A pattern in general —
+`plate-today`'s hand-written tools each call `requestAccess()` lazily inside their own `call()`.)
+
+**Build it in** — pass `PLATETODAYTOOLS_INCLUDE_CONTACTS=1` to `build-and-sign.sh`; it adds the
+`NSContactsUsageDescription` string and the `com.apple.security.personal-information.addressbook`
+entitlement for you:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.3 \
+APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+NOTARIZE_APP=0 PLATETODAYTOOLS_INCLUDE_CONTACTS=1 \
+./packaging/build-and-sign.sh
+```
+
+**Set up a run that will actually trigger it:**
+
+1. In **Contacts.app**, make sure there's a person you'll recognize in a summary — add one if
+   needed, with a name plus an email, phone, or organization.
+2. In **Calendar.app**, create an event **for today** whose title names that person —
+   e.g. *"Coffee with Jane Smith"* — or add them as an invitee.
+3. Launch the signed build. macOS asks for **Calendar**, **Reminders**, **and Contacts** at
+   launch — allow all three.
+4. When the summary comes back it's enriched: *"…your 10am coffee with Jane Smith (jane@acme.com)…"*
+   instead of just *"coffee with Jane Smith"* — *if* the model chose to look Jane up. Nothing on
+   today's calendar naming a contact means the tool goes uncalled and the summary is unchanged;
+   that's expected.
+
+**Reset the grant between runs** with
+`tccutil reset AddressBook lab.locallm.sdk.reference.platetodaytools`.
 
 ## Mac App Store build: `packaging/build-and-sign-mas.sh`
 

@@ -64,7 +64,7 @@ xcodebuild -downloadComponent MetalToolchain
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
+export LOCALLM_SDK_VERSION=1.0.0-beta.3
 ```
 
 - `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
@@ -152,7 +152,7 @@ That's the point: the model layer is a swap-in, not a rewrite.
 ## Verified live
 
 ```
-model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-beta.1
+model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-beta.3
 Connecting to Deepwiki…
 Skipping read_wiki_contents: excluded by this example.
 Built 2 tool(s) from Deepwiki's live schema: ask_question, read_wiki_structure

@@ -25,7 +25,7 @@ Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta 
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.1`, which needs macOS 27. Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.3`, which needs macOS 27. Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
 `'v27' is unavailable`. Nothing to download by hand — `Package.swift` (both this app's and the
 sibling [`Components`](../../Components/) package it depends on) requires an explicit
@@ -33,14 +33,14 @@ sibling [`Components`](../../Components/) package it depends on) requires an exp
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift build
 ```
 
 ## Quick dev-loop run
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run
 ```
 
 Unlike `plate-today`, this app needs no TCC entitlements to function — the MCP server picker
@@ -52,7 +52,7 @@ the packaged build below to test it as a real, distributable `.app`.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
+LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh

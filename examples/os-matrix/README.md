@@ -22,7 +22,7 @@ Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different beha
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run OSMatrix
 ```
 
 > **`error: package … tools version 6.4.0 … installed version is 6.3.3`** — your Swift
@@ -60,7 +60,7 @@ run ends by pointing at `--download`.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
 ```
 
 This calls `try await lab.models.startDownload("mlx-community/Qwen3-4B-4bit")` — an `async`

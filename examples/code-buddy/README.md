@@ -101,7 +101,7 @@ few `public` functions, none with doc comments.
 
 ```bash
 # in locallm/examples/code-buddy/
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declaration"
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declaration"
 ```
 
 - `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
@@ -128,7 +128,7 @@ Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
 ### All options
 
 ```
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> [task...]
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run CodeBuddy [options] <workspace-dir> [task...]
 
   --route heavy|light   which model (default: heavy)
   --heavy <hf-repo>     model for .heavy   (default: mlx-community/Qwen3-8B-4bit)
@@ -163,7 +163,7 @@ xcodebuild -downloadComponent MetalToolchain
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
+export LOCALLM_SDK_VERSION=1.0.0-beta.3
 ```
 
 - `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell. Skip it only if
