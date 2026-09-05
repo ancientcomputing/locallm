@@ -17,6 +17,7 @@ examples/plate-today/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.pn
 examples/plate-today-tools/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
 examples/workspace-buddy/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
 examples/components-demo/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
+examples/model-switch/packaging/Resources/Assets.xcassets/AppIcon.appiconset/*.png
 tmp/
 %SystemDrive%/
 .DS_Store
