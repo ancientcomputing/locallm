@@ -10,6 +10,11 @@ import LocalLMLabSDKCore
 // - MCPResourcesView / MCPPromptsView: read an enabled resource / expand an enabled prompt from a
 //   connected server — the "extract value, not just plumbing" half of the MCP client, callback-
 //   based so the host app decides what "attach"/"use" means for its own UI.
+// - ModelPickerView: binds to lab.models (@Observable ModelRegistry) — lists knownModels with
+//   availability badges; a "downloaded models / add from Hugging Face / progress" section that
+//   renders only when a DownloadableModelProvider is registered (C2-absent builds compile and
+//   render without it). ClaudeAuthField: API-key entry, value handed to the host, not persisted.
 //
 // Aggregate context-budget display (LocalLM Lab's own "Context budget" section, beyond the
-// per-server counts already shown here) isn't here yet.
+// per-server counts already shown here) isn't here yet — see
+// locallmlab-sdk/docs/07-release-roadmap.md phase 5's capability audit.
