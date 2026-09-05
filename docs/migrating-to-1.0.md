@@ -20,27 +20,36 @@ to build: the xcframeworks are compiled with the macOS 27 SDK (27-only symbols w
 a stable Xcode fails with `'v27' is unavailable`. Register the macOS-27-only providers behind
 `if #available(macOS 27, *)` — see [`sdk-guide.md` §1a](sdk-guide.md).
 
-## 2. Point `knownSDKReleases` at the new release
+## 2. Point your manifest at the new release
+
+The `examples/*/Package.swift` files resolve each SDK module as a `binaryTarget` off a URL +
+checksum, keyed by version. A newer version is a new entry:
 
 ```swift
-"1.0.0-beta.2": SDKRelease(
-    url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
-    checksum: "<from the release's .sha256 asset>"
+"1.0.0-beta.3": SDKRelease(
+    url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
+    checksum: "<the .sha256 asset next to the zip on that release>"
 ),
 ```
 
-The release now carries **three** xcframeworks (all on the one tag):
+The example manifests build against `defaultSDKVersion` with no environment variable (so
+"clone, open in Xcode, Run" works); `LOCALLM_SDK_VERSION` overrides it from a shell. Your own
+app's manifest can do the same, or just hardcode one `binaryTarget(url:checksum:)`.
+
+The release carries **four** xcframeworks (all on the one tag):
 
 | xcframework | link it when | floor |
 |---|---|---|
 | `LocalLMLabSDKCore` | always | macOS 26 |
 | `LocalLMLabSDKInference` | you run open-weight / MLX models | macOS 26 (register `MLXModelProvider` only on 27) |
-| `LocalLMLabSDKClaude` | you offer Claude | **macOS 27** — forces a 27 deployment target on whatever links it |
+| `LocalLMLabSDKClaude` | you offer Claude via Foundation Models | **macOS 27** — forces a 27 deployment target on whatever links it |
+| `LocalLMLabSDKRemote` | you offer online providers (GPT / Claude online / OpenRouter) | macOS 26 manifest floor; `RemoteModelProvider` is `@available(macOS 27)` |
 
 `ClaudeModelProvider` moved out of Core into `LocalLMLabSDKClaude` (its dependency
 `ClaudeForFoundationModels` is macOS-27-pinned). See
-[`examples/code-buddy/Package.swift`](../examples/code-buddy/Package.swift) for the multi-binary
-manifest shape.
+[`examples/code-buddy/Package.swift`](../examples/code-buddy/Package.swift) (Core + Inference)
+and [`examples/model-switch/Package.swift`](../examples/model-switch/Package.swift) (Remote +
+`Components`) for the multi-binary manifest shapes.
 
 ## 3. The one thing that can break your build: non-frozen enums
 

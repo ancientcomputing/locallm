@@ -39,22 +39,23 @@ Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently t
 
 This branch tracks `1.0.0-beta.3` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
-`'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` requires an
-explicit `LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency from there:
+`'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` resolves
+`LocalLMLabSDKCore` as a binary dependency, building against `1.0.0-beta.3` by default:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
 ```
 
-Omitting `LOCALLM_SDK_VERSION`, or setting an unknown version, fails fast with a clear error
-listing the versions this copy knows about — see `Package.swift` itself for the current table.
+Set `LOCALLM_SDK_VERSION` to build against a different published release — from a shell, not
+inside Xcode (its package resolution doesn't see shell environment variables). See
+[`../README.md`](../README.md#building--running-an-sdk-example) for the CLI / Xcode workflows and
+how to change the SDK version.
 
 ## Quick dev-loop run (no signing, no TCC/OAuth)
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run
+swift run
 ```
 
 Fast, but **cannot** get real Calendar/Reminders access (no code signing means TCC denies bare CLI
@@ -69,7 +70,6 @@ both require a properly signed `.app` with entitlements and Info.plist usage-des
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -79,7 +79,7 @@ NOTARIZE_APP=0 \
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LOCALLM_SDK_VERSION` | Yes | — | Read by `Package.swift`, not the script itself — but `swift build` (which the script calls) fails without it. |
+| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by `Package.swift` (not the script) — set it to build against a different published release. |
 | `APP_IDENTITY` | Yes | — | Must match a valid codesigning identity in your keychain (`security find-identity -v -p codesigning`). `SIGN_IDENTITY` also works as a fallback name. |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
@@ -126,7 +126,6 @@ entitlement for you:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 PLATETODAY_INCLUDE_CONTACTS=1 \
 ./packaging/build-and-sign.sh

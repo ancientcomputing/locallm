@@ -61,13 +61,12 @@ in `0.8.0`, but on macOS 27 you use `1.0.0-beta.3+`.)
 ## Getting the SDK
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
 ```
 
-Same `LOCALLM_SDK_VERSION` mechanism as `plate-today` — see that example's README for the general
-shape. Omitting it, or requesting a version this file doesn't know about, fails fast with a clear
-error rather than resolving to some default.
+Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today` — set
+`LOCALLM_SDK_VERSION` in a shell to pin another release, or see
+[`../README.md`](../README.md#building--running-an-sdk-example).
 
 ## Real build: `packaging/build-and-sign.sh`
 
@@ -76,7 +75,6 @@ both require a properly signed `.app`, not a bare `swift build` binary.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -105,7 +103,6 @@ entitlement for you:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 PLATETODAYTOOLS_INCLUDE_CONTACTS=1 \
 ./packaging/build-and-sign.sh

@@ -73,12 +73,6 @@ require_command spctl
 require_command xcrun
 require_command python3
 
-if [[ -z "${LOCALLM_SDK_VERSION:-}" ]]; then
-  echo "LOCALLM_SDK_VERSION is required (Package.swift resolves the SDK binaries from it)." >&2
-  echo "e.g. LOCALLM_SDK_VERSION=1.0.0-beta.3 $0" >&2
-  exit 1
-fi
-
 if ! security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >/dev/null 2>&1; then
   echo "APP_IDENTITY is not installed or is not valid for codesigning: $APP_IDENTITY" >&2
   security find-identity -v -p codesigning || true

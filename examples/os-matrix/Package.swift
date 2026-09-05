@@ -8,7 +8,7 @@ import PackageDescription
 // pattern. See README.md for the four scenarios and the "Claude → separate 27-only target"
 // recipe.
 //
-// Links Core + Inference as binaryTargets. Set LOCALLM_SDK_VERSION explicitly.
+// Links Core + Inference as binaryTargets. Builds against `defaultSDKVersion`; LOCALLM_SDK_VERSION overrides from a shell.
 
 struct SDKRelease {
     let coreURL: String
@@ -16,6 +16,14 @@ struct SDKRelease {
     let inferenceURL: String
     let inferenceChecksum: String
 }
+
+// The SDK release these examples build against with no setup — what "clone, open in
+// Xcode, Run" uses. `knownSDKReleases` carries this plus the previous release. Build
+// against another published version: set LOCALLM_SDK_VERSION in your shell (works for
+// `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
+// release not listed, add its entry (URL + the `.sha256` next to the zip on the
+// GitHub release) or just replace the strings in place.
+let defaultSDKVersion = "1.0.0-beta.3"
 
 let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-beta.2": SDKRelease(
@@ -29,19 +37,14 @@ let knownSDKReleases: [String: SDKRelease] = [
         coreChecksum: "a276ab7bdbdaa2be64ccfda45e66eabeb22c33be3246a1bea53be8f5c8998592",
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip",
         inferenceChecksum: "d99aaa9fd703afe51bf9b6f5636819527ae001c5e07efe4e07159b824681dda2"
-    )
+    ),
 ]
 
 func failManifest(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(1)
 }
-guard let requested = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] else {
-    failManifest("""
-    error: LOCALLM_SDK_VERSION is not set. e.g. LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix
-    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    """)
-}
+let requested = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] ?? defaultSDKVersion
 guard let sdk = knownSDKReleases[requested] else {
     failManifest("error: Unknown LOCALLM_SDK_VERSION \"\(requested)\". Known: \(knownSDKReleases.keys.sorted().joined(separator: ", "))")
 }

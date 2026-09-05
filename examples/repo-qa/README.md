@@ -55,21 +55,17 @@ Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your term
 (it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
 Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
 
-**2. Set two environment variables** in the terminal you'll build from:
+**2. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.3
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
-  alone).
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download `LocalLMLabSDKCore.xcframework`
-  from. Omitting it fails fast with a clear error listing what it knows. (`MCPTool`, this app's
-  whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use `1.0.0-beta.3+`.)
-
-These last only for the current terminal — re-run step 2 in each new terminal (or add both
-`export` lines to your `~/.zshrc`).
+Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
+setup — `export LOCALLM_SDK_VERSION=<version>` here to pin a different published release.
+(`MCPTool`, this app's whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use
+`1.0.0-beta.3+`.)
 
 **3. Build:**
 

@@ -17,12 +17,12 @@ Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different beha
 
 ## Run
 
-`Package.swift` resolves the SDK as a binary dependency and **requires an explicit
-`LOCALLM_SDK_VERSION`** (it fails fast otherwise, listing the versions this copy knows about):
+`Package.swift` resolves the SDK as a binary dependency, building against `1.0.0-beta.3` by
+default (set `LOCALLM_SDK_VERSION` in a shell to pin another release — see
+[`../README.md`](../README.md#building--running-an-sdk-example)):
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run OSMatrix
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run OSMatrix
 ```
 
 > **`error: package … tools version 6.4.0 … installed version is 6.3.3`** — your Swift
@@ -60,7 +60,7 @@ run ends by pointing at `--download`.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
+swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
 ```
 
 This calls `try await lab.models.startDownload("mlx-community/Qwen3-4B-4bit")` — an `async`

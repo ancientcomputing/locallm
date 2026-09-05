@@ -60,18 +60,16 @@ it. One-time; safe to re-run:
 xcodebuild -downloadComponent MetalToolchain
 ```
 
-**3. Set two environment variables** in the terminal you'll build from:
+**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.3
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
-  alone).
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download. This example links
-  **two** binaries — `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the
-  MLX runtime) — from that one GitHub Release. Omitting it fails fast with a clear error.
+Leaves your system default alone; lasts only for the current terminal. `Package.swift` builds
+against SDK `1.0.0-beta.3` with no further setup — it links **two** binaries,
+`LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the MLX runtime), from
+that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
 
 These last only for the current terminal — re-run step 3 in each new terminal (or add both
 `export` lines to your `~/.zshrc`).

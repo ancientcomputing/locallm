@@ -22,6 +22,14 @@ struct SDKRelease {
 // Add an entry whenever a new Remote.xcframework release is published. The matching Core comes
 // from Components' own knownSDKReleases table for the same LOCALLM_SDK_VERSION — keep the two
 // in step.
+// The SDK release these examples build against with no setup — what "clone, open in
+// Xcode, Run" uses. `knownSDKReleases` carries this plus the previous release. Build
+// against another published version: set LOCALLM_SDK_VERSION in your shell (works for
+// `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
+// release not listed, add its entry (URL + the `.sha256` next to the zip on the
+// GitHub release) or just replace the strings in place.
+let defaultSDKVersion = "1.0.0-beta.3"
+
 let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-beta.3": SDKRelease(
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip",
@@ -34,14 +42,7 @@ func failManifest(_ message: String) -> Never {
     exit(1)
 }
 
-guard let requested = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] else {
-    failManifest("""
-    error: LOCALLM_SDK_VERSION is not set.
-    Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run ModelSwitch
-    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    """)
-}
+let requested = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] ?? defaultSDKVersion
 guard let sdk = knownSDKReleases[requested] else {
     failManifest("""
     error: Unknown LOCALLM_SDK_VERSION "\(requested)".
