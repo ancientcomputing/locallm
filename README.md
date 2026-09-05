@@ -18,17 +18,19 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
     directly (no HTTP server, subprocess + JSON on stdin/stdout).
   - **localai-cli-swift/** — The same examples in Swift.
   - **plate-today/**, **plate-today-tools/**, **repo-qa/**, **workspace-buddy/**,
-    **components-demo/**, and **code-buddy/** — reference apps for the LocalLM Lab
-    SDK, see below.
+    **components-demo/**, **code-buddy/**, **os-matrix/**, and **model-switch/** —
+    reference apps for the LocalLM Lab SDK, see below.
 - **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
   managing MCP servers, built on the SDK's public API.
 
 ## LocalLM Lab SDK
 
-> **1.0.0-beta — requires macOS 27** — adds the model layer: offer Apple's on-device model, Claude,
-> and locally-run open-weight (MLX) models behind one API. Requires the macOS 27 + Xcode 27
-> betas. Coming from `0.8.x`? See **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** —
-> it's mostly additive, with one enum-resilience compile caveat.
+> **1.0.0-beta — model layer builds for macOS 26 & 27** — offer Apple's on-device model, Private
+> Cloud Compute, Claude (Foundation Models *or* the online API), online providers (GPT /
+> OpenRouter / any OpenAI-compatible server, with provider-native web search), and locally-run
+> open-weight (MLX) models behind one API. `SystemModelProvider` works on macOS 26; the rest
+> need macOS 27. Coming from `0.8.x`? See **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)**
+> — it's mostly additive, with one enum-resilience compile caveat.
 
 Building your own native macOS app instead? `LocalLMLabSDKCore` links directly into your app's
 binary — Calendar/Reminders/Contacts/Location access, a full MCP client (tool discovery, OAuth,
@@ -75,6 +77,12 @@ for the full framing.
 - **[examples/code-buddy/](examples/code-buddy/)** — the model layer end to end: a CLI coding
   agent routing `.heavy` / `.light` to locally-run MLX models, with Core's Workspace tools and
   an MCP docs server.
+- **[examples/os-matrix/](examples/os-matrix/)** — one `.macOS("26.0")` CLI that runs on both
+  macOS 26 and 27 with no source `#if`, showing `ModelAvailability.requiresOS` gating.
+- **[examples/model-switch/](examples/model-switch/)** — the online / remote providers: add a
+  provider + API key, tick web search, and switch between every configured model (on-device,
+  PCC, Claude-4-FM, GPT, Claude online, OpenRouter) from one chat window. Uses `Components`'
+  `AIModelsSettingsView` for the settings panel.
 - **[docs/annotated-examples.md](docs/annotated-examples.md)** — every reference app's full
   source, with every SDK touchpoint marked inline.
 

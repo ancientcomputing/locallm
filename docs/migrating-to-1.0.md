@@ -105,6 +105,12 @@ locally-run open-weight (MLX) models behind one API, with routing and residency 
   `capabilityProbe`; `residentModelLimit`, `MLXPreflightLimits`, `residencyEventStream` for
   the memory story on a constrained Mac.
 
+Since `1.0.0-beta.3`, also **online providers** (`sdk-guide.md` §6b) — GPT, Claude's online
+Messages API, OpenRouter, or any OpenAI-compatible server, with provider-native web search,
+behind the same `lab.makeSession(route:)`. Add the `LocalLMLabSDKRemote` binaryTarget,
+`import LocalLMLabSDKRemote`, register `RemoteModelProvider(config)`. Nothing about the
+existing model layer changes.
+
 None of this is required — a `LanguageModelSession` you build yourself with Core's tools still
 works exactly as in `0.8.x`.
 
@@ -113,5 +119,6 @@ works exactly as in `0.8.x`.
 - The built app runs on **macOS 26 or 27**; building the SDK against `1.0` needs the **Xcode 27
   beta** until it GAs.
 - `1.0.0-beta.N` makes **no API-stability guarantee** — signatures can move between betas.
-- All three xcframeworks are Developer-ID-signed and notarized. SwiftPM still verifies them by
-  checksum; a consumer embedding them in a notarized app re-signs as part of its own build.
+- All xcframeworks (`Core`, `Claude`, `Inference`, `Remote`) are Developer-ID-signed and
+  notarized. SwiftPM still verifies them by checksum; a consumer embedding them in a notarized
+  app re-signs as part of its own build.

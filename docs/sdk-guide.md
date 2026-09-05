@@ -78,8 +78,15 @@ import LocalLMLabSDKCore
 ```
 
 If you also want the prebuilt SwiftUI pieces (MCP server picker, OAuth waiting view, resource/
-prompt browsing), add `Components` the same way — see [`examples/components-demo`](../examples/components-demo)
-for a working example of using it.
+prompt browsing, model picker, AI Models settings panel), add `Components` the same way — see
+[`examples/components-demo`](../examples/components-demo) for a working example of using it.
+
+There are five binaries on each release, all keyed off the same `LOCALLM_SDK_VERSION`; link
+only the ones you use: **`Core`** (always), **`Claude`** (Claude via Foundation Models —
+forces a macOS 27 target), **`Inference`** (local open-weight / MLX models), **`Remote`**
+(online providers — GPT / Claude online / OpenRouter, see §6b), and **`Components`** (SwiftUI,
+consumed as source). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
+(Remote + Components) are the multi-binary manifest shapes to copy from.
 
 ### 1a. Targeting macOS 26 and macOS 27 from one build
 
@@ -800,6 +807,56 @@ owns the security-scoped-bookmark bracket; the ready-made tools (`SearchWorkspac
 `ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`, `DeleteWorkspaceFileTool`)
 are FoundationModels `Tool`s you drop straight into `makeSession`. → *`code-buddy` and
 [`workspace-buddy`](../examples/workspace-buddy/) (the Core-only, no-MLX version) both use these.*
+
+## 6b. Online providers — GPT, Claude online, OpenRouter (`LocalLMLabSDKRemote`)
+
+**Reach for this when** you want a hosted model API — OpenAI, Anthropic's Messages API,
+OpenRouter, or any OpenAI-compatible server — behind the *same* `lab.makeSession(route:)` call
+site as the on-device and local models, ideally with the provider running web search for you.
+
+`LocalLMLabSDKRemote.xcframework` is a **4th binary** on the release, added the same way as
+`Inference` / `Claude` — a `binaryTarget` keyed off `LOCALLM_SDK_VERSION`. It has **no
+third-party dependencies** (pure `URLSession`). Its manifest floor is macOS 26, so linking it
+does **not** force a macOS 27 deployment target; `RemoteModelProvider` itself is
+`@available(macOS 27)` and reports `.requiresOS("macOS 27")` on 26 — so a macOS-26 app can link
+it and just not register it below 27.
+
+```swift
+import LocalLMLabSDKRemote
+
+// One data-driven config per provider. A preset fills in the dialect + base URL + auth shape;
+// YOU supply the model ids — the SDK ships none (which id is current/good is your call).
+var openai = RemoteProviderConfig.openAI(apiKey: key, models: [RemoteModel(id: "gpt-…")])
+openai.capabilities.insert(.webSearch)
+openai.defaultOptions.webSearch = true          // provider runs the search; no MCP needed
+
+lab.models.replace(RemoteModelProvider(openai)) // register / re-register at runtime
+lab.models.route("chat", to: ModelID(scheme: "openai", rest: "gpt-…")!)
+let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
+```
+
+- **`RemoteProviderConfig`** — `scheme`, `dialect` (`.openAIChat` / `.openAIResponses` /
+  `.anthropicMessages` / `.openAICompatible`), `baseURL`, `auth`, `models`, `capabilities`,
+  `defaultOptions`. No vendor is privileged — Claude-over-HTTP is just `dialect:
+  .anthropicMessages`. Presets: `.openAI`, `.openAIResponses`, `.anthropic`, `.openRouter`,
+  `.openAICompatible`.
+- **`RemoteModelProvider.probe(for:timeout:)`** — a **zero-token** check of key + model +
+  reachability. Returns `.available` / `.needsCredential` (401/403) / `.unsupportedModel`
+  (404 or absent from `GET /models`) / `.providerError` (429 / 5xx / timeout). Call it before
+  offering a provider — a hosted API has far more failure modes than a local model.
+- **`ModelRegistry.replace(_:)` / `.removeProvider(scheme:)`** — add, swap, or drop a provider
+  between sessions without rebuilding `LocalLMLab`.
+- **Web search** — set `capabilities.insert(.webSearch)` + `defaultOptions.webSearch = true`
+  (per-provider), or `SessionOptions(webSearch: true)` per turn. Works on OpenAI, Anthropic
+  Messages, OpenRouter, and `ClaudeModelProvider` (Foundation Models). `session.events`
+  yields `.serverToolCall` with the queries; `session.citations` carries the sources.
+
+**Settings UI:** `Components`' `AIModelsSettingsView` renders the whole "AI Models" panel
+(add provider + key, per-model rows, web-search toggle, Test connection). `Components` does
+**not** link `Remote` — it calls back through `onSave` / `onRemove` / `onTest` closures with
+plain `RemoteProviderDraft` / `ProviderTestOutcome` values, so a macOS-26 chooser can host the
+panel and hand the actual `RemoteModelProvider` work to a 27-only helper. → *the full pattern
+is [`examples/model-switch`](../examples/model-switch/).*
 
 ## 7. Connectors: Calendar, Reminders, Contacts, Location
 
