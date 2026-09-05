@@ -103,10 +103,10 @@ values instead of an opaque "routed to `pcc` fails" reaching the host (roadmap i
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       a276ab7bdbdaa2be64ccfda45e66eabeb22c33be3246a1bea53be8f5c8998592
-LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     75f446bbaf449f6dcee300f1d30637c384017ee84e1f5d62cf0167b2c382c2e9
-LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  d99aaa9fd703afe51bf9b6f5636819527ae001c5e07efe4e07159b824681dda2
-LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     12bb263dc4ffd5d05101d422fed0dbb67086412370d665f8c2427edd0aadd142
+LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       2600da14b13e3bfcf8d33491a5f4a8fb7406fc5d314a20ba491348a029898d8c
+LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     248e23d3c4836fb4d7018afdd8001cb8c7a3f207c4569bf98bd1738422150982
+LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  5ce9b4481f6509fffb460d45cf230d3e2711a01082ca779525363141c2e2646b
+LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     71edcf700058a1ca60f7aa101894e6219ef9a6e0d7f3a8ff1539f5e446e5d9dd
 ```
 
 ## 1.0.0-beta.2 — 2026-09-02
