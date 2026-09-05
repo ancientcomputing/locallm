@@ -38,6 +38,23 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
 Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published release — see
 [`../README.md`](../README.md#building--running-an-sdk-example).
 
+## Open in Xcode and Run
+
+A committed `ComponentsDemo.xcodeproj` is the fastest look:
+
+```bash
+open ComponentsDemo.xcodeproj
+```
+
+Pick the **ComponentsDemo** scheme and Run — a real `.app` (menu bar, Dock icon,
+`componentsdemo:` OAuth redirect scheme), ad-hoc signed for this Mac, the same local-run tier
+as `packaging/build-and-sign.sh` with `APP_IDENTITY` unset. Needs the Xcode 27 beta selected.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)
+— edit `project.yml`, not the `.xcodeproj`. To pin a different SDK release for the Xcode build,
+edit `defaultSDKVersion` in `../../Components/Package.swift` (Xcode ignores `LOCALLM_SDK_VERSION`).
+
 ## Quick dev-loop run
 
 ```bash
