@@ -74,7 +74,30 @@ macOS 27 you use `1.0.0-beta.3+`.)
 swift build
 ```
 
-This just proves it builds. To *actually run* it you need a signed `.app` — see below.
+This just proves it builds. To *actually run* it: open the Xcode project (next), or make a
+signed `.app` with `packaging/build-and-sign.sh` (further below).
+
+## Open in Xcode and Run
+
+A committed `WorkspaceBuddy.xcodeproj` is the lowest-friction way to try it:
+
+```bash
+open WorkspaceBuddy.xcodeproj
+```
+
+Pick the **WorkspaceBuddy** scheme and Run — a real sandboxed `.app` (menu bar, Dock icon, the
+`files.user-selected.read-write` entitlement), signed ad-hoc for this Mac. Click **Choose
+Folder…**, pick a throwaway directory, type a request, hit **Go**.
+
+One caveat specific to this example: an ad-hoc signature's identity changes on every rebuild, so
+a security-scoped bookmark saved by one build won't resolve after the next — you'll re-pick the
+folder each time you rebuild. To watch the bookmark genuinely survive a rebuild (the point of
+the example), set your team under the **WorkspaceBuddy** target ▸ **Signing & Capabilities** (a
+free personal Apple ID team is enough), or use `packaging/build-and-sign.sh` below.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,
+then `xcodegen generate`.
 
 ## Running it
 

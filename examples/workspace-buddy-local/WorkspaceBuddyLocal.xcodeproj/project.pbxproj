@@ -1,0 +1,349 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1E8259B6194EBC1274C309D6 /* WorkspaceBuddyLocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286ACDB54D928B5E3EB94233 /* WorkspaceBuddyLocalApp.swift */; };
+		C05EAF9EBFC11167BB717198 /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = 03B4B0362AF39CC6788EB66F /* LocalLMLabSDKCore */; };
+		DBC45C40C8D094BC496E406E /* LocalLMLabSDKInference in Frameworks */ = {isa = PBXBuildFile; productRef = D8BA76FAF426583B353364A0 /* LocalLMLabSDKInference */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		012FC0F8024E93BC5A91DB10 /* workspace-buddy-local */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "workspace-buddy-local"; path = .; sourceTree = SOURCE_ROOT; };
+		286ACDB54D928B5E3EB94233 /* WorkspaceBuddyLocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceBuddyLocalApp.swift; sourceTree = "<group>"; };
+		618664F841014BD290BB8AAB /* WorkspaceBuddyLocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WorkspaceBuddyLocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1CF14561F5A9CC296C66C3B7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C05EAF9EBFC11167BB717198 /* LocalLMLabSDKCore in Frameworks */,
+				DBC45C40C8D094BC496E406E /* LocalLMLabSDKInference in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		37527F7E4760AAF9147003BE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				618664F841014BD290BB8AAB /* WorkspaceBuddyLocal.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		51BCD23843BC284DD0BD943D /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				012FC0F8024E93BC5A91DB10 /* workspace-buddy-local */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		5C759046DAAB8FCF4F453EA2 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				D13F66A42B77EAC2DFF5D3CC /* WorkspaceBuddyLocal */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		CABE1BBA965BBC4653AF6C03 = {
+			isa = PBXGroup;
+			children = (
+				51BCD23843BC284DD0BD943D /* Packages */,
+				5C759046DAAB8FCF4F453EA2 /* Sources */,
+				37527F7E4760AAF9147003BE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D13F66A42B77EAC2DFF5D3CC /* WorkspaceBuddyLocal */ = {
+			isa = PBXGroup;
+			children = (
+				286ACDB54D928B5E3EB94233 /* WorkspaceBuddyLocalApp.swift */,
+			);
+			path = WorkspaceBuddyLocal;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1C338898E3828B213EBA07BF /* WorkspaceBuddyLocal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3100925B6089447B0A7684A1 /* Build configuration list for PBXNativeTarget "WorkspaceBuddyLocal" */;
+			buildPhases = (
+				61658ED033645755EC21B9CD /* Sources */,
+				1CF14561F5A9CC296C66C3B7 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WorkspaceBuddyLocal;
+			packageProductDependencies = (
+				03B4B0362AF39CC6788EB66F /* LocalLMLabSDKCore */,
+				D8BA76FAF426583B353364A0 /* LocalLMLabSDKInference */,
+			);
+			productName = WorkspaceBuddyLocal;
+			productReference = 618664F841014BD290BB8AAB /* WorkspaceBuddyLocal.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C76D6CA70CAEDA95C62F8C2D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					1C338898E3828B213EBA07BF = {
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 1871EB2F205C3FF0A32D08B5 /* Build configuration list for PBXProject "WorkspaceBuddyLocal" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = CABE1BBA965BBC4653AF6C03;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				031BC93D3DA35F55D08B5691 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 37527F7E4760AAF9147003BE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1C338898E3828B213EBA07BF /* WorkspaceBuddyLocal */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		61658ED033645755EC21B9CD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1E8259B6194EBC1274C309D6 /* WorkspaceBuddyLocalApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		06ED48EDC3D93DB34616758E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1FB5DA22274575E5FA4602C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = xcodeproj/WorkspaceBuddyLocal.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/WorkspaceBuddyLocal-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.workspacebuddylocal;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		AD04DCF4C1B9339F5D00811A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = xcodeproj/WorkspaceBuddyLocal.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/WorkspaceBuddyLocal-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.workspacebuddylocal;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		B959C0AE00B97485FEADD5FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1871EB2F205C3FF0A32D08B5 /* Build configuration list for PBXProject "WorkspaceBuddyLocal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B959C0AE00B97485FEADD5FC /* Debug */,
+				06ED48EDC3D93DB34616758E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3100925B6089447B0A7684A1 /* Build configuration list for PBXNativeTarget "WorkspaceBuddyLocal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AD04DCF4C1B9339F5D00811A /* Debug */,
+				1FB5DA22274575E5FA4602C7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		031BC93D3DA35F55D08B5691 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		03B4B0362AF39CC6788EB66F /* LocalLMLabSDKCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKCore;
+		};
+		D8BA76FAF426583B353364A0 /* LocalLMLabSDKInference */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKInference;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = C76D6CA70CAEDA95C62F8C2D /* Project object */;
+}

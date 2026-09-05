@@ -54,7 +54,7 @@ build against the latest stable release. No environment variable is needed for e
 | `repo-qa`, `code-buddy`, `os-matrix` | CLI | ✅ the whole example | — (no `packaging/`) |
 | `components-demo`, `model-switch` | SwiftUI, no system permissions | ✅ — real `.app` via the committed `.xcodeproj`; bundle-less via `Package.swift` / `swift run` | **any** identity, or **none** — see the table below |
 | `plate-today`, `plate-today-tools` | SwiftUI + Calendar / Reminders / Contacts | ✅ via the committed `.xcodeproj` (ad-hoc; set a team in Signing & Capabilities for reliable prompts). Bare `swift run` is denied the prompts. | **a signing identity is required** — a **free** "Apple Development" one works |
-| `workspace-buddy`, `workspace-buddy-local` | SwiftUI + App Sandbox | same as `plate-today` | same as `plate-today` |
+| `workspace-buddy`, `workspace-buddy-local` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` (ad-hoc; the security-scoped bookmark only survives a rebuild once you set a team in Signing & Capabilities). Bare `swift run` is compile-only. | same as `plate-today` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
 **Xcode ▸ Settings ▸ Accounts**. No paid Apple Developer account, no Developer ID certificate.
@@ -64,7 +64,8 @@ build against the latest stable release. No environment variable is needed for e
 1. Get the code: `git clone https://github.com/ancientcomputing/locallm`, or **Code ▸ Download
    ZIP** on GitHub and unzip.
 2. Open the project:
-   - **`components-demo`, `model-switch`, `plate-today`, `plate-today-tools`** ship a committed
+   - **The six SwiftUI examples** (`components-demo`, `model-switch`, `plate-today`,
+     `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`) ship a committed
      `.xcodeproj` — **File ▸ Open** → `examples/<name>/<Name>.xcodeproj`. Run gives a *real*
      `.app` (Dock icon, menu bar, `⌘,`, URL scheme, entitlements), ad-hoc signed for this Mac.
      The project is generated from `project.yml` with
@@ -73,10 +74,12 @@ build against the latest stable release. No environment variable is needed for e
    - **Every example** also opens as a package: **File ▸ Open** → `examples/<name>/Package.swift`.
      Run works, but a SwiftUI app runs bundle-less (no Dock icon, `⌘,` may not register).
    Either way Xcode resolves the SDK binary automatically — no `LOCALLM_SDK_VERSION`.
-3. Choose the scheme (named after the example) and press **Run**. For the ad-hoc `.xcodeproj`
-   builds of `plate-today` / `plate-today-tools`, Calendar/Reminders prompts are more reliable if
-   you set a team under the target's **Signing & Capabilities** (a free personal team is enough).
-   CLI examples take arguments — **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
+3. Choose the scheme (named after the example) and press **Run**. The ad-hoc `.xcodeproj` builds
+   are enough to try every example, but set a team under the target's **Signing & Capabilities**
+   (a free personal team is enough) for `plate-today` / `plate-today-tools` (reliable
+   Calendar/Reminders prompts) and `workspace-buddy` / `workspace-buddy-local` (the
+   security-scoped bookmark then survives a rebuild). CLI examples take arguments —
+   **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
 
 ### Signing a `.app` — `APP_IDENTITY`
 

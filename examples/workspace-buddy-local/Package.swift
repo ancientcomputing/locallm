@@ -60,6 +60,12 @@ guard let sdk = knownSDKReleases[requested] else {
 let package = Package(
     name: "WorkspaceBuddyLocal",
     platforms: [.macOS("27.0")],
+    products: [
+        // Vend the binaries as library products so the XcodeGen .xcodeproj variant (project.yml)
+        // can depend on them by name. `swift build` doesn't need this.
+        .library(name: "LocalLMLabSDKCore", targets: ["LocalLMLabSDKCore"]),
+        .library(name: "LocalLMLabSDKInference", targets: ["LocalLMLabSDKInference"])
+    ],
     targets: [
         .binaryTarget(name: "LocalLMLabSDKCore", url: sdk.coreURL, checksum: sdk.coreChecksum),
         .binaryTarget(name: "LocalLMLabSDKInference", url: sdk.inferenceURL, checksum: sdk.inferenceChecksum),

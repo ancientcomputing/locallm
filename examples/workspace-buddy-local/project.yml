@@ -1,0 +1,66 @@
+# XcodeGen spec for the "double-click, Run" variant of Workspace Buddy Local.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates WorkspaceBuddyLocal.xcodeproj
+#
+# The generated WorkspaceBuddyLocal.xcodeproj IS committed — a fresh clone opens it and Runs.
+# Edit project.yml, not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the
+# way to make a distributable / MAS .app.
+#
+# Like workspace-buddy this is ALWAYS App-Sandboxed. NEW vs workspace-buddy: it links the MLX
+# runtime (LocalLMLabSDKInference, macOS 27 / Metal) and needs the network.client entitlement —
+# MLXModelProvider.download fetches the model from Hugging Face on first run.
+name: WorkspaceBuddyLocal
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  WorkspaceBuddyLocal:
+    build:
+      targets:
+        WorkspaceBuddyLocal: all
+    run:
+      config: Debug
+packages:
+  WorkspaceBuddyLocalPackage:
+    path: .
+targets:
+  WorkspaceBuddyLocal:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/WorkspaceBuddyLocal
+    info:
+      path: xcodeproj/WorkspaceBuddyLocal-Info.plist
+      properties:
+        CFBundleDisplayName: Workspace Buddy Local
+        CFBundleName: Workspace Buddy Local
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+    # XcodeGen owns (regenerates) this file — separate from
+    # packaging/WorkspaceBuddyLocal.entitlements, which build-and-sign.sh owns.
+    entitlements:
+      path: xcodeproj/WorkspaceBuddyLocal.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.workspacebuddylocal
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: WorkspaceBuddyLocalPackage
+        product: LocalLMLabSDKCore
+      - package: WorkspaceBuddyLocalPackage
+        product: LocalLMLabSDKInference

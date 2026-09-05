@@ -62,7 +62,29 @@ that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a differe
 swift build
 ```
 
-This just proves it builds. To *actually run* it you need a signed, sandboxed `.app` — see below.
+This just proves it builds. To *actually run* it: open the Xcode project (next), or make a
+signed `.app` with `packaging/build-and-sign.sh` (further below).
+
+## Open in Xcode and Run
+
+A committed `WorkspaceBuddyLocal.xcodeproj` is the lowest-friction way to try it:
+
+```bash
+open WorkspaceBuddyLocal.xcodeproj
+```
+
+Pick the **WorkspaceBuddyLocal** scheme and Run — a real sandboxed `.app` with the
+`files.user-selected.read-write` and `network.client` entitlements (the model download needs the
+latter), the `LocalLMLabSDKInference` (MLX) framework embedded, signed ad-hoc for this Mac.
+**First Go downloads the model** (~4.5 GB for the default); after that it's local and offline.
+
+Same ad-hoc caveat as `workspace-buddy`: the security-scoped bookmark won't survive a rebuild
+under an ad-hoc identity — set your team under the target ▸ **Signing & Capabilities** (a free
+personal Apple ID team is enough) to see it persist, or use `packaging/build-and-sign.sh` below.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,
+then `xcodegen generate`.
 
 ## Running it
 
