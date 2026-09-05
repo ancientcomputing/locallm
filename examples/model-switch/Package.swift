@@ -25,7 +25,7 @@ struct SDKRelease {
 let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-beta.3": SDKRelease(
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip",
-        remoteChecksum: "TODO"
+        remoteChecksum: "12bb263dc4ffd5d05101d422fed0dbb67086412370d665f8c2427edd0aadd142"
     ),
 ]
 

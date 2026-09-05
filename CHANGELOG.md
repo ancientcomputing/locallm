@@ -103,10 +103,10 @@ values instead of an opaque "routed to `pcc` fails" reaching the host (roadmap i
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       TODO
-LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     TODO
-LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  TODO
-LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     TODO
+LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       a276ab7bdbdaa2be64ccfda45e66eabeb22c33be3246a1bea53be8f5c8998592
+LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     75f446bbaf449f6dcee300f1d30637c384017ee84e1f5d62cf0167b2c382c2e9
+LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  d99aaa9fd703afe51bf9b6f5636819527ae001c5e07efe4e07159b824681dda2
+LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     12bb263dc4ffd5d05101d422fed0dbb67086412370d665f8c2427edd0aadd142
 ```
 
 ## 1.0.0-beta.2 — 2026-09-02
