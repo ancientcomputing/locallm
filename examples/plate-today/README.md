@@ -37,14 +37,14 @@ Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently t
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.1`, which needs macOS 27. Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.3` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
 `'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` requires an
 explicit `LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency from there:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift build
 ```
 
 Omitting `LOCALLM_SDK_VERSION`, or setting an unknown version, fails fast with a clear error
@@ -54,7 +54,7 @@ listing the versions this copy knows about — see `Package.swift` itself for th
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run
+LOCALLM_SDK_VERSION=1.0.0-beta.3 swift run
 ```
 
 Fast, but **cannot** get real Calendar/Reminders access (no code signing means TCC denies bare CLI
@@ -69,7 +69,7 @@ both require a properly signed `.app` with entitlements and Info.plist usage-des
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
+LOCALLM_SDK_VERSION=1.0.0-beta.3 \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -99,7 +99,7 @@ internal TestFlight testing.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 VERSION=1.0.0-beta.1 ./packaging/build-and-sign-mas.sh
+LOCALLM_SDK_VERSION=1.0.0-beta.3 VERSION=1.0.0-beta.3 ./packaging/build-and-sign-mas.sh
 ```
 
 `APP_SIGN_IDENTITY` (an "Apple Distribution" identity), `INSTALLER_SIGN_IDENTITY` (a "3rd Party
@@ -110,6 +110,46 @@ keychain / `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` if not se
 App ID, provisioning profile). `PLATETODAY_INCLUDE_LOCATION_WEATHER`/`PLATETODAY_INCLUDE_CONTACTS`
 work the same as above; `PLATETODAY_INCLUDE_TODOIST` (default `1`, included) is the build-time
 opt-**out** if you want to build without a Todoist account.
+
+## Trying the Contacts enrichment (opt-in)
+
+By default plate-today checks Calendar, Reminders, and Todoist — a fixed set, all listed in the
+prompt. The Contacts tool is different: it's registered but **not** in the prompt, so the model
+only calls it *on its own* when a calendar event or reminder names a specific person and it
+decides looking them up is useful (the tool's own description tells it when). This is the
+example's point — a tool the model reaches for conditionally, with a permission it requests only
+on first use, rather than up front.
+
+**Build it in** — pass `PLATETODAY_INCLUDE_CONTACTS=1` to `build-and-sign.sh`; the script adds
+the `NSContactsUsageDescription` string and the `com.apple.security.personal-information.addressbook`
+entitlement for you:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+LOCALLM_SDK_VERSION=1.0.0-beta.3 \
+APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+NOTARIZE_APP=0 PLATETODAY_INCLUDE_CONTACTS=1 \
+./packaging/build-and-sign.sh
+```
+
+**Set up a run that will actually trigger it:**
+
+1. In **Contacts.app**, make sure there's a person you can recognize in a summary — add one if
+   needed, with a name plus an email, phone, or organization (those are what the tool returns).
+2. In **Calendar.app**, create an event **for today** whose title names that person —
+   e.g. *"Coffee with Jane Smith"* — or add them as an invitee.
+3. Launch the signed build. Grant **Calendar** and **Reminders** at launch as usual — still no
+   Contacts prompt yet.
+4. While the model is working, a **"Plate Today would like to access your contacts"** prompt
+   appears — because the model chose to look Jane up. Allow it.
+5. The summary comes back enriched: *"…your 10am coffee with Jane Smith (jane@acme.com)…"*
+   instead of just *"coffee with Jane Smith."*
+
+If nothing on today's calendar names someone in your Contacts, the model won't call the tool and
+you'll see no Contacts prompt — that's the expected on-demand behavior, not a failure.
+
+**Reset the grant between runs** with
+`tccutil reset AddressBook lab.locallm.sdk.reference.platetoday`.
 
 ## Troubleshooting
 

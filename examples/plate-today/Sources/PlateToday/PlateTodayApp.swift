@@ -104,6 +104,46 @@ struct TodaysLocationTool: Tool {
 }
 #endif
 
+// MARK: - Contacts tool (via Core's ContactsAccess connector)
+
+#if PLATETODAY_INCLUDE_CONTACTS
+// Same "not shipped as part of Core, permission-gated so the app decides how to expose it"
+// reasoning as TodaysLocationTool above. Mirrors LocalLM Lab's own SearchContactsTool — same
+// name, description, and read-only guarantee, minus that tool's socket round-trip to a separate
+// process (plate-today is single-process, so it calls ContactsAccess directly).
+//
+// Build-time opt-in, default off — unlike Calendar/Reminders, Contacts isn't part of plate-
+// today's actual "what's on my plate today" narrative (there's no daily contacts digest), so it
+// only makes sense as an on-demand lookup the model reaches for if a person's name comes up
+// (e.g. enriching a calendar event's attendee) — not something to prompt for unconditionally.
+// Also avoids an extra TCC prompt for anyone just trying the default build.
+struct SearchContactsTool: Tool {
+    let name = "searchContacts"
+    let description = "Searches the user's Contacts by name and returns matching contacts — name, organization, phone numbers, and email addresses. Only call this when the user is explicitly asking to look up, find, or search for a person in their Contacts, or when enriching a calendar/reminder item that names a specific person. Read-only; cannot create, modify, or delete contacts."
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The name (or partial name) to search for, e.g. \"Jane\" or \"Jane Smith\".")
+        var query: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        let access = await Connectors.requestAccess(.contacts)
+        guard access.granted else { return access.error ?? "Contacts access not granted." }
+
+        let matches = ContactsAccess.search(query: arguments.query, limit: 10)
+        if matches.isEmpty { return "No contacts found matching \"\(arguments.query)\"." }
+        return matches.map { contact in
+            var line = "- \(contact.name)"
+            if let org = contact.organization, !org.isEmpty { line += " (\(org))" }
+            if !contact.phoneNumbers.isEmpty { line += " — phone: \(contact.phoneNumbers.joined(separator: ", "))" }
+            if !contact.emails.isEmpty { line += " — email: \(contact.emails.joined(separator: ", "))" }
+            return line
+        }.joined(separator: "\n")
+    }
+}
+#endif
+
 // MARK: - Todoist tool (via Core's MCP client)
 
 struct TodoistTasksTool: Tool {
@@ -203,6 +243,12 @@ final class PlateTodayModel: ObservableObject {
         tools.append(WeatherTool())
         checks.append("the user's current location and today's weather there (getCurrentLocation, then getWeather with that place)")
         summarizeNote = ", including the weather"
+        #endif
+        #if PLATETODAY_INCLUDE_CONTACTS
+        // Deliberately not added to `checks` — this is an on-demand enrichment tool (see
+        // SearchContactsTool's own description), not a fourth thing to unconditionally check
+        // every run the way calendar/reminders/Todoist are.
+        tools.append(SearchContactsTool())
         #endif
         let prompt = """
         What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \

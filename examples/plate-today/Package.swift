@@ -92,9 +92,17 @@ let includeLocationWeather = ProcessInfo.processInfo.environment["PLATETODAY_INC
 // PLATETODAY_INCLUDE_TODOIST=0 to exclude it temporarily during that kind of loop.
 let includeTodoist = ProcessInfo.processInfo.environment["PLATETODAY_INCLUDE_TODOIST"] != "0"
 
+// Build-time opt-in, default OFF — same shape as Location/Weather above, for the same kind of
+// reason: Contacts isn't part of plate-today's daily-summary narrative (see SearchContactsTool's
+// own comment), so it's an on-demand enrichment tool the model reaches for only if relevant, not
+// a fourth thing checked every run — and defaulting it off avoids an extra TCC prompt for anyone
+// just trying the default build. Set PLATETODAY_INCLUDE_CONTACTS=1 to include it.
+let includeContacts = ProcessInfo.processInfo.environment["PLATETODAY_INCLUDE_CONTACTS"] == "1"
+
 var swiftSettings: [SwiftSetting] = []
 if includeLocationWeather { swiftSettings.append(.define("PLATETODAY_INCLUDE_LOCATION_WEATHER")) }
 if includeTodoist { swiftSettings.append(.define("PLATETODAY_INCLUDE_TODOIST")) }
+if includeContacts { swiftSettings.append(.define("PLATETODAY_INCLUDE_CONTACTS")) }
 
 let package = Package(
     name: "PlateToday",
