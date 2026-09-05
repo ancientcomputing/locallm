@@ -25,3 +25,7 @@ tmp/
 ._*
 .Trashes
 .Spotlight-V100
+
+# Xcode per-user state (XcodeGen projects are committed; user state is not)
+xcuserdata/
+*.xcuserstate

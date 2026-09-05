@@ -49,6 +49,25 @@ Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published releas
 [`../README.md`](../README.md#building--running-an-sdk-example). A stable Xcode fails with
 `'v27' is unavailable`; use the Xcode 27 beta.
 
+## Open in Xcode and Run
+
+A committed `ModelSwitch.xcodeproj` gives you the fastest look:
+
+```bash
+open ModelSwitch.xcodeproj
+```
+
+Pick the **ModelSwitch** scheme and hit Run. It builds a real `.app` (proper menu bar, Dock
+icon, `⌘,` Providers screen), ad-hoc signed for this Mac — the same local-run tier as
+`packaging/build-and-sign.sh` with `APP_IDENTITY` unset. Needs the Xcode 27 beta selected
+(Xcode ▸ Settings ▸ Locations ▸ Command Line Tools, or launch Xcode-beta directly).
+
+The project is generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)
+— edit `project.yml`, not the `.xcodeproj`, and regenerate. To pin a different SDK release for
+the Xcode build, edit `defaultSDKVersion` in `Package.swift` and `../../Components/Package.swift`
+(Xcode's package resolution ignores `LOCALLM_SDK_VERSION`).
+
 ## Quick dev-loop run
 
 ```bash

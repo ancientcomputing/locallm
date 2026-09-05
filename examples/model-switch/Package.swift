@@ -53,6 +53,11 @@ guard let sdk = knownSDKReleases[requested] else {
 let package = Package(
     name: "ModelSwitch",
     platforms: [.macOS("27.0")],          // RemoteModelProvider is @available(macOS 27)
+    products: [
+        // Vend the Remote binary as a library product so the XcodeGen .xcodeproj variant
+        // (packaging/project.yml) can depend on it by name. `swift build` doesn't need this.
+        .library(name: "LocalLMLabSDKRemote", targets: ["LocalLMLabSDKRemote"])
+    ],
     dependencies: [
         .package(path: "../../Components")
     ],
