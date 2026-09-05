@@ -51,6 +51,31 @@ inside Xcode (its package resolution doesn't see shell environment variables). S
 [`../README.md`](../README.md#building--running-an-sdk-example) for the CLI / Xcode workflows and
 how to change the SDK version.
 
+## Open in Xcode and Run
+
+A committed `PlateToday.xcodeproj` is the lowest-friction way to try the full app:
+
+```bash
+open PlateToday.xcodeproj
+```
+
+Pick the **PlateToday** scheme and Run. It builds a real `.app` — menu bar, Dock icon,
+`platetoday:` OAuth redirect scheme, the Calendar/Reminders entitlement and usage strings — with
+**Todoist on, Contacts and Location/Weather off** (the default feature set). Signed ad-hoc for
+this Mac.
+
+Calendar/Reminders prompts can be flaky under an ad-hoc signature. For a dependable prompt, open
+the **PlateToday** target ▸ **Signing & Capabilities** and select your team — "Sign to Run
+Locally" or a free personal Apple ID team is enough, no paid account. See the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)
+— edit `project.yml`, not the `.xcodeproj`. Turn on Contacts/Location by adding the flag to
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` there (plus the matching usage string + entitlement). To
+pin a different SDK release for the Xcode build, edit `defaultSDKVersion` in `Package.swift`
+(Xcode ignores `LOCALLM_SDK_VERSION`).
+
 ## Quick dev-loop run (no signing, no TCC/OAuth)
 
 ```bash

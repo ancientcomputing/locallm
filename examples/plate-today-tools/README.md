@@ -68,6 +68,29 @@ Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today
 `LOCALLM_SDK_VERSION` in a shell to pin another release, or see
 [`../README.md`](../README.md#building--running-an-sdk-example).
 
+## Open in Xcode and Run
+
+A committed `PlateTodayTools.xcodeproj` is the lowest-friction way to try the full app:
+
+```bash
+open PlateTodayTools.xcodeproj
+```
+
+Pick the **PlateTodayTools** scheme and Run — a real `.app` (menu bar, Dock icon,
+`platetodaytools:` OAuth scheme, Calendar/Reminders entitlement + usage strings), **Todoist on,
+Contacts and Location/Weather off**, signed ad-hoc for this Mac.
+
+Calendar/Reminders prompts can be flaky under an ad-hoc signature — for a dependable prompt, open
+the **PlateTodayTools** target ▸ **Signing & Capabilities** and pick your team ("Sign to Run
+Locally" / a free personal team, no paid account). See the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,
+then `xcodegen generate`. Enable Contacts/Location by adding the flag to
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` there. Pin a different SDK release by editing
+`defaultSDKVersion` in `Package.swift` (Xcode ignores `LOCALLM_SDK_VERSION`).
+
 ## Real build: `packaging/build-and-sign.sh`
 
 Same script shape as `plate-today`'s — Calendar/Reminders TCC prompts and the Todoist OAuth flow

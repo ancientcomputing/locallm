@@ -83,6 +83,11 @@ if includeContacts { swiftSettings.append(.define("PLATETODAY_INCLUDE_CONTACTS")
 let package = Package(
     name: "PlateToday",
     platforms: [.macOS("26.0")],
+    products: [
+        // Vend the Core binary as a library product so the XcodeGen .xcodeproj variant
+        // (project.yml) can depend on it by name. `swift build` doesn't need this.
+        .library(name: "LocalLMLabSDKCore", targets: ["LocalLMLabSDKCore"])
+    ],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
