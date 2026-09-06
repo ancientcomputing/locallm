@@ -142,6 +142,22 @@ Omit `[task...]` to enter the interactive `>>` loop instead of running one shot.
 
 `--route light` uses a smaller ~2 GB model instead of ~4.5 GB — start there on a tighter Mac.
 
+## In Xcode
+
+A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
+**File ▸ Open → `Package.swift`**, pick the **CodeBuddy** scheme, Run. It works, with three
+caveats:
+
+- **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
+  the workspace dir and each task word as separate entries.
+- **Use an absolute path for `<workspace-dir>`.** Xcode's default working directory is a
+  DerivedData folder, not this package, so a relative path resolves to the wrong place. (Or set
+  **Edit Scheme ▸ Options ▸ Working Directory**.)
+- **The interactive `>>` loop reads stdin** — it works in the Xcode console's input line, but a
+  terminal is the more natural home for it. One-shot runs (with a task) are unaffected.
+
+No signing setup — a plain CLI tool signs ad-hoc automatically.
+
 ## Getting the SDK & toolchain
 
 Copy-paste each step. Steps 1–2 are one-time machine setup; step 3 sets up your terminal session

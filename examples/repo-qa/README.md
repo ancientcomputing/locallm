@@ -85,6 +85,20 @@ swift run RepoQA anthropics/claude-code "What is the plugin system?"
 swift run RepoQA facebook/react                 # no question → "what does this repo do?"
 ```
 
+## In Xcode
+
+This is a command-line tool, so — unlike the SwiftUI examples — there's no `.xcodeproj` to ship:
+**File ▸ Open → `Package.swift`**, pick the **RepoQA** scheme, Run. Output goes to the Xcode
+console. Two things differ from the terminal:
+
+- **Set the arguments in the scheme**, not on a command line:
+  **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** → add `anthropics/claude-code` and your
+  question as separate entries.
+- No signing setup — a plain CLI tool signs ad-hoc automatically.
+
+`RepoQA` takes a GitHub `owner/repo` slug (not a path), so Xcode's working directory doesn't
+matter here.
+
 ## Output — answer on stdout, everything else on stderr
 
 Run it in a terminal and you see everything; nothing to enable. The streams are split on purpose:

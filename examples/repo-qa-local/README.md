@@ -96,6 +96,19 @@ swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift
 swift run RepoQALocal --apple anthropics/claude-code "What is the plugin system?"   # Apple's on-device model instead
 ```
 
+## In Xcode
+
+A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
+**File ▸ Open → `Package.swift`**, pick the **RepoQALocal** scheme, Run. Output goes to the
+Xcode console.
+
+- **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
+  e.g. `--apple`, `anthropics/claude-code`, and the question as separate entries.
+- No signing setup — a plain CLI tool signs ad-hoc automatically; the MLX model download needs
+  no entitlement outside a sandbox.
+- `RepoQALocal` takes a GitHub `owner/repo` slug (not a path), so Xcode's working directory
+  doesn't matter.
+
 ## Output — answer on stdout, everything else on stderr
 
 Run it in a terminal and you see everything; nothing to enable. The streams are split on purpose:
