@@ -69,33 +69,39 @@ you want it to work on is a separate argument and can be anywhere. Every command
 directory as a `# in …` comment.
 
 **1. Copy the sample workspace out of this repo and put it under its own git.** The repo ships a
-[`sample-workspace/`](sample-workspace/) with one undocumented Swift file. code-buddy edits files
-in place, and a fresh one-commit git repo is how you'll see exactly what it changed (step 4).
+[`sample-workspace/`](sample-workspace/) — a tiny SwiftPM package (`Geometry`: `Rectangle` +
+`area` / `perimeter` / `isSquare` / `scaled`, four passing tests, no doc comments). code-buddy
+edits files in place, so a fresh local git repo is how you'll see exactly what it changed.
 
 ```bash
 # in locallm/examples/code-buddy/
 rm -rf /tmp/cb-demo                       # start clean (safe: /tmp is throwaway)
 cp -R sample-workspace /tmp/cb-demo
-git -C /tmp/cb-demo init -q && git -C /tmp/cb-demo add -A && git -C /tmp/cb-demo commit -qm "before code-buddy"
+cd /tmp/cb-demo
+git init -q && git add -A && git commit -qm "Geometry: initial implementation, tests passing"
+
+# Introduce one regression as a second commit, for the run_tests / git task in step 5:
+sed -i '' 's/height: rectangle.height \* factor/height: rectangle.height/' Sources/Geometry/Geometry.swift
+git commit -aqm "scaled(): drop a redundant-looking multiply"
+cd -                                     # back to locallm/examples/code-buddy/
 ```
 
-What those three lines do, and don't do:
+What that does, and doesn't do:
 
 - **`rm -rf /tmp/cb-demo`** clears any leftover from a previous run. `/tmp` is scratch space the
   OS wipes on reboot — nothing you care about lives there.
 - **`cp -R`** makes a plain copy of `sample-workspace/` at `/tmp/cb-demo`. Your checkout of
   `locallm` is untouched from here on; the walkthrough only ever writes to `/tmp/cb-demo`.
-- **`git -C /tmp/cb-demo init`** creates a `.git/` folder *inside `/tmp/cb-demo`* and nothing
-  else — it's a brand-new, empty, entirely local repo. It doesn't contact a server, doesn't
-  touch the `locallm` repo (that's a different directory tree), and can't "clobber" another repo.
-  If you somehow re-ran it on a dir that already had a `.git/`, git would just say
-  "Reinitialized" and leave your history intact — but the `rm -rf` above means you always get a
-  clean one here.
-- **`git add -A` + `git commit`** record the copied file as commit #1. That baseline is the
-  before-picture `git diff` compares against in step 4.
+- **`git init`** creates a `.git/` folder *inside `/tmp/cb-demo`* and nothing else — a brand-new,
+  entirely local repo. It doesn't contact a server, doesn't touch the `locallm` repo (a
+  different directory tree), and can't "clobber" another repo.
+- **The first commit** is the green baseline. **The `sed` + second commit** makes `scaled(_:by:)`
+  forget to scale the height — one test (`testScaledScalesBothDimensions`) now fails. That commit
+  is what code-buddy hunts down in step 5.
 
-**2. Look at what you're starting with** — `/tmp/cb-demo/Geometry.swift` has `Rectangle` plus a
-few `public` functions, none with doc comments.
+**2. Look at what you're starting with** — `/tmp/cb-demo/Sources/Geometry/Geometry.swift` has
+`Rectangle` plus a few `public` declarations, none with doc comments; and after step 1,
+`swift test` in `/tmp/cb-demo` reports one failure.
 
 **3. From the package directory, run code-buddy, pointing it at that copy:**
 
@@ -107,7 +113,7 @@ swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declarat
 - `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
 - `/tmp/cb-demo` — the **workspace**: the only directory the model can read or edit.
 - the quoted string — the **task**. One shot: it lists files, reads `Geometry.swift`, applies a
-  patch, and reports back.
+  patch, and reports back. (It won't touch the planted bug — this task is only about comments.)
 
 While it runs, its narration (including a lot of visible "thinking" — these small models are
 verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ applyPatch`, …)
@@ -124,6 +130,51 @@ git -C /tmp/cb-demo diff
 You should see `///` lines added above `area`, `perimeter`, `isSquare(_:)`, `scaled(_:by:)`, etc.
 Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
 (`git -C /tmp/cb-demo checkout .`). Re-run step 3 with a different task to keep experimenting.
+
+**5. Now watch it use `run_tests` and `git`.** First undo step 3's edits so the diff at the end
+is just the bug fix:
+
+```bash
+git -C /tmp/cb-demo checkout .
+```
+
+Then hand code-buddy a task that needs all three tool kinds in one shot — the file tools,
+`run_tests`, and `git`:
+
+```bash
+# in locallm/examples/code-buddy/
+swift run CodeBuddy /tmp/cb-demo \
+  "The last commit introduced a one-line bug. Run 'git show HEAD' to see what it changed, run the tests to confirm the failure, fix that one line in Sources/Geometry/Geometry.swift, re-run the tests to confirm all four pass, then run 'git diff' to show the fix."
+```
+
+The stderr trace of a successful run (default `--route heavy` — the 8B model; verified):
+
+```
+→ git                 git show HEAD  — the "scaled(): drop a redundant-looking multiply" commit
+→ run_tests           testScaledScalesBothDimensions … failed  ("3.0" is not equal to "6.0")
+→ readWorkspaceFile   Sources/Geometry/Geometry.swift
+→ editWorkspaceFile   puts "* factor" back on the height
+→ run_tests           Executed 4 tests, with 0 failures
+→ git                 git diff  — the one-line fix
+```
+
+Confirm it yourself — the workspace is the source of truth, not the model's summary:
+
+```bash
+git -C /tmp/cb-demo diff             # the model's uncommitted fix — one line in scaled(_:by:)
+( cd /tmp/cb-demo && swift test )    # Executed 4 tests, with 0 failures
+```
+
+`git` here is **read-only** — code-buddy exposes `status`, `diff`, `log`, `show`, `blame` and a
+few more; `commit` / `checkout` / `reset` are refused (it changes files through `applyPatch` /
+`editWorkspaceFile`, never git). `run_tests` runs exactly the `--test-cmd` you pass (default
+`swift test`) in the workspace, with a 4-minute timeout. Both are this example's own code, not
+the SDK's — see
+[The `git` and `run_tests` tools](#the-git-and-run_tests-tools-this-example-provides-them-not-the-sdk).
+
+> The tools are deterministic; the model's ability to chain them is not. The default `heavy`
+> (8B) route handles this reliably; `--route light` (3B) is faster but often mangles a multi-step
+> edit. If a run stalls or the model narrates instead of acting, Ctrl-C and re-run.
 
 ### All options
 
@@ -209,6 +260,7 @@ model. Weights land in `~/.cache/huggingface/hub/` — shared with
 | `lab.models.route` / `availability` / `validate` / `download` | pre-flight + streamed download on first run |
 | `lab.makeSession(route:tools:instructions:)` | resolves route → model, assembles tools |
 | Core Workspace tools | `workspaceTree`, `searchWorkspace`, `readWorkspaceFile`, `readFileRange`, `applyPatch`, `editWorkspaceFile`, `writeWorkspaceFile`, `listWorkspaceFiles` |
+| Host-owned `Process` tools (not from the SDK) | `git` (read-only allow-list) and `run_tests` (`--test-cmd`) in [`ProcessTools.swift`](Sources/CodeBuddy/ProcessTools.swift) — exercised by walkthrough step 5 |
 | `lab.mcp` | one no-auth MCP server (DeepWiki), auto-merged into the session's tools |
 | `LocalLMLabSession.events` | the stderr `→ tool` / `✓ tool` trace |
 | `session.languageModelSession.streamResponse` | streamed answer |

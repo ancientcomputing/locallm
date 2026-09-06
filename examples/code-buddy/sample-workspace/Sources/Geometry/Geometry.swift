@@ -1,6 +1,6 @@
 // A tiny geometry helper, deliberately left undocumented — the starting point for the
-// code-buddy walkthrough in ../README.md. Ask code-buddy to "add a doc comment to every
-// public function", then `git diff` to see what it changed.
+// code-buddy walkthrough in ../../README.md. Ask code-buddy to "add a doc comment to every
+// public declaration", then `git diff` to see what it changed.
 
 import Foundation
 
