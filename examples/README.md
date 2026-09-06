@@ -144,8 +144,10 @@ LOCALLM_SDK_VERSION=1.0.0-beta.2 \
 
 ### Building against a different SDK version
 
-Every `examples/*/Package.swift` (and `Components/Package.swift`) has a `defaultSDKVersion` line
-and a small `knownSDKReleases` table — the current release plus the previous one:
+Every SDK example's top-level `Package.swift` (and `Components/Package.swift`) has a
+`defaultSDKVersion` line and a small `knownSDKReleases` table — the current release plus the
+previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these — it's a
+dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
 
 ```swift
 let defaultSDKVersion = "1.0.0-beta.3"
