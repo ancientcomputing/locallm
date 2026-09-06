@@ -97,10 +97,14 @@ then `xcodegen generate`.
 ## Running it
 
 Like `workspace-buddy`, a bare `swift run` gets you neither the sandbox nor the
-`files.user-selected` entitlement, so it's compile-only. The real build is
-`packaging/build-and-sign.sh`, which needs a signing identity — a **free "Apple Development"** one
-is enough (an ad-hoc build won't hold the sandbox grant); a Developer ID is only for
-distribution. See the [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
+`files.user-selected` entitlement, so it's compile-only. Two ways to get a real, entitled build:
+
+- **The Xcode project above** — the fast path; a locally-signed `.app` to run and iterate on.
+- **`packaging/build-and-sign.sh`** — for a `.app` you can hand to another Mac (Developer-ID
+  signed and notarizable). It needs a signing identity; a **free "Apple Development"** one is
+  enough for a local run (an ad-hoc build won't hold the sandbox grant), a Developer ID for
+  distribution. See the
+  [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
 APP_IDENTITY="Apple Development: Your Name (TEAMID)" \

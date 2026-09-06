@@ -78,11 +78,12 @@ Useful for compiler-level iteration. Run it as a real app from the packaged buil
 executable has no `Info.plist`, so the app menu, the Dock icon, and window activation are all
 rough, and `⌘,` for the Providers screen may not register (use the toolbar button).
 
-## Real build: `packaging/build-and-sign.sh`
+## Distributable build: `packaging/build-and-sign.sh`
 
-Produces a proper `Model Switch.app` bundle. No entitlements, no system-permission prompts —
-the app only makes outbound HTTPS calls — so with no `APP_IDENTITY` it signs **ad-hoc** and the
-`.app` runs on this Mac:
+For just trying the app, the Xcode project above is enough. Use this script to produce a
+`Model Switch.app` you can hand to another Mac. No entitlements, no system-permission prompts —
+the app only makes outbound HTTPS calls — so with no `APP_IDENTITY` it signs **ad-hoc** (this Mac
+only); set one for a distributable build:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh

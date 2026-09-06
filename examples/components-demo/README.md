@@ -67,9 +67,10 @@ Unlike `plate-today`, this app needs no TCC entitlements to function — the MCP
 or not. `swift run` is enough to try the full server-add/connect/tool-enable flow; you only need
 the packaged build below to test it as a real, distributable `.app`.
 
-## Real build: `packaging/build-and-sign.sh`
+## Distributable build: `packaging/build-and-sign.sh`
 
-With no `APP_IDENTITY` this signs **ad-hoc** and the `.app` runs on this Mac; set `APP_IDENTITY`
+For just trying the app, the Xcode project above is enough. Use this script for a `.app` you can
+hand to another Mac. With no `APP_IDENTITY` it signs **ad-hoc** (this Mac only); set `APP_IDENTITY`
 to sign it for wider use — see the
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 

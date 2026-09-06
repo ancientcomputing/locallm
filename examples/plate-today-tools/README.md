@@ -99,11 +99,12 @@ then `xcodegen generate`. Enable Contacts/Location by adding the flag to
 `SWIFT_ACTIVE_COMPILATION_CONDITIONS` there. Pin a different SDK release by editing
 `defaultSDKVersion` in `Package.swift` (Xcode ignores `LOCALLM_SDK_VERSION`).
 
-## Real build: `packaging/build-and-sign.sh`
+## Distributable build: `packaging/build-and-sign.sh`
 
-Same script shape as `plate-today`'s — Calendar/Reminders TCC prompts and the Todoist OAuth flow
-both need a signed `.app`. A **free "Apple Development"** identity is enough; a Developer ID is
-only for distribution. See the
+For just trying the app, the Xcode project above is enough. Use this script — same shape as
+`plate-today`'s — when you want a build you can hand to another Mac: Developer-ID signed and
+notarizable. A **free "Apple Development"** identity still produces a valid local build; a
+Developer ID is what makes it distributable. See the
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash

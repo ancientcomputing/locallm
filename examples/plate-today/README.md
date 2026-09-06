@@ -95,12 +95,14 @@ binaries outright) and the OAuth redirect won't have a registered URL scheme to 
 for compiler-level iteration only. `TODOIST_MCP_URL` overrides the default `https://ai.todoist.net/mcp`
 if you need to point at a different server for testing.
 
-## Real build: `packaging/build-and-sign.sh`
+## Distributable build: `packaging/build-and-sign.sh`
 
-The only way to actually exercise the Calendar/Reminders TCC prompts or the Todoist OAuth flow —
-both need a signed `.app` with entitlements and Info.plist keys. A **free "Apple Development"**
-identity is enough (an ad-hoc build won't hold the permission grants); a Developer ID is only
-needed to distribute. See the
+For just trying the app, the Xcode project above is enough — it already produces a locally-signed
+`.app` that exercises the Calendar/Reminders TCC prompts and the Todoist OAuth flow. Use this
+script when you want a build you can hand to another Mac: Developer-ID signed and notarizable,
+with the entitlements and Info.plist keys applied by the script rather than by `project.yml`. A
+**free "Apple Development"** identity still produces a valid local build (an ad-hoc one won't
+hold the permission grants); a Developer ID is what makes it distributable. See the
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash

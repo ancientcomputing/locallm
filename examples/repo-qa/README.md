@@ -77,8 +77,8 @@ The first `swift build` (or `swift run`) downloads the xcframework.
 
 ## Running it
 
-Assumes the two `export`s from step 2 are set in this terminal. A bare `swift run` is the real,
-intended way to use this app — not a dev-loop shortcut.
+Assumes the two `export`s from step 2 are set in this terminal. A bare `swift run` is a real way
+to use this app — not just a dev-loop shortcut (the Xcode Run below is equally fine).
 
 ```bash
 swift run RepoQA anthropics/claude-code "What is the plugin system?"
