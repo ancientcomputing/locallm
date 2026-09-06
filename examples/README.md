@@ -61,8 +61,9 @@ build against the latest stable release. No environment variable is needed for e
 
 ### In Xcode
 
-1. Get the code: `git clone https://github.com/ancientcomputing/locallm`, or **Code ▸ Download
-   ZIP** on GitHub and unzip.
+1. Get the code — either `git clone https://github.com/ancientcomputing/locallm`, or open the
+   repo's page on **github.com**, click the green **`<> Code`** button, choose **Download ZIP**,
+   and unzip. (That button is on the GitHub website, not in Xcode.)
 2. Open the project:
    - **The six SwiftUI examples** (`components-demo`, `model-switch`, `plate-today`,
      `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`) ship a committed
