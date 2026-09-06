@@ -40,15 +40,17 @@ Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published releas
 
 ## Open in Xcode and Run
 
-A committed `ComponentsDemo.xcodeproj` is the fastest look:
+A committed `ComponentsDemo.xcodeproj` is the fastest look. **Open it in `Xcode-beta.app`, not a
+stable Xcode** (the target is macOS 27 → a stable Xcode fails with `'v27' is unavailable`).
+Launch `Xcode-beta.app` and **File ▸ Open**, or:
 
 ```bash
-open ComponentsDemo.xcodeproj
+open -a Xcode-beta ComponentsDemo.xcodeproj
 ```
 
 Pick the **ComponentsDemo** scheme and Run — a real `.app` (menu bar, Dock icon,
 `componentsdemo:` OAuth redirect scheme), ad-hoc signed for this Mac, the same local-run tier
-as `packaging/build-and-sign.sh` with `APP_IDENTITY` unset. Needs the Xcode 27 beta selected.
+as `packaging/build-and-sign.sh` with `APP_IDENTITY` unset.
 
 Generated from [`project.yml`](project.yml) with
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)

@@ -51,16 +51,18 @@ Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published releas
 
 ## Open in Xcode and Run
 
-A committed `ModelSwitch.xcodeproj` gives you the fastest look:
+A committed `ModelSwitch.xcodeproj` gives you the fastest look. **Open it in `Xcode-beta.app`,
+not a stable Xcode** — the target is macOS 27, so a stable Xcode fails with `'v27' is
+unavailable`. `open` uses your default Xcode (usually the stable one), so either launch
+`Xcode-beta.app` first and **File ▸ Open**, or:
 
 ```bash
-open ModelSwitch.xcodeproj
+open -a Xcode-beta ModelSwitch.xcodeproj
 ```
 
 Pick the **ModelSwitch** scheme and hit Run. It builds a real `.app` (proper menu bar, Dock
 icon, `⌘,` Providers screen), ad-hoc signed for this Mac — the same local-run tier as
-`packaging/build-and-sign.sh` with `APP_IDENTITY` unset. Needs the Xcode 27 beta selected
-(Xcode ▸ Settings ▸ Locations ▸ Command Line Tools, or launch Xcode-beta directly).
+`packaging/build-and-sign.sh` with `APP_IDENTITY` unset.
 
 The project is generated from [`project.yml`](project.yml) with
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)

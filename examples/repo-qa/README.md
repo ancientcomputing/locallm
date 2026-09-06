@@ -88,8 +88,9 @@ swift run RepoQA facebook/react                 # no question → "what does thi
 ## In Xcode
 
 This is a command-line tool, so — unlike the SwiftUI examples — there's no `.xcodeproj` to ship:
-**File ▸ Open → `Package.swift`**, pick the **RepoQA** scheme, Run. Output goes to the Xcode
-console. Two things differ from the terminal:
+**File ▸ Open → `Package.swift`**, pick the **RepoQA** scheme, Run. Do it in **`Xcode-beta.app`,
+not a stable Xcode** (the manifest targets macOS 27 → a stable Xcode fails with `'v27' is
+unavailable`). Output goes to the Xcode console. Two things differ from the terminal:
 
 - **Set the arguments in the scheme**, not on a command line:
   **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** → add `anthropics/claude-code` and your

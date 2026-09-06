@@ -53,10 +53,12 @@ how to change the SDK version.
 
 ## Open in Xcode and Run
 
-A committed `PlateToday.xcodeproj` is the lowest-friction way to try the full app:
+A committed `PlateToday.xcodeproj` is the lowest-friction way to try the full app. **Open it in
+`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
 
 ```bash
-open PlateToday.xcodeproj
+open -a Xcode-beta PlateToday.xcodeproj
 ```
 
 Pick the **PlateToday** scheme and Run. It builds a real `.app` — menu bar, Dock icon,

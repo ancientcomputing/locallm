@@ -145,8 +145,9 @@ Omit `[task...]` to enter the interactive `>>` loop instead of running one shot.
 ## In Xcode
 
 A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
-**File ▸ Open → `Package.swift`**, pick the **CodeBuddy** scheme, Run. It works, with three
-caveats:
+**File ▸ Open → `Package.swift`**, pick the **CodeBuddy** scheme, Run — in **`Xcode-beta.app`,
+not a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). It
+works, with three caveats:
 
 - **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
   the workspace dir and each task word as separate entries.

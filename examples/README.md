@@ -64,15 +64,20 @@ build against the latest stable release. No environment variable is needed for e
 1. Get the code — either `git clone https://github.com/ancientcomputing/locallm`, or open the
    repo's page on **github.com**, click the green **`<> Code`** button, choose **Download ZIP**,
    and unzip. (That button is on the GitHub website, not in Xcode.)
-2. Open the project:
+2. **Open it in the Xcode 27 beta — `Xcode-beta.app`, not a stable Xcode.** Every example targets
+   macOS 27; a stable Xcode fails with `'v27' is unavailable`. Double-clicking a project opens it
+   in your *default* Xcode, which is usually the stable one — instead, right-click the file ▸
+   **Open With ▸ Xcode-beta**, or launch `Xcode-beta.app` first and use **File ▸ Open**. (The
+   *Xcode ▸ Settings ▸ Locations ▸ Command Line Tools* selection does **not** change this — it
+   only affects the terminal `swift` / `xcodebuild`.) Then:
    - **The six SwiftUI examples** (`components-demo`, `model-switch`, `plate-today`,
      `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`) ship a committed
-     `.xcodeproj` — **File ▸ Open** → `examples/<name>/<Name>.xcodeproj`. Run gives a *real*
-     `.app` (Dock icon, menu bar, `⌘,`, URL scheme, entitlements). The project is generated from
-     `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`
-     and `xcodegen generate`, not the `.xcodeproj` directly.
-   - **Every example** also opens as a package: **File ▸ Open** → `examples/<name>/Package.swift`.
-     Run works, but a SwiftUI app runs bundle-less (no Dock icon, `⌘,` may not register).
+     `.xcodeproj` — open `examples/<name>/<Name>.xcodeproj`. Run gives a *real* `.app` (Dock icon,
+     menu bar, `⌘,`, URL scheme, entitlements). The project is generated from `project.yml` with
+     [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml` and `xcodegen
+     generate`, not the `.xcodeproj` directly.
+   - **Every example** also opens as a package: open `examples/<name>/Package.swift`. Run works,
+     but a SwiftUI app runs bundle-less (no Dock icon, `⌘,` may not register).
    Either way Xcode resolves the SDK binary automatically — no `LOCALLM_SDK_VERSION`.
 3. Choose the scheme (named after the example) and press **Run**.
 

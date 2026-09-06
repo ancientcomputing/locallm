@@ -35,8 +35,9 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run OSMatrix
 ### In Xcode
 
 A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
-**File ▸ Open → `Package.swift`**, pick the **OSMatrix** scheme, Run — output goes to the Xcode
-console. No arguments needed for the default run; for `--download <hf-repo>` add both entries
+**File ▸ Open → `Package.swift`**, pick the **OSMatrix** scheme, Run — in **`Xcode-beta.app`, not
+a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). Output
+goes to the Xcode console. No arguments needed for the default run; for `--download <hf-repo>` add both entries
 under **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**. No signing setup — a plain CLI tool
 signs ad-hoc automatically. The point of the example is running the *same* build on a macOS 26
 and a macOS 27 machine, so you'll still want a terminal (or two Macs) to see the contrast.

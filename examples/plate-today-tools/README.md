@@ -70,10 +70,12 @@ Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today
 
 ## Open in Xcode and Run
 
-A committed `PlateTodayTools.xcodeproj` is the lowest-friction way to try the full app:
+A committed `PlateTodayTools.xcodeproj` is the lowest-friction way to try the full app. **Open it
+in `Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
 
 ```bash
-open PlateTodayTools.xcodeproj
+open -a Xcode-beta PlateTodayTools.xcodeproj
 ```
 
 Pick the **PlateTodayTools** scheme and Run — a real `.app` (menu bar, Dock icon,

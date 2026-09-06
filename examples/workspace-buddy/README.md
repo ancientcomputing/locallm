@@ -79,10 +79,12 @@ signed `.app` with `packaging/build-and-sign.sh` (further below).
 
 ## Open in Xcode and Run
 
-A committed `WorkspaceBuddy.xcodeproj` is the lowest-friction way to try it:
+A committed `WorkspaceBuddy.xcodeproj` is the lowest-friction way to try it. **Open it in
+`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
 
 ```bash
-open WorkspaceBuddy.xcodeproj
+open -a Xcode-beta WorkspaceBuddy.xcodeproj
 ```
 
 Pick the **WorkspaceBuddy** scheme and Run — a real sandboxed `.app` (menu bar, Dock icon, the

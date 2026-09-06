@@ -99,8 +99,9 @@ swift run RepoQALocal --apple anthropics/claude-code "What is the plugin system?
 ## In Xcode
 
 A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
-**File ▸ Open → `Package.swift`**, pick the **RepoQALocal** scheme, Run. Output goes to the
-Xcode console.
+**File ▸ Open → `Package.swift`**, pick the **RepoQALocal** scheme, Run — in **`Xcode-beta.app`,
+not a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). Output
+goes to the Xcode console.
 
 - **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
   e.g. `--apple`, `anthropics/claude-code`, and the question as separate entries.
