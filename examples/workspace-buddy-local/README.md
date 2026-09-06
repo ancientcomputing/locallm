@@ -75,12 +75,20 @@ open WorkspaceBuddyLocal.xcodeproj
 
 Pick the **WorkspaceBuddyLocal** scheme and Run — a real sandboxed `.app` with the
 `files.user-selected.read-write` and `network.client` entitlements (the model download needs the
-latter), the `LocalLMLabSDKInference` (MLX) framework embedded, signed ad-hoc for this Mac.
-**First Go downloads the model** (~4.5 GB for the default); after that it's local and offline.
+latter), the `LocalLMLabSDKInference` (MLX) framework embedded. **First Go downloads the model**
+(~4.5 GB for the default); after that it's local and offline.
 
-Same ad-hoc caveat as `workspace-buddy`: the security-scoped bookmark won't survive a rebuild
-under an ad-hoc identity — set your team under the target ▸ **Signing & Capabilities** (a free
-personal Apple ID team is enough) to see it persist, or use `packaging/build-and-sign.sh` below.
+**Signing.** Set to **Automatic** with no hard-coded team, so Xcode signs with your **Apple
+Development** identity. Same reason as `workspace-buddy`: the security-scoped bookmark is bound
+to the signing identity and won't survive a rebuild under an ad-hoc one.
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (**free** is enough) | picked automatically — stable `Apple Development` signing, bookmark persists across rebuilds |
+| No Apple ID | Run stops with *"requires a development team"* — add a free Apple ID, **or** target ▸ **Signing & Capabilities** ▸ **Sign to Run Locally** (ad-hoc; runs, but you re-pick the folder each rebuild) |
+
+Only the Xcode Run build is affected. `packaging/build-and-sign.sh` (below) ignores the project
+file and signs with whatever `APP_IDENTITY` you pass it.
 
 Generated from [`project.yml`](project.yml) with
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,

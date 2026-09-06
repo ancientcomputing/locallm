@@ -7,9 +7,18 @@
 # to make a distributable / MAS .app.
 #
 # This app is ALWAYS App-Sandboxed (that's the point of the example — see the security-scoped
-# bookmark story in docs/sdk-guide.md §8). Signed ad-hoc here; a sandboxed ad-hoc app runs on
-# this Mac. The NSOpenPanel folder pick + the user-selected.read-write entitlement are all it
-# needs — folder access has no TCC usage-description requirement.
+# bookmark story in docs/sdk-guide.md §8). The NSOpenPanel folder pick + the
+# user-selected.read-write entitlement are all it needs — folder access has no TCC
+# usage-description requirement.
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode. A security-scoped bookmark is tied to the app's signing identity, so under
+# an ad-hoc signature (identity changes every rebuild) it won't survive a rebuild — a real team
+# signature is what makes the bookmark-persists-across-relaunch point of this example actually
+# hold. One Apple ID → picked automatically; none → Run says "requires a development team" until
+# you add an Apple ID (Xcode ▸ Settings ▸ Accounts, free is enough) or switch the target to
+# "Sign to Run Locally". packaging/build-and-sign.sh is unaffected — it signs with whatever
+# APP_IDENTITY you pass.
 name: WorkspaceBuddy
 options:
   bundleIdPrefix: lab.locallm.sdk.reference
@@ -53,8 +62,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.workspacebuddy
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_STYLE: Automatic
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: NO
         LD_RUNPATH_SEARCH_PATHS:

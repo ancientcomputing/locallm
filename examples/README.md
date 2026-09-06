@@ -52,9 +52,9 @@ build against the latest stable release. No environment variable is needed for e
 | Example | Kind | `swift run` (or Xcode ▸ Run) | To get a real `.app` (`packaging/build-and-sign.sh`) |
 |---|---|---|---|
 | `repo-qa`, `code-buddy`, `os-matrix` | CLI | ✅ the whole example | — (no `packaging/`) |
-| `components-demo`, `model-switch` | SwiftUI, no system permissions | ✅ — real `.app` via the committed `.xcodeproj`; bundle-less via `Package.swift` / `swift run` | **any** identity, or **none** — see the table below |
-| `plate-today`, `plate-today-tools` | SwiftUI + Calendar / Reminders / Contacts | ✅ via the committed `.xcodeproj` (ad-hoc; set a team in Signing & Capabilities for reliable prompts). Bare `swift run` is denied the prompts. | **a signing identity is required** — a **free** "Apple Development" one works |
-| `workspace-buddy`, `workspace-buddy-local` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` (ad-hoc; the security-scoped bookmark only survives a rebuild once you set a team in Signing & Capabilities). Bare `swift run` is compile-only. | same as `plate-today` |
+| `components-demo`, `model-switch` | SwiftUI, no system permissions | ✅ — real `.app` via the committed `.xcodeproj` (ad-hoc, no account needed); bundle-less via `Package.swift` / `swift run` | **any** identity, or **none** — see the table below |
+| `plate-today`, `plate-today-tools` | SwiftUI + Calendar / Reminders / Contacts | ✅ via the committed `.xcodeproj` — **Automatic** signing: Xcode uses your Apple ID's Apple Development identity (a **free** one works), needed for reliable prompts. No Apple ID → add one or pick *Sign to Run Locally*. Bare `swift run` is denied the prompts. | **a signing identity is required** — a **free** "Apple Development" one works |
+| `workspace-buddy`, `workspace-buddy-local` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
 **Xcode ▸ Settings ▸ Accounts**. No paid Apple Developer account, no Developer ID certificate.
@@ -67,19 +67,27 @@ build against the latest stable release. No environment variable is needed for e
    - **The six SwiftUI examples** (`components-demo`, `model-switch`, `plate-today`,
      `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`) ship a committed
      `.xcodeproj` — **File ▸ Open** → `examples/<name>/<Name>.xcodeproj`. Run gives a *real*
-     `.app` (Dock icon, menu bar, `⌘,`, URL scheme, entitlements), ad-hoc signed for this Mac.
-     The project is generated from `project.yml` with
-     [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml` and
-     `xcodegen generate`, not the `.xcodeproj` directly.
+     `.app` (Dock icon, menu bar, `⌘,`, URL scheme, entitlements). The project is generated from
+     `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`
+     and `xcodegen generate`, not the `.xcodeproj` directly.
    - **Every example** also opens as a package: **File ▸ Open** → `examples/<name>/Package.swift`.
      Run works, but a SwiftUI app runs bundle-less (no Dock icon, `⌘,` may not register).
    Either way Xcode resolves the SDK binary automatically — no `LOCALLM_SDK_VERSION`.
-3. Choose the scheme (named after the example) and press **Run**. The ad-hoc `.xcodeproj` builds
-   are enough to try every example, but set a team under the target's **Signing & Capabilities**
-   (a free personal team is enough) for `plate-today` / `plate-today-tools` (reliable
-   Calendar/Reminders prompts) and `workspace-buddy` / `workspace-buddy-local` (the
-   security-scoped bookmark then survives a rebuild). CLI examples take arguments —
-   **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
+3. Choose the scheme (named after the example) and press **Run**.
+
+   **Signing of the `.xcodeproj` Run build:**
+   - `components-demo`, `model-switch` — **ad-hoc**, no account needed. They only make outbound
+     HTTPS calls, so ad-hoc is fine.
+   - `plate-today`, `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local` —
+     **Automatic**, no hard-coded team. Xcode signs with your **Apple Development** identity: add
+     any Apple ID under **Xcode ▸ Settings ▸ Accounts** (a **free** one is enough) and Xcode
+     picks it up. With no Apple ID, Run stops with *"requires a development team"* — add one, or
+     open the target ▸ **Signing & Capabilities** and choose **Sign to Run Locally** (ad-hoc; the
+     app runs, but Calendar/Reminders prompts are unreliable and the workspace bookmark won't
+     survive a rebuild). None of this touches `packaging/build-and-sign.sh`, which signs with
+     `APP_IDENTITY` (below).
+
+   CLI examples take arguments — **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
 
 ### Signing a `.app` — `APP_IDENTITY`
 

@@ -10,9 +10,12 @@
 # with no env vars. Flip via SWIFT_ACTIVE_COMPILATION_CONDITIONS below (plus the matching
 # usage-description key + entitlement for Contacts/Location).
 #
-# Signing: ad-hoc by default. Calendar/Reminders TCC prompts can be unreliable under an ad-hoc
-# signature — for a dependable prompt, open the target ▸ Signing & Capabilities and pick your
-# team ("Sign to Run Locally" / a free personal team is enough; no paid account needed).
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode (Calendar/Reminders TCC prompts are only dependable under a real team
+# signature). One Apple ID → picked automatically; none → Run says "requires a development team"
+# until you add an Apple ID (Xcode ▸ Settings ▸ Accounts, free is enough) or switch the target
+# to "Sign to Run Locally". packaging/build-and-sign.sh is unaffected — it signs with whatever
+# APP_IDENTITY you pass (ad-hoc if unset).
 name: PlateTodayTools
 options:
   bundleIdPrefix: lab.locallm.sdk.reference
@@ -61,8 +64,7 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: PLATETODAYTOOLS_INCLUDE_TODOIST
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_STYLE: Automatic
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
         LD_RUNPATH_SEARCH_PATHS:

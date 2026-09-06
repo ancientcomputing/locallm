@@ -86,14 +86,22 @@ open WorkspaceBuddy.xcodeproj
 ```
 
 Pick the **WorkspaceBuddy** scheme and Run — a real sandboxed `.app` (menu bar, Dock icon, the
-`files.user-selected.read-write` entitlement), signed ad-hoc for this Mac. Click **Choose
-Folder…**, pick a throwaway directory, type a request, hit **Go**.
+`files.user-selected.read-write` entitlement). Click **Choose Folder…**, pick a throwaway
+directory, type a request, hit **Go**.
 
-One caveat specific to this example: an ad-hoc signature's identity changes on every rebuild, so
-a security-scoped bookmark saved by one build won't resolve after the next — you'll re-pick the
-folder each time you rebuild. To watch the bookmark genuinely survive a rebuild (the point of
-the example), set your team under the **WorkspaceBuddy** target ▸ **Signing & Capabilities** (a
-free personal Apple ID team is enough), or use `packaging/build-and-sign.sh` below.
+**Signing.** The project is set to **Automatic** with no hard-coded team, so Xcode signs the Run
+build with your **Apple Development** identity. That matters here: a security-scoped bookmark is
+bound to the app's signing identity, and an ad-hoc identity changes on every rebuild — so under
+ad-hoc you re-pick the folder after every rebuild, and the "bookmark survives relaunch" point of
+this example never actually shows. A stable team signature fixes that.
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (**free** is enough) | picked automatically — stable `Apple Development` signing, bookmark persists across rebuilds |
+| No Apple ID | Run stops with *"requires a development team"* — add a free Apple ID, **or** target ▸ **Signing & Capabilities** ▸ **Sign to Run Locally** (ad-hoc; runs, but you re-pick the folder each rebuild) |
+
+Only the Xcode Run build is affected. `packaging/build-and-sign.sh` (below) ignores the project
+file and signs with whatever `APP_IDENTITY` you pass it.
 
 Generated from [`project.yml`](project.yml) with
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,

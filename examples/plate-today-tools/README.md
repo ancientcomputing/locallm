@@ -78,11 +78,19 @@ open PlateTodayTools.xcodeproj
 
 Pick the **PlateTodayTools** scheme and Run — a real `.app` (menu bar, Dock icon,
 `platetodaytools:` OAuth scheme, Calendar/Reminders entitlement + usage strings), **Todoist on,
-Contacts and Location/Weather off**, signed ad-hoc for this Mac.
+Contacts and Location/Weather off**.
 
-Calendar/Reminders prompts can be flaky under an ad-hoc signature — for a dependable prompt, open
-the **PlateTodayTools** target ▸ **Signing & Capabilities** and pick your team ("Sign to Run
-Locally" / a free personal team, no paid account). See the
+**Signing.** The project is set to **Automatic** with no hard-coded team, so Xcode signs the Run
+build with your **Apple Development** identity — needed for dependable Calendar/Reminders prompts
+(unreliable under an ad-hoc signature).
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (**free** is enough) | picked automatically — real `Apple Development` signing, prompts work |
+| No Apple ID | Run stops with *"requires a development team"* — add a free Apple ID, **or** target ▸ **Signing & Capabilities** ▸ **Sign to Run Locally** (ad-hoc; runs, but the prompts may misbehave) |
+
+Only the Xcode Run build is affected. `packaging/build-and-sign.sh` ignores the project file and
+signs with whatever `APP_IDENTITY` you pass (ad-hoc if unset) — see the
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 Generated from [`project.yml`](project.yml) with
