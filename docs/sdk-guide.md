@@ -1178,9 +1178,10 @@ fails loudly if `oldString` isn't found or isn't unique in the file (pass `repla
 really mean every occurrence). This was a deliberate choice, not an obvious one: a small on-device
 model reliably producing correct line numbers and context lines for a real diff format is a much
 harder ask than quoting one exact, minimal, uniquely-identifying snippet — and it's a much simpler,
-safer thing for Core to validate and apply. `writeFile` is create-only (fails if the file already
-exists) — use `editFile` to modify something that's already there, same add-vs-update split
-Calendar/Reminders/Contacts already use.
+safer thing for Core to validate and apply. `writeFile` is create-by-default — it fails on an
+existing file unless you pass `overwrite: true`, the deliberate opt-in for regenerating a
+wholly-derived file (a CSV/JSON data export, a report). Use `editFile` for a targeted change to
+an existing file, same add-vs-update split Calendar/Reminders/Contacts already use.
 
 Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWorkspaceFilesTool`,
 `ReadWorkspaceFileTool`, `WriteWorkspaceFileTool`, `EditWorkspaceFileTool`, `DeleteWorkspaceFileTool`
@@ -1804,8 +1805,8 @@ enum WorkspaceAccess {
 
     static func listFiles(in root: URL, subpath: String?) -> Result<[WorkspaceEntry], WorkspaceError>
     static func readFile(in root: URL, path: String) -> Result<String, WorkspaceError>
-    // create-only — fails if the file already exists; use editFile to modify an existing one
-    static func writeFile(in root: URL, path: String, contents: String) -> Result<Void, WorkspaceError>
+    // create-by-default — fails on an existing file unless overwrite:true; use editFile for a partial change
+    static func writeFile(in root: URL, path: String, contents: String, overwrite: Bool = false) -> Result<Void, WorkspaceError>
     // search-and-replace, not a unified-diff format — oldString must match exactly once unless replaceAll
     static func editFile(in root: URL, path: String, oldString: String, newString: String, replaceAll: Bool) -> Result<Void, WorkspaceError>
     static func deleteFile(in root: URL, path: String) -> Result<Void, WorkspaceError>
@@ -1824,7 +1825,7 @@ struct ReadWorkspaceFileTool: Tool {
 struct WriteWorkspaceFileTool: Tool {
     let name = "writeWorkspaceFile"
     init(root: URL, description: String? = nil)
-    struct Arguments { var path: String; var contents: String }
+    struct Arguments { var path: String; var contents: String; var overwrite: Bool? }
 }
 struct EditWorkspaceFileTool: Tool {
     let name = "editWorkspaceFile"
