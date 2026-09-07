@@ -88,6 +88,11 @@ let session = try lab.makeSession(route: "chat")
 `lab.models.downloads` (`[ModelID: Double]`, observable) is what a picker binds to for a
 progress bar. On macOS 26, `--download` prints "needs macOS 27" and exits.
 
+The availability table this CLI prints — and the `--download` progress — are exactly what
+`Components`' `ModelPickerView` renders as a real settings screen (badges, on-disk sizes,
+progress bar, "Add from Hugging Face"); see
+[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+
 ## The four scenarios, and where each shows up here
 
 | # | Scenario | In this example |

@@ -282,6 +282,11 @@ the other on switch) and splits work across `--route heavy` / `--route light`:
 The LocalLM Lab app's AI Models panel surfaces the same signals (a memory-pressure warning per
 model, a Compact/Balanced/Full tool-result preset) if you'd rather see it in a UI first.
 
+code-buddy prints its download progress to stderr by hand to show the raw `mlx.download` stream.
+In a SwiftUI app, `Components`' `ModelPickerView` renders the model list, availability badges,
+on-disk sizes, the progress bar, and an "Add from Hugging Face" field from `lab.models` directly
+— see [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+
 ## The `git` and `run_tests` tools (this example provides them, not the SDK)
 
 **Background.** A "tool" here is a small Swift type conforming to `Tool` that you put in the

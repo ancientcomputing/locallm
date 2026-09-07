@@ -161,6 +161,12 @@ reasons; see `repo-qa`'s README). The only differences:
 
 That's the point: the model layer is a swap-in, not a rewrite.
 
+> **Building a UI for this?** This CLI prints download `%` to stderr by hand to show the raw
+> `mlx.download` event stream. A real app doesn't need to: `Components`' `ModelPickerView`
+> ([`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer))
+> binds to `lab.models` and renders the model list, availability badges, on-disk sizes, the
+> progress bar, and an "Add from Hugging Face" field for you.
+
 ## Verified live
 
 ```

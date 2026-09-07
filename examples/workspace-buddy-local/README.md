@@ -174,6 +174,13 @@ copied verbatim. The differences, all in the view model:
 The `WorkspaceTools` array, the instructions, the single-turn shape, and the "no delete tool by
 default" choice are all unchanged.
 
+> **The download UI is hand-rolled here on purpose.** The `.downloadingModel(fraction)` state and
+> the `mlx.validate` → `mlx.download` loop are ~20 lines that show the raw event stream. If you
+> want the ready-made version — a model list with availability badges, on-disk sizes, the
+> progress bar, and an "Add from Hugging Face" field — `Components`' `ModelPickerView` binds
+> straight to `lab.models`; see
+> [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+
 ## Changing the model
 
 Edit `workspaceModelRepo` at the top of

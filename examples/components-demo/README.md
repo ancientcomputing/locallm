@@ -18,7 +18,7 @@ Beyond the picker, the app has no TCC-gated connectors (no Calendar/Reminders/Lo
 build-time feature flags — just the "Add a server" screen, per-tool/per-resource enable toggles,
 live "Tools available this session" tracking, and a "Save As…" export of what a connected server
 offers. See
-[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-for-mcp-server-management)
+[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)
 for what `Components` provides and how it's meant to be dropped into your own app.
 
 Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta to build).

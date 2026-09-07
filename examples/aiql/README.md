@@ -170,6 +170,12 @@ the two things it gets wrong on raw data (transcription, and "top N", which is n
 `sortRows`). A 4B model usually works but sometimes adds a step you didn't ask for. A 12B+ model
 is the most reliable. Any MLX-format Hugging Face repo id works in the field.
 
+The model field and the download progress panel here are hand-built (the panel is fed by
+`session.events`). For a settings-screen version of the same thing — a model list with
+availability badges, on-disk sizes, and an "Add from Hugging Face" field — use `Components`'
+`ModelPickerView`; see
+[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+
 ## More
 
 - [`docs/sdk-guide.md` §8b](../../docs/sdk-guide.md) — the "AIQL" data verbs, in prose.

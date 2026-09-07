@@ -2,7 +2,8 @@
 
 Audience: a Swift developer linking `LocalLMLabSDKCore` into their own macOS app to add local-AI
 tool-calling — system connectors (Calendar, Reminders, Contacts, Location), an MCP client, and
-(via `Components`) prebuilt SwiftUI for managing MCP server connections. Everything here has been
+(via `Components`) prebuilt SwiftUI for MCP servers and for the model layer (model picker,
+open-weight downloads, online-provider settings). Everything here has been
 exercised against real signed apps and real live MCP servers, not just written from the API
 surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
 [`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
@@ -1393,26 +1394,29 @@ Apple-Distribution-signed, sandboxed `.pkg` build this setup enables — Develop
 notarization is the other supported path (`build-and-sign.sh`), for distributing outside the Mac
 App Store.
 
-## 11. Components: prebuilt SwiftUI for MCP server management
+## 11. Components: prebuilt SwiftUI (MCP servers + the model layer)
 
-> **Reach for this when** you want a working "manage MCP servers" screen — add / remove /
-> reconnect, all three auth types from §3, per-tool and per-resource enable/disable,
-> resource + prompt browsing — without building that UI yourself. It's SwiftUI, entirely
-> optional, and layered strictly on Core's public API (nothing here you couldn't write). Also
-> ships `ModelPickerView` / `ClaudeAuthField` for the model layer (§6a). **Skip it if** your
-> app has no user-facing server management, or your design is too bespoke to reuse these views
-> — go straight to `MCPServerManager` (§6 — the MCP client API).
+> **Reach for this when** you want a working settings surface — for **MCP servers** (add /
+> remove / reconnect, all three auth types from §3, per-tool and per-resource enable/disable,
+> resource + prompt browsing) **or the model layer** (pick a model, download an open-weight
+> one from Hugging Face with a progress bar, see on-disk size, configure an online provider +
+> key + web search) — without building that UI yourself. It's SwiftUI, entirely optional, and
+> layered strictly on Core's public API (nothing here you couldn't write). **Skip it if** your
+> app has no user-facing configuration, or your design is too bespoke to reuse these views —
+> go straight to `MCPServerManager` (§6) or `lab.models` (§6a).
 >
-> **Example that uses it:** [`components-demo`](../examples/components-demo/) — essentially
-> the whole app is these views.
+> **Examples that use it:** [`components-demo`](../examples/components-demo/) — essentially
+> the whole app is the MCP views; [`model-switch`](../examples/model-switch/) — the online-provider
+> panel (`AIModelsSettingsView`).
 
-See [`annotated-examples.md`](annotated-examples.md) for `components-demo`'s full source with
-every `Components`/`Core` touchpoint marked.
+See [`annotated-examples.md`](annotated-examples.md) for both apps' full source with every
+`Components`/`Core` touchpoint marked.
 
 Everything above is `Core` — a plain Swift engine with no UI dependency. `Components` is a
-separate, optional package built on top of Core's public API, for when you don't want to write
-your own MCP-server-management UI from scratch. See [`examples/components-demo`](../examples/components-demo)
-for a working reference app using all of it.
+separate, optional package built on top of Core's public API. It ships one binary-artifact
+dependency on `Core.xcframework` and no source access to Core's internals.
+
+**MCP-server views:**
 
 - **`MCPServerManagerObservable`** — an `ObservableObject` wrapper around `MCPServerManager`, for
   SwiftUI apps that want `@Published`-style reactivity without writing the wrapper themselves (see
@@ -1426,9 +1430,46 @@ for a working reference app using all of it.
   read/expand one, via callbacks (`onAttach`/`onUse`) so your app decides what to actually do with
   the result — append it to a text field, feed a session, save it, whatever fits your UI.
 
-None of these views hold persistence of their own — call `manager.core.restore(from:)` yourself at
-launch with whatever you've saved, the same shape `MCPServerManager`'s own doc comment on that
-method describes.
+**Model-layer views** (all bind directly to `lab.models`, an `@Observable` `ModelRegistry` — no
+polling):
+
+- **`ModelPickerView`** — the local-model surface. Lists `registry.knownModels` with an
+  availability badge each (*Ready* / *Not downloaded* / *Needs credential* / *Requires macOS 27*),
+  bound to a `Binding<ModelID?>` for the current choice. When `LocalLMLabSDKInference` is linked it
+  also renders a **"Downloaded models"** section: each installed model with its on-disk size, a
+  **live download progress bar** per in-flight download (`registry.downloads`), and an **"Add from
+  Hugging Face"** field wired to `registry.startDownload(_:)`. On macOS 26, `show27OnlyModels: true`
+  (the default) shows `pcc` / `claude` / `mlx` as disabled "Requires macOS 27" rows. This is the
+  ready-made version of the hand-rolled `.downloadingModel(fraction)` progress loop in the
+  model-layer examples ([`repo-qa-local`](../examples/repo-qa-local/),
+  [`workspace-buddy-local`](../examples/workspace-buddy-local/), [`aiql`](../examples/aiql/),
+  [`code-buddy`](../examples/code-buddy/)) — those roll their own to show the raw `mlx.download`
+  event stream; a real settings panel uses this.
+- **`AIModelsSettingsView`** — the whole "AI Models" panel: the built-in families with live
+  availability, then one `ProviderSettingsSection` per configured **online** provider, then an
+  **Add provider** menu (OpenAI / Anthropic / OpenRouter / custom OpenAI-compatible). The host owns
+  `[RemoteProviderDraft]` (persist keys to the Keychain) and the `onSave` / `onRemove` / `onTest`
+  closures that turn a draft into a `RemoteModelProvider` and call `lab.models.replace(_:)`.
+  `Components` has **no dependency on `LocalLMLabSDKRemote`** — the closures are the seam, so a
+  macOS-26 chooser can present the panel and hand the 27-only work to a helper. See §6b.
+- **`ProviderSettingsSection`** — one provider block: API-key field, a **Configured ✓** badge, a
+  per-model row editor (add / trash), an **Enable web search** toggle + **Max searches** stepper
+  once configured, and a **Test connection** button (one result per model, via the host's
+  `probe(for:)`). Usable on its own if you don't want the whole `AIModelsSettingsView`.
+- **`RemoteProviderDraft`** / **`RemoteProviderKind`** / **`ProviderTestOutcome`** — the plain data
+  types the host maps to `RemoteProviderConfig` in ~20 lines (see
+  [`examples/model-switch`](../examples/model-switch/)'s `ProviderGlue.swift`).
+- **`ClaudeAuthField`** — a ready-made secure field for the Anthropic API key that
+  `ClaudeModelProvider(auth: .apiKey(_:))` needs for prototyping (a shipped app uses App Attest).
+  The value is handed to the host via the binding; `Components` never persists it.
+
+`ModelPickerView` (local models + MLX download) and `AIModelsSettingsView` (online providers) are
+currently **separate surfaces** — a full "AI Models" panel composes both. Unifying them is on the
+list; for now, present whichever your app needs, or stack them.
+
+None of these views hold persistence of their own — the MCP views go through
+`manager.core.restore(from:)`, the model views through `lab.snapshot()` / `lab.restore(from:)`
+and your own Keychain, at launch, with whatever you've saved.
 
 ## 12. Full function/type reference
 
@@ -1450,6 +1491,7 @@ and gotchas — use this one when you just need to check a signature.
 | MCP client + OAuth (Todoist) + Keychain | `plate-today` / `plate-today-tools` | — |
 | `MCPTool` built from a live server schema (no hand-written `Arguments`) | [`repo-qa`](../examples/repo-qa/) · [`repo-qa-local`](../examples/repo-qa-local/) | A |
 | `Components` — `MCPServerPickerView` / `MCPServerManagerObservable` / resources / prompts | [`components-demo`](../examples/components-demo/) | — |
+| `Components` — model layer (`ModelPickerView` / `AIModelsSettingsView` / `ProviderSettingsSection`) | [`model-switch`](../examples/model-switch/) (`AIModelsSettingsView`) | — |
 
 ### The model layer (`LocalLMLab`, routing, providers, sessions)
 
@@ -2138,13 +2180,52 @@ struct MCPPromptsView: View {
 // Model layer (1.0)
 struct ModelPickerView: View {
     init(registry: ModelRegistry, selection: Binding<ModelID?>, show27OnlyModels: Bool = true)
-    // Lists registry.knownModels; each row shows availability (grayed + reason for .unavailable),
-    // a download button + progress for .notDownloaded, storage size. Binds to the @Observable
-    // registry directly — no polling. On macOS 26, show27OnlyModels: true adds disabled
-    // "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
+    // Lists registry.knownModels with an availability badge each (Ready / Not downloaded /
+    // Needs credential / Requires macOS 27). When LocalLMLabSDKInference is linked, also a
+    // "Downloaded models" section: installed models + on-disk size, a live progress bar per
+    // registry.downloads entry, and an "Add from Hugging Face" field → registry.startDownload(_:).
+    // Binds to the @Observable registry directly — no polling. On macOS 26, show27OnlyModels:
+    // true adds disabled "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
 }
 struct ClaudeAuthField: View {
     init(apiKey: Binding<String>, onCommit: @escaping () -> Void = {})
     // A ready-made secure field for the Claude API key that ClaudeModelProvider(auth: .apiKey(_:)) needs.
+}
+
+// Online providers (1.0.0-beta.3) — the "AI Models" settings panel. Host owns [RemoteProviderDraft]
+// (keys → Keychain) and maps a draft → RemoteProviderConfig in the closures. Components does not
+// link LocalLMLabSDKRemote; see §6b and examples/model-switch/ProviderGlue.swift.
+struct AIModelsSettingsView: View {
+    init(registry: ModelRegistry, providers: Binding<[RemoteProviderDraft]>,
+         onSave: @escaping (RemoteProviderDraft) -> Void,
+         onRemove: @escaping (RemoteProviderDraft) -> Void,
+         onTest: ((RemoteProviderDraft) async -> ProviderTestOutcome)? = nil)
+    // Built-in families + one ProviderSettingsSection per online provider + an "Add provider" menu.
+}
+struct ProviderSettingsSection: View {
+    init(draft: Binding<RemoteProviderDraft>,
+         onSave: @escaping (RemoteProviderDraft) -> Void,
+         onRemove: (() -> Void)? = nil,
+         onTest: ((RemoteProviderDraft) async -> ProviderTestOutcome)? = nil)
+    // One provider: key field, Configured badge, per-model rows, web-search toggle + max-searches
+    // stepper, "Test connection" (one result per model). Usable standalone.
+}
+struct RemoteProviderDraft: Identifiable, Hashable, Sendable {
+    var scheme, displayName, baseURL, apiKey: String
+    var kind: RemoteProviderKind
+    var models: [String]                 // .new(_:) leaves this empty — host prefills (docs/12 §10)
+    var webSearchSupported, webSearchEnabled, configured: Bool
+    var maxSearches: Int
+    var statusText: String?
+    static func new(_ kind: RemoteProviderKind) -> RemoteProviderDraft
+}
+enum RemoteProviderKind: String, CaseIterable {   // openAIChat, openAIResponses, anthropic, openRouter, openAICompatible
+    var addMenuLabel: String { get }
+}
+struct ProviderTestOutcome: Sendable, Equatable {
+    struct ModelResult: Identifiable { var modelId: String; var ok: Bool; var detail: String }
+    var results: [ModelResult]           // one per configured model, in order
+    var message: String?                 // set instead of results when the check couldn't run
+    static func unableToRun(_ message: String) -> ProviderTestOutcome
 }
 ```
