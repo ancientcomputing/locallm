@@ -17,27 +17,23 @@ struct SDKRelease {
     let checksum: String
 }
 
+// The SDK release these examples build against with no setup — what "clone, open in
+// Xcode, Run" uses. `knownSDKReleases` carries this plus the previous release. Build
+// against another published version: set LOCALLM_SDK_VERSION in your shell (works for
+// `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
+// release not listed, add its entry (URL + the `.sha256` next to the zip on the
+// GitHub release) or just replace the strings in place.
+let defaultSDKVersion = "1.0.0-beta.3"
+
 let knownSDKReleases: [String: SDKRelease] = [
-    "0.7.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
-        checksum: "8853f891f782cb052dd49850e6490558ba68b21b6970a0e1b83d393ab50f8289"
-    ),
-    "0.7.1": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.1/LocalLMLabSDKCore-0.7.1.xcframework.zip",
-        checksum: "d165bc1fbed790ac2264502c0cfa16336b68d2d7d9d282964742bd8b73f08e21"
-    ),
-    "0.8.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.8.0/LocalLMLabSDKCore-0.8.0.xcframework.zip",
-        checksum: "3a7369e3fbd88de0bcf5cbe2e0a4202b2b919b67c20f364fb8bb2572fd1b9703"
-    ),
-    "1.0.0-beta.1": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.1/LocalLMLabSDKCore-1.0.0-beta.1.xcframework.zip",
-        checksum: "0b4ab34e474d1acd725161cfb591cf3d862a7529fe7c9dbadf01eece3ad1590f"
-    ),
     "1.0.0-beta.2": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
         checksum: "e3e687e503d3c563e6548b472dc8eb415475f0402845e9b4a56c58c15105c974"
-    )
+    ),
+    "1.0.0-beta.3": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
+        checksum: "a49b8bfcde340d8b86bf106d2af2cb9d84f3839a3bc1695016f3952a3fcdfb92"
+    ),
 ]
 
 func failManifest(_ message: String) -> Never {
@@ -45,16 +41,7 @@ func failManifest(_ message: String) -> Never {
     exit(1)
 }
 
-guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] else {
-    failManifest("""
-    error: LOCALLM_SDK_VERSION is not set.
-    Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.8.0 swift build
-    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    NOTE: this example needs 0.8.0 or later — it depends on WorkspaceAccess/WorkspaceTools
-    (docs/sdk-guide.md §8a), which 0.7.0/0.7.1 predate.
-    """)
-}
+let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] ?? defaultSDKVersion
 
 guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
     failManifest("""
@@ -66,6 +53,11 @@ guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
 let package = Package(
     name: "WorkspaceBuddy",
     platforms: [.macOS("26.0")],
+    products: [
+        // Vend the Core binary as a library product so the XcodeGen .xcodeproj variant
+        // (project.yml) can depend on it by name. `swift build` doesn't need this.
+        .library(name: "LocalLMLabSDKCore", targets: ["LocalLMLabSDKCore"])
+    ],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",

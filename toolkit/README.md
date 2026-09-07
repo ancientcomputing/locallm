@@ -16,8 +16,8 @@ The zip and its checksum are checked into this folder — one per release. Grab
 them by cloning the repo, or download a single file raw, e.g.:
 
 ```bash
-curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.2-arm64.zip
-curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.2-arm64.zip.sha256
+curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.3-arm64.zip
+curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.3-arm64.zip.sha256
 ```
 
 Older releases (`0.6`–`0.8`) are alongside it in this folder.
@@ -25,20 +25,21 @@ Older releases (`0.6`–`0.8`) are alongside it in this folder.
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-1.0.0-beta.2-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-1.0.0-beta.3-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-1.0.0-beta.2-arm64.zip
+unzip localai-toolkit-1.0.0-beta.3-arm64.zip
 ```
 
-This produces `localai-cli`, `localai-playground-run` (macOS 27) and
-`localai-playground-run-compat` (macOS 26), plus the `.dylib`s and resource
-bundles they need. Keep everything together — `localai-cli` picks the right
-helper next to itself based on the OS — and either put `localai-cli` on your
-`PATH` or reference it by full path.
+This produces `localai-cli`, `localai-playground-run` (macOS 27),
+`localai-playground-run-compat` (macOS 26), and a `runtime/` folder holding
+the libraries and resources they load. Keep `runtime/` next to the
+executables — the folder moves as a unit — and `localai-cli` picks the right
+helper next to itself based on the OS. Put `localai-cli` on your `PATH` (or
+reference it by full path); the folder itself has to stay together.
 
 On macOS 26 only the Apple on-device model (`system`) is available; Private
 Cloud Compute, Claude, and open-weight (MLX) models need macOS 27.

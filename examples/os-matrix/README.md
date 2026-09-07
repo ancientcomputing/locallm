@@ -17,12 +17,12 @@ Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different beha
 
 ## Run
 
-`Package.swift` resolves the SDK as a binary dependency and **requires an explicit
-`LOCALLM_SDK_VERSION`** (it fails fast otherwise, listing the versions this copy knows about):
+`Package.swift` resolves the SDK as a binary dependency, building against `1.0.0-beta.3` by
+default (set `LOCALLM_SDK_VERSION` in a shell to pin another release — see
+[`../README.md`](../README.md#building--running-an-sdk-example)):
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run OSMatrix
 ```
 
 > **`error: package … tools version 6.4.0 … installed version is 6.3.3`** — your Swift
@@ -31,6 +31,16 @@ LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix
 > quick fix is to edit line 1 of `Package.swift` down to your installed version
 > (`// swift-tools-version: 6.3`). The alternative is a newer toolchain — a standalone Swift
 > 6.4 toolchain from swift.org runs fine on macOS 26; no OS upgrade needed.
+
+### In Xcode
+
+A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
+**File ▸ Open → `Package.swift`**, pick the **OSMatrix** scheme, Run — in **`Xcode-beta.app`, not
+a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). Output
+goes to the Xcode console. No arguments needed for the default run; for `--download <hf-repo>` add both entries
+under **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**. No signing setup — a plain CLI tool
+signs ad-hoc automatically. The point of the example is running the *same* build on a macOS 26
+and a macOS 27 machine, so you'll still want a terminal (or two Macs) to see the contrast.
 
 ### On macOS 26
 
@@ -60,7 +70,7 @@ run ends by pointing at `--download`.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.2 swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
+swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
 ```
 
 This calls `try await lab.models.startDownload("mlx-community/Qwen3-4B-4bit")` — an `async`
@@ -77,6 +87,11 @@ let session = try lab.makeSession(route: "chat")
 
 `lab.models.downloads` (`[ModelID: Double]`, observable) is what a picker binds to for a
 progress bar. On macOS 26, `--download` prints "needs macOS 27" and exits.
+
+The availability table this CLI prints — and the `--download` progress — are exactly what
+`Components`' `ModelPickerView` renders as a real settings screen (badges, on-disk sizes,
+progress bar, "Add from Hugging Face"); see
+[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
 
 ## The four scenarios, and where each shows up here
 

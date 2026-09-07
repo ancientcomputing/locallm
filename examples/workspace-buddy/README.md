@@ -42,6 +42,19 @@ Realistic asks: "rename `oldName` to `newName` in this file", "add a doc comment
 function", "convert this JSON to YAML". It will struggle with big files, many files in one
 request, or open-ended refactors, and it tool-calls less reliably than a larger model.
 
+**Prompts to try.** Point it at a throwaway folder with a handful of small text/code files (a
+copy of some project's `Sources/`, or just make a few by hand), then paste one of these:
+
+- `List the files here, then add a one-line comment with the file's name to the top of each .swift file.`
+- `In README.md, replace every occurrence of "TODO" with "DONE".`
+- `Create a file called NOTES.md with a two-sentence summary of what this folder contains.`
+- `Rename the function greet to sayHello in Sources/App/main.swift, including any calls to it in that file.`
+- `Read config.json and write the same data as config.yaml next to it.`
+
+Each is one well-scoped change to one or two named files — the shape the on-device model handles
+reliably. After **Go**, confirm with `git diff` (or your editor); the model's summary is not the
+source of truth, the files on disk are.
+
 For more capability while staying local, [`workspace-buddy-local`](../workspace-buddy-local) is
 this same app running a downloadable open-weight model (e.g. an 8B). The SDK can also route to
 Claude if a cloud model is acceptable — see [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
@@ -56,22 +69,17 @@ Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your term
 (it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
 Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
 
-**2. Set two environment variables** in the terminal you'll build from:
+**2. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
-  alone).
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download
-  `LocalLMLabSDKCore.xcframework` from. Omitting it fails fast with a clear error. (`WorkspaceAccess`/
-  `WorkspaceTools`, this app's whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use
-  `1.0.0-beta.1+`.)
-
-These last only for the current terminal — re-run step 2 in each new terminal (or add both
-`export` lines to your `~/.zshrc`).
+Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
+setup — `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
+(`WorkspaceAccess`/`WorkspaceTools`, this app's whole point, first shipped in SDK `0.8.0`, but on
+macOS 27 you use `1.0.0-beta.3+`.)
 
 **3. Compile-check:**
 
@@ -79,19 +87,57 @@ These last only for the current terminal — re-run step 2 in each new terminal 
 swift build
 ```
 
-This just proves it builds. To *actually run* it you need a signed `.app` — see below.
+This just proves it builds. To *actually run* it: open the Xcode project (next), or make a
+signed `.app` with `packaging/build-and-sign.sh` (further below).
+
+## Open in Xcode and Run
+
+A committed `WorkspaceBuddy.xcodeproj` is the lowest-friction way to try it. **Open it in
+`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+
+```bash
+open -a Xcode-beta WorkspaceBuddy.xcodeproj
+```
+
+Pick the **WorkspaceBuddy** scheme and Run — a real sandboxed `.app` (menu bar, Dock icon, the
+`files.user-selected.read-write` entitlement). Click **Choose Folder…**, pick a throwaway
+directory, type a request, hit **Go**.
+
+**Signing.** The project is set to **Automatic** with no hard-coded team, so Xcode signs the Run
+build with your **Apple Development** identity. That matters here: a security-scoped bookmark is
+bound to the app's signing identity, and an ad-hoc identity changes on every rebuild — so under
+ad-hoc you re-pick the folder after every rebuild, and the "bookmark survives relaunch" point of
+this example never actually shows. A stable team signature fixes that.
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (**free** is enough) | picked automatically — stable `Apple Development` signing, bookmark persists across rebuilds |
+| No Apple ID | Run stops with *"requires a development team"* — add a free Apple ID, **or** target ▸ **Signing & Capabilities** ▸ **Sign to Run Locally** (ad-hoc; runs, but you re-pick the folder each rebuild) |
+
+Only the Xcode Run build is affected. `packaging/build-and-sign.sh` (below) ignores the project
+file and signs with whatever `APP_IDENTITY` you pass it.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,
+then `xcodegen generate`.
 
 ## Running it
 
 Unlike the CLI examples, this is a sandboxed SwiftUI `.app`, and the whole point — a
 security-scoped bookmark surviving relaunch — only means anything with the sandbox on and the
-`com.apple.security.files.user-selected.read-write` entitlement in place. A bare `swift run`
-gets neither, so it's compile-only. The real build is `packaging/build-and-sign.sh`, which needs
-a **Developer ID Application** signing identity in your keychain
-(`security find-identity -v -p codesigning`):
+`com.apple.security.files.user-selected.read-write` entitlement in place. A bare `swift run` gets
+neither, so it's compile-only. Two ways to get a real, entitled build:
+
+- **The Xcode project above** — the fast path; a locally-signed `.app` you can run and iterate on.
+- **`packaging/build-and-sign.sh`** — for a `.app` you can hand to another Mac (Developer-ID
+  signed and notarizable). It needs a signing identity; a **free "Apple Development"** one is
+  enough for a local run (an ad-hoc build won't hold the sandbox grant), a Developer ID for
+  distribution. See the
+  [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
   ./packaging/build-and-sign.sh
 ```

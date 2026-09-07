@@ -18,29 +18,50 @@ Beyond the picker, the app has no TCC-gated connectors (no Calendar/Reminders/Lo
 build-time feature flags — just the "Add a server" screen, per-tool/per-resource enable toggles,
 live "Tools available this session" tracking, and a "Save As…" export of what a connected server
 offers. See
-[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-for-mcp-server-management)
+[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)
 for what `Components` provides and how it's meant to be dropped into your own app.
 
 Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta to build).
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.1`, which needs macOS 27. Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.3`, which needs macOS 27. Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
 `'v27' is unavailable`. Nothing to download by hand — `Package.swift` (both this app's and the
-sibling [`Components`](../../Components/) package it depends on) requires an explicit
-`LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency:
+sibling [`Components`](../../Components/) package it depends on) resolves `LocalLMLabSDKCore` as a
+binary dependency, building against `1.0.0-beta.3` by default:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
 ```
+
+Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published release — see
+[`../README.md`](../README.md#building--running-an-sdk-example).
+
+## Open in Xcode and Run
+
+A committed `ComponentsDemo.xcodeproj` is the fastest look. **Open it in `Xcode-beta.app`, not a
+stable Xcode** (the target is macOS 27 → a stable Xcode fails with `'v27' is unavailable`).
+Launch `Xcode-beta.app` and **File ▸ Open**, or:
+
+```bash
+open -a Xcode-beta ComponentsDemo.xcodeproj
+```
+
+Pick the **ComponentsDemo** scheme and Run — a real `.app` (menu bar, Dock icon,
+`componentsdemo:` OAuth redirect scheme), ad-hoc signed for this Mac, the same local-run tier
+as `packaging/build-and-sign.sh` with `APP_IDENTITY` unset.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)
+— edit `project.yml`, not the `.xcodeproj`. To pin a different SDK release for the Xcode build,
+edit `defaultSDKVersion` in `../../Components/Package.swift` (Xcode ignores `LOCALLM_SDK_VERSION`).
 
 ## Quick dev-loop run
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run
+swift run
 ```
 
 Unlike `plate-today`, this app needs no TCC entitlements to function — the MCP server picker
@@ -48,22 +69,23 @@ Unlike `plate-today`, this app needs no TCC entitlements to function — the MCP
 or not. `swift run` is enough to try the full server-add/connect/tool-enable flow; you only need
 the packaged build below to test it as a real, distributable `.app`.
 
-## Real build: `packaging/build-and-sign.sh`
+## Distributable build: `packaging/build-and-sign.sh`
+
+For just trying the app, the Xcode project above is enough. Use this script for a `.app` you can
+hand to another Mac. With no `APP_IDENTITY` it signs **ad-hoc** (this Mac only); set `APP_IDENTITY`
+to sign it for wider use — see the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-NOTARIZE_APP=0 \
-./packaging/build-and-sign.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
 ```
 
 ### Environment variables
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LOCALLM_SDK_VERSION` | Yes | — | Read by both this app's `Package.swift` and `Components`' own — `swift build` fails without it. |
-| `APP_IDENTITY` | Yes | — | Must match a valid codesigning identity in your keychain (`security find-identity -v -p codesigning`). `SIGN_IDENTITY` also works as a fallback name. |
+| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
+| `APP_IDENTITY` | No | ad-hoc | Any codesigning identity, or unset for a local ad-hoc build. See the [signing table](../README.md#signing-a-app--app_identity). |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |

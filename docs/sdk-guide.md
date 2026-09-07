@@ -2,7 +2,8 @@
 
 Audience: a Swift developer linking `LocalLMLabSDKCore` into their own macOS app to add local-AI
 tool-calling — system connectors (Calendar, Reminders, Contacts, Location), an MCP client, and
-(via `Components`) prebuilt SwiftUI for managing MCP server connections. Everything here has been
+(via `Components`) prebuilt SwiftUI for MCP servers and for the model layer (model picker,
+open-weight downloads, online-provider settings). Everything here has been
 exercised against real signed apps and real live MCP servers, not just written from the API
 surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
 [`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
@@ -78,14 +79,23 @@ import LocalLMLabSDKCore
 ```
 
 If you also want the prebuilt SwiftUI pieces (MCP server picker, OAuth waiting view, resource/
-prompt browsing), add `Components` the same way — see [`examples/components-demo`](../examples/components-demo)
-for a working example of using it.
+prompt browsing, model picker, AI Models settings panel), add `Components` the same way — see
+[`examples/components-demo`](../examples/components-demo) for a working example of using it.
+
+The release carries **four xcframeworks** plus `Components` as source, all keyed off the same
+`LOCALLM_SDK_VERSION`; link only the ones you use: **`Core`** (always), **`Claude`** (Claude via
+Foundation Models — forces a macOS 27 target), **`Inference`** (local open-weight / MLX models),
+**`Remote`** (online providers — GPT / Claude online / OpenRouter, see §6b), and **`Components`**
+(SwiftUI, consumed as source, not an xcframework). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
+(Remote + Components) are the multi-binary manifest shapes to copy from.
 
 ### 1a. Targeting macOS 26 and macOS 27 from one build
 
 As of `1.0.0-beta.2`, `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`
-all have a **macOS 26 deployment floor**. One app, one link, runs on both — with the model
-families that need macOS 27 (Private Cloud Compute, open-weight / MLX) simply absent on 26. The
+all have a **macOS 26 deployment floor** — and `LocalLMLabSDKRemote` (added in `1.0.0-beta.3`)
+has a macOS 26 *manifest* floor too, though `RemoteModelProvider` itself is 27-only (see §6b).
+One app, one link, runs on both — with the model families that need macOS 27 (Private Cloud
+Compute, open-weight / MLX, online providers) simply absent on 26. The
 `#available` check is one block, at provider registration; everything after it is identical code.
 
 ```swift
@@ -631,7 +641,7 @@ survive a relaunch. → *code-buddy builds `LocalLMLab` with two providers and m
 | Provider | Ships in | `scheme` | macOS | For |
 |---|---|---|---|---|
 | `SystemModelProvider` | Core | `system` | 26+ | Apple's on-device model — always there on an Apple-Intelligence Mac |
-| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model — **not functional yet**; a session routed to `pcc` fails. Fix targeted for a later release. |
+| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model (Apple's own models, not your weights). Needs the PCC entitlement + App Store Small Business Program — there is no paid tier. Since `1.0.0-beta.3` the provider maps availability, quota, and typed errors cleanly, and adds `probe(timeout:)` — an async liveness check (`availability(for:)` alone can say `.available` while turns still throw on a build without the entitlement). |
 | `ClaudeModelProvider(auth:)` | **`LocalLMLabSDKClaude`** | `claude` | 27 | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
 | `MLXModelProvider` | **Inference** | `mlx` | 27 | Locally-run open-weight models (Qwen, Llama, …) via MLX |
 
@@ -800,6 +810,56 @@ owns the security-scoped-bookmark bracket; the ready-made tools (`SearchWorkspac
 `ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`, `DeleteWorkspaceFileTool`)
 are FoundationModels `Tool`s you drop straight into `makeSession`. → *`code-buddy` and
 [`workspace-buddy`](../examples/workspace-buddy/) (the Core-only, no-MLX version) both use these.*
+
+## 6b. Online providers — GPT, Claude online, OpenRouter (`LocalLMLabSDKRemote`)
+
+**Reach for this when** you want a hosted model API — OpenAI, Anthropic's Messages API,
+OpenRouter, or any OpenAI-compatible server — behind the *same* `lab.makeSession(route:)` call
+site as the on-device and local models, ideally with the provider running web search for you.
+
+`LocalLMLabSDKRemote.xcframework` is a **4th binary** on the release, added the same way as
+`Inference` / `Claude` — a `binaryTarget` keyed off `LOCALLM_SDK_VERSION`. It has **no
+third-party dependencies** (pure `URLSession`). Its manifest floor is macOS 26, so linking it
+does **not** force a macOS 27 deployment target; `RemoteModelProvider` itself is
+`@available(macOS 27)` and reports `.requiresOS("macOS 27")` on 26 — so a macOS-26 app can link
+it and just not register it below 27.
+
+```swift
+import LocalLMLabSDKRemote
+
+// One data-driven config per provider. A preset fills in the dialect + base URL + auth shape;
+// YOU supply the model ids — the SDK ships none (which id is current/good is your call).
+var openai = RemoteProviderConfig.openAI(apiKey: key, models: [RemoteModel(id: "gpt-…")])
+openai.capabilities.insert(.webSearch)
+openai.defaultOptions.webSearch = true          // provider runs the search; no MCP needed
+
+lab.models.replace(RemoteModelProvider(openai)) // register / re-register at runtime
+lab.models.route("chat", to: ModelID(scheme: "openai", rest: "gpt-…")!)
+let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
+```
+
+- **`RemoteProviderConfig`** — `scheme`, `dialect` (`.openAIChat` / `.openAIResponses` /
+  `.anthropicMessages` / `.openAICompatible`), `baseURL`, `auth`, `models`, `capabilities`,
+  `defaultOptions`. No vendor is privileged — Claude-over-HTTP is just `dialect:
+  .anthropicMessages`. Presets: `.openAI`, `.openAIResponses`, `.anthropic`, `.openRouter`,
+  `.openAICompatible`.
+- **`RemoteModelProvider.probe(for:timeout:)`** — a **zero-token** check of key + model +
+  reachability. Returns `.available` / `.needsCredential` (401/403) / `.unsupportedModel`
+  (404 or absent from `GET /models`) / `.providerError` (429 / 5xx / timeout). Call it before
+  offering a provider — a hosted API has far more failure modes than a local model.
+- **`ModelRegistry.replace(_:)` / `.removeProvider(scheme:)`** — add, swap, or drop a provider
+  between sessions without rebuilding `LocalLMLab`.
+- **Web search** — set `capabilities.insert(.webSearch)` + `defaultOptions.webSearch = true`
+  (per-provider), or `SessionOptions(webSearch: true)` per turn. Works on OpenAI, Anthropic
+  Messages, OpenRouter, and `ClaudeModelProvider` (Foundation Models). `session.events`
+  yields `.serverToolCall` with the queries; `session.citations` carries the sources.
+
+**Settings UI:** `Components`' `AIModelsSettingsView` renders the whole "AI Models" panel
+(add provider + key, per-model rows, web-search toggle, Test connection). `Components` does
+**not** link `Remote` — it calls back through `onSave` / `onRemove` / `onTest` closures with
+plain `RemoteProviderDraft` / `ProviderTestOutcome` values, so a macOS-26 chooser can host the
+panel and hand the actual `RemoteModelProvider` work to a 27-only helper. → *the full pattern
+is [`examples/model-switch`](../examples/model-switch/).*
 
 ## 7. Connectors: Calendar, Reminders, Contacts, Location
 
@@ -1121,9 +1181,11 @@ fails loudly if `oldString` isn't found or isn't unique in the file (pass `repla
 really mean every occurrence). This was a deliberate choice, not an obvious one: a small on-device
 model reliably producing correct line numbers and context lines for a real diff format is a much
 harder ask than quoting one exact, minimal, uniquely-identifying snippet — and it's a much simpler,
-safer thing for Core to validate and apply. `writeFile` is create-only (fails if the file already
-exists) — use `editFile` to modify something that's already there, same add-vs-update split
-Calendar/Reminders/Contacts already use.
+safer thing for Core to validate and apply. `writeFile` is create-by-default — it fails on an
+existing file unless you pass `overwrite: true`, the deliberate opt-in for regenerating a
+wholly-derived file (a CSV/JSON data export, a report), or `append: true` to add to the end of
+one (accumulating a result that arrives in pages). Use `editFile` for a targeted change to
+an existing file, same add-vs-update split Calendar/Reminders/Contacts already use.
 
 Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWorkspaceFilesTool`,
 `ReadWorkspaceFileTool`, `WriteWorkspaceFileTool`, `EditWorkspaceFileTool`, `DeleteWorkspaceFileTool`
@@ -1138,6 +1200,50 @@ synchronous, bracketing a single, quick access. If you're handing these tools to
 `respond(to:)` call — the security-scoped access window has to stay open for that *whole* async
 call, not just a synchronous setup step. `examples/workspace-buddy` shows the async-aware version
 (`withFolderAccessAsync<T>(_:)`) this actually requires.
+
+### 8b. `FileBackedTool` + the "AIQL" data verbs: a mechanical MCP-dataset → CSV pipeline
+
+The problem: a data-source tool (an MCP server tool for a dataset, an API, a big query) can
+return far more than fits in a small model's context — after the host truncates it the model
+sees a fraction, and it will paper over the gap rather than stop. Routing a bulk payload
+*through* the model is the wrong shape: the model is good at deciding *what* to extract and
+*how*, bad at being a copy buffer. Ask an 8–14B model to copy 80 records into a CSV and it
+invents the ones it didn't see.
+
+**`FileBackedTool`** wraps a dynamic-schema tool (an MCP tool adapter is the motivating case)
+and adds one root-level argument, `saveAs`. When the model supplies a path, the wrapped tool's
+raw result is written to `<workspace>/<saveAs>` and only a short receipt — byte/line count and a
+bounded head preview — returns. The model then works from the file (`readFileRange` a window →
+the verbs below), and the payload never enters its context. It's not a `Tool` that calls
+another `Tool` (the model can't invoke that) — it's a **decorator the host applies** when
+building the tool array. `FileBackedTool.mcp(descriptor:manager:root:)` wraps an
+`MCPToolDescriptor` in one call; `saveAsAppend` accumulates paginated pages into one file.
+
+**The data verbs** — ready-made `Tool`s, each takes the root `URL` at init, reads one workspace
+file, does one mechanical transform, writes a CSV back, and returns a one-line receipt (so the
+row data never reaches the model):
+
+| Tool | SQL analogue | what it does |
+|---|---|---|
+| `JSONToCSVTool` (`jsonToCsv`) | `SELECT cols FROM json_array` | point `rowsAt` at the records array (use `describeJson` first), list `{header, path}` columns — `path` is a `JSONPath` (`attributes.EMAIL`, `regions[0].code`) into each record; omit `columns` to flatten every scalar field |
+| `SelectColumnsTool` (`selectColumns`) | `SELECT a AS x, b` | project a CSV to chosen columns, reorder, rename |
+| `FilterRowsTool` (`filterRows`) | `WHERE` | keep rows matching conditions (`eq`/`ne`/`contains`/`notContains`/`startsWith`/`endsWith`/`matches`/`gt`/`gte`/`lt`/`lte`/`isEmpty`/`notEmpty`), ALL or `matchAny` |
+| `SortRowsTool` (`sortRows`) | `ORDER BY … LIMIT` | sort by a column (numeric if it's all-numeric), optional `limit` — **the mechanical answer to "top N", which is exactly where a small model fabricates** |
+| `DedupeRowsTool` (`dedupeRows`) | `SELECT DISTINCT` | drop duplicate rows, whole-row or by `on:` columns |
+| `AggregateRowsTool` (`aggregateRows`) | `GROUP BY` | `count`/`sum`/`avg`/`min`/`max` per group |
+| `ConcatRowsTool` (`concatRows`) | `UNION ALL` | stack CSV files, columns matched by name — for paginated pulls or separate exports |
+| `DescribeJSONTool` (`describeJson`) | — | compact structure summary (key paths, types, array lengths) — call before `jsonToCsv`; read-only |
+| `CSVInfoTool` (`csvInfo`) | — | row count, columns, sample rows — check a stage produced what you expected; read-only |
+
+The intended shape is a chain: `raw.json → describeJson → jsonToCsv → filterRows → sortRows →
+out.csv`. The building blocks under them — `CSVCodec` (RFC 4180 encode/decode + a header-keyed
+`Table`) and `JSONPath` (a read-only `a.b[0].c` resolver over a `JSONSerialization` value) — are
+`public` for writing your own verbs. **Pagination:** the model calls the data tool once per page
+with the same `saveAs` path plus `saveAsAppend: true`, and `jsonToCsv` / `describeJson` read the
+resulting file of concatenated JSON values (`{…}{…}{…}`) as one dataset.
+
+[`examples/aiql`](../examples/aiql/) is the end-to-end SwiftUI app — a plain-English request
+over an MCP dataset → this pipeline → a CSV in a folder you chose, with a local MLX model.
 
 ## 9. What's NOT in Core yet
 
@@ -1288,26 +1394,29 @@ Apple-Distribution-signed, sandboxed `.pkg` build this setup enables — Develop
 notarization is the other supported path (`build-and-sign.sh`), for distributing outside the Mac
 App Store.
 
-## 11. Components: prebuilt SwiftUI for MCP server management
+## 11. Components: prebuilt SwiftUI (MCP servers + the model layer)
 
-> **Reach for this when** you want a working "manage MCP servers" screen — add / remove /
-> reconnect, all three auth types from §3, per-tool and per-resource enable/disable,
-> resource + prompt browsing — without building that UI yourself. It's SwiftUI, entirely
-> optional, and layered strictly on Core's public API (nothing here you couldn't write). Also
-> ships `ModelPickerView` / `ClaudeAuthField` for the model layer (§6a). **Skip it if** your
-> app has no user-facing server management, or your design is too bespoke to reuse these views
-> — go straight to `MCPServerManager` (§6 — the MCP client API).
+> **Reach for this when** you want a working settings surface — for **MCP servers** (add /
+> remove / reconnect, all three auth types from §3, per-tool and per-resource enable/disable,
+> resource + prompt browsing) **or the model layer** (pick a model, download an open-weight
+> one from Hugging Face with a progress bar, see on-disk size, configure an online provider +
+> key + web search) — without building that UI yourself. It's SwiftUI, entirely optional, and
+> layered strictly on Core's public API (nothing here you couldn't write). **Skip it if** your
+> app has no user-facing configuration, or your design is too bespoke to reuse these views —
+> go straight to `MCPServerManager` (§6) or `lab.models` (§6a).
 >
-> **Example that uses it:** [`components-demo`](../examples/components-demo/) — essentially
-> the whole app is these views.
+> **Examples that use it:** [`components-demo`](../examples/components-demo/) — essentially
+> the whole app is the MCP views; [`model-switch`](../examples/model-switch/) — the online-provider
+> panel (`AIModelsSettingsView`).
 
-See [`annotated-examples.md`](annotated-examples.md) for `components-demo`'s full source with
-every `Components`/`Core` touchpoint marked.
+See [`annotated-examples.md`](annotated-examples.md) for both apps' full source with every
+`Components`/`Core` touchpoint marked.
 
 Everything above is `Core` — a plain Swift engine with no UI dependency. `Components` is a
-separate, optional package built on top of Core's public API, for when you don't want to write
-your own MCP-server-management UI from scratch. See [`examples/components-demo`](../examples/components-demo)
-for a working reference app using all of it.
+separate, optional package built on top of Core's public API. It ships one binary-artifact
+dependency on `Core.xcframework` and no source access to Core's internals.
+
+**MCP-server views:**
 
 - **`MCPServerManagerObservable`** — an `ObservableObject` wrapper around `MCPServerManager`, for
   SwiftUI apps that want `@Published`-style reactivity without writing the wrapper themselves (see
@@ -1321,9 +1430,46 @@ for a working reference app using all of it.
   read/expand one, via callbacks (`onAttach`/`onUse`) so your app decides what to actually do with
   the result — append it to a text field, feed a session, save it, whatever fits your UI.
 
-None of these views hold persistence of their own — call `manager.core.restore(from:)` yourself at
-launch with whatever you've saved, the same shape `MCPServerManager`'s own doc comment on that
-method describes.
+**Model-layer views** (all bind directly to `lab.models`, an `@Observable` `ModelRegistry` — no
+polling):
+
+- **`ModelPickerView`** — the local-model surface. Lists `registry.knownModels` with an
+  availability badge each (*Ready* / *Not downloaded* / *Needs credential* / *Requires macOS 27*),
+  bound to a `Binding<ModelID?>` for the current choice. When `LocalLMLabSDKInference` is linked it
+  also renders a **"Downloaded models"** section: each installed model with its on-disk size, a
+  **live download progress bar** per in-flight download (`registry.downloads`), and an **"Add from
+  Hugging Face"** field wired to `registry.startDownload(_:)`. On macOS 26, `show27OnlyModels: true`
+  (the default) shows `pcc` / `claude` / `mlx` as disabled "Requires macOS 27" rows. This is the
+  ready-made version of the hand-rolled `.downloadingModel(fraction)` progress loop in the
+  model-layer examples ([`repo-qa-local`](../examples/repo-qa-local/),
+  [`workspace-buddy-local`](../examples/workspace-buddy-local/), [`aiql`](../examples/aiql/),
+  [`code-buddy`](../examples/code-buddy/)) — those roll their own to show the raw `mlx.download`
+  event stream; a real settings panel uses this.
+- **`AIModelsSettingsView`** — the whole "AI Models" panel: the built-in families with live
+  availability, then one `ProviderSettingsSection` per configured **online** provider, then an
+  **Add provider** menu (OpenAI / Anthropic / OpenRouter / custom OpenAI-compatible). The host owns
+  `[RemoteProviderDraft]` (persist keys to the Keychain) and the `onSave` / `onRemove` / `onTest`
+  closures that turn a draft into a `RemoteModelProvider` and call `lab.models.replace(_:)`.
+  `Components` has **no dependency on `LocalLMLabSDKRemote`** — the closures are the seam, so a
+  macOS-26 chooser can present the panel and hand the 27-only work to a helper. See §6b.
+- **`ProviderSettingsSection`** — one provider block: API-key field, a **Configured ✓** badge, a
+  per-model row editor (add / trash), an **Enable web search** toggle + **Max searches** stepper
+  once configured, and a **Test connection** button (one result per model, via the host's
+  `probe(for:)`). Usable on its own if you don't want the whole `AIModelsSettingsView`.
+- **`RemoteProviderDraft`** / **`RemoteProviderKind`** / **`ProviderTestOutcome`** — the plain data
+  types the host maps to `RemoteProviderConfig` in ~20 lines (see
+  [`examples/model-switch`](../examples/model-switch/)'s `ProviderGlue.swift`).
+- **`ClaudeAuthField`** — a ready-made secure field for the Anthropic API key that
+  `ClaudeModelProvider(auth: .apiKey(_:))` needs for prototyping (a shipped app uses App Attest).
+  The value is handed to the host via the binding; `Components` never persists it.
+
+`ModelPickerView` (local models + MLX download) and `AIModelsSettingsView` (online providers) are
+currently **separate surfaces** — a full "AI Models" panel composes both. Unifying them is on the
+list; for now, present whichever your app needs, or stack them.
+
+None of these views hold persistence of their own — the MCP views go through
+`manager.core.restore(from:)`, the model views through `lab.snapshot()` / `lab.restore(from:)`
+and your own Keychain, at launch, with whatever you've saved.
 
 ## 12. Full function/type reference
 
@@ -1345,6 +1491,7 @@ and gotchas — use this one when you just need to check a signature.
 | MCP client + OAuth (Todoist) + Keychain | `plate-today` / `plate-today-tools` | — |
 | `MCPTool` built from a live server schema (no hand-written `Arguments`) | [`repo-qa`](../examples/repo-qa/) · [`repo-qa-local`](../examples/repo-qa-local/) | A |
 | `Components` — `MCPServerPickerView` / `MCPServerManagerObservable` / resources / prompts | [`components-demo`](../examples/components-demo/) | — |
+| `Components` — model layer (`ModelPickerView` / `AIModelsSettingsView` / `ProviderSettingsSection`) | [`model-switch`](../examples/model-switch/) (`AIModelsSettingsView`) | — |
 
 ### The model layer (`LocalLMLab`, routing, providers, sessions)
 
@@ -1413,7 +1560,10 @@ protocol DownloadableModelProvider: ModelProvider {
     var residencyEventStream: AsyncStream<ResidencyEvent>? { get }                      // nil default
 }
 struct SystemModelProvider: ModelProvider { init() }                    // Core
-@available(macOS 27, *) struct PCCModelProvider: ModelProvider { init() }   // Core
+@available(macOS 27, *) struct PCCModelProvider: ModelProvider {           // Core
+    init()
+    func probe(timeout: Duration = .seconds(8)) async -> ModelAvailability // authoritative PCC liveness check (beta.3+)
+}
 
 // --- ClaudeModelProvider — LocalLMLabSDKClaude (separate xcframework, macOS 27) ---
 struct ClaudeModelProvider: ModelProvider {
@@ -1744,8 +1894,8 @@ enum WorkspaceAccess {
 
     static func listFiles(in root: URL, subpath: String?) -> Result<[WorkspaceEntry], WorkspaceError>
     static func readFile(in root: URL, path: String) -> Result<String, WorkspaceError>
-    // create-only — fails if the file already exists; use editFile to modify an existing one
-    static func writeFile(in root: URL, path: String, contents: String) -> Result<Void, WorkspaceError>
+    // create-by-default — fails on an existing file unless overwrite:true (or append:true to add to the end); use editFile for a partial change
+    static func writeFile(in root: URL, path: String, contents: String, overwrite: Bool = false, append: Bool = false) -> Result<Void, WorkspaceError>
     // search-and-replace, not a unified-diff format — oldString must match exactly once unless replaceAll
     static func editFile(in root: URL, path: String, oldString: String, newString: String, replaceAll: Bool) -> Result<Void, WorkspaceError>
     static func deleteFile(in root: URL, path: String) -> Result<Void, WorkspaceError>
@@ -1764,7 +1914,7 @@ struct ReadWorkspaceFileTool: Tool {
 struct WriteWorkspaceFileTool: Tool {
     let name = "writeWorkspaceFile"
     init(root: URL, description: String? = nil)
-    struct Arguments { var path: String; var contents: String }
+    struct Arguments { var path: String; var contents: String; var overwrite: Bool?; var append: Bool? }
 }
 struct EditWorkspaceFileTool: Tool {
     let name = "editWorkspaceFile"
@@ -1777,6 +1927,29 @@ struct DeleteWorkspaceFileTool: Tool {
     let name = "deleteWorkspaceFile"
     init(root: URL, description: String? = nil)
     struct Arguments { var path: String }
+}
+
+// The "AIQL" data verbs — each init(root:description:), reads one workspace file, writes a CSV
+// (see §8b for the full table and pipeline shape). CSVCodec + JSONPath are public building blocks.
+struct JSONToCSVTool: Tool     { let name = "jsonToCsv" }      // SELECT cols FROM json_array
+struct SelectColumnsTool: Tool { let name = "selectColumns" }  // SELECT a AS x, b
+struct FilterRowsTool: Tool    { let name = "filterRows" }     // WHERE
+struct SortRowsTool: Tool      { let name = "sortRows" }       // ORDER BY … LIMIT  (the mechanical "top N")
+struct DedupeRowsTool: Tool    { let name = "dedupeRows" }     // SELECT DISTINCT
+struct AggregateRowsTool: Tool { let name = "aggregateRows" }  // GROUP BY
+struct ConcatRowsTool: Tool    { let name = "concatRows" }     // UNION ALL
+struct DescribeJSONTool: Tool  { let name = "describeJson" }   // structure summary (read-only)
+struct CSVInfoTool: Tool       { let name = "csvInfo" }        // row/column counts + samples (read-only)
+
+// Host-applied decorator: wraps a dynamic-schema tool, adds a root-level `saveAs` that writes the
+// wrapped tool's raw result to a workspace file instead of returning it. §8b.
+struct FileBackedTool: Tool {
+    typealias Arguments = GeneratedContent
+    init(name: String, description: String, argumentsJSONSchema: Data, root: URL,
+         previewCharacters: Int = 600, inlineCharacterLimit: Int? = nil,
+         invoke: @escaping @Sendable (GeneratedContent) async -> String) throws
+    static func mcp(descriptor: MCPToolDescriptor, manager: MCPServerManager, root: URL,
+                    previewCharacters: Int = 600, inlineCharacterLimit: Int? = nil) throws -> FileBackedTool
 }
 ```
 
@@ -2007,13 +2180,52 @@ struct MCPPromptsView: View {
 // Model layer (1.0)
 struct ModelPickerView: View {
     init(registry: ModelRegistry, selection: Binding<ModelID?>, show27OnlyModels: Bool = true)
-    // Lists registry.knownModels; each row shows availability (grayed + reason for .unavailable),
-    // a download button + progress for .notDownloaded, storage size. Binds to the @Observable
-    // registry directly — no polling. On macOS 26, show27OnlyModels: true adds disabled
-    // "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
+    // Lists registry.knownModels with an availability badge each (Ready / Not downloaded /
+    // Needs credential / Requires macOS 27). When LocalLMLabSDKInference is linked, also a
+    // "Downloaded models" section: installed models + on-disk size, a live progress bar per
+    // registry.downloads entry, and an "Add from Hugging Face" field → registry.startDownload(_:).
+    // Binds to the @Observable registry directly — no polling. On macOS 26, show27OnlyModels:
+    // true adds disabled "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
 }
 struct ClaudeAuthField: View {
     init(apiKey: Binding<String>, onCommit: @escaping () -> Void = {})
     // A ready-made secure field for the Claude API key that ClaudeModelProvider(auth: .apiKey(_:)) needs.
+}
+
+// Online providers (1.0.0-beta.3) — the "AI Models" settings panel. Host owns [RemoteProviderDraft]
+// (keys → Keychain) and maps a draft → RemoteProviderConfig in the closures. Components does not
+// link LocalLMLabSDKRemote; see §6b and examples/model-switch/ProviderGlue.swift.
+struct AIModelsSettingsView: View {
+    init(registry: ModelRegistry, providers: Binding<[RemoteProviderDraft]>,
+         onSave: @escaping (RemoteProviderDraft) -> Void,
+         onRemove: @escaping (RemoteProviderDraft) -> Void,
+         onTest: ((RemoteProviderDraft) async -> ProviderTestOutcome)? = nil)
+    // Built-in families + one ProviderSettingsSection per online provider + an "Add provider" menu.
+}
+struct ProviderSettingsSection: View {
+    init(draft: Binding<RemoteProviderDraft>,
+         onSave: @escaping (RemoteProviderDraft) -> Void,
+         onRemove: (() -> Void)? = nil,
+         onTest: ((RemoteProviderDraft) async -> ProviderTestOutcome)? = nil)
+    // One provider: key field, Configured badge, per-model rows, web-search toggle + max-searches
+    // stepper, "Test connection" (one result per model). Usable standalone.
+}
+struct RemoteProviderDraft: Identifiable, Hashable, Sendable {
+    var scheme, displayName, baseURL, apiKey: String
+    var kind: RemoteProviderKind
+    var models: [String]                 // .new(_:) leaves this empty — host prefills (docs/12 §10)
+    var webSearchSupported, webSearchEnabled, configured: Bool
+    var maxSearches: Int
+    var statusText: String?
+    static func new(_ kind: RemoteProviderKind) -> RemoteProviderDraft
+}
+enum RemoteProviderKind: String, CaseIterable {   // openAIChat, openAIResponses, anthropic, openRouter, openAICompatible
+    var addMenuLabel: String { get }
+}
+struct ProviderTestOutcome: Sendable, Equatable {
+    struct ModelResult: Identifiable { var modelId: String; var ok: Bool; var detail: String }
+    var results: [ModelResult]           // one per configured model, in order
+    var message: String?                 // set instead of results when the check couldn't run
+    static func unableToRun(_ message: String) -> ProviderTestOutcome
 }
 ```

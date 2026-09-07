@@ -20,27 +20,36 @@ to build: the xcframeworks are compiled with the macOS 27 SDK (27-only symbols w
 a stable Xcode fails with `'v27' is unavailable`. Register the macOS-27-only providers behind
 `if #available(macOS 27, *)` — see [`sdk-guide.md` §1a](sdk-guide.md).
 
-## 2. Point `knownSDKReleases` at the new release
+## 2. Point your manifest at the new release
+
+The `examples/*/Package.swift` files resolve each SDK module as a `binaryTarget` off a URL +
+checksum, keyed by version. A newer version is a new entry:
 
 ```swift
-"1.0.0-beta.2": SDKRelease(
-    url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
-    checksum: "<from the release's .sha256 asset>"
+"1.0.0-beta.3": SDKRelease(
+    url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
+    checksum: "<the .sha256 asset next to the zip on that release>"
 ),
 ```
 
-The release now carries **three** xcframeworks (all on the one tag):
+The example manifests build against `defaultSDKVersion` with no environment variable (so
+"clone, open in Xcode, Run" works); `LOCALLM_SDK_VERSION` overrides it from a shell. Your own
+app's manifest can do the same, or just hardcode one `binaryTarget(url:checksum:)`.
+
+The release carries **four** xcframeworks (all on the one tag):
 
 | xcframework | link it when | floor |
 |---|---|---|
 | `LocalLMLabSDKCore` | always | macOS 26 |
 | `LocalLMLabSDKInference` | you run open-weight / MLX models | macOS 26 (register `MLXModelProvider` only on 27) |
-| `LocalLMLabSDKClaude` | you offer Claude | **macOS 27** — forces a 27 deployment target on whatever links it |
+| `LocalLMLabSDKClaude` | you offer Claude via Foundation Models | **macOS 27** — forces a 27 deployment target on whatever links it |
+| `LocalLMLabSDKRemote` | you offer online providers (GPT / Claude online / OpenRouter) | macOS 26 manifest floor; `RemoteModelProvider` is `@available(macOS 27)` |
 
 `ClaudeModelProvider` moved out of Core into `LocalLMLabSDKClaude` (its dependency
 `ClaudeForFoundationModels` is macOS-27-pinned). See
-[`examples/code-buddy/Package.swift`](../examples/code-buddy/Package.swift) for the multi-binary
-manifest shape.
+[`examples/code-buddy/Package.swift`](../examples/code-buddy/Package.swift) (Core + Inference)
+and [`examples/model-switch/Package.swift`](../examples/model-switch/Package.swift) (Remote +
+`Components`) for the multi-binary manifest shapes.
 
 ## 3. The one thing that can break your build: non-frozen enums
 
@@ -105,6 +114,19 @@ locally-run open-weight (MLX) models behind one API, with routing and residency 
   `capabilityProbe`; `residentModelLimit`, `MLXPreflightLimits`, `residencyEventStream` for
   the memory story on a constrained Mac.
 
+Since `1.0.0-beta.3`, also **online providers** (`sdk-guide.md` §6b) — GPT, Claude's online
+Messages API, OpenRouter, or any OpenAI-compatible server, with provider-native web search,
+behind the same `lab.makeSession(route:)`. Add the `LocalLMLabSDKRemote` binaryTarget,
+`import LocalLMLabSDKRemote`, register `RemoteModelProvider(config)`. Nothing about the
+existing model layer changes.
+
+Also since `1.0.0-beta.3`, **`FileBackedTool` + the "AIQL" data verbs** in Core (`sdk-guide.md`
+§8b) — `jsonToCsv` / `filterRows` / `sortRows` / `concatRows` / `describeJson` / `csvInfo` and
+friends, for an MCP-dataset → CSV pipeline where the row data never passes through the model.
+Purely additive: new `Tool` structs plus `CSVCodec` / `JSONPath` building blocks and an
+`append:` option on `WorkspaceAccess.writeFile`. [`examples/aiql`](../examples/aiql/) is the
+worked app.
+
 None of this is required — a `LanguageModelSession` you build yourself with Core's tools still
 works exactly as in `0.8.x`.
 
@@ -113,5 +135,6 @@ works exactly as in `0.8.x`.
 - The built app runs on **macOS 26 or 27**; building the SDK against `1.0` needs the **Xcode 27
   beta** until it GAs.
 - `1.0.0-beta.N` makes **no API-stability guarantee** — signatures can move between betas.
-- All three xcframeworks are Developer-ID-signed and notarized. SwiftPM still verifies them by
-  checksum; a consumer embedding them in a notarized app re-signs as part of its own build.
+- All xcframeworks (`Core`, `Claude`, `Inference`, `Remote`) are Developer-ID-signed and
+  notarized. SwiftPM still verifies them by checksum; a consumer embedding them in a notarized
+  app re-signs as part of its own build.

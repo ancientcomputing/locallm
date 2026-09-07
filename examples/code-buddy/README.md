@@ -69,45 +69,60 @@ you want it to work on is a separate argument and can be anywhere. Every command
 directory as a `# in …` comment.
 
 **1. Copy the sample workspace out of this repo and put it under its own git.** The repo ships a
-[`sample-workspace/`](sample-workspace/) with one undocumented Swift file. code-buddy edits files
-in place, and a fresh one-commit git repo is how you'll see exactly what it changed (step 4).
+[`sample-workspace/`](sample-workspace/) — a tiny SwiftPM package (`Geometry`: `Rectangle` +
+`area` / `perimeter` / `isSquare` / `scaled`, four passing tests, no doc comments). code-buddy
+edits files in place, so a fresh local git repo is how you'll see exactly what it changed.
 
 ```bash
 # in locallm/examples/code-buddy/
 rm -rf /tmp/cb-demo                       # start clean (safe: /tmp is throwaway)
 cp -R sample-workspace /tmp/cb-demo
-git -C /tmp/cb-demo init -q && git -C /tmp/cb-demo add -A && git -C /tmp/cb-demo commit -qm "before code-buddy"
+cd /tmp/cb-demo
+git init -q && git add -A && git commit -qm "Geometry: initial implementation, tests passing"
+
+# Introduce one regression as a second commit, for the run_tests / git task in step 5:
+sed -i '' 's/height: rectangle.height \* factor/height: rectangle.height/' Sources/Geometry/Geometry.swift
+git commit -aqm "scaled(): drop a redundant-looking multiply"
+cd -                                     # back to locallm/examples/code-buddy/
 ```
 
-What those three lines do, and don't do:
+What that does, and doesn't do:
 
 - **`rm -rf /tmp/cb-demo`** clears any leftover from a previous run. `/tmp` is scratch space the
   OS wipes on reboot — nothing you care about lives there.
 - **`cp -R`** makes a plain copy of `sample-workspace/` at `/tmp/cb-demo`. Your checkout of
   `locallm` is untouched from here on; the walkthrough only ever writes to `/tmp/cb-demo`.
-- **`git -C /tmp/cb-demo init`** creates a `.git/` folder *inside `/tmp/cb-demo`* and nothing
-  else — it's a brand-new, empty, entirely local repo. It doesn't contact a server, doesn't
-  touch the `locallm` repo (that's a different directory tree), and can't "clobber" another repo.
-  If you somehow re-ran it on a dir that already had a `.git/`, git would just say
-  "Reinitialized" and leave your history intact — but the `rm -rf` above means you always get a
-  clean one here.
-- **`git add -A` + `git commit`** record the copied file as commit #1. That baseline is the
-  before-picture `git diff` compares against in step 4.
+- **`git init`** creates a `.git/` folder *inside `/tmp/cb-demo`* and nothing else — a brand-new,
+  entirely local repo. It doesn't contact a server, doesn't touch the `locallm` repo (a
+  different directory tree), and can't "clobber" another repo.
+- **The first commit** is the green baseline. **The `sed` + second commit** makes `scaled(_:by:)`
+  forget to scale the height — one test (`testScaledScalesBothDimensions`) now fails. That commit
+  is what code-buddy hunts down in step 5.
 
-**2. Look at what you're starting with** — `/tmp/cb-demo/Geometry.swift` has `Rectangle` plus a
-few `public` functions, none with doc comments.
+**2. Look at what you're starting with** — `/tmp/cb-demo/Sources/Geometry/Geometry.swift` has
+`Rectangle` plus a few `public` declarations, none with doc comments; and after step 1,
+`swift test` in `/tmp/cb-demo` reports one failure.
 
 **3. From the package directory, run code-buddy, pointing it at that copy:**
 
 ```bash
 # in locallm/examples/code-buddy/
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declaration"
+swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// doc comment line above every public declaration (the struct, each stored property, the initializer, both computed properties, and both top-level functions). Each comment should briefly say what that declaration is. Keep every existing line's indentation exactly as it is. Change nothing else."
 ```
 
 - `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
 - `/tmp/cb-demo` — the **workspace**: the only directory the model can read or edit.
-- the quoted string — the **task**. One shot: it lists files, reads `Geometry.swift`, applies a
-  patch, and reports back.
+- the quoted string — the **task**. One shot: it reads `Geometry.swift` and edits it in place.
+  (It won't touch the planted bug — this task is only about comments.)
+
+> **Spell the task out.** A vague ask like *"add doc comments to every public declaration"* sends
+> an 8B model into a spiral — *which files? how do I find them? can I bulk-edit?* — and it
+> sometimes concludes there's nothing to do. Naming the file, listing what counts, and pinning
+> down the mechanics (*"keep the indentation", "change nothing else"*) is the difference between
+> a reliable one-shot and a coin flip. Even then a local 8B may write terse comments or nudge a
+> line's whitespace — **step 4 is where you check and keep or discard**. This prompt discipline
+> is a property of small local models, not a code-buddy quirk; it pays off in `workspace-buddy-local`
+> and `aiql` too.
 
 While it runs, its narration (including a lot of visible "thinking" — these small models are
 verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ applyPatch`, …)
@@ -125,10 +140,55 @@ You should see `///` lines added above `area`, `perimeter`, `isSquare(_:)`, `sca
 Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
 (`git -C /tmp/cb-demo checkout .`). Re-run step 3 with a different task to keep experimenting.
 
+**5. Now watch it use `run_tests` and `git`.** First undo step 3's edits so the diff at the end
+is just the bug fix:
+
+```bash
+git -C /tmp/cb-demo checkout .
+```
+
+Then hand code-buddy a task that needs all three tool kinds in one shot — the file tools,
+`run_tests`, and `git`:
+
+```bash
+# in locallm/examples/code-buddy/
+swift run CodeBuddy /tmp/cb-demo \
+  "The last commit introduced a one-line bug. Run 'git show HEAD' to see what it changed, run the tests to confirm the failure, fix that one line in Sources/Geometry/Geometry.swift, re-run the tests to confirm all four pass, then run 'git diff' to show the fix."
+```
+
+The stderr trace of a successful run (default `--route heavy` — the 8B model; verified):
+
+```
+→ git                 git show HEAD  — the "scaled(): drop a redundant-looking multiply" commit
+→ run_tests           testScaledScalesBothDimensions … failed  ("3.0" is not equal to "6.0")
+→ readWorkspaceFile   Sources/Geometry/Geometry.swift
+→ editWorkspaceFile   puts "* factor" back on the height
+→ run_tests           Executed 4 tests, with 0 failures
+→ git                 git diff  — the one-line fix
+```
+
+Confirm it yourself — the workspace is the source of truth, not the model's summary:
+
+```bash
+git -C /tmp/cb-demo diff             # the model's uncommitted fix — one line in scaled(_:by:)
+( cd /tmp/cb-demo && swift test )    # Executed 4 tests, with 0 failures
+```
+
+`git` here is **read-only** — code-buddy exposes `status`, `diff`, `log`, `show`, `blame` and a
+few more; `commit` / `checkout` / `reset` are refused (it changes files through `applyPatch` /
+`editWorkspaceFile`, never git). `run_tests` runs exactly the `--test-cmd` you pass (default
+`swift test`) in the workspace, with a 4-minute timeout. Both are this example's own code, not
+the SDK's — see
+[The `git` and `run_tests` tools](#the-git-and-run_tests-tools-this-example-provides-them-not-the-sdk).
+
+> The tools are deterministic; the model's ability to chain them is not. The default `heavy`
+> (8B) route handles this reliably; `--route light` (3B) is faster but often mangles a multi-step
+> edit. If a run stalls or the model narrates instead of acting, Ctrl-C and re-run.
+
 ### All options
 
 ```
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> [task...]
+swift run CodeBuddy [options] <workspace-dir> [task...]
 
   --route heavy|light   which model (default: heavy)
   --heavy <hf-repo>     model for .heavy   (default: mlx-community/Qwen3-8B-4bit)
@@ -141,6 +201,23 @@ LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run CodeBuddy [options] <workspace-dir> [
 Omit `[task...]` to enter the interactive `>>` loop instead of running one shot.
 
 `--route light` uses a smaller ~2 GB model instead of ~4.5 GB — start there on a tighter Mac.
+
+## In Xcode
+
+A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
+**File ▸ Open → `Package.swift`**, pick the **CodeBuddy** scheme, Run — in **`Xcode-beta.app`,
+not a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). It
+works, with three caveats:
+
+- **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
+  the workspace dir and each task word as separate entries.
+- **Use an absolute path for `<workspace-dir>`.** Xcode's default working directory is a
+  DerivedData folder, not this package, so a relative path resolves to the wrong place. (Or set
+  **Edit Scheme ▸ Options ▸ Working Directory**.)
+- **The interactive `>>` loop reads stdin** — it works in the Xcode console's input line, but a
+  terminal is the more natural home for it. One-shot runs (with a task) are unaffected.
+
+No signing setup — a plain CLI tool signs ad-hoc automatically.
 
 ## Getting the SDK & toolchain
 
@@ -159,18 +236,17 @@ it. One-time; safe to re-run:
 xcodebuild -downloadComponent MetalToolchain
 ```
 
-**3. Set two environment variables** in the terminal you'll build from:
+**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell. Skip it only if
-  `xcode-select -p` already points at `Xcode-beta.app`.
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download — this example links
-  **two** binaries (`LocalLMLabSDKCore.xcframework` + `LocalLMLabSDKInference.xcframework`, the
-  MLX runtime) from that one GitHub Release. Omitting it fails fast with a clear error.
+Skip it only if `xcode-select -p` already points at `Xcode-beta.app`; it lasts only for the
+current terminal. `Package.swift` builds against SDK `1.0.0-beta.3` with no further setup — it
+links **two** binaries (`LocalLMLabSDKCore.xcframework` + `LocalLMLabSDKInference.xcframework`,
+the MLX runtime) from that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a
+different published release.
 
 These last only for the current terminal — re-run step 3 in each new terminal (or add both
 `export` lines to your `~/.zshrc`).
@@ -193,6 +269,7 @@ model. Weights land in `~/.cache/huggingface/hub/` — shared with
 | `lab.models.route` / `availability` / `validate` / `download` | pre-flight + streamed download on first run |
 | `lab.makeSession(route:tools:instructions:)` | resolves route → model, assembles tools |
 | Core Workspace tools | `workspaceTree`, `searchWorkspace`, `readWorkspaceFile`, `readFileRange`, `applyPatch`, `editWorkspaceFile`, `writeWorkspaceFile`, `listWorkspaceFiles` |
+| Host-owned `Process` tools (not from the SDK) | `git` (read-only allow-list) and `run_tests` (`--test-cmd`) in [`ProcessTools.swift`](Sources/CodeBuddy/ProcessTools.swift) — exercised by walkthrough step 5 |
 | `lab.mcp` | one no-auth MCP server (DeepWiki), auto-merged into the session's tools |
 | `LocalLMLabSession.events` | the stderr `→ tool` / `✓ tool` trace |
 | `session.languageModelSession.streamResponse` | streamed answer |
@@ -213,6 +290,11 @@ the other on switch) and splits work across `--route heavy` / `--route light`:
 
 The LocalLM Lab app's AI Models panel surfaces the same signals (a memory-pressure warning per
 model, a Compact/Balanced/Full tool-result preset) if you'd rather see it in a UI first.
+
+code-buddy prints its download progress to stderr by hand to show the raw `mlx.download` stream.
+In a SwiftUI app, `Components`' `ModelPickerView` renders the model list, availability badges,
+on-disk sizes, the progress bar, and an "Add from Hugging Face" field from `lab.models` directly
+— see [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
 
 ## The `git` and `run_tests` tools (this example provides them, not the SDK)
 

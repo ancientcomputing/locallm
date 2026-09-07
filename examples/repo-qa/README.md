@@ -55,21 +55,17 @@ Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your term
 (it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
 Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
 
-**2. Set two environment variables** in the terminal you'll build from:
+**2. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
-  alone).
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download `LocalLMLabSDKCore.xcframework`
-  from. Omitting it fails fast with a clear error listing what it knows. (`MCPTool`, this app's
-  whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use `1.0.0-beta.1+`.)
-
-These last only for the current terminal — re-run step 2 in each new terminal (or add both
-`export` lines to your `~/.zshrc`).
+Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
+setup — `export LOCALLM_SDK_VERSION=<version>` here to pin a different published release.
+(`MCPTool`, this app's whole point, first shipped in SDK `0.8.0`, but on macOS 27 you use
+`1.0.0-beta.3+`.)
 
 **3. Build:**
 
@@ -81,13 +77,28 @@ The first `swift build` (or `swift run`) downloads the xcframework.
 
 ## Running it
 
-Assumes the two `export`s from step 2 are set in this terminal. A bare `swift run` is the real,
-intended way to use this app — not a dev-loop shortcut.
+Assumes the two `export`s from step 2 are set in this terminal. A bare `swift run` is a real way
+to use this app — not just a dev-loop shortcut (the Xcode Run below is equally fine).
 
 ```bash
 swift run RepoQA anthropics/claude-code "What is the plugin system?"
 swift run RepoQA facebook/react                 # no question → "what does this repo do?"
 ```
+
+## In Xcode
+
+This is a command-line tool, so — unlike the SwiftUI examples — there's no `.xcodeproj` to ship:
+**File ▸ Open → `Package.swift`**, pick the **RepoQA** scheme, Run. Do it in **`Xcode-beta.app`,
+not a stable Xcode** (the manifest targets macOS 27 → a stable Xcode fails with `'v27' is
+unavailable`). Output goes to the Xcode console. Two things differ from the terminal:
+
+- **Set the arguments in the scheme**, not on a command line:
+  **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** → add `anthropics/claude-code` and your
+  question as separate entries.
+- No signing setup — a plain CLI tool signs ad-hoc automatically.
+
+`RepoQA` takes a GitHub `owner/repo` slug (not a path), so Xcode's working directory doesn't
+matter here.
 
 ## Output — answer on stdout, everything else on stderr
 

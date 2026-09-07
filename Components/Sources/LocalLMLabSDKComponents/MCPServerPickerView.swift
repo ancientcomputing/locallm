@@ -72,13 +72,18 @@ public struct MCPServerPickerView: View {
                     .frame(width: 140)
             }
 
+            // Radio group, not a segmented control. A segmented `Picker` with 3 long labels
+            // flips between "hug content" and "fill the frame" distribution across layout passes
+            // (an empty vs. filled `TextField` reports a different ideal width, and any keystroke
+            // re-runs layout) — so it visibly resized and its inline label vanished the moment
+            // you typed in the URL field. A radio group has no such width ambiguity, shows all
+            // three options at once, and is the macOS-idiomatic control for a one-of-N form field.
             Picker("Auth type", selection: $newServerAuthType) {
                 Text("None").tag(MCPAuthType.none)
                 Text("Personal Access Token").tag(MCPAuthType.pat)
                 Text("OAuth (manual client)").tag(MCPAuthType.oauthManual)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 420)
+            .pickerStyle(.radioGroup)
 
             if newServerAuthType == .pat {
                 SecureField("Personal access token", text: $newServerPATToken)

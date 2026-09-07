@@ -37,24 +37,59 @@ Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently t
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.1`, which needs macOS 27. Build with the **Xcode 27 beta**
+This branch tracks `1.0.0-beta.3` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27 beta**
 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
-`'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` requires an
-explicit `LOCALLM_SDK_VERSION` and resolves `LocalLMLabSDKCore` as a binary dependency from there:
+`'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` resolves
+`LocalLMLabSDKCore` as a binary dependency, building against `1.0.0-beta.3` by default:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift build
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
 ```
 
-Omitting `LOCALLM_SDK_VERSION`, or setting an unknown version, fails fast with a clear error
-listing the versions this copy knows about — see `Package.swift` itself for the current table.
+Set `LOCALLM_SDK_VERSION` to build against a different published release — from a shell, not
+inside Xcode (its package resolution doesn't see shell environment variables). See
+[`../README.md`](../README.md#building--running-an-sdk-example) for the CLI / Xcode workflows and
+how to change the SDK version.
+
+## Open in Xcode and Run
+
+A committed `PlateToday.xcodeproj` is the lowest-friction way to try the full app. **Open it in
+`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+
+```bash
+open -a Xcode-beta PlateToday.xcodeproj
+```
+
+Pick the **PlateToday** scheme and Run. It builds a real `.app` — menu bar, Dock icon,
+`platetoday:` OAuth redirect scheme, the Calendar/Reminders entitlement and usage strings — with
+**Todoist on, Contacts and Location/Weather off** (the default feature set).
+
+**Signing.** The project is set to **Automatic** with no hard-coded team, so Xcode signs the Run
+build with your **Apple Development** identity — which is what makes the Calendar/Reminders
+prompts dependable (they're unreliable under an ad-hoc signature).
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (a **free** one is enough) | Xcode picks it automatically — real `Apple Development` signing, prompts work |
+| No Apple ID | Run stops with *"Signing … requires a development team"* — add a free Apple ID, **or** open the **PlateToday** target ▸ **Signing & Capabilities** and choose **Sign to Run Locally** (ad-hoc; app still runs, but Calendar/Reminders prompts may misbehave) |
+
+This only affects the Xcode Run build. `packaging/build-and-sign.sh` ignores the project file and
+signs with whatever `APP_IDENTITY` you pass it (ad-hoc if unset) — see the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen && xcodegen generate`)
+— edit `project.yml`, not the `.xcodeproj`. Turn on Contacts/Location by adding the flag to
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS` there (plus the matching usage string + entitlement). To
+pin a different SDK release for the Xcode build, edit `defaultSDKVersion` in `Package.swift`
+(Xcode ignores `LOCALLM_SDK_VERSION`).
 
 ## Quick dev-loop run (no signing, no TCC/OAuth)
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 swift run
+swift run
 ```
 
 Fast, but **cannot** get real Calendar/Reminders access (no code signing means TCC denies bare CLI
@@ -62,15 +97,19 @@ binaries outright) and the OAuth redirect won't have a registered URL scheme to 
 for compiler-level iteration only. `TODOIST_MCP_URL` overrides the default `https://ai.todoist.net/mcp`
 if you need to point at a different server for testing.
 
-## Real build: `packaging/build-and-sign.sh`
+## Distributable build: `packaging/build-and-sign.sh`
 
-The only way to actually exercise the Calendar/Reminders TCC prompts or the Todoist OAuth flow —
-both require a properly signed `.app` with entitlements and Info.plist usage-description keys.
+For just trying the app, the Xcode project above is enough — it already produces a locally-signed
+`.app` that exercises the Calendar/Reminders TCC prompts and the Todoist OAuth flow. Use this
+script when you want a build you can hand to another Mac: Developer-ID signed and notarizable,
+with the entitlements and Info.plist keys applied by the script rather than by `project.yml`. A
+**free "Apple Development"** identity still produces a valid local build (an ad-hoc one won't
+hold the permission grants); a Developer ID is what makes it distributable. See the
+[signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
 ```
@@ -79,8 +118,8 @@ NOTARIZE_APP=0 \
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LOCALLM_SDK_VERSION` | Yes | — | Read by `Package.swift`, not the script itself — but `swift build` (which the script calls) fails without it. |
-| `APP_IDENTITY` | Yes | — | Must match a valid codesigning identity in your keychain (`security find-identity -v -p codesigning`). `SIGN_IDENTITY` also works as a fallback name. |
+| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by `Package.swift` (not the script) — set it to build against a different published release. |
+| `APP_IDENTITY` | Yes | — | A codesigning identity — a **free** "Apple Development" one works. See the [signing table](../README.md#signing-a-app--app_identity). `SIGN_IDENTITY` also works as a fallback name. |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |
@@ -99,7 +138,7 @@ internal TestFlight testing.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.1 VERSION=1.0.0-beta.1 ./packaging/build-and-sign-mas.sh
+LOCALLM_SDK_VERSION=1.0.0-beta.3 VERSION=1.0.0-beta.3 ./packaging/build-and-sign-mas.sh
 ```
 
 `APP_SIGN_IDENTITY` (an "Apple Distribution" identity), `INSTALLER_SIGN_IDENTITY` (a "3rd Party
@@ -110,6 +149,45 @@ keychain / `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` if not se
 App ID, provisioning profile). `PLATETODAY_INCLUDE_LOCATION_WEATHER`/`PLATETODAY_INCLUDE_CONTACTS`
 work the same as above; `PLATETODAY_INCLUDE_TODOIST` (default `1`, included) is the build-time
 opt-**out** if you want to build without a Todoist account.
+
+## Trying the Contacts enrichment (opt-in)
+
+By default plate-today checks Calendar, Reminders, and Todoist — a fixed set, all listed in the
+prompt. The Contacts tool is different: it's registered but **not** in the prompt, so the model
+only calls it *on its own* when a calendar event or reminder names a specific person and it
+decides looking them up is useful (the tool's own description tells it when). This is the
+example's point — a tool the model reaches for conditionally, with a permission it requests only
+on first use, rather than up front.
+
+**Build it in** — pass `PLATETODAY_INCLUDE_CONTACTS=1` to `build-and-sign.sh`; the script adds
+the `NSContactsUsageDescription` string and the `com.apple.security.personal-information.addressbook`
+entitlement for you:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+NOTARIZE_APP=0 PLATETODAY_INCLUDE_CONTACTS=1 \
+./packaging/build-and-sign.sh
+```
+
+**Set up a run that will actually trigger it:**
+
+1. In **Contacts.app**, make sure there's a person you can recognize in a summary — add one if
+   needed, with a name plus an email, phone, or organization (those are what the tool returns).
+2. In **Calendar.app**, create an event **for today** whose title names that person —
+   e.g. *"Coffee with Jane Smith"* — or add them as an invitee.
+3. Launch the signed build. Grant **Calendar** and **Reminders** at launch as usual — still no
+   Contacts prompt yet.
+4. While the model is working, a **"Plate Today would like to access your contacts"** prompt
+   appears — because the model chose to look Jane up. Allow it.
+5. The summary comes back enriched: *"…your 10am coffee with Jane Smith (jane@acme.com)…"*
+   instead of just *"coffee with Jane Smith."*
+
+If nothing on today's calendar names someone in your Contacts, the model won't call the tool and
+you'll see no Contacts prompt — that's the expected on-demand behavior, not a failure.
+
+**Reset the grant between runs** with
+`tccutil reset AddressBook lab.locallm.sdk.reference.platetoday`.
 
 ## Troubleshooting
 

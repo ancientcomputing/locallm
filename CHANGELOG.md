@@ -1,14 +1,149 @@
 # Changelog — LocalLM Lab SDK
 
-This tracks the **public SDK surface** (`LocalLMLabSDKCore`, `LocalLMLabSDKInference`,
-`LocalLMLabSDKComponents`) as consumed from this repo. Dates are release dates. Each version
-maps to a GitHub Release on `ancientcomputing/locallm` (tag `v<version>`); the xcframework
-checksums live on the release, not here.
+This tracks the **public SDK surface** (`LocalLMLabSDKCore`, `LocalLMLabSDKClaude`,
+`LocalLMLabSDKInference`, `LocalLMLabSDKRemote`, `LocalLMLabSDKComponents`) as consumed from
+this repo. Dates are release dates. Each version maps to a GitHub Release on
+`ancientcomputing/locallm` (tag `v<version>`); the xcframework checksums live on the release,
+not here.
 
 **As of `1.0.0-beta.2`, the whole SDK builds for macOS 26** — the model layer works on
 macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-weight (MLX)
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
+
+## 1.0.0-beta.3 — 2026-09-06
+
+Two headline additions: **online providers** (a new `LocalLMLabSDKRemote.xcframework` — GPT /
+Claude / OpenRouter / any OpenAI-compatible server, over HTTP, with provider-native web
+search) and a **rebuilt Private Cloud Compute provider**.
+
+### Added — online / remote providers (`LocalLMLabSDKRemote.xcframework`, new — a 4th binary)
+
+- **`RemoteModelProvider`** — one `ModelProvider` for any HTTP model API. Pure `URLSession`,
+  no third-party dependencies, no bundle resources. macOS 26 *manifest* floor (linking it
+  does **not** force a macOS 27 deployment target); `RemoteModelProvider` itself is
+  `@available(macOS 27)` and reports `.requiresOS("macOS 27")` on 26. Add the
+  `LocalLMLabSDKRemote` binaryTarget keyed off the same `LOCALLM_SDK_VERSION`.
+- **`RemoteProviderConfig`** — a data-driven provider description (scheme, dialect, base URL,
+  auth, models, capabilities, per-provider default `SessionOptions`). Dialects:
+  `.openAIChat`, `.openAIResponses`, `.anthropicMessages`, and `.openAICompatible` as an
+  escape hatch. No vendor is privileged — Claude-via-HTTP is just another config. Presets:
+  `.openAI`, `.openAIResponses`, `.anthropic`, `.openRouter`, `.openAICompatible`.
+- **The SDK ships no default model ids.** Every preset defaults `models: []`; which model id
+  is current and good enough is the host app's call, on its own release cadence — see
+  [`examples/model-switch`](examples/model-switch/) for the pattern.
+- **`RemoteModelProvider.probe(for:timeout:)`** — a zero-token connectivity / key / model
+  check. `GET {base}/models` (OpenAI-style list) or `GET {base}/v1/models/{id}`
+  (Anthropic-style); maps the outcome to `.available` / `.needsCredential` (401/403) /
+  `.unsupportedModel` (404 or absent from the list) / `.providerError` (429 / 5xx / timeout).
+  Run it before offering a provider — remote models have far more failure modes than local.
+- **Provider-native web search** via `SessionOptions(webSearch:webSearchMaxUses:)` on OpenAI,
+  Anthropic Messages, and OpenRouter — and, new this release, on **`ClaudeModelProvider`**
+  (Claude-via-Foundation-Models). `LocalLMLabSession.events` surfaces `.serverToolCall`
+  (query + result count) and `session.citations` carries the sources.
+- **`ServerTool`** — the abstraction for provider-executed tools (web search is the first).
+- **`ModelRegistry.replace(_:)` / `.removeProvider(scheme:)`** — reconfigure the registry at
+  runtime (add/replace/drop a provider between sessions) without rebuilding `LocalLMLab`.
+
+### Added — `Components` (the AI Models settings surface)
+
+- **`AIModelsSettingsView`** — the whole panel: built-in models + one `ProviderSettingsSection`
+  per configured online provider + an "Add provider" menu.
+- **`ProviderSettingsSection`** — one provider: API-key field, a **Configured ✓** badge, a
+  per-model list (add / remove rows), an **Enable web search** toggle + **Max searches**
+  stepper once configured, and a **Test connection** button (one result per configured model,
+  via the host's `probe(for:)`).
+- **`RemoteProviderDraft`** / **`ProviderTestOutcome`** — plain data types the host maps to
+  `RemoteProviderConfig` in ~30 lines. `Components` has **no dependency on `Remote`** —
+  coordination is via optional closures (`onSave` / `onRemove` / `onTest`), so a macOS-26
+  chooser can present the panel and hand the work to a 27-only helper.
+
+### Added — Private Cloud Compute
+
+**`PCCModelProvider` rebuilt** on the real `FoundationModels.PrivateCloudComputeLanguageModel`
+surface (macOS 27) — availability, quota, and typed errors map to clean `ModelAvailability`
+values instead of an opaque "routed to `pcc` fails" reaching the host (roadmap items 10/14).
+
+> **On PCC access:** Apple's PCC tier is free but gated — your shipping app needs the
+> **Private Cloud Compute entitlement**, enrollment in the **App Store Small Business
+> Program**, and fewer than 2M first-time downloads. There is no paid tier. See
+> [`developer.apple.com/private-cloud-compute`](https://developer.apple.com/private-cloud-compute/).
+
+- **`PCCModelProvider.probe(timeout:)`** — an `async` liveness check. `availability(for:)`
+  reads only the synchronous `PrivateCloudComputeLanguageModel.availability`, which on some
+  Developer-ID builds reports `.available` while every turn still throws at request time.
+  `probe()` runs one minimal request and maps the outcome — a typed
+  `PrivateCloudComputeLanguageModel.Error` **or** the opaque `ModelManagerError` 1046
+  ("The model service failed") — to a `ModelAvailability`. Hosts that gate a `pcc` route
+  should call this and cache the verdict.
+- **`availability(for: .pcc)`** now folds in `PrivateCloudComputeLanguageModel.quotaUsage`:
+  a spent free-tier quota reports `.unavailable(kind: .providerError)` with the reset date
+  rather than `.available`.
+
+### Added — `Core` workspace: file-backed tools + the "AIQL" data verbs (`docs/sdk-guide.md` §8b)
+
+The building blocks for a "plain-English query over an MCP-fronted dataset → a CSV file"
+pipeline where the row data never passes through the model, so it can't be fabricated.
+
+- **`FileBackedTool`** — a host-applied decorator around a dynamic-schema tool (an MCP tool is
+  the motivating case). Adds a root-level `saveAs` argument; when the model supplies it, the
+  wrapped tool's raw result is written to `<workspace>/<saveAs>` and only a short receipt
+  (byte/line count + a bounded preview) returns — the payload never enters the model's
+  context. `saveAsAppend` accumulates paginated results. `FileBackedTool.mcp(descriptor:manager:root:)`
+  wraps an `MCPToolDescriptor` in one call.
+- **The data verbs** — ready-made `Tool`s, each reads a workspace file, does one mechanical
+  transform, writes a CSV, returns a one-line receipt: `jsonToCsv` (project a JSON array to
+  CSV), `selectColumns`, `filterRows` (`eq`/`contains`/`matches`/`gt`/… , AND or ANY),
+  `sortRows` (with `limit` — the mechanical "top N"), `dedupeRows`, `aggregateRows`
+  (`count`/`sum`/`avg`/`min`/`max`), `concatRows` (`UNION ALL`), plus `describeJson` /
+  `csvInfo` for discovery and per-stage verification. `jsonToCsv` / `describeJson` read a file
+  of concatenated JSON values (appended paginated pages).
+- **`CSVCodec`** (RFC 4180 encode/decode + a header-keyed `Table`) and **`JSONPath`** (a
+  read-only `a.b[0].c` resolver over a `JSONSerialization` value) are `public` for building
+  your own verbs.
+- **`WorkspaceAccess.writeFile` / `WriteWorkspaceFileTool`** gain `overwrite:` (create-only by
+  default) and `append:`.
+
+### Fixed — `Core` workspace
+
+- **`resolveScopedPath`** dropped the workspace root's last path component during relative
+  resolution when the root `URL` had no trailing slash (`someURL.appendingPathComponent("ws")`,
+  `URL(fileURLWithPath: aString)`), so every nested write (`raw/data.json`) was rejected as an
+  escape. Also handles `resolvingSymlinksInPath` rewriting `/private/tmp` → `/tmp` on
+  not-yet-existing paths.
+
+### Added — examples
+
+- **[`examples/model-switch/`](examples/model-switch/)** — the reference app for the online
+  providers: add a provider + key, tick web search, and switch between every configured model
+  (Apple on-device, PCC, Claude-4-FM, GPT, Claude online, any OpenRouter model) from one chat
+  window, one `lab.makeSession` call site. Links `Remote` as a binaryTarget and Core +
+  `Components` from the `Components` package.
+- **[`examples/aiql/`](examples/aiql/)** — "ask your data": a SwiftUI app (Core + Inference,
+  sandboxed) that pulls an MCP-fronted dataset and writes the spreadsheet you asked for, via
+  `FileBackedTool` + the data verbs. MCP OAuth through the `aiql://` URL scheme; the progress
+  panel is driven by `session.events`.
+
+### Changed
+
+- **`SessionOptions`** — new per-query knobs, threaded through `makeSession` /
+  `session.respond`: `webSearch`, `webSearchMaxUses`, plus sampling overrides. A provider that
+  can't honor a knob ignores it.
+- **`GenerationErrorDescription`** gains a dedicated arm for
+  `PrivateCloudComputeLanguageModel.Error`: a spent-quota failure now names its reset date
+  and the Small Business Program gate instead of rendering as a thin `LocalizedError`.
+- **`Components/Package.swift`** re-vends `LocalLMLabSDKCore` as a `.library` product so an
+  app that consumes `Components` *and* declares its own `Remote` binaryTarget doesn't hit a
+  duplicate-`LocalLMLabSDKCore`-target collision (`model-switch` needs this).
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       a49b8bfcde340d8b86bf106d2af2cb9d84f3839a3bc1695016f3952a3fcdfb92
+LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     cd312701e764c408d51efb1dd7cbb8c71c3392aab02fbec98a0a1f3dd584506a
+LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  0e2b3cc522291dd6c0afdede6ee4516d272ed20b5c22adad68b80893c266800d
+LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     2b1e401a606c2c34d3e086cf9a2edad9d2c9ca730a3c3840b964f88d9e2e446b
+```
 
 ## 1.0.0-beta.2 — 2026-09-02
 

@@ -44,21 +44,17 @@ it. One-time; safe to re-run:
 xcodebuild -downloadComponent MetalToolchain
 ```
 
-**3. Set two environment variables** in the terminal you'll build from:
+**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
-  alone).
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download. This example links
-  **two** binaries — `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the
-  MLX runtime, which carries its own Metal shaders) — from that one GitHub Release.
-
-These last only for the current terminal — re-run step 3 in each new terminal (or add both
-`export` lines to your `~/.zshrc`).
+Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
+setup — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
+`LocalLMLabSDKInference.xcframework` (the MLX runtime, which carries its own Metal shaders), from
+that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
 
 **4. Compile-check:**
 
@@ -66,17 +62,54 @@ These last only for the current terminal — re-run step 3 in each new terminal 
 swift build
 ```
 
-This just proves it builds. To *actually run* it you need a signed, sandboxed `.app` — see below.
+This just proves it builds. To *actually run* it: open the Xcode project (next), or make a
+signed `.app` with `packaging/build-and-sign.sh` (further below).
+
+## Open in Xcode and Run
+
+A committed `WorkspaceBuddyLocal.xcodeproj` is the lowest-friction way to try it. **Open it in
+`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+
+```bash
+open -a Xcode-beta WorkspaceBuddyLocal.xcodeproj
+```
+
+Pick the **WorkspaceBuddyLocal** scheme and Run — a real sandboxed `.app` with the
+`files.user-selected.read-write` and `network.client` entitlements (the model download needs the
+latter), the `LocalLMLabSDKInference` (MLX) framework embedded. **First Go downloads the model**
+(~4.5 GB for the default); after that it's local and offline.
+
+**Signing.** Set to **Automatic** with no hard-coded team, so Xcode signs with your **Apple
+Development** identity. Same reason as `workspace-buddy`: the security-scoped bookmark is bound
+to the signing identity and won't survive a rebuild under an ad-hoc one.
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (**free** is enough) | picked automatically — stable `Apple Development` signing, bookmark persists across rebuilds |
+| No Apple ID | Run stops with *"requires a development team"* — add a free Apple ID, **or** target ▸ **Signing & Capabilities** ▸ **Sign to Run Locally** (ad-hoc; runs, but you re-pick the folder each rebuild) |
+
+Only the Xcode Run build is affected. `packaging/build-and-sign.sh` (below) ignores the project
+file and signs with whatever `APP_IDENTITY` you pass it.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,
+then `xcodegen generate`.
 
 ## Running it
 
 Like `workspace-buddy`, a bare `swift run` gets you neither the sandbox nor the
-`files.user-selected` entitlement, so it's compile-only. The real build is
-`packaging/build-and-sign.sh`, which needs a **Developer ID Application** signing identity in your
-keychain (`security find-identity -v -p codesigning`):
+`files.user-selected` entitlement, so it's compile-only. Two ways to get a real, entitled build:
+
+- **The Xcode project above** — the fast path; a locally-signed `.app` to run and iterate on.
+- **`packaging/build-and-sign.sh`** — for a `.app` you can hand to another Mac (Developer-ID
+  signed and notarizable). It needs a signing identity; a **free "Apple Development"** one is
+  enough for a local run (an ad-hoc build won't hold the sandbox grant), a Developer ID for
+  distribution. See the
+  [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
   ./packaging/build-and-sign.sh
 ```
@@ -85,6 +118,20 @@ NOTARIZE_APP=0 \
 open it, click **Choose Folder…**, pick a throwaway directory, type a request, and hit **Go**.
 **First Go downloads the model** (~4.5 GB for the default), with a progress bar. After that it's
 local and offline — the second run starts generating immediately.
+
+**Prompts to try.** Same tools and instructions as [`workspace-buddy`](../workspace-buddy#about-the-model),
+so its prompt list applies here too. Point the app at a throwaway folder with a few small files and
+paste one of these — the 8B model handles a bit more per request than Apple's on-device one:
+
+- `Add a triple-slash doc comment above every public function in Sources/, saying what it does.`
+- `Rename the type Widget to Gadget everywhere it appears in this folder, including other files that reference it.`
+- `In every .swift file, sort the import lines alphabetically.`
+- `Read data.json and write a Markdown table of the same rows to data.md.`
+- `Find every file containing the string "deprecated" and add a "// TODO: remove" comment on that line.`
+
+Confirm the result with `git diff` — the files on disk are the source of truth, not the model's
+summary. Keep to one folder and one clearly-scoped change per request; open-ended "refactor this
+project" asks are still beyond a local 8B.
 
 ## Where the model is stored
 
@@ -121,11 +168,38 @@ copied verbatim. The differences, all in the view model:
 | `SystemLanguageModel.default` availability check | `MLXModelProvider` + `LocalLMLab` + `lab.models.route(.local, to: …)` in `init` |
 | — | a `.downloadingModel(fraction)` state; `mlx.validate` → `mlx.download` on first run, progress into the UI |
 | `LanguageModelSession(tools: tools) { instructions }` | `lab.makeSession(route: .local, tools: tools, instructions:)` |
-| `session.respond(to:)` | `session.languageModelSession.respond(to:)` |
+| `session.respond(to:)` — awaited whole, spinner until done | `session.languageModelSession.streamResponse(to:)` — text streams in, plus a `session.events` loop for the "Reading a file…" activity line |
 | `com.apple.security.network.client` — not needed | **required** (the model download) |
 
 The `WorkspaceTools` array, the instructions, the single-turn shape, and the "no delete tool by
 default" choice are all unchanged.
+
+### Why stream here and not in `workspace-buddy`
+
+Apple's on-device model answers a small edit in a couple of seconds — a spinner is fine.
+`Qwen3-8B-4bit` on the GPU takes long enough (tens of seconds, plus pauses while it reads
+files) that a bare "Working…" spinner reads as *stuck*. So this version:
+
+- shows the answer **as it's generated** (`streamResponse` — each snapshot is the whole answer
+  so far; shown latest-wins rather than diffed, since a reasoning model drops its `<think>`
+  block mid-stream and the snapshot can reset across a tool call — `code-buddy` does the
+  careful append-only version because stdout can't un-print);
+- shows **which tool is running** during the gaps, from `session.events`
+  (`.toolCallStarted` / `.toolCallFinished` → "Reading a file…", "Editing a file…");
+- keeps the Qwen `<think>` reasoning visible inline — strip it consumer-side if you want just
+  the summary.
+
+`session.events` is the side-channel *around* generation (tool calls, context compaction,
+model-load progress); token text always comes from `streamResponse`. See
+[`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions),
+the `LocalLMLabSession.events` subsection.
+
+> **The download UI is hand-rolled here on purpose.** The `.downloadingModel(fraction)` state and
+> the `mlx.validate` → `mlx.download` loop are ~20 lines that show the raw event stream. If you
+> want the ready-made version — a model list with availability badges, on-disk sizes, the
+> progress bar, and an "Add from Hugging Face" field — `Components`' `ModelPickerView` binds
+> straight to `lab.models`; see
+> [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
 
 ## Changing the model
 

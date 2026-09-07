@@ -60,18 +60,16 @@ it. One-time; safe to re-run:
 xcodebuild -downloadComponent MetalToolchain
 ```
 
-**3. Set two environment variables** in the terminal you'll build from:
+**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-export LOCALLM_SDK_VERSION=1.0.0-beta.1
 ```
 
-- `DEVELOPER_DIR` makes `swift` use the Xcode 27 beta for this shell (leaves your system default
-  alone).
-- `LOCALLM_SDK_VERSION` tells `Package.swift` which SDK release to download. This example links
-  **two** binaries — `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the
-  MLX runtime) — from that one GitHub Release. Omitting it fails fast with a clear error.
+Leaves your system default alone; lasts only for the current terminal. `Package.swift` builds
+against SDK `1.0.0-beta.3` with no further setup — it links **two** binaries,
+`LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the MLX runtime), from
+that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
 
 These last only for the current terminal — re-run step 3 in each new terminal (or add both
 `export` lines to your `~/.zshrc`).
@@ -97,6 +95,20 @@ swift run RepoQALocal facebook/react                 # no question → "what doe
 swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift-nio "how does the event loop work?"
 swift run RepoQALocal --apple anthropics/claude-code "What is the plugin system?"   # Apple's on-device model instead
 ```
+
+## In Xcode
+
+A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
+**File ▸ Open → `Package.swift`**, pick the **RepoQALocal** scheme, Run — in **`Xcode-beta.app`,
+not a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). Output
+goes to the Xcode console.
+
+- **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
+  e.g. `--apple`, `anthropics/claude-code`, and the question as separate entries.
+- No signing setup — a plain CLI tool signs ad-hoc automatically; the MLX model download needs
+  no entitlement outside a sandbox.
+- `RepoQALocal` takes a GitHub `owner/repo` slug (not a path), so Xcode's working directory
+  doesn't matter.
 
 ## Output — answer on stdout, everything else on stderr
 
@@ -149,10 +161,16 @@ reasons; see `repo-qa`'s README). The only differences:
 
 That's the point: the model layer is a swap-in, not a rewrite.
 
+> **Building a UI for this?** This CLI prints download `%` to stderr by hand to show the raw
+> `mlx.download` event stream. A real app doesn't need to: `Components`' `ModelPickerView`
+> ([`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer))
+> binds to `lab.models` and renders the model list, availability badges, on-disk sizes, the
+> progress bar, and an "Add from Hugging Face" field for you.
+
 ## Verified live
 
 ```
-model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-beta.1
+model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-beta.3
 Connecting to Deepwiki…
 Skipping read_wiki_contents: excluded by this example.
 Built 2 tool(s) from Deepwiki's live schema: ask_question, read_wiki_structure
