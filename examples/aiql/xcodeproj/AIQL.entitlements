@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Unconditional sandbox, like workspace-buddy — this is what makes the security-scoped
+	     bookmark pattern (docs/02-sdk-developer-guide.md §8) necessary to demonstrate. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Read/write to the folder the user picks via NSOpenPanel — the pipeline writes raw/data.json
+	     and the CSV stages there. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- The MCP connection (and OAuth redirect fetch) plus MLXModelProvider.download on first run.
+	     Without this both are silently blocked by the sandbox. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>
