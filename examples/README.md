@@ -176,16 +176,18 @@ and checksum strings in place.
 
 ### Troubleshooting
 
-**`error: artifact of binary target 'LocalLMLabSDKCore' has changed checksum; … the new artifact
-won't be downloaded`** — you built this example once against an *earlier* cut of the same version
-tag (during a pre-release beta, a `vX.Y.Z` release asset can be re-uploaded with new bytes), and
-SwiftPM won't silently swap the cached artifact for one with a different checksum. The manifest is
-correct; the stale copy is local. Fix it per package:
+**`artifact of binary target 'LocalLMLabSDKCore' has changed checksum`**, or in Xcode
+**`Missing package product 'LocalLMLabSDKCore' / 'LocalLMLabSDKRemote' / 'LocalLMLabSDKComponents'`**
+— same cause: you built this example once against an *earlier* cut of the same version tag (during
+a pre-release beta, a `vX.Y.Z` release asset can be re-uploaded with new bytes), and SwiftPM /
+Xcode won't silently swap the cached artifact for one with a different checksum — so the download
+is refused and the products it would have provided go "missing". The manifest is correct; the
+stale copy is local.
 
 ```bash
-rm -rf examples/<name>/.build        # then build / Run again
+rm -rf examples/<name>/.build                              # swift build
+rm -rf ~/Library/Developer/Xcode/DerivedData/<Name>-*      # Xcode (or: File ▸ Packages ▸ Reset Package Caches)
 ```
 
-In Xcode: **File ▸ Packages ▸ Reset Package Caches** (and delete `~/Library/Developer/Xcode/DerivedData/<project>`
-if it persists). This only happens across a re-cut of one version tag — a normal version bump
-changes the tag, so there's nothing stale to collide with.
+Then build / Run again. This only happens across a re-cut of one version tag — a normal version
+bump changes the tag, so there's nothing stale to collide with.
