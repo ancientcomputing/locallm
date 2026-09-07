@@ -1234,6 +1234,7 @@ row data never reaches the model):
 | `ConcatRowsTool` (`concatRows`) | `UNION ALL` | stack CSV files, columns matched by name — for paginated pulls or separate exports |
 | `DescribeJSONTool` (`describeJson`) | — | compact structure summary (key paths, types, array lengths) — call before `jsonToCsv`; read-only |
 | `CSVInfoTool` (`csvInfo`) | — | row count, columns, sample rows — check a stage produced what you expected; read-only |
+| `BuildSpreadsheetTool` (`buildSpreadsheet`) | `SELECT … WHERE … ORDER BY … LIMIT` in one statement | the whole `jsonToCsv → filterRows → dedupeRows → sortRows → selectColumns` chain from one `Arguments` — `columns`, `filters` (a range is two entries), `sortBy`, `limit`, `distinctOn`; the host runs the stages in a fixed order |
 
 The intended shape is a chain: `raw.json → describeJson → jsonToCsv → filterRows → sortRows →
 out.csv`. The building blocks under them — `CSVCodec` (RFC 4180 encode/decode + a header-keyed
@@ -1241,6 +1242,19 @@ out.csv`. The building blocks under them — `CSVCodec` (RFC 4180 encode/decode 
 `public` for writing your own verbs. **Pagination:** the model calls the data tool once per page
 with the same `saveAs` path plus `saveAsAppend: true`, and `jsonToCsv` / `describeJson` read the
 resulting file of concatenated JSON values (`{…}{…}{…}`) as one dataset.
+
+**`buildSpreadsheet` — when the model keeps dropping a step (`1.0.0-beta.4`).** Chaining the
+verbs asks the model to emit a correct multi-call sequence. Small models (8–14B) are reliable at
+*describing* a query but drift when *orchestrating* one — they drop or reorder a stage, most
+often the filter when it is the third refinement (state filter + range + sort). No prompt
+phrasing fixes this; it is the same class of failure that made `sortRows` necessary for "top N".
+`buildSpreadsheet` collapses the chain: the model fills one `Arguments` — `columns`, `filters`
+(a numeric range is two `{gte}` / `{lte}` entries on one column), `sortBy`, `limit`,
+`distinctOn` — and the host runs `project → where → distinct → order/limit → select` in that
+fixed order. There is no step to forget. Every field reference is a record field name; a name no
+record carries is a hard `Error:` (a bad spec), not a silently empty column. Same guarantee as
+the individual verbs — the model never sees a row. The `aiql` example uses it in place of the
+chain; the individual verbs stay for pipelines that need per-stage control.
 
 [`examples/aiql`](../examples/aiql/) is the end-to-end SwiftUI app — a plain-English request
 over an MCP dataset → this pipeline → a CSV in a folder you chose, with a local MLX model.
@@ -1940,6 +1954,7 @@ struct AggregateRowsTool: Tool { let name = "aggregateRows" }  // GROUP BY
 struct ConcatRowsTool: Tool    { let name = "concatRows" }     // UNION ALL
 struct DescribeJSONTool: Tool  { let name = "describeJson" }   // structure summary (read-only)
 struct CSVInfoTool: Tool       { let name = "csvInfo" }        // row/column counts + samples (read-only)
+struct BuildSpreadsheetTool: Tool { let name = "buildSpreadsheet" } // the whole SELECT…WHERE…ORDER BY…LIMIT in one call
 
 // Host-applied decorator: wraps a dynamic-schema tool, adds a root-level `saveAs` that writes the
 // wrapped tool's raw result to a workspace file instead of returning it. §8b.
