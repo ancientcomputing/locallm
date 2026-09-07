@@ -157,7 +157,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-beta.2": SDKRelease(url: "…/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
                                checksum: "e3e687e5…"),
     "1.0.0-beta.3": SDKRelease(url: "…/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
-                               checksum: "a276ab7b…"),
+                               checksum: "a49b8b…"),
 ]
 ```
 
@@ -173,3 +173,19 @@ curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-be
 Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass
 `LOCALLM_SDK_VERSION=<version>` from a shell. Simplest of all for a one-off: just replace the URL
 and checksum strings in place.
+
+### Troubleshooting
+
+**`error: artifact of binary target 'LocalLMLabSDKCore' has changed checksum; … the new artifact
+won't be downloaded`** — you built this example once against an *earlier* cut of the same version
+tag (during a pre-release beta, a `vX.Y.Z` release asset can be re-uploaded with new bytes), and
+SwiftPM won't silently swap the cached artifact for one with a different checksum. The manifest is
+correct; the stale copy is local. Fix it per package:
+
+```bash
+rm -rf examples/<name>/.build        # then build / Run again
+```
+
+In Xcode: **File ▸ Packages ▸ Reset Package Caches** (and delete `~/Library/Developer/Xcode/DerivedData/<project>`
+if it persists). This only happens across a re-cut of one version tag — a normal version bump
+changes the tag, so there's nothing stale to collide with.
