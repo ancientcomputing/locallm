@@ -11,6 +11,23 @@ macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
 
+## 1.0.0-beta.4 — unreleased
+
+### Added — `LocalLMLabSDKCore`
+
+- **`BuildSpreadsheetTool`** (`buildSpreadsheet`) — the whole `jsonToCsv → filterRows →
+  dedupeRows → sortRows → selectColumns` chain (section 8b) as one `Tool`. The model fills a
+  single `Arguments` (`recordsAt`, `columns`, `filters`, `matchAny`, `sortBy` /
+  `sortDescending`, `limit`, `distinctOn`) and the host runs the stages in a fixed order. A
+  numeric range is two `filters` entries (`gte` + `lte`) on one column. A `filters` / `sortBy`
+  / `distinctOn` field that no record carries returns `Error:` rather than a silently empty
+  column. Added because small local models (8–14B) reliably *describe* a query but drift when
+  *orchestrating* a multi-call chain — most often dropping the filter when it is the third
+  refinement. The individual verbs are unchanged and stay for per-stage pipelines.
+- [`examples/aiql`](examples/aiql/) uses `buildSpreadsheet` in place of the verb chain; its
+  instruction prompt drops from six steps to four, and its default model is
+  `mlx-community/Qwen3-14B-4bit`.
+
 ## 1.0.0-beta.3 — 2026-09-06
 
 Two headline additions: **online providers** (a new `LocalLMLabSDKRemote.xcframework` — GPT /
