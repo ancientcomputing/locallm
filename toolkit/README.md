@@ -34,11 +34,12 @@ shasum -a 256 -c localai-toolkit-1.0.0-beta.3-arm64.zip.sha256
 unzip localai-toolkit-1.0.0-beta.3-arm64.zip
 ```
 
-This produces `localai-cli`, `localai-playground-run` (macOS 27) and
-`localai-playground-run-compat` (macOS 26), plus the `.dylib`s and resource
-bundles they need. Keep everything together — `localai-cli` picks the right
-helper next to itself based on the OS — and either put `localai-cli` on your
-`PATH` or reference it by full path.
+This produces `localai-cli`, `localai-playground-run` (macOS 27),
+`localai-playground-run-compat` (macOS 26), and a `runtime/` folder holding
+the libraries and resources they load. Keep `runtime/` next to the
+executables — the folder moves as a unit — and `localai-cli` picks the right
+helper next to itself based on the OS. Put `localai-cli` on your `PATH` (or
+reference it by full path); the folder itself has to stay together.
 
 On macOS 26 only the Apple on-device model (`system`) is available; Private
 Cloud Compute, Claude, and open-weight (MLX) models need macOS 27.
