@@ -33,7 +33,7 @@ let defaultSDKVersion = "1.0.0-beta.3"
 let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-beta.3": SDKRelease(
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip",
-        remoteChecksum: "71edcf700058a1ca60f7aa101894e6219ef9a6e0d7f3a8ff1539f5e446e5d9dd"
+        remoteChecksum: "2b1e401a606c2c34d3e086cf9a2edad9d2c9ca730a3c3840b964f88d9e2e446b"
     ),
 ]
 

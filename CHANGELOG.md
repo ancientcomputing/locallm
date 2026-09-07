@@ -11,7 +11,7 @@ macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
 
-## 1.0.0-beta.3 — 2026-09-05
+## 1.0.0-beta.3 — 2026-09-06
 
 Two headline additions: **online providers** (a new `LocalLMLabSDKRemote.xcframework` — GPT /
 Claude / OpenRouter / any OpenAI-compatible server, over HTTP, with provider-native web
@@ -139,10 +139,10 @@ pipeline where the row data never passes through the model, so it can't be fabri
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       2600da14b13e3bfcf8d33491a5f4a8fb7406fc5d314a20ba491348a029898d8c
-LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     248e23d3c4836fb4d7018afdd8001cb8c7a3f207c4569bf98bd1738422150982
-LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  5ce9b4481f6509fffb460d45cf230d3e2711a01082ca779525363141c2e2646b
-LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     71edcf700058a1ca60f7aa101894e6219ef9a6e0d7f3a8ff1539f5e446e5d9dd
+LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip       a49b8bfcde340d8b86bf106d2af2cb9d84f3839a3bc1695016f3952a3fcdfb92
+LocalLMLabSDKClaude-1.0.0-beta.3.xcframework.zip     cd312701e764c408d51efb1dd7cbb8c71c3392aab02fbec98a0a1f3dd584506a
+LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip  0e2b3cc522291dd6c0afdede6ee4516d272ed20b5c22adad68b80893c266800d
+LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip     2b1e401a606c2c34d3e086cf9a2edad9d2c9ca730a3c3840b964f88d9e2e446b
 ```
 
 ## 1.0.0-beta.2 — 2026-09-02

@@ -38,9 +38,9 @@ let knownSDKReleases: [String: SDKRelease] = [
     ),
     "1.0.0-beta.3": SDKRelease(
         coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
-        coreChecksum: "2600da14b13e3bfcf8d33491a5f4a8fb7406fc5d314a20ba491348a029898d8c",
+        coreChecksum: "a49b8bfcde340d8b86bf106d2af2cb9d84f3839a3bc1695016f3952a3fcdfb92",
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKInference-1.0.0-beta.3.xcframework.zip",
-        inferenceChecksum: "5ce9b4481f6509fffb460d45cf230d3e2711a01082ca779525363141c2e2646b"
+        inferenceChecksum: "0e2b3cc522291dd6c0afdede6ee4516d272ed20b5c22adad68b80893c266800d"
     ),
 ]
 
