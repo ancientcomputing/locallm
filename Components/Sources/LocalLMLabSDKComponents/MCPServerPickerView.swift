@@ -72,12 +72,15 @@ public struct MCPServerPickerView: View {
                     .frame(width: 140)
             }
 
-            // Caption label *above* the control, not the Picker's own label beside it: SwiftUI
-            // elides a segmented Picker's inline label under width pressure (so "Auth type"
-            // vanished the moment the URL field got text and the view re-laid-out), and a label
-            // beside the control competes for the row's width. `maxWidth` lets the segments use
-            // up to 420 but shrink in a narrow pane instead of overflowing — a vertical
-            // ScrollView *centers* overflowing content, which clips it on both sides.
+            // Caption label above + a DEFINITE width on the segmented control. Two separate
+            // problems were in play:
+            //  1. A `Picker`'s own inline label is elided under width pressure — so "Auth type"
+            //     vanished when the view re-laid-out. Fixed by an explicit caption above.
+            //  2. An empty `TextField` and one with text report different ideal widths, and with
+            //     `.windowResizability(.contentMinSize)` that changes the pane width — so a
+            //     `maxWidth`/flexible picker grew (and truncated its last segment) the moment you
+            //     typed. A fixed `.frame(width:)` decouples it: same size regardless of siblings.
+            // 400 fits all three segment labels; the picker area's own min width is 480.
             VStack(alignment: .leading, spacing: 3) {
                 Text("Auth type").font(.caption).foregroundStyle(.secondary)
                 Picker("Auth type", selection: $newServerAuthType) {
@@ -87,7 +90,7 @@ public struct MCPServerPickerView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 420, alignment: .leading)
+                .frame(width: 400)
             }
 
             if newServerAuthType == .pat {
