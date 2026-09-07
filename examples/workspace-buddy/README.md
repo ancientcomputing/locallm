@@ -42,6 +42,19 @@ Realistic asks: "rename `oldName` to `newName` in this file", "add a doc comment
 function", "convert this JSON to YAML". It will struggle with big files, many files in one
 request, or open-ended refactors, and it tool-calls less reliably than a larger model.
 
+**Prompts to try.** Point it at a throwaway folder with a handful of small text/code files (a
+copy of some project's `Sources/`, or just make a few by hand), then paste one of these:
+
+- `List the files here, then add a one-line comment with the file's name to the top of each .swift file.`
+- `In README.md, replace every occurrence of "TODO" with "DONE".`
+- `Create a file called NOTES.md with a two-sentence summary of what this folder contains.`
+- `Rename the function greet to sayHello in Sources/App/main.swift, including any calls to it in that file.`
+- `Read config.json and write the same data as config.yaml next to it.`
+
+Each is one well-scoped change to one or two named files — the shape the on-device model handles
+reliably. After **Go**, confirm with `git diff` (or your editor); the model's summary is not the
+source of truth, the files on disk are.
+
 For more capability while staying local, [`workspace-buddy-local`](../workspace-buddy-local) is
 this same app running a downloadable open-weight model (e.g. an 8B). The SDK can also route to
 Claude if a cloud model is acceptable — see [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).

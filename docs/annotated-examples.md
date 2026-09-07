@@ -1,8 +1,9 @@
 # Annotated example source
 
 The full source of every reference app, with every line that actually touches the SDK marked
-`// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`, and
-`workspace-buddy-local`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
+`// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
+`workspace-buddy-local`, `os-matrix`, and `aiql`), `// ← SDK (Remote)` (online providers —
+`model-switch`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
@@ -952,7 +953,7 @@ of whether it uses `Components` or not.
 The fullest **model-layer** example (see also
 [`repo-qa-local`](#examplesrepo-qa-localsourcesrepoqalocalmainswift) for the minimal one, and
 [`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift)
-for the sandboxed one, both annotated below), and one of three linking a second binary, `LocalLMLabSDKInference.xcframework`
+for the sandboxed one, both annotated below), and one of several linking a second binary, `LocalLMLabSDKInference.xcframework`
 (the MLX runtime). Lines that touch it are marked `// ← SDK (Inference)`; `// ← SDK` is Core as
 elsewhere. A CLI coding agent: point it at a repo, give it a task (one-shot) or omit the task to
 get a `>>` loop over one persistent session, and it downloads an open-weight MLX model on first
@@ -1310,7 +1311,7 @@ make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it
 The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qasourcesrepoqamainswift) above,
 with the ~20 lines that swap Apple's on-device model for an open-weight MLX model you download and
 run locally. The Deepwiki / `MCPTool` half is a verbatim copy of `repo-qa`'s — diff the two to see
-exactly what adopting the model layer costs. Second of the three binaries linking
+exactly what adopting the model layer costs. One of several examples linking
 `LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as elsewhere.
 
 ```swift
@@ -1449,7 +1450,7 @@ same folder-picker, same security-scoped bookmark, same `WorkspaceTools` — but
 open-weight MLX model routed through the 1.0 model layer. It is the one example that runs the
 model layer **inside App Sandbox**, so it also needs `com.apple.security.network.client` (to fetch
 the weights on first run) on top of `workspace-buddy`'s `files.user-selected.read-write`; the
-model downloads into this app's own sandbox container. Third of the three binaries linking
+model downloads into this app's own sandbox container. One of several examples linking
 `LocalLMLabSDKInference`. The `FolderAccess` enum is verbatim from `workspace-buddy` and is
 elided here — see that section above.
 
@@ -1586,3 +1587,636 @@ instantiations + one error formatter), the delta is entirely the model layer: th
 route setup, the first-run `availability` check, and the `validate` + `download` progress loop.
 The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
 sandbox changes nothing in the code, only the entitlements.
+
+## `examples/os-matrix/Sources/OSMatrix/main.swift`
+
+One `.macOS("26.0")` CLI that runs unchanged on macOS 26 and macOS 27 — no source `#if`, a single
+`#available` block at provider registration. Everything after that block is identical code on both
+OSes; the macOS-27-only model families (`PCCModelProvider`, open-weight via `MLXModelProvider`) are
+simply absent on 26, and `ModelAvailability.requiresOS` / `lab.models.schemesRequiringNewerOS` are
+what a picker reads to show them as disabled rows. See
+[`sdk-guide.md` §1a](sdk-guide.md#1a-targeting-macos-26-and-macos-27-from-one-build). It links
+`LocalLMLabSDKInference` for the MLX types but never forces a 27 deployment target — the
+`#available` gate is the whole story.
+
+```swift
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKInference                                         // ← SDK (Inference)
+
+// See Package.swift / README.md for the four scenarios. Run on macOS 26 and macOS 27 — same
+// binary, no source `#if`, one `#available` check at provider registration.
+//   swift run OSMatrix
+//   swift run OSMatrix --download mlx-community/Qwen3-4B-4bit   # macOS 27 only; ~2–5 GB
+
+@MainActor
+func run() async throws {
+    let args = CommandLine.arguments
+    let downloadRepo: String? = args.firstIndex(of: "--download").flatMap { i in
+        i + 1 < args.count ? args[i + 1] : nil
+    }
+
+    // ── register what the running OS supports ──
+    // SystemModelProvider works on macOS 26 and 27. The rest need macOS 27, so they go in one
+    // #available block. Everything AFTER this line is identical on both OSes.
+    var providers: [any ModelProvider] = [SystemModelProvider()]      // ← SDK
+    if #available(macOS 27, *) {
+        providers.append(PCCModelProvider())                          // ← SDK
+        providers.append(MLXModelProvider())                          // ← SDK (Inference)
+    }
+    let lab = LocalLMLab(configuration: .init(providers: providers))  // ← SDK
+    lab.models.route("chat", to: .system)                             // ← SDK
+
+    // ── model availability table ──
+    let v = ProcessInfo.processInfo.operatingSystemVersion
+    print("Running on macOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)\n")
+    print("Model families:")
+    for id in [ModelID.system, .pcc, ModelID("claude:sonnet5")!,      // ← SDK
+               ModelID(scheme: "mlx", rest: "mlx-community/Qwen3-4B-4bit")!] {
+        let name = id.rawValue.padding(toLength: 42, withPad: " ", startingAt: 0)
+        print("  \(name) \(describe(lab.models.availability(for: id)))")   // ← SDK
+    }
+    if !lab.models.schemesRequiringNewerOS.isEmpty {                   // ← SDK
+        print("\n  (\(lab.models.schemesRequiringNewerOS.joined(separator: ", ")) need macOS 27 — a picker shows these as disabled rows)")
+    }
+
+    // ── `--download` — a feature that only exists on macOS 27 ──
+    if let repo = downloadRepo {
+        guard #available(macOS 27, *), !lab.models.downloadableProviders.isEmpty else {   // ← SDK
+            print("\n--download needs macOS 27 (open-weight models run via MLX, which is macOS 27+).")
+            return
+        }
+        print("\nDownloading \(repo) from Hugging Face — fetches the weights (typically 2–5 GB)…")
+        let installed = try await lab.models.startDownload(repo)      // ← SDK  (resolves once weights are on disk)
+        let size = installed.sizeBytes.map { " (\($0 / 1_000_000) MB)" } ?? ""
+        print("Done: \(installed.id.rawValue)\(size). It's now .available — route a session to it:")
+        print("  lab.models.route(\"chat\", to: ModelID(\"\(installed.id.rawValue)\")!)")
+        print("  let session = try lab.makeSession(route: \"chat\")")
+        return
+    }
+
+    // ── connector tools that work on both OSes ──
+    let tools: [any Tool] = [ClockTool(), WeatherTool()]              // ← SDK
+
+    // ── the same call, identical on 26 and 27 ──
+    let session = try lab.makeSession(route: "chat", tools: tools,    // ← SDK
+        instructions: "You have getCurrentTime and getWeather tools. Use them; be concise.")
+    print("\nAsking the on-device model (with tools)…")
+    let answer = try await session.respond(to: "What time is it, and what's the weather in Tokyo?")   // ← SDK
+    print("→ \(answer)")
+
+    if #available(macOS 27, *), !lab.models.downloadableProviders.isEmpty {   // ← SDK
+        print("\nOpen-weight (MLX) models are available on macOS 27. Download one with:")
+        print("  swift run OSMatrix --download mlx-community/Qwen3-4B-4bit")
+        print("In code that's `try await lab.models.startDownload(\"<hf-repo-id>\")`; `lab.models.downloads` is the observable a picker binds to for a progress bar.")
+    } else {
+        print("\nOpen-weight (MLX) models need macOS 27 — unavailable here.")
+    }
+}
+
+func describe(_ a: ModelAvailability) -> String {                     // ← SDK (type)
+    switch a {
+    case .available: return "available"
+    case .notDownloaded: return "not downloaded"
+    case .needsCredential: return "needs credential"
+    case .unavailable(let kind, let detail):
+        if case .requiresOS(let os) = kind { return "requires \(os)" }   // ← SDK (.requiresOS)
+        return "unavailable — \(detail)"
+    @unknown default:
+        return "unknown"                                              // non-frozen — see sdk-guide §9
+    }
+}
+
+do {
+    try await run()
+} catch {
+    FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+    exit(1)
+}
+```
+
+**Tally**: of ~90 lines of actual code, ~15 touch the SDK — and every one of the OS-conditional
+lines is inside the single `if #available(macOS 27, *)` block at the top. `describe(_:)` is a
+plain `switch` over `ModelAvailability`; `.requiresOS` is the one case a 26-aware app has to
+handle that a 27-only app never sees. No `#if canImport` anywhere — `LocalLMLabSDKInference` is
+linked unconditionally and its 27-only providers just aren't appended on 26.
+
+## `examples/model-switch/Sources/ModelSwitch/AppModel.swift`
+
+The **online / remote providers** example (`sdk-guide.md`
+[§6b](sdk-guide.md#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)): a chat
+window that talks to Apple's on-device model, PCC, Claude-via-Foundation-Models, and any number of
+HTTP providers (GPT, Claude online, OpenRouter, OpenAI-compatible) from one `lab.makeSession`
+call, with provider-run web search. This is the only example linking a **fourth** binary,
+`LocalLMLabSDKRemote.xcframework` — lines that touch it are marked `// ← SDK (Remote)`. It also
+uses `Components` for the whole settings panel (`// ← Components`); `Components` itself does *not*
+link `Remote`, so the two meet through the `RemoteProviderDraft` / `ProviderTestOutcome` data
+types and the `onSave` / `onRemove` / `onTest` closures — see `ModelSwitchApp.swift` and
+`ProviderGlue.swift` below.
+
+```swift
+import Foundation
+import Observation
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKComponents                                        // ← Components
+import LocalLMLabSDKRemote                                            // ← SDK (Remote)
+
+@available(macOS 27, *)
+@MainActor
+@Observable
+final class AppModel {
+    let lab: LocalLMLab                                               // ← SDK (type)
+
+    // Online-provider drafts, persisted by the app. Demo persistence only — a real app stores
+    // the API keys in the Keychain, not UserDefaults.
+    var providers: [RemoteProviderDraft] = [] {                       // ← Components (type)
+        didSet { persist() }
+    }
+
+    var selectedModel: ModelID = .system                             // ← SDK (type)
+
+    var transcript: [ChatLine] = []
+    var input: String = ""
+    var webSearchThisTurn = false
+    var isResponding = false
+    var lastError: String?
+
+    struct ChatLine: Identifiable {
+        let id = UUID()
+        var role: Role
+        var text: String
+        var searches: [String] = []
+        var citations: [Citation] = []                                // ← SDK (type)
+        enum Role { case user, assistant }
+    }
+
+    init() {
+        // Start with just Apple's on-device provider; every HTTP provider is added at runtime
+        // by restore() / applyDraft() via lab.models.replace(_:).
+        lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider()]))   // ← SDK
+        restore()
+    }
+
+    var availableModels: [ModelID] {
+        lab.models.knownModels.filter { lab.models.availability(for: $0).isAvailable }   // ← SDK
+    }
+
+    // MARK: provider config
+
+    func applyDraft(_ draft: RemoteProviderDraft) {
+        guard let idx = providers.firstIndex(where: { $0.scheme == draft.scheme }) else { return }
+        var updated = draft
+        if let config = draft.makeConfig() {                          // makeConfig() → RemoteProviderConfig, see ProviderGlue.swift
+            lab.models.replace(RemoteModelProvider(config))           // ← SDK (Remote)  — add/replace at runtime
+            updated.configured = true
+            updated.statusText = "\(config.models.count) model(s) available."
+        } else {
+            lab.models.removeProvider(scheme: draft.scheme)           // ← SDK
+            updated.configured = false
+            updated.statusText = "Enter an API key to enable."
+        }
+        providers[idx] = updated
+    }
+
+    func removeDraft(_ draft: RemoteProviderDraft) {
+        lab.models.removeProvider(scheme: draft.scheme)               // ← SDK
+        if selectedModel.scheme == draft.scheme { selectedModel = .system }
+    }
+
+    // "Test connection" — in-process here since this example links Remote directly. A host split
+    // across a macOS-26 chooser + a 27-only helper round-trips this through a serve op instead.
+    // Every configured model, not just the first — a valid key doesn't mean a second model id the
+    // user just typed is real.
+    func testDraft(_ draft: RemoteProviderDraft) async -> ProviderTestOutcome {   // ← Components (type)
+        guard let config = draft.makeConfig(), !config.models.isEmpty else {
+            return .unableToRun("Add a model id and an API key first.")
+        }
+        let provider = RemoteModelProvider(config)                    // ← SDK (Remote)
+        var results: [ProviderTestOutcome.ModelResult] = []
+        for model in config.models {
+            guard let modelID = ModelID(scheme: config.scheme, rest: model.id) else {   // ← SDK
+                results.append(.init(modelId: model.id, ok: false, detail: "isn't a valid model id."))
+                continue
+            }
+            let availability = await provider.probe(for: modelID)     // ← SDK (Remote)  — zero-token key/model/reachability check
+            let detail: String
+            switch availability {
+            case .available: detail = "Available."
+            case .needsCredential: detail = "The API key was rejected."
+            case .unavailable(_, let d): detail = d
+            default: detail = "Unknown status."
+            }
+            results.append(.init(modelId: model.id, ok: availability.isAvailable, detail: detail))
+        }
+        return ProviderTestOutcome(results: results)
+    }
+
+    // MARK: chat
+
+    func send() async {
+        let prompt = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty, !isResponding else { return }
+        input = ""
+        lastError = nil
+        transcript.append(.init(role: .user, text: prompt))
+        var line = ChatLine(role: .assistant, text: "")
+        transcript.append(line)
+        let lineID = line.id
+        isResponding = true
+        defer { isResponding = false }
+
+        do {
+            lab.models.route("chat", to: selectedModel)               // ← SDK  — one route, repointed per turn
+            let session = try lab.makeSession(                        // ← SDK
+                route: "chat",
+                instructions: "You are a helpful assistant. Be concise.",
+                options: .init(webSearch: webSearchThisTurn))         // ← SDK (SessionOptions) — provider runs the search
+
+            let events = Task { [weak self] in
+                for await event in session.events {                   // ← SDK
+                    guard let self else { return }
+                    if case .serverToolCall(let a) = event, case .webSearch(let q, _) = a.kind {   // ← SDK
+                        self.update(lineID) { $0.searches.append(contentsOf: q) }
+                    }
+                }
+            }
+
+            let answer = try await session.respond(to: prompt)       // ← SDK
+            events.cancel()
+            line.text = answer
+            update(lineID) { $0.text = answer; $0.citations = session.citations }   // ← SDK  — web-search sources
+        } catch {
+            let message = (error as? LocalLMLabError)?.errorDescription ?? "\(error)"   // ← SDK
+            lastError = message
+            update(lineID) { $0.text = "⚠️ \(message)" }
+        }
+    }
+
+    private func update(_ id: UUID, _ mutate: (inout ChatLine) -> Void) {
+        guard let idx = transcript.firstIndex(where: { $0.id == id }) else { return }
+        mutate(&transcript[idx])
+    }
+
+    // MARK: persistence (demo only — real apps use the Keychain for keys)
+
+    private static let key = "modelswitch.providers.v1"
+
+    private func persist() {
+        let plain = providers.map {
+            ["scheme": $0.scheme, "displayName": $0.displayName, "kind": $0.kind.rawValue,
+             "baseURL": $0.baseURL, "apiKey": $0.apiKey,
+             "models": $0.models.joined(separator: "\n"),
+             "webSearchSupported": String($0.webSearchSupported),
+             "webSearchEnabled": String($0.webSearchEnabled),
+             "maxSearches": String($0.maxSearches)]
+        }
+        UserDefaults.standard.set(plain, forKey: Self.key)
+    }
+
+    private func restore() {
+        let rows = UserDefaults.standard.array(forKey: Self.key) as? [[String: String]] ?? []
+        providers = rows.compactMap { r in
+            guard let scheme = r["scheme"], let kindRaw = r["kind"],
+                  let kind = RemoteProviderKind(rawValue: kindRaw) else { return nil }   // ← Components (type)
+            var d = RemoteProviderDraft(
+                scheme: scheme, displayName: r["displayName"] ?? scheme, kind: kind,
+                baseURL: r["baseURL"] ?? "", apiKey: r["apiKey"] ?? "",
+                models: (r["models"] ?? "").split(whereSeparator: \.isNewline).map(String.init),
+                webSearchSupported: r["webSearchSupported"] == "true",
+                webSearchEnabled: r["webSearchEnabled"] == "true",
+                maxSearches: Int(r["maxSearches"] ?? "5") ?? 5)
+            if let config = d.makeConfig() {
+                lab.models.replace(RemoteModelProvider(config))       // ← SDK (Remote)
+                d.configured = true
+            }
+            return d
+        }
+    }
+}
+```
+
+The `~30 lines of glue` the section above keeps referring to is one file:
+
+```swift
+// examples/model-switch/Sources/ModelSwitch/ProviderGlue.swift
+import Foundation
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKComponents                                        // ← Components
+import LocalLMLabSDKRemote                                            // ← SDK (Remote)
+
+// RemoteProviderDraft (Components' UI shape) → RemoteProviderConfig (Remote's model-layer shape).
+// The SDK ships no default model ids — an empty model list is a real, intentional state (the
+// user removed every row), so makeConfig() must round-trip it as zero models, never resurrect
+// a default.
+extension RemoteProviderDraft {
+    func makeConfig() -> RemoteProviderConfig? {                      // ← SDK (Remote) (type)
+        let models = self.models.map { RemoteModel(id: $0) }          // ← SDK (Remote)
+        var config: RemoteProviderConfig
+
+        switch kind {
+        case .openAIChat:
+            guard !apiKey.isEmpty else { return nil }
+            config = .openAI(apiKey: apiKey, models: models)          // ← SDK (Remote) (preset)
+        case .openAIResponses:
+            guard !apiKey.isEmpty else { return nil }
+            config = .openAIResponses(apiKey: apiKey, models: models) // ← SDK (Remote) (preset)
+        case .anthropic:
+            guard !apiKey.isEmpty else { return nil }
+            config = .anthropic(apiKey: apiKey, models: models)       // ← SDK (Remote) (preset)
+        case .openRouter:
+            guard !apiKey.isEmpty else { return nil }
+            config = .openRouter(apiKey: apiKey, models: models)      // ← SDK (Remote) (preset)
+        case .openAICompatible:
+            guard let url = URL(string: baseURL), !baseURL.isEmpty else { return nil }
+            config = .openAICompatible(                               // ← SDK (Remote) (escape hatch)
+                scheme: scheme, displayName: displayName, baseURL: url,
+                apiKey: apiKey.isEmpty ? nil : apiKey, models: models)
+        }
+
+        // Carry the panel's web-search checkbox into the provider defaults.
+        if webSearchSupported {
+            config.capabilities.insert(.webSearch)                    // ← SDK (Remote)
+            config.defaultOptions.webSearch = webSearchEnabled        // ← SDK (Remote)
+            config.defaultOptions.webSearchMaxUses = maxSearches      // ← SDK (Remote)
+        }
+        return config
+    }
+}
+```
+
+**Tally**: the whole model layer here is `lab.models.replace(_:)` / `.removeProvider(scheme:)` to
+reconfigure at runtime, `.route` + `makeSession(options:)` per turn, and `session.events` /
+`session.citations` for the web-search side-channel. Everything provider-specific — dialects,
+base URLs, auth, presets — is data inside `RemoteProviderConfig`, built once in the ~40-line
+`ProviderGlue.swift`. `probe(for:)` is the one call that hits the network without spending a
+token, and it's what the settings panel's **Test connection** button runs.
+
+## `examples/model-switch/Sources/ModelSwitch/ModelSwitchApp.swift`
+
+The `Components` half: `AIModelsSettingsView` is the entire "AI Models" settings panel — add a
+provider, key field, per-model rows, a web-search toggle + max-searches stepper, and a **Test
+connection** button. The host supplies four things and writes no settings UI of its own.
+
+```swift
+import SwiftUI
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKComponents                                        // ← Components
+
+@main
+@available(macOS 27, *)
+struct ModelSwitchApp: App {
+    @State private var model = AppModel()
+
+    var body: some Scene {
+        WindowGroup("Model Switch") {
+            ChatView(model: model)                                    // ordinary SwiftUI — model picker, transcript, composer; elided
+                .frame(minWidth: 520, minHeight: 460)
+        }
+        Settings {
+            SettingsScreen(model: model)
+                .frame(width: 560, height: 620)
+        }
+    }
+}
+
+@available(macOS 27, *)
+private struct SettingsScreen: View {
+    @Bindable var model: AppModel
+    var body: some View {
+        AIModelsSettingsView(                                         // ← Components  — the whole panel
+            registry: model.lab.models,                               // ← SDK  — built-in models come from here
+            providers: $model.providers,
+            onSave:   { model.applyDraft($0) },                       // draft → lab.models.replace(_:)
+            onRemove: { model.removeDraft($0) },                      // draft → lab.models.removeProvider(scheme:)
+            onTest:   { await model.testDraft($0) })                  // draft → provider.probe(for:) per model
+    }
+}
+```
+
+**Tally**: three lines. `AIModelsSettingsView(registry:providers:onSave:onRemove:onTest:)` is the
+whole settings surface; the `ChatView` (model `Picker` bound to `model.availableModels`, a
+web-search `Toggle`, the transcript) is ordinary SwiftUI and is elided here. The closures are the
+seam that keeps `Components` free of any dependency on `Remote`.
+
+## `examples/aiql/Sources/AIQL/AIQLApp.swift`
+
+The **`FileBackedTool` + "AIQL" data-verb** showcase (`sdk-guide.md`
+[§8b](sdk-guide.md#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
+type a local model, an MCP data source, and a plain-English request; the app pulls the dataset
+into a file (so the raw payload never enters the model's context) and runs it through
+`describeJson → jsonToCsv → filter/sort/select` to a CSV. The model only names the operations and
+the columns — every row-level step is an SDK primitive, so there's nothing for an 8–14B model to
+fabricate. Links `LocalLMLabSDKInference` for the MLX model; `FolderAccess` is verbatim from
+`workspace-buddy-local` (`sdk-guide.md` §8) and elided.
+
+```swift
+import AppKit
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKInference                                         // ← SDK (Inference)
+import SwiftUI
+
+// MARK: - FolderAccess { pickFolder / resolveBookmarkedFolder / withFolderAccessAsync }
+//   — verbatim from workspace-buddy-local (docs/sdk-guide.md §8); elided here.
+
+@available(macOS 27.0, *)
+@MainActor
+final class AIQLModel: ObservableObject {
+    enum Stage: Equatable {
+        case idle, connecting
+        case downloadingModel(Double)      // 0…1
+        case running
+        case done(fileName: String, csv: String, folder: URL)
+        case failed(String)
+    }
+
+    @Published var modelRepo = "mlx-community/Qwen3-8B-4bit"
+    @Published var serverURLString = "https://econ-index.mcp.claude.com/mcp"
+    @Published var request = ""
+    @Published private(set) var folderURL: URL?
+    @Published private(set) var stage: Stage = .idle
+    @Published private(set) var steps: [String] = []
+
+    private let manager = MCPServerManager()                          // ← SDK
+    private let mlx = MLXModelProvider(residentModelLimit: 1)         // ← SDK (Inference)
+    private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
+
+    init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
+
+    // canGo / isBusy / chooseFolder / go() — plain view-model plumbing, elided.
+
+    private func run() async {
+        steps = []
+        let prompt = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let serverURL = URL(string: serverURLString.trimmingCharacters(in: .whitespaces)), serverURL.scheme != nil else {
+            stage = .failed("That MCP server address doesn't look like a web link."); return
+        }
+        guard let modelID = ModelID(scheme: "mlx", rest: modelRepo.trimmingCharacters(in: .whitespaces)) else {   // ← SDK
+            stage = .failed("The model name should look like mlx-community/Qwen3-8B-4bit."); return
+        }
+        lab.models.route(.local, to: modelID)                        // ← SDK
+
+        // 1 — connect (triggers an OAuth browser sign-in automatically if the server needs one)
+        stage = .connecting
+        let connection = await manager.addServer(url: serverURL, displayName: serverURL.host ?? "MCP server")   // ← SDK
+        guard case .success(let server) = connection else {
+            if case .failure(let error) = connection {
+                stage = .failed("Couldn't connect to that MCP server — \(Self.describe(error))")
+            } else {
+                stage = .failed("Couldn't connect to that MCP server.")
+            }
+            return
+        }
+        guard !server.tools.isEmpty else {
+            stage = .failed("Connected, but that server didn't offer any tools to get data from."); return
+        }
+        step("Connected — \(server.tools.count) data tool(s) available.")
+
+        // 2 — download the model on first use
+        if case .notDownloaded = lab.models.availability(for: modelID) {   // ← SDK
+            stage = .downloadingModel(0)
+            if let preflight = try? await mlx.validate(modelRepo.trimmingCharacters(in: .whitespaces)), !preflight.passed {   // ← SDK (Inference)
+                stage = .failed("That model didn't pass its check: \(preflight.detail ?? "unknown reason")."); return
+            }
+            do {
+                for try await event in mlx.download(modelRepo.trimmingCharacters(in: .whitespaces)) {   // ← SDK (Inference)
+                    if case .progress(_, _, let fraction) = event { stage = .downloadingModel(fraction) }
+                }
+            } catch {
+                stage = .failed("The model download failed: \(error.localizedDescription)"); return
+            }
+        }
+
+        // 3 — run the pipeline inside the security-scoped access window
+        stage = .running
+        let outcome = await FolderAccess.withFolderAccessAsync { root in
+            await self.runPipeline(prompt: prompt, root: root, serverTools: server.tools, serverID: server.id, modelID: modelID)
+        }
+        stage = outcome ?? .failed("Couldn't open the folder you chose — pick it again.")
+    }
+
+    private func runPipeline(prompt: String, root: URL, serverTools: [MCPToolDescriptor],   // ← SDK (type)
+                             serverID: MCPServerID, modelID: ModelID) async -> Stage {       // ← SDK (types)
+        // Wrap the server's tools as file-backed so the model can `saveAs` any of them. Cap the
+        // count — a small model degrades past ~8 tools; prefer names that look like "get a dataset".
+        let ranked = serverTools.sorted { Self.dataLikelihood($0.name) > Self.dataLikelihood($1.name) }
+        let dataTools: [any Tool] = ranked.prefix(4).compactMap {
+            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000)   // ← SDK  — payload → file, receipt → model
+        }
+        guard !dataTools.isEmpty else { return .failed("Couldn't read that server's tools — its data format isn't supported yet.") }
+
+        // The data verbs: each takes root at init, reads one workspace file, writes a CSV, returns
+        // a one-line receipt — the row data never reaches the model.
+        var tools: [any Tool] = dataTools
+        tools.append(DescribeJSONTool(root: root))                   // ← SDK
+        tools.append(CSVInfoTool(root: root))                        // ← SDK
+        tools.append(JSONToCSVTool(root: root))                      // ← SDK
+        tools.append(SelectColumnsTool(root: root))                  // ← SDK
+        tools.append(FilterRowsTool(root: root))                     // ← SDK
+        tools.append(SortRowsTool(root: root))                       // ← SDK
+        tools.append(ConcatRowsTool(root: root))                     // ← SDK
+
+        let instructions = """
+        You turn a data question into a fixed sequence of tool calls that ends with a CSV file. \
+        You never write row data yourself …
+        1. Pick the ONE data tool whose result answers the question and call it with `saveAs` set \
+           to "raw/data.json". … use `saveAsAppend: true` for each further page.
+        2. describeJson  path "raw/data.json".
+        3. jsonToCsv  inputPath "raw/data.json", outputPath "all.csv": rowsAt = the array path, \
+           columns = {header, path} per field.
+        4. Apply ONLY the refinements the question asks for → sortRows with `limit` for "top N", \
+           filterRows for "only/without/where". Do NOT add a filter or sort it didn't ask for.
+        5. selectColumns → "out.csv", exactly the fields the question named.
+        6. csvInfo  path "out.csv", then reply with the column names and row count. Don't print rows.
+        """  // (full prompt in the source)
+
+        let session: LocalLMLabSession                               // ← SDK
+        do {
+            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions, includeMCPTools: false)   // ← SDK
+        } catch {
+            return .failed("Couldn't start the model: \(error.localizedDescription)")
+        }
+        defer { session.cancel() }                                   // ← SDK
+
+        // Friendly progress from the session's tool-call side-channel.
+        let stepTask = Task { @MainActor in
+            for await event in session.events {                      // ← SDK
+                switch event {
+                case .toolCallStarted(_, let name):
+                    self.step(Self.friendlyStep(for: name))
+                case .toolCallFinished(_, let name, let failed) where failed:
+                    self.step("  · \(Self.friendlyStep(for: name)) hit a snag — retrying")
+                default: break
+                }
+            }
+        }
+        defer { stepTask.cancel() }
+
+        do {
+            _ = try await session.languageModelSession.respond(to: "Question: \(prompt)\n\nBegin with step 1 now.")   // ← SDK
+        } catch {
+            return .failed(await GenerationErrorDescription.describe(error))   // ← SDK
+        }
+
+        // The result CSV. Instructions ask for "out.csv"; fall back to the newest .csv if a weak
+        // model left it in the last stage file.
+        var name = "out.csv"
+        if case .failure = WorkspaceAccess.readFile(in: root, path: "out.csv"),               // ← SDK
+           case .success(let entries) = WorkspaceAccess.listFiles(in: root, subpath: nil) {   // ← SDK
+            if let newest = entries
+                .filter({ !$0.isDirectory && $0.name.hasSuffix(".csv") })
+                .max(by: { ($0.modifiedDate ?? .distantPast) < ($1.modifiedDate ?? .distantPast) }) {
+                name = newest.name
+            }
+        }
+        guard case .success(let csv) = WorkspaceAccess.readFile(in: root, path: name) else {   // ← SDK
+            return .failed("The model finished but didn't write a spreadsheet. Try rephrasing, or a larger model.")
+        }
+        step("Saved \(name).")
+        return .done(fileName: name, csv: csv, folder: root)
+    }
+
+    // describe(_:) over MCPServerError, dataLikelihood / friendlyStep string helpers — elided.
+}
+
+// MARK: - ContentView — ordinary SwiftUI (four text fields, a Go button, a status area). Elided.
+
+// Handle aiql://oauth/callback through the AppDelegate, not SwiftUI's .onOpenURL — WindowGroup
+// treats an open-URL event as a request for a new window. Same fix plate-today / components-demo use.
+@available(macOS 27.0, *)
+private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "aiql" {
+            MCPOAuthRedirectListener.shared.handleRedirect(url)       // ← SDK
+        }
+    }
+}
+
+@available(macOS 27.0, *)
+@main
+struct AIQLApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var model = AIQLModel()
+
+    init() {
+        MCPOAuthFlow.redirectURI = "aiql://oauth/callback"           // ← SDK
+    }
+
+    var body: some Scene {
+        WindowGroup { ContentView(model: model) }
+            .windowResizability(.contentMinSize)
+            .handlesExternalEvents(matching: [])
+    }
+}
+```
+
+**Tally**: the model layer is the same ~7 lines as `repo-qa-local` (`MLXModelProvider` / `LocalLMLab`
+/ `route` / `availability` / `validate` / `download` / `makeSession`). Everything new here is the
+pipeline: `FileBackedTool.mcp(descriptor:manager:root:)` wraps each MCP data tool so its payload
+lands in a file instead of the model's context, and the eight data-verb `Tool`s
+(`describeJson` / `jsonToCsv` / `selectColumns` / `filterRows` / `sortRows` / `concatRows` /
+`csvInfo`) each do one mechanical CSV transform and return only a receipt. The `instructions`
+string doing the orchestration is the real work of this example — the SDK surface it drives is
+about a dozen one-line `Tool` instantiations plus `WorkspaceAccess` to read the result back.

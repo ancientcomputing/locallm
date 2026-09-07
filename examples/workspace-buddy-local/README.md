@@ -119,6 +119,20 @@ open it, click **Choose Folder…**, pick a throwaway directory, type a request,
 **First Go downloads the model** (~4.5 GB for the default), with a progress bar. After that it's
 local and offline — the second run starts generating immediately.
 
+**Prompts to try.** Same tools and instructions as [`workspace-buddy`](../workspace-buddy#about-the-model),
+so its prompt list applies here too. Point the app at a throwaway folder with a few small files and
+paste one of these — the 8B model handles a bit more per request than Apple's on-device one:
+
+- `Add a triple-slash doc comment above every public function in Sources/, saying what it does.`
+- `Rename the type Widget to Gadget everywhere it appears in this folder, including other files that reference it.`
+- `In every .swift file, sort the import lines alphabetically.`
+- `Read data.json and write a Markdown table of the same rows to data.md.`
+- `Find every file containing the string "deprecated" and add a "// TODO: remove" comment on that line.`
+
+Confirm the result with `git diff` — the files on disk are the source of truth, not the model's
+summary. Keep to one folder and one clearly-scoped change per request; open-ended "refactor this
+project" asks are still beyond a local 8B.
+
 ## Where the model is stored
 
 Because this app is sandboxed, the Hugging Face cache is redirected into its container — the

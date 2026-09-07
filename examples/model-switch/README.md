@@ -35,6 +35,21 @@ Running a packaged build (`packaging/build-and-sign.sh`, below):
 4. **Switch models mid-conversation** — the picker changes which provider the *next* turn routes
    to; the transcript carries over.
 
+**Prompts to try.** With only **system** configured (no key), any plain chat prompt works —
+`Explain the difference between a struct and a class in Swift` — but there's nothing to switch
+between and web search does nothing. The example only gets interesting once a provider with an
+API key is added; then:
+
+| Prompt | What it demonstrates |
+|---|---|
+| `In two sentences, what is Private Cloud Compute?` | ask it once, then re-send after switching the picker — compare `system` vs a hosted model on the same question |
+| *(Web search **on**)* `What did Apple announce at WWDC this year? Cite your sources.` | provider-native search — the queries show inline, citation links appear under the answer |
+| *(Web search **on**)* `What's the latest stable Swift version, and when was it released?` | a fact newer than any model's training cut-off — only answerable via search |
+| `Write a haiku about local inference, then translate it to French.` | a two-step turn; run it on each configured model to feel the quality difference |
+
+Web search needs a provider that supports it (OpenAI, Anthropic, or OpenRouter) with **Enable
+web search** ticked in the Providers panel.
+
 ## Getting the SDK
 
 Nothing to download by hand — `Package.swift` (both this app's and the sibling

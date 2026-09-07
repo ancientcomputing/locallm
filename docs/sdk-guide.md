@@ -81,18 +81,20 @@ If you also want the prebuilt SwiftUI pieces (MCP server picker, OAuth waiting v
 prompt browsing, model picker, AI Models settings panel), add `Components` the same way — see
 [`examples/components-demo`](../examples/components-demo) for a working example of using it.
 
-There are five binaries on each release, all keyed off the same `LOCALLM_SDK_VERSION`; link
-only the ones you use: **`Core`** (always), **`Claude`** (Claude via Foundation Models —
-forces a macOS 27 target), **`Inference`** (local open-weight / MLX models), **`Remote`**
-(online providers — GPT / Claude online / OpenRouter, see §6b), and **`Components`** (SwiftUI,
-consumed as source). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
+The release carries **four xcframeworks** plus `Components` as source, all keyed off the same
+`LOCALLM_SDK_VERSION`; link only the ones you use: **`Core`** (always), **`Claude`** (Claude via
+Foundation Models — forces a macOS 27 target), **`Inference`** (local open-weight / MLX models),
+**`Remote`** (online providers — GPT / Claude online / OpenRouter, see §6b), and **`Components`**
+(SwiftUI, consumed as source, not an xcframework). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
 (Remote + Components) are the multi-binary manifest shapes to copy from.
 
 ### 1a. Targeting macOS 26 and macOS 27 from one build
 
 As of `1.0.0-beta.2`, `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`
-all have a **macOS 26 deployment floor**. One app, one link, runs on both — with the model
-families that need macOS 27 (Private Cloud Compute, open-weight / MLX) simply absent on 26. The
+all have a **macOS 26 deployment floor** — and `LocalLMLabSDKRemote` (added in `1.0.0-beta.3`)
+has a macOS 26 *manifest* floor too, though `RemoteModelProvider` itself is 27-only (see §6b).
+One app, one link, runs on both — with the model families that need macOS 27 (Private Cloud
+Compute, open-weight / MLX, online providers) simply absent on 26. The
 `#available` check is one block, at provider registration; everything after it is identical code.
 
 ```swift

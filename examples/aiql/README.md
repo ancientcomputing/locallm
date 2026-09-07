@@ -134,17 +134,34 @@ app's sandbox container at
 
 ## Try it
 
-The Anthropic Economic Index has a public, no-auth MCP server:
+The **Anthropic Economic Index** publishes a public, no-auth MCP server — a good first data
+source because every one of its tools returns a clean table of records:
 
 - **MCP data source:** `https://econ-index.mcp.claude.com/mcp`
-- **Request:** `every country and its usage index, highest first, top 10`
 
-`out.csv` comes back as `country,usage_index` — Australia 6.4, Singapore 5.81, … — copied from
-the source by the host, exact against the published index.
+Paste any of these into **Request** (leave the model and server at their defaults):
 
-This exact pipeline (same server, same request, `mlx-community/Qwen3-8B-4bit`) was verified end
-to end from the command line: one tool call per step, output exact. The app wraps that pipeline
-in a UI; its progress panel is fed by `session.events`.
+| Request | `out.csv` you get back |
+|---|---|
+| `every country and its usage index, highest first, top 10` | `country,usage_index` — Australia 6.4, Singapore 5.81, … |
+| `the 15 US states with the highest Claude usage index, and their automation percentage` | `state,usage_index,automation_pct` |
+| `the top 20 work tasks people use Claude for, with each task's share percentage` | `rank,task,share_pct` |
+| `countries where coursework use is above 20 percent, highest usage index first` | `country,usage_index,coursework_pct` |
+| `all job categories ranked by their share of global Claude usage` | `category,share_pct` |
+
+The first request is verified end to end from the command line (same server, same
+`mlx-community/Qwen3-8B-4bit`): one tool call per step, `out.csv` exact against the published
+index. The rest use the same dataset and the same pipeline shape — **one dataset tool, then a
+filter and/or a sort, then the columns you named** — which is what the 8B default runs cleanly.
+Stacking three or more refinements into one request is where a smaller model starts adding a
+step you didn't ask for (see [Model choice](#model-choice)). The app wraps this pipeline in a
+UI; its progress panel is fed by `session.events`.
+
+**Writing your own.** Name a dataset ("every country", "US states", "work tasks", "job
+categories"), the columns you want, and up to two refinements: "top N" / "highest … first" → a
+sort, "where X is above/below N" / "only rows containing …" → a filter. The model picks the tool
+and the field names; the data verbs do every row-level step, so `out.csv` can't contain a value
+the source didn't have.
 
 ## Model choice
 
