@@ -4,11 +4,14 @@
 //   Go  →  (1) connect to the MCP server (public, or an OAuth sign-in in the browser)
 //          (2) download the local model if it isn't cached yet
 //          (3) run the pipeline: pull the dataset into a file (FileBackedTool — the raw payload
-//              never enters the model's context), then describeJson → jsonToCsv → sort/filter/
-//              select (the Core data verbs) → a CSV in the folder you chose.
+//              never enters the model's context), then describeJson to find the fields, then one
+//              buildSpreadsheet call (columns + filters + sort + limit) → a CSV in the folder
+//              you chose.
 //
-// The model only names the operations and the columns; the SDK primitives do every row-level
-// step, so there is nothing for the model to fabricate. See docs/sdk-guide.md §8b.
+// The model only describes the query — which fields, which filters, which sort; the SDK
+// primitive (BuildSpreadsheetTool, on the Core data verbs) does every row-level step in a fixed
+// order, so there is nothing for the model to fabricate and no step for it to drop. See
+// docs/sdk-guide.md §8b.
 //
 // Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
 // picker + security-scoped bookmark), plate-today (MCP client + OAuth redirect via AppDelegate),
@@ -179,46 +182,42 @@ final class AIQLModel: ObservableObject {
 
         var tools: [any Tool] = dataTools
         tools.append(DescribeJSONTool(root: root))
+        tools.append(BuildSpreadsheetTool(root: root))
         tools.append(CSVInfoTool(root: root))
-        tools.append(JSONToCSVTool(root: root))
-        tools.append(SelectColumnsTool(root: root))
-        tools.append(FilterRowsTool(root: root))
-        tools.append(SortRowsTool(root: root))
-        tools.append(ConcatRowsTool(root: root))
 
         let dataToolNames = dataTools.map(\.name).joined(separator: ", ")
         let instructions = """
-        You turn a data question into a fixed sequence of tool calls that ends with a CSV file. \
-        You never write row data yourself — every tool does the mechanical work and the file is \
-        built for you.
+        You turn a data question into a short, fixed sequence of tool calls that ends with a CSV \
+        file. You never write row data yourself — the tools do every row-level step.
 
-        Run these steps in order, one tool call each, without asking for confirmation:
+        Run these steps in order, without asking for confirmation:
 
         1. Pick the ONE data tool whose result answers the question — from: \(dataToolNames) — and \
            call it with its `saveAs` argument set to "raw/data.json". Never call a data tool \
-           without `saveAs`; the result is large. If the result covers only part of the data and \
-           the tool has a page / offset / cursor argument, call it again for each page with the \
-           same `saveAs` path plus `saveAsAppend: true` until you have it all — jsonToCsv reads \
-           every appended page.
+           without `saveAs`; the result is large. If the source is paged (a page / offset / \
+           cursor argument) call it once per page with the same `saveAs` path plus \
+           `saveAsAppend: true` until you have every page.
         2. describeJson  path "raw/data.json". Its output has lines like `items[0].name  string`. \
-           The array's path is the part before `[0]` (here: `items`); the record fields are the \
-           parts after `[0].` (here: `name`).
-        3. jsonToCsv  inputPath "raw/data.json", outputPath "all.csv": rowsAt = the array path \
-           from step 2 (no "[0]"); columns = for each field the question asks for, {header: a \
-           name you choose, path: the field name from step 2}. If unsure of the field names, \
-           omit `columns` to get every field, then use selectColumns.
-        4. Apply ONLY the refinements the question explicitly asks for, each reading the previous \
-           file, writing "stage1.csv", "stage2.csv", …:
-             - "top N" / "highest" / "largest" / "most"  => sortRows with `limit`
-             - "only …" / "without …" / "where …"        => filterRows
-           Do NOT add a filter or a sort the question did not ask for.
-        5. LAST call before csvInfo is always selectColumns: input = the last stage file (or \
-           "all.csv" if step 4 did nothing), outputPath = "out.csv", columns = exactly the \
-           fields the question named, in order, renamed to what the question calls them.
-        6. csvInfo  path "out.csv"  — then reply in one sentence with the column names and the \
+           The records array is the part before `[0]` (here: `items`); the fields are the parts \
+           after `[0].` (here: `name`).
+        3. buildSpreadsheet — ONE call: inputPath "raw/data.json", outputPath "out.csv".
+             - recordsAt: the array path from step 2 (no "[0]"). Empty if the root is the array.
+             - columns: one {header, path} per field the question names. `path` is the field \
+               name from step 2; `header` is what the question calls it. Also include any field \
+               you filter or sort on. Omit columns entirely to get every field.
+             - filters: one entry per condition the question states. A numeric range — \
+               "between A and B", "from A to B" — is TWO entries on that column: {op: gte, \
+               value: A} and {op: lte, value: B}. "over N" → gt; "at least N" → gte; \
+               "under N" → lt; "no more than N" → lte; "is X" → eq; "contains X" → contains. \
+               Leave filters empty if the question asks for none.
+             - sortBy / sortDescending: set when the question says highest / largest / top / \
+               most (descending) or lowest / smallest / fewest (ascending).
+             - limit: the N in "top N" / "first N" / "N …". Omit when the question gives no number.
+        4. csvInfo  path "out.csv"  — then reply in one sentence with the column names and the \
            row count. Do not print the rows.
 
-        If a tool returns text starting with "Error:", read it, fix that one call, and retry it.
+        If a tool returns text starting with "Error:", read it, fix that one call's arguments, \
+        and retry it.
         """
 
         let session: LocalLMLabSession
@@ -250,8 +249,8 @@ final class AIQLModel: ObservableObject {
             return .failed(await GenerationErrorDescription.describe(error))
         }
 
-        // The result CSV. Instructions ask for "out.csv"; if a weak model left it in the last
-        // stage file, fall back to the most recently written .csv.
+        // The result CSV. Instructions ask for "out.csv"; if a weak model wrote it somewhere
+        // else, fall back to the most recently written .csv.
         var name = "out.csv"
         if case .failure = WorkspaceAccess.readFile(in: root, path: "out.csv"),
            case .success(let entries) = WorkspaceAccess.listFiles(in: root, subpath: nil) {
@@ -301,10 +300,7 @@ final class AIQLModel: ObservableObject {
     static func friendlyStep(for toolName: String) -> String {
         switch toolName {
         case "describeJson": return "Looking at how the data is organised…"
-        case "jsonToCsv": return "Building the spreadsheet…"
-        case "selectColumns": return "Keeping just the columns you asked for…"
-        case "filterRows": return "Filtering the rows…"
-        case "sortRows": return "Sorting…"
+        case "buildSpreadsheet": return "Building the spreadsheet…"
         case "csvInfo": return "Checking the result…"
         default: return "Fetching the data…"
         }
