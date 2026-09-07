@@ -107,13 +107,22 @@ What that does, and doesn't do:
 
 ```bash
 # in locallm/examples/code-buddy/
-swift run CodeBuddy /tmp/cb-demo "add a /// doc comment to every public declaration"
+swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// doc comment line above every public declaration (the struct, each stored property, the initializer, both computed properties, and both top-level functions). Each comment should briefly say what that declaration is. Keep every existing line's indentation exactly as it is. Change nothing else."
 ```
 
 - `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
 - `/tmp/cb-demo` — the **workspace**: the only directory the model can read or edit.
-- the quoted string — the **task**. One shot: it lists files, reads `Geometry.swift`, applies a
-  patch, and reports back. (It won't touch the planted bug — this task is only about comments.)
+- the quoted string — the **task**. One shot: it reads `Geometry.swift` and edits it in place.
+  (It won't touch the planted bug — this task is only about comments.)
+
+> **Spell the task out.** A vague ask like *"add doc comments to every public declaration"* sends
+> an 8B model into a spiral — *which files? how do I find them? can I bulk-edit?* — and it
+> sometimes concludes there's nothing to do. Naming the file, listing what counts, and pinning
+> down the mechanics (*"keep the indentation", "change nothing else"*) is the difference between
+> a reliable one-shot and a coin flip. Even then a local 8B may write terse comments or nudge a
+> line's whitespace — **step 4 is where you check and keep or discard**. This prompt discipline
+> is a property of small local models, not a code-buddy quirk; it pays off in `workspace-buddy-local`
+> and `aiql` too.
 
 While it runs, its narration (including a lot of visible "thinking" — these small models are
 verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ applyPatch`, …)
