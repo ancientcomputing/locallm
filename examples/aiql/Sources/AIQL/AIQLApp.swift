@@ -73,7 +73,7 @@ final class AIQLModel: ObservableObject {
         case failed(String)
     }
 
-    @Published var modelRepo = "mlx-community/Qwen3-8B-4bit"
+    @Published var modelRepo = "mlx-community/Qwen3-14B-4bit"
     @Published var serverURLString = "https://econ-index.mcp.claude.com/mcp"
     @Published var request = ""
     @Published private(set) var folderURL: URL?

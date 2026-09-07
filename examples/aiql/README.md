@@ -31,6 +31,40 @@ This is the SwiftUI counterpart to the pipeline in
 The progress panel shows each step in plain language as it happens ("Building the spreadsheet…",
 "Sorting…"). When it's done, the CSV preview appears with a **Show in Finder** button.
 
+## What the model actually does
+
+The pipeline above is a fixed program written in Swift. The model fills in the blanks — it
+never runs a loop, evaluates a condition, or handles a value.
+
+**Hardcoded in `AIQLApp.swift` / the data verbs** — the same every run:
+
+- the step order (pull → `describeJson` → `jsonToCsv` → optional filter/sort → `selectColumns`
+  → `csvInfo`) and the file name at each stage, spelled out in the session instructions
+- every row-level operation: JSON parsing, field extraction, "top N" (a mechanical
+  `sortRows` + `limit`), filtering, sorting, column projection — all pure Swift in
+  `TabularEngine`, which only ever returns a receipt (row/column counts, first 3 rows)
+- which tools the model even sees: the server's tools are ranked by how "dataset-like" the
+  name looks and only the top 4 are wrapped; the raw-file reader is withheld
+- the raw payload's path — `FileBackedTool`'s `saveAs` parks it in `raw/data.json`; it never
+  enters the model's context
+
+**The model decides** — roughly six slots per run:
+
+1. which one data tool answers the question (and whether to paginate)
+2. the records array's path — but copied from `describeJson`'s output, not inferred
+3. the column mapping: for each field the request names, a `{header, path}` pair. This is the
+   one genuinely semantic step — matching "usage index" in the request to the `usage_index`
+   key in the schema
+4. which refinements the request asked for → `filterRows` vs `sortRows`, and their arguments
+   (sort column, `descending`, `limit`, filter operator + value)
+5. the final column set and the names to give them
+6. a one-sentence summary (counts only)
+
+So the intelligence budget is small and bounded: fuzzy request→schema matching, and picking
+the right tool. Everything downstream is deterministic. That's why an 8B model runs it and its
+failure mode is control-flow drift (an extra step, the wrong array) rather than a wrong number
+— it is never in a position to produce a wrong number.
+
 ## What it highlights for SDK developers
 
 It's three existing examples stitched together, plus the "AIQL" data verbs:
@@ -96,7 +130,7 @@ Pick the **AIQL** scheme and Run — a real sandboxed `.app` with the
 `files.user-selected.read-write` and `network.client` entitlements (the model download and the
 MCP connection both need the latter), the `aiql://` URL scheme registered for the OAuth callback,
 and the `LocalLMLabSDKInference` (MLX) framework embedded. **First Go downloads the model**
-(~4.3 GB for the default); after that it's local and offline.
+(~8 GB for the default); after that it's local and offline.
 
 **Signing.** Set to **Automatic** with no hard-coded team, so Xcode signs with your **Apple
 Development** identity — the security-scoped bookmark for the output folder is bound to the
@@ -149,13 +183,13 @@ Paste any of these into **Request** (leave the model and server at their default
 | `countries where coursework use is above 20 percent, highest usage index first` | `country,usage_index,coursework_pct` |
 | `all job categories ranked by their share of global Claude usage` | `category,share_pct` |
 
-The first request is verified end to end from the command line (same server, same
-`mlx-community/Qwen3-8B-4bit`): one tool call per step, `out.csv` exact against the published
+The first request is verified end to end from the command line (same server) on
+`mlx-community/Qwen3-8B-4bit`: one tool call per step, `out.csv` exact against the published
 index. The rest use the same dataset and the same pipeline shape — **one dataset tool, then a
-filter and/or a sort, then the columns you named** — which is what the 8B default runs cleanly.
-Stacking three or more refinements into one request is where a smaller model starts adding a
-step you didn't ask for (see [Model choice](#model-choice)). The app wraps this pipeline in a
-UI; its progress panel is fed by `session.events`.
+filter and/or a sort, then the columns you named** — which the default runs cleanly. Stacking
+three or more refinements into one request is where a smaller model starts adding a step you
+didn't ask for (see [Model choice](#model-choice)). The app wraps this pipeline in a UI; its
+progress panel is fed by `session.events`.
 
 **Writing your own.** Name a dataset ("every country", "US states", "work tasks", "job
 categories"), the columns you want, and up to two refinements: "top N" / "highest … first" → a
@@ -165,10 +199,19 @@ the source didn't have.
 
 ## Model choice
 
-`mlx-community/Qwen3-8B-4bit` (the default, ~4.3 GB) runs the pipeline cleanly — the verbs remove
-the two things it gets wrong on raw data (transcription, and "top N", which is now a mechanical
-`sortRows`). A 4B model usually works but sometimes adds a step you didn't ask for. A 12B+ model
-is the most reliable. Any MLX-format Hugging Face repo id works in the field.
+`mlx-community/Qwen3-14B-4bit` (the default, ~8 GB) is the most reliable at the one step that
+isn't mechanical — matching the request's wording to the dataset's real field names. It needs a
+16 GB Mac to clear the size-vs-memory preflight (weights must be ≤ 70% of physical RAM).
+
+Lighter alternatives that still run the pipeline cleanly: `mlx-community/Qwen3-8B-4bit`
+(~4.3 GB) — the previous default, fine for a request with one filter or one sort; a 4B model
+usually works but sometimes adds a step you didn't ask for. The data verbs already remove what
+small models get wrong on raw data (transcription, and "top N", now a mechanical `sortRows`), so
+a bigger model mainly buys more reliable column discovery.
+
+Any MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
+and its `qat` sibling — their shipped `model.safetensors.index.json` disagrees with the actual
+weight files, so the load fails (and the bad size in it trips the preflight).
 
 The model field and the download progress panel here are hand-built (the panel is fed by
 `session.events`). For a settings-screen version of the same thing — a model list with
