@@ -32,7 +32,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`components-demo`](#examplescomponents-demosourcescomponentsdemocomponentsdemoappswift) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-toolssourcesplatetodaytoolsplatetodaytoolsappswift) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
 | [`workspace-buddy`](#examplesworkspace-buddysourcesworkspacebuddyworkspacebuddyappswift) | 172 | 226 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
-| [`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift) | 203 | 253 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift) | 252 | 323 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-todaysourcesplatetodayplatetodayappswift) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
 | [`model-switch`](#examplesmodel-switchsourcesmodelswitchappmodelswift) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`code-buddy`](#examplescode-buddysourcescodebuddymainswift) | 298 | 387 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
@@ -1486,7 +1486,7 @@ change.
 
 ## `examples/workspace-buddy-local/Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift`
 
-*203 lines of code (253 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+*252 lines of code (323 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddysourcesworkspacebuddyworkspacebuddyappswift) above —
@@ -1497,6 +1497,11 @@ the weights on first run) on top of `workspace-buddy`'s `files.user-selected.rea
 model downloads into this app's own sandbox container. One of several examples linking
 `LocalLMLabSDKInference`. The `FolderAccess` enum is verbatim from `workspace-buddy` and is
 elided here — see that section above.
+
+Where `workspace-buddy` awaits `respond(to:)` whole behind a spinner, this one **streams**: an
+8B model on the GPU is slow enough that a bare spinner reads as stuck, so the answer renders as
+it generates (`streamResponse`) and a `session.events` loop names the tool running during each
+pause.
 
 ```swift
 import Foundation
@@ -1519,13 +1524,14 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
     enum State {
         case idle
         case downloadingModel(Double)   // 0…1
-        case working
+        case working(String)            // the answer so far — "" until the first token
         case ready(String)
         case failed(String)
     }
 
     @Published private(set) var folderURL: URL?
     @Published private(set) var state: State = .idle
+    @Published private(set) var activity: String?   // which tool is running during a pause; nil = generating
 
     // The model layer: an MLX provider (one model resident at a time), Apple's on-device model
     // kept as a fallback, and one named route pointing at the MLX model.
@@ -1553,6 +1559,17 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
         Task { await run(trimmed) }
     }
 
+    // Tool name → a phrase for the activity line. Not SDK — just presentation.
+    private static func activityLabel(for toolName: String) -> String {
+        switch toolName {
+        case "listWorkspaceFiles": return "Listing the folder…"
+        case "readWorkspaceFile":  return "Reading a file…"
+        case "editWorkspaceFile":  return "Editing a file…"
+        case "writeWorkspaceFile": return "Writing a new file…"
+        default:                   return "Working…"
+        }
+    }
+
     private func run(_ request: String) async {
         // 1. Download the model on first use (streams progress into the UI).
         if case .notDownloaded = lab.models.availability(for: modelID) {   // ← SDK
@@ -1573,8 +1590,9 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
             }
         }
 
-        // 2. Run the request, exactly as workspace-buddy does — only the session-creation line differs.
-        state = .working
+        // 2. Run the request. Same as workspace-buddy up to makeSession; from there it streams.
+        state = .working("")
+        activity = nil
         let result: String? = await FolderAccess.withFolderAccessAsync { root in
             let tools: [any Tool] = [
                 ListWorkspaceFilesTool(root: root),                  // ← SDK (Path A)
@@ -1591,18 +1609,41 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 already there. Explain what you changed and why, briefly.
                 """
             do {
-                // The only line that differs from workspace-buddy: lab.makeSession(route:) instead
-                // of LanguageModelSession(tools:). includeMCPTools: false — this app has no MCP.
                 let session = try self.lab.makeSession(              // ← SDK
                     route: .local, tools: tools, instructions: instructions, includeMCPTools: false
                 )
-                let response = try await session.languageModelSession.respond(to: request)   // ← SDK
-                return response.content
+
+                // .events is the side-channel around generation — here, the tool running during
+                // a pause. Token text stays on streamResponse below.
+                let events = Task { @MainActor in
+                    for await event in session.events {             // ← SDK
+                        switch event {
+                        case .toolCallStarted(_, let name): self.activity = Self.activityLabel(for: name)
+                        case .toolCallFinished:                self.activity = nil
+                        default: break
+                        }
+                    }
+                }
+                defer { events.cancel() }
+
+                // Each snapshot is the whole answer so far. Usually append-only — but a reasoning
+                // model drops its <think> block once the answer starts, and the snapshot can reset
+                // across a tool call, so show the latest non-empty one rather than diffing.
+                // (code-buddy does the careful append-only version — stdout can't un-print.)
+                var text = ""
+                for try await snapshot in session.languageModelSession.streamResponse(to: request) {   // ← SDK
+                    guard !snapshot.content.isEmpty else { continue }
+                    text = snapshot.content
+                    self.activity = nil
+                    self.state = .working(text)
+                }
+                return text
             } catch {
                 return "Error: \(await GenerationErrorDescription.describe(error))"   // ← SDK
             }
         }
 
+        activity = nil
         guard let result else {
             state = .failed("Could not access the workspace folder — try choosing it again.")
             return
@@ -1612,7 +1653,8 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
 }
 
 // MARK: - UI (ordinary SwiftUI — model-repo label, folder path, a text field, a Go button, a
-// download-progress bar, a result view. No SDK touchpoints; elided.)
+// download-progress bar, and a bottom-pinned ScrollView that shows `state`'s streaming text +
+// the `activity` line. No SDK touchpoints; elided.)
 
 @available(macOS 26.0, *)
 @main
@@ -1625,10 +1667,11 @@ struct WorkspaceBuddyLocalApp: App {
 }
 ```
 
-**Tally**: of ~90 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI UI
-section both elided), ~13 touch the SDK. Against `workspace-buddy`'s four (four Tool
-instantiations + one error formatter), the delta is entirely the model layer: the provider/lab/
-route setup, the first-run `availability` check, and the `validate` + `download` progress loop.
+**Tally**: of ~110 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
+UI section both elided), ~17 touch the SDK. Against `workspace-buddy`'s four (four Tool
+instantiations + one error formatter), the delta is the model layer (provider/lab/route setup,
+the first-run `availability` check, the `validate` + `download` progress loop) plus the streaming
+turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond`.
 The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
 sandbox changes nothing in the code, only the entitlements.
 

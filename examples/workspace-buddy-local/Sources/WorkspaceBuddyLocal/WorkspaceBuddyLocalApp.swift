@@ -9,7 +9,10 @@
 //
 // The FolderAccess section below is copied verbatim from workspace-buddy. The differences are all
 // in WorkspaceBuddyLocalModel: a LocalLMLab + MLXModelProvider, a download step with progress,
-// and `lab.makeSession(route:tools:)` instead of `LanguageModelSession(tools:)`.
+// `lab.makeSession(route:tools:)` instead of `LanguageModelSession(tools:)`, and — because an 8B
+// model on a Mac's GPU is slow enough that a bare spinner is unnerving — the answer is *streamed*
+// (`streamResponse` + `session.events` for the per-tool-call activity line) rather than awaited
+// whole.
 
 import Foundation
 import FoundationModels
@@ -78,13 +81,16 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
     enum State {
         case idle
         case downloadingModel(Double)   // 0…1
-        case working
+        case working(String)            // the model's answer so far — "" until the first token
         case ready(String)
         case failed(String)
     }
 
     @Published private(set) var folderURL: URL?
     @Published private(set) var state: State = .idle
+    // What the model is doing *between* bursts of text — a tool call — so the UI has something to
+    // show during the pauses. `nil` = the model is generating (or hasn't started).
+    @Published private(set) var activity: String?
 
     // The model layer: an MLX provider (one model resident at a time), Apple's on-device model
     // kept as a fallback, and one named route pointing at the MLX model.
@@ -112,6 +118,18 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
         Task { await run(trimmed) }
     }
 
+    // "Reading a file…" reads better mid-run than the raw tool name "readWorkspaceFile".
+    // (`SessionEvent` carries the tool name, not its arguments, so we can't name the file.)
+    private static func activityLabel(for toolName: String) -> String {
+        switch toolName {
+        case "listWorkspaceFiles": return "Listing the folder…"
+        case "readWorkspaceFile":  return "Reading a file…"
+        case "editWorkspaceFile":  return "Editing a file…"
+        case "writeWorkspaceFile": return "Writing a new file…"
+        default:                   return "Working…"
+        }
+    }
+
     private func run(_ request: String) async {
         // 1. Download the model on first use (streams progress into the UI).
         if case .notDownloaded = lab.models.availability(for: modelID) {
@@ -132,8 +150,10 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
             }
         }
 
-        // 2. Run the request, exactly as workspace-buddy does — only the session-creation line differs.
-        state = .working
+        // 2. Run the request. Same as workspace-buddy up to session creation; from there it
+        //    streams the answer instead of awaiting `respond(to:)` whole.
+        state = .working("")
+        activity = nil
         let result: String? = await FolderAccess.withFolderAccessAsync { root in
             let tools: [any Tool] = [
                 ListWorkspaceFilesTool(root: root),
@@ -153,13 +173,42 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 let session = try self.lab.makeSession(
                     route: .local, tools: tools, instructions: instructions, includeMCPTools: false
                 )
-                let response = try await session.languageModelSession.respond(to: request)
-                return response.content
+
+                // `session.events` is the side-channel around generation — here, which tool the
+                // model is running during a pause. Token text stays on `streamResponse` below.
+                let events = Task { @MainActor in
+                    for await event in session.events {
+                        switch event {
+                        case .toolCallStarted(_, let name):
+                            self.activity = Self.activityLabel(for: name)
+                        case .toolCallFinished:
+                            self.activity = nil
+                        default:
+                            break
+                        }
+                    }
+                }
+                defer { events.cancel() }
+
+                // Each snapshot is the whole answer so far. It's *usually* append-only, but a
+                // reasoning model drops its <think> block once the real answer starts, and the
+                // snapshot can reset across a tool call — so just show the latest non-empty one
+                // rather than diffing. (code-buddy does the careful append-only version, because
+                // stdout can't un-print.)
+                var text = ""
+                for try await snapshot in session.languageModelSession.streamResponse(to: request) {
+                    guard !snapshot.content.isEmpty else { continue }
+                    text = snapshot.content
+                    self.activity = nil
+                    self.state = .working(text)
+                }
+                return text
             } catch {
                 return "Error: \(await GenerationErrorDescription.describe(error))"
             }
         }
 
+        activity = nil
         guard let result else {
             state = .failed("Could not access the workspace folder — try choosing it again.")
             return
@@ -219,14 +268,19 @@ struct ContentView: View {
                 ProgressView(value: fraction) {
                     Text("Downloading \(workspaceModelRepo) — \(Int(fraction * 100))%")
                 }
-            case .working:
-                ProgressView("Working…")
-            case .ready(let summary):
-                ScrollView {
-                    Text(summary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
+            case .working(let text):
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text(model.activity ?? (text.isEmpty ? "Thinking…" : "Writing…"))
+                            .foregroundStyle(.secondary)
+                    }
+                    if !text.isEmpty {
+                        streamingText(text)
+                    }
                 }
+            case .ready(let summary):
+                streamingText(summary)
             case .failed(let message):
                 Text(message)
                     .foregroundStyle(.red)
@@ -236,6 +290,23 @@ struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 520, idealWidth: 560, maxWidth: .infinity, minHeight: 360, idealHeight: 440, maxHeight: .infinity)
+    }
+
+    // A scrolling text view that stays pinned to the bottom as tokens arrive. The model's
+    // answer includes the Qwen <think> reasoning inline — shown as-is here; strip it consumer-
+    // side if you want just the summary (see repo-qa-local's README).
+    private func streamingText(_ text: String) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                Text(text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                Color.clear.frame(height: 1).id("bottom")
+            }
+            .onChange(of: text) { _, _ in
+                withAnimation(.linear(duration: 0.1)) { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+        }
     }
 }
 

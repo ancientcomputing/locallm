@@ -168,11 +168,31 @@ copied verbatim. The differences, all in the view model:
 | `SystemLanguageModel.default` availability check | `MLXModelProvider` + `LocalLMLab` + `lab.models.route(.local, to: …)` in `init` |
 | — | a `.downloadingModel(fraction)` state; `mlx.validate` → `mlx.download` on first run, progress into the UI |
 | `LanguageModelSession(tools: tools) { instructions }` | `lab.makeSession(route: .local, tools: tools, instructions:)` |
-| `session.respond(to:)` | `session.languageModelSession.respond(to:)` |
+| `session.respond(to:)` — awaited whole, spinner until done | `session.languageModelSession.streamResponse(to:)` — text streams in, plus a `session.events` loop for the "Reading a file…" activity line |
 | `com.apple.security.network.client` — not needed | **required** (the model download) |
 
 The `WorkspaceTools` array, the instructions, the single-turn shape, and the "no delete tool by
 default" choice are all unchanged.
+
+### Why stream here and not in `workspace-buddy`
+
+Apple's on-device model answers a small edit in a couple of seconds — a spinner is fine.
+`Qwen3-8B-4bit` on the GPU takes long enough (tens of seconds, plus pauses while it reads
+files) that a bare "Working…" spinner reads as *stuck*. So this version:
+
+- shows the answer **as it's generated** (`streamResponse` — each snapshot is the whole answer
+  so far; shown latest-wins rather than diffed, since a reasoning model drops its `<think>`
+  block mid-stream and the snapshot can reset across a tool call — `code-buddy` does the
+  careful append-only version because stdout can't un-print);
+- shows **which tool is running** during the gaps, from `session.events`
+  (`.toolCallStarted` / `.toolCallFinished` → "Reading a file…", "Editing a file…");
+- keeps the Qwen `<think>` reasoning visible inline — strip it consumer-side if you want just
+  the summary.
+
+`session.events` is the side-channel *around* generation (tool calls, context compaction,
+model-load progress); token text always comes from `streamResponse`. See
+[`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions),
+the `LocalLMLabSession.events` subsection.
 
 > **The download UI is hand-rolled here on purpose.** The `.downloadingModel(fraction)` state and
 > the `mlx.validate` → `mlx.download` loop are ~20 lines that show the raw event stream. If you
