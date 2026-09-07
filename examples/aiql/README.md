@@ -21,15 +21,13 @@ This is the SwiftUI counterpart to the pipeline in
 3. **Run the pipeline** in the folder you chose:
 
    ```
-   the data tool  → raw/data.json     (FileBackedTool `saveAs` — the raw payload never enters the model's context)
-   describeJson    raw/data.json       (find the records and their real field names)
-   jsonToCsv       → all.csv           (the host reads every record — no transcription)
-   sortRows / filterRows / selectColumns   (only the steps your request asks for)
-   → out.csv
+   the data tool    → raw/data.json   (FileBackedTool `saveAs` — the raw payload never enters the model's context)
+   describeJson       raw/data.json    (find the records and their real field names)
+   buildSpreadsheet → out.csv          (one call: columns + filters + sort + limit; the host reads every record)
    ```
 
-The progress panel shows each step in plain language as it happens ("Building the spreadsheet…",
-"Sorting…"). When it's done, the CSV preview appears with a **Show in Finder** button.
+The progress panel shows each step in plain language as it happens ("Building the spreadsheet…").
+When it's done, the CSV preview appears with a **Show in Finder** button.
 
 ## What the model actually does
 
@@ -38,32 +36,34 @@ never runs a loop, evaluates a condition, or handles a value.
 
 **Hardcoded in `AIQLApp.swift` / the data verbs** — the same every run:
 
-- the step order (pull → `describeJson` → `jsonToCsv` → optional filter/sort → `selectColumns`
-  → `csvInfo`) and the file name at each stage, spelled out in the session instructions
+- the step order (pull → `describeJson` → `buildSpreadsheet` → `csvInfo`) and the file name at
+  each stage, spelled out in the session instructions
+- the query stages *inside* `buildSpreadsheet` — project → filter → dedupe → sort/limit →
+  select — run in a fixed order in Swift, whatever order the model listed the arguments in
 - every row-level operation: JSON parsing, field extraction, "top N" (a mechanical
-  `sortRows` + `limit`), filtering, sorting, column projection — all pure Swift in
-  `TabularEngine`, which only ever returns a receipt (row/column counts, first 3 rows)
+  sort + `limit`), filtering, sorting, column projection — all pure Swift in `TabularEngine`,
+  which only ever returns a receipt (row/column counts, first 3 rows)
 - which tools the model even sees: the server's tools are ranked by how "dataset-like" the
   name looks and only the top 4 are wrapped; the raw-file reader is withheld
 - the raw payload's path — `FileBackedTool`'s `saveAs` parks it in `raw/data.json`; it never
   enters the model's context
 
-**The model decides** — roughly six slots per run:
+**The model decides** — one data-tool pick, then one `buildSpreadsheet` form:
 
 1. which one data tool answers the question (and whether to paginate)
-2. the records array's path — but copied from `describeJson`'s output, not inferred
-3. the column mapping: for each field the request names, a `{header, path}` pair. This is the
-   one genuinely semantic step — matching "usage index" in the request to the `usage_index`
-   key in the schema
-4. which refinements the request asked for → `filterRows` vs `sortRows`, and their arguments
-   (sort column, `descending`, `limit`, filter operator + value)
-5. the final column set and the names to give them
-6. a one-sentence summary (counts only)
+2. the records array's path — copied from `describeJson`'s output, not inferred
+3. `columns`: for each field the request names, a `{header, path}` pair. This is the one
+   genuinely semantic step — matching "usage index" in the request to the `usage_index` key in
+   the schema
+4. `filters`: one entry per condition the request states (a numeric range is two entries);
+   `sortBy` / `sortDescending` for "highest"/"lowest"; `limit` for "top N"
+5. a one-sentence summary (counts only)
 
 So the intelligence budget is small and bounded: fuzzy request→schema matching, and picking
-the right tool. Everything downstream is deterministic. That's why an 8B model runs it and its
-failure mode is control-flow drift (an extra step, the wrong array) rather than a wrong number
-— it is never in a position to produce a wrong number.
+the right tool. Everything downstream is deterministic. The model describes the query once; it
+never sequences the stages, so it can't drop one — the failure mode that made a range filter
+silently vanish when it was step 4 of a 6-call chain. Its remaining failure mode is naming the
+wrong field or array, which surfaces as an `Error:` it retries, not a wrong number.
 
 ## What it highlights for SDK developers
 
@@ -74,7 +74,7 @@ It's three existing examples stitched together, plus the "AIQL" data verbs:
 | [`workspace-buddy-local`](../workspace-buddy-local) | SwiftUI + App Sandbox + `MLXModelProvider` download + `NSOpenPanel` folder picker + security-scoped bookmark |
 | [`plate-today`](../plate-today) | `MCPServerManager` + the OAuth redirect wired through `AppDelegate` (not SwiftUI's `.onOpenURL`) + `CFBundleURLTypes` |
 | [`repo-qa`](../repo-qa) | building tools from a live MCP schema — here `FileBackedTool.mcp(descriptor:manager:root:)` |
-| SDK §8b | `describeJson` · `jsonToCsv` · `selectColumns` · `filterRows` · `sortRows` · `concatRows` · `csvInfo` |
+| SDK §8b | `describeJson` · `buildSpreadsheet` (the whole `jsonToCsv`+`filterRows`+`sortRows`+`selectColumns` query in one call) · `csvInfo` |
 
 Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
 
@@ -179,23 +179,22 @@ Paste any of these into **Request** (leave the model and server at their default
 |---|---|
 | `every country and its usage index, highest first, top 10` | `country,usage_index` — Australia 6.4, Singapore 5.81, … |
 | `the 15 US states with the highest Claude usage index, and their automation percentage` | `state,usage_index,automation_pct` |
+| `US states where automation percentage is between 48 and 51, highest usage index first` | `state,usage_index,automation_pct` |
 | `the top 20 work tasks people use Claude for, with each task's share percentage` | `rank,task,share_pct` |
 | `countries where coursework use is above 20 percent, highest usage index first` | `country,usage_index,coursework_pct` |
 | `all job categories ranked by their share of global Claude usage` | `category,share_pct` |
 
-The first request is verified end to end from the command line (same server) on
-`mlx-community/Qwen3-8B-4bit`: one tool call per step, `out.csv` exact against the published
-index. The rest use the same dataset and the same pipeline shape — **one dataset tool, then a
-filter and/or a sort, then the columns you named** — which the default runs cleanly. Stacking
-three or more refinements into one request is where a smaller model starts adding a step you
-didn't ask for (see [Model choice](#model-choice)). The app wraps this pipeline in a UI; its
-progress panel is fed by `session.events`.
+Each is **one `buildSpreadsheet` call** — the model picks the dataset tool, then fills one form
+(columns, filters, sort, limit) and the host runs the stages in a fixed order. The first request
+is verified end to end from the command line (same server) on `mlx-community/Qwen3-8B-4bit`:
+`out.csv` exact against the published index. The app wraps this pipeline in a UI; its progress
+panel is fed by `session.events`.
 
 **Writing your own.** Name a dataset ("every country", "US states", "work tasks", "job
-categories"), the columns you want, and up to two refinements: "top N" / "highest … first" → a
-sort, "where X is above/below N" / "only rows containing …" → a filter. The model picks the tool
-and the field names; the data verbs do every row-level step, so `out.csv` can't contain a value
-the source didn't have.
+categories"), the columns you want, and any refinements: "top N" / "highest … first" → a sort,
+"where X is above/below N" / "between A and B" / "only rows containing …" → filters. The model
+describes the query in one call; the data verbs do every row-level step, so `out.csv` can't
+contain a value the source didn't have, and there is no step sequence for a small model to drop.
 
 ## Model choice
 
@@ -203,11 +202,11 @@ the source didn't have.
 isn't mechanical — matching the request's wording to the dataset's real field names. It needs a
 16 GB Mac to clear the size-vs-memory preflight (weights must be ≤ 70% of physical RAM).
 
-Lighter alternatives that still run the pipeline cleanly: `mlx-community/Qwen3-8B-4bit`
-(~4.3 GB) — the previous default, fine for a request with one filter or one sort; a 4B model
-usually works but sometimes adds a step you didn't ask for. The data verbs already remove what
-small models get wrong on raw data (transcription, and "top N", now a mechanical `sortRows`), so
-a bigger model mainly buys more reliable column discovery.
+`mlx-community/Qwen3-8B-4bit` (~4.3 GB) also runs it — `buildSpreadsheet` means even a
+multi-condition request is one tool call, so the 8B's old failure (dropping a filter from a long
+call chain) is gone; what a bigger model still buys is more reliable column discovery. A 4B
+model usually works. The data verbs already remove what small models get wrong on raw data
+(transcription, and "top N", now a mechanical sort).
 
 Any MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
 and its `qat` sibling — their shipped `model.safetensors.index.json` disagrees with the actual
