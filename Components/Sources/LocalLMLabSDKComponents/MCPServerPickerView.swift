@@ -72,13 +72,24 @@ public struct MCPServerPickerView: View {
                     .frame(width: 140)
             }
 
-            Picker("Auth type", selection: $newServerAuthType) {
-                Text("None").tag(MCPAuthType.none)
-                Text("Personal Access Token").tag(MCPAuthType.pat)
-                Text("OAuth (manual client)").tag(MCPAuthType.oauthManual)
+            // Explicit label + `.fixedSize()`: SwiftUI elides a `Picker`'s own label when the
+            // segmented control is width-constrained, and `.frame(width:)` lets the segments
+            // stretch to fill it — together those made "Auth type" vanish and the segments jump
+            // wider the instant the URL field got text (a re-layout, since the OAuth overlay
+            // condition reads `newServerURL`). A real `Text` label and a content-hugging control
+            // don't move.
+            HStack(spacing: 10) {
+                Text("Auth type").foregroundStyle(.secondary)
+                Picker("Auth type", selection: $newServerAuthType) {
+                    Text("None").tag(MCPAuthType.none)
+                    Text("Personal Access Token").tag(MCPAuthType.pat)
+                    Text("OAuth (manual client)").tag(MCPAuthType.oauthManual)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
+                Spacer(minLength: 0)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 420)
 
             if newServerAuthType == .pat {
                 SecureField("Personal access token", text: $newServerPATToken)
