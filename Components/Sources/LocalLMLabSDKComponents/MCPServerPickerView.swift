@@ -72,26 +72,18 @@ public struct MCPServerPickerView: View {
                     .frame(width: 140)
             }
 
-            // Caption label above + a DEFINITE width on the segmented control. Two separate
-            // problems were in play:
-            //  1. A `Picker`'s own inline label is elided under width pressure — so "Auth type"
-            //     vanished when the view re-laid-out. Fixed by an explicit caption above.
-            //  2. An empty `TextField` and one with text report different ideal widths, and with
-            //     `.windowResizability(.contentMinSize)` that changes the pane width — so a
-            //     `maxWidth`/flexible picker grew (and truncated its last segment) the moment you
-            //     typed. A fixed `.frame(width:)` decouples it: same size regardless of siblings.
-            // 400 fits all three segment labels; the picker area's own min width is 480.
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Auth type").font(.caption).foregroundStyle(.secondary)
-                Picker("Auth type", selection: $newServerAuthType) {
-                    Text("None").tag(MCPAuthType.none)
-                    Text("Personal Access Token").tag(MCPAuthType.pat)
-                    Text("OAuth (manual client)").tag(MCPAuthType.oauthManual)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 400)
+            // Radio group, not a segmented control. A segmented `Picker` with 3 long labels
+            // flips between "hug content" and "fill the frame" distribution across layout passes
+            // (an empty vs. filled `TextField` reports a different ideal width, and any keystroke
+            // re-runs layout) — so it visibly resized and its inline label vanished the moment
+            // you typed in the URL field. A radio group has no such width ambiguity, shows all
+            // three options at once, and is the macOS-idiomatic control for a one-of-N form field.
+            Picker("Auth type", selection: $newServerAuthType) {
+                Text("None").tag(MCPAuthType.none)
+                Text("Personal Access Token").tag(MCPAuthType.pat)
+                Text("OAuth (manual client)").tag(MCPAuthType.oauthManual)
             }
+            .pickerStyle(.radioGroup)
 
             if newServerAuthType == .pat {
                 SecureField("Personal access token", text: $newServerPATToken)
