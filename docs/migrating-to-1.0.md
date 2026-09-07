@@ -120,6 +120,13 @@ behind the same `lab.makeSession(route:)`. Add the `LocalLMLabSDKRemote` binaryT
 `import LocalLMLabSDKRemote`, register `RemoteModelProvider(config)`. Nothing about the
 existing model layer changes.
 
+Also since `1.0.0-beta.3`, **`FileBackedTool` + the "AIQL" data verbs** in Core (`sdk-guide.md`
+§8b) — `jsonToCsv` / `filterRows` / `sortRows` / `concatRows` / `describeJson` / `csvInfo` and
+friends, for an MCP-dataset → CSV pipeline where the row data never passes through the model.
+Purely additive: new `Tool` structs plus `CSVCodec` / `JSONPath` building blocks and an
+`append:` option on `WorkspaceAccess.writeFile`. [`examples/aiql`](../examples/aiql/) is the
+worked app.
+
 None of this is required — a `LanguageModelSession` you build yourself with Core's tools still
 works exactly as in `0.8.x`.
 

@@ -80,13 +80,49 @@ values instead of an opaque "routed to `pcc` fails" reaching the host (roadmap i
   a spent free-tier quota reports `.unavailable(kind: .providerError)` with the reset date
   rather than `.available`.
 
-### Added — example
+### Added — `Core` workspace: file-backed tools + the "AIQL" data verbs (`docs/sdk-guide.md` §8b)
+
+The building blocks for a "plain-English query over an MCP-fronted dataset → a CSV file"
+pipeline where the row data never passes through the model, so it can't be fabricated.
+
+- **`FileBackedTool`** — a host-applied decorator around a dynamic-schema tool (an MCP tool is
+  the motivating case). Adds a root-level `saveAs` argument; when the model supplies it, the
+  wrapped tool's raw result is written to `<workspace>/<saveAs>` and only a short receipt
+  (byte/line count + a bounded preview) returns — the payload never enters the model's
+  context. `saveAsAppend` accumulates paginated results. `FileBackedTool.mcp(descriptor:manager:root:)`
+  wraps an `MCPToolDescriptor` in one call.
+- **The data verbs** — ready-made `Tool`s, each reads a workspace file, does one mechanical
+  transform, writes a CSV, returns a one-line receipt: `jsonToCsv` (project a JSON array to
+  CSV), `selectColumns`, `filterRows` (`eq`/`contains`/`matches`/`gt`/… , AND or ANY),
+  `sortRows` (with `limit` — the mechanical "top N"), `dedupeRows`, `aggregateRows`
+  (`count`/`sum`/`avg`/`min`/`max`), `concatRows` (`UNION ALL`), plus `describeJson` /
+  `csvInfo` for discovery and per-stage verification. `jsonToCsv` / `describeJson` read a file
+  of concatenated JSON values (appended paginated pages).
+- **`CSVCodec`** (RFC 4180 encode/decode + a header-keyed `Table`) and **`JSONPath`** (a
+  read-only `a.b[0].c` resolver over a `JSONSerialization` value) are `public` for building
+  your own verbs.
+- **`WorkspaceAccess.writeFile` / `WriteWorkspaceFileTool`** gain `overwrite:` (create-only by
+  default) and `append:`.
+
+### Fixed — `Core` workspace
+
+- **`resolveScopedPath`** dropped the workspace root's last path component during relative
+  resolution when the root `URL` had no trailing slash (`someURL.appendingPathComponent("ws")`,
+  `URL(fileURLWithPath: aString)`), so every nested write (`raw/data.json`) was rejected as an
+  escape. Also handles `resolvingSymlinksInPath` rewriting `/private/tmp` → `/tmp` on
+  not-yet-existing paths.
+
+### Added — examples
 
 - **[`examples/model-switch/`](examples/model-switch/)** — the reference app for the online
   providers: add a provider + key, tick web search, and switch between every configured model
   (Apple on-device, PCC, Claude-4-FM, GPT, Claude online, any OpenRouter model) from one chat
   window, one `lab.makeSession` call site. Links `Remote` as a binaryTarget and Core +
   `Components` from the `Components` package.
+- **[`examples/aiql/`](examples/aiql/)** — "ask your data": a SwiftUI app (Core + Inference,
+  sandboxed) that pulls an MCP-fronted dataset and writes the spreadsheet you asked for, via
+  `FileBackedTool` + the data verbs. MCP OAuth through the `aiql://` URL scheme; the progress
+  panel is driven by `session.events`.
 
 ### Changed
 

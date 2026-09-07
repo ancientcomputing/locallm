@@ -1180,7 +1180,8 @@ model reliably producing correct line numbers and context lines for a real diff 
 harder ask than quoting one exact, minimal, uniquely-identifying snippet — and it's a much simpler,
 safer thing for Core to validate and apply. `writeFile` is create-by-default — it fails on an
 existing file unless you pass `overwrite: true`, the deliberate opt-in for regenerating a
-wholly-derived file (a CSV/JSON data export, a report). Use `editFile` for a targeted change to
+wholly-derived file (a CSV/JSON data export, a report), or `append: true` to add to the end of
+one (accumulating a result that arrives in pages). Use `editFile` for a targeted change to
 an existing file, same add-vs-update split Calendar/Reminders/Contacts already use.
 
 Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWorkspaceFilesTool`,
@@ -1196,6 +1197,50 @@ synchronous, bracketing a single, quick access. If you're handing these tools to
 `respond(to:)` call — the security-scoped access window has to stay open for that *whole* async
 call, not just a synchronous setup step. `examples/workspace-buddy` shows the async-aware version
 (`withFolderAccessAsync<T>(_:)`) this actually requires.
+
+### 8b. `FileBackedTool` + the "AIQL" data verbs: a mechanical MCP-dataset → CSV pipeline
+
+The problem: a data-source tool (an MCP server tool for a dataset, an API, a big query) can
+return far more than fits in a small model's context — after the host truncates it the model
+sees a fraction, and it will paper over the gap rather than stop. Routing a bulk payload
+*through* the model is the wrong shape: the model is good at deciding *what* to extract and
+*how*, bad at being a copy buffer. Ask an 8–14B model to copy 80 records into a CSV and it
+invents the ones it didn't see.
+
+**`FileBackedTool`** wraps a dynamic-schema tool (an MCP tool adapter is the motivating case)
+and adds one root-level argument, `saveAs`. When the model supplies a path, the wrapped tool's
+raw result is written to `<workspace>/<saveAs>` and only a short receipt — byte/line count and a
+bounded head preview — returns. The model then works from the file (`readFileRange` a window →
+the verbs below), and the payload never enters its context. It's not a `Tool` that calls
+another `Tool` (the model can't invoke that) — it's a **decorator the host applies** when
+building the tool array. `FileBackedTool.mcp(descriptor:manager:root:)` wraps an
+`MCPToolDescriptor` in one call; `saveAsAppend` accumulates paginated pages into one file.
+
+**The data verbs** — ready-made `Tool`s, each takes the root `URL` at init, reads one workspace
+file, does one mechanical transform, writes a CSV back, and returns a one-line receipt (so the
+row data never reaches the model):
+
+| Tool | SQL analogue | what it does |
+|---|---|---|
+| `JSONToCSVTool` (`jsonToCsv`) | `SELECT cols FROM json_array` | point `rowsAt` at the records array (use `describeJson` first), list `{header, path}` columns — `path` is a `JSONPath` (`attributes.EMAIL`, `regions[0].code`) into each record; omit `columns` to flatten every scalar field |
+| `SelectColumnsTool` (`selectColumns`) | `SELECT a AS x, b` | project a CSV to chosen columns, reorder, rename |
+| `FilterRowsTool` (`filterRows`) | `WHERE` | keep rows matching conditions (`eq`/`ne`/`contains`/`notContains`/`startsWith`/`endsWith`/`matches`/`gt`/`gte`/`lt`/`lte`/`isEmpty`/`notEmpty`), ALL or `matchAny` |
+| `SortRowsTool` (`sortRows`) | `ORDER BY … LIMIT` | sort by a column (numeric if it's all-numeric), optional `limit` — **the mechanical answer to "top N", which is exactly where a small model fabricates** |
+| `DedupeRowsTool` (`dedupeRows`) | `SELECT DISTINCT` | drop duplicate rows, whole-row or by `on:` columns |
+| `AggregateRowsTool` (`aggregateRows`) | `GROUP BY` | `count`/`sum`/`avg`/`min`/`max` per group |
+| `ConcatRowsTool` (`concatRows`) | `UNION ALL` | stack CSV files, columns matched by name — for paginated pulls or separate exports |
+| `DescribeJSONTool` (`describeJson`) | — | compact structure summary (key paths, types, array lengths) — call before `jsonToCsv`; read-only |
+| `CSVInfoTool` (`csvInfo`) | — | row count, columns, sample rows — check a stage produced what you expected; read-only |
+
+The intended shape is a chain: `raw.json → describeJson → jsonToCsv → filterRows → sortRows →
+out.csv`. The building blocks under them — `CSVCodec` (RFC 4180 encode/decode + a header-keyed
+`Table`) and `JSONPath` (a read-only `a.b[0].c` resolver over a `JSONSerialization` value) — are
+`public` for writing your own verbs. **Pagination:** the model calls the data tool once per page
+with the same `saveAs` path plus `saveAsAppend: true`, and `jsonToCsv` / `describeJson` read the
+resulting file of concatenated JSON values (`{…}{…}{…}`) as one dataset.
+
+[`examples/aiql`](../examples/aiql/) is the end-to-end SwiftUI app — a plain-English request
+over an MCP dataset → this pipeline → a CSV in a folder you chose, with a local MLX model.
 
 ## 9. What's NOT in Core yet
 
@@ -1805,8 +1850,8 @@ enum WorkspaceAccess {
 
     static func listFiles(in root: URL, subpath: String?) -> Result<[WorkspaceEntry], WorkspaceError>
     static func readFile(in root: URL, path: String) -> Result<String, WorkspaceError>
-    // create-by-default — fails on an existing file unless overwrite:true; use editFile for a partial change
-    static func writeFile(in root: URL, path: String, contents: String, overwrite: Bool = false) -> Result<Void, WorkspaceError>
+    // create-by-default — fails on an existing file unless overwrite:true (or append:true to add to the end); use editFile for a partial change
+    static func writeFile(in root: URL, path: String, contents: String, overwrite: Bool = false, append: Bool = false) -> Result<Void, WorkspaceError>
     // search-and-replace, not a unified-diff format — oldString must match exactly once unless replaceAll
     static func editFile(in root: URL, path: String, oldString: String, newString: String, replaceAll: Bool) -> Result<Void, WorkspaceError>
     static func deleteFile(in root: URL, path: String) -> Result<Void, WorkspaceError>
@@ -1825,7 +1870,7 @@ struct ReadWorkspaceFileTool: Tool {
 struct WriteWorkspaceFileTool: Tool {
     let name = "writeWorkspaceFile"
     init(root: URL, description: String? = nil)
-    struct Arguments { var path: String; var contents: String; var overwrite: Bool? }
+    struct Arguments { var path: String; var contents: String; var overwrite: Bool?; var append: Bool? }
 }
 struct EditWorkspaceFileTool: Tool {
     let name = "editWorkspaceFile"
@@ -1838,6 +1883,29 @@ struct DeleteWorkspaceFileTool: Tool {
     let name = "deleteWorkspaceFile"
     init(root: URL, description: String? = nil)
     struct Arguments { var path: String }
+}
+
+// The "AIQL" data verbs — each init(root:description:), reads one workspace file, writes a CSV
+// (see §8b for the full table and pipeline shape). CSVCodec + JSONPath are public building blocks.
+struct JSONToCSVTool: Tool     { let name = "jsonToCsv" }      // SELECT cols FROM json_array
+struct SelectColumnsTool: Tool { let name = "selectColumns" }  // SELECT a AS x, b
+struct FilterRowsTool: Tool    { let name = "filterRows" }     // WHERE
+struct SortRowsTool: Tool      { let name = "sortRows" }       // ORDER BY … LIMIT  (the mechanical "top N")
+struct DedupeRowsTool: Tool    { let name = "dedupeRows" }     // SELECT DISTINCT
+struct AggregateRowsTool: Tool { let name = "aggregateRows" }  // GROUP BY
+struct ConcatRowsTool: Tool    { let name = "concatRows" }     // UNION ALL
+struct DescribeJSONTool: Tool  { let name = "describeJson" }   // structure summary (read-only)
+struct CSVInfoTool: Tool       { let name = "csvInfo" }        // row/column counts + samples (read-only)
+
+// Host-applied decorator: wraps a dynamic-schema tool, adds a root-level `saveAs` that writes the
+// wrapped tool's raw result to a workspace file instead of returning it. §8b.
+struct FileBackedTool: Tool {
+    typealias Arguments = GeneratedContent
+    init(name: String, description: String, argumentsJSONSchema: Data, root: URL,
+         previewCharacters: Int = 600, inlineCharacterLimit: Int? = nil,
+         invoke: @escaping @Sendable (GeneratedContent) async -> String) throws
+    static func mcp(descriptor: MCPToolDescriptor, manager: MCPServerManager, root: URL,
+                    previewCharacters: Int = 600, inlineCharacterLimit: Int? = nil) throws -> FileBackedTool
 }
 ```
 
