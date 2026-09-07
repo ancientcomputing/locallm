@@ -18,7 +18,33 @@ trailing comment is used instead of `**bold**` — it survives being read as a c
 See [`sdk-guide.md`](sdk-guide.md) for the prose walkthrough these annotate — this file is the
 companion "show me the whole thing at once" reference.
 
+## How much code is this, really?
+
+Every reference app in full — the whole Swift source, not a snippet. "Code" is non-blank,
+non-comment lines; these examples are commented far more heavily than production code, so the
+"with comments" column roughly doubles it.
+
+| Example | Code | With comments | In one line |
+|---|--:|--:|---|
+| [`repo-qa`](#examplesrepo-qasourcesrepoqamainswift) | 66 | 115 | Apple's on-device model calling a real MCP server's tools, built from its live schema — no `Arguments` structs |
+| [`os-matrix`](#examplesos-matrixsourcesosmatrixmainswift) | 74 | 97 | one binary that runs on macOS 26 **and** 27, model families gated by OS at registration |
+| [`repo-qa-local`](#examplesrepo-qa-localsourcesrepoqalocalmainswift) | 92 | 126 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model (the model layer) |
+| [`components-demo`](#examplescomponents-demosourcescomponentsdemocomponentsdemoappswift) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
+| [`plate-today-tools`](#examplesplate-today-toolssourcesplatetodaytoolsplatetodaytoolsappswift) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
+| [`workspace-buddy`](#examplesworkspace-buddysourcesworkspacebuddyworkspacebuddyappswift) | 172 | 226 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift) | 203 | 253 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox |
+| [`plate-today`](#examplesplate-todaysourcesplatetodayplatetodayappswift) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
+| [`model-switch`](#examplesmodel-switchsourcesmodelswitchappmodelswift) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
+| [`code-buddy`](#examplescode-buddysourcescodebuddymainswift) | 298 | 387 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
+| [`aiql`](#examplesaiqlsourcesaiqlaiqlappswift) | 392 | 475 | a plain-English request → the spreadsheet you asked for, via an MCP dataset, sandboxed SwiftUI, zero fabricated values |
+
+The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most,
+and each section's **Tally** breaks that down. The rest is ordinary SwiftUI, Foundation, and
+argument parsing.
+
 ## `examples/plate-today/Sources/PlateToday/PlateTodayApp.swift`
+
+*216 lines of code (359 with comments).*
 
 Demonstrates `Core` directly: Calendar/Reminders connectors, the MCP client, Keychain-backed OAuth
 — no `Components` involved. This is "Path B" — a hand-written `Tool` adapter per connector; see
@@ -347,6 +373,8 @@ setup that would look the same regardless of where the tools' data comes from.
 
 ## `examples/plate-today-tools/Sources/PlateTodayTools/PlateTodayToolsApp.swift`
 
+*149 lines of code (235 with comments) — ~130 fewer than `plate-today` for the same app.*
+
 The Path A twin of plate-today above — same app, same UI, same connectors, rebuilt on Core's
 ready-made FoundationModels Tools (§7a of `sdk-guide.md`) instead of hand-writing a `Tool` struct
 per connector. Marked the same way, plus `// ← SDK (Path A)` specifically on lines that only exist
@@ -500,6 +528,8 @@ struct), but trades pinned arguments for a raw, server-defined tool surface — 
 
 ## `examples/repo-qa/Sources/RepoQA/main.swift`
 
+*66 lines of code (115 with comments) — the smallest SDK program here.*
+
 A third, deliberately different shape: a plain command-line tool, not a signed GUI `.app` — MCP
 touches nothing TCC-gated, so there's no permission prompt to need a real bundle for. Builds an
 `MCPTool` for every tool a server offers, in a loop, entirely from that server's own live schema.
@@ -594,6 +624,8 @@ Swift equivalent for) converts automatically, degrading the union to a plain str
 `MCPToolAdapter`'s documented behavior for constructs past the common case.
 
 ## `examples/workspace-buddy/Sources/WorkspaceBuddy/WorkspaceBuddyApp.swift`
+
+*172 lines of code (226 with comments) — the plain-SwiftUI UI section is elided below.*
 
 A fourth shape again: the first reference app that writes to disk, and the first sandboxed by
 default. Pick a folder, describe a change, the on-device model reads/creates/edits files in it via
@@ -746,6 +778,8 @@ needs," it's the opposite: given a resolved URL, actually reading/writing files 
 sandbox is four one-line Tool instantiations, not a filesystem library to write yourself.
 
 ## `examples/components-demo/Sources/ComponentsDemo/ComponentsDemoApp.swift`
+
+*141 lines of code (189 with comments).*
 
 Demonstrates `Components`: the prebuilt server picker, resource/prompt browsing — no hand-written
 MCP-management UI at all.
@@ -949,6 +983,9 @@ glue (`toolsForSession()`, the OAuth scheme/callback wiring) any Core-linked app
 of whether it uses `Components` or not.
 
 ## `examples/code-buddy/Sources/CodeBuddy/main.swift`
+
+*203 lines of code in this file (264 with comments); 298 across the app's two files, `main.swift`
++ [`ProcessTools.swift`](#examplescode-buddysourcescodebuddyprocesstoolsswift).*
 
 The fullest **model-layer** example (see also
 [`repo-qa-local`](#examplesrepo-qa-localsourcesrepoqalocalmainswift) for the minimal one, and
@@ -1193,6 +1230,8 @@ Task cancellation is the whole cancel story.
 
 ## `examples/code-buddy/Sources/CodeBuddy/ProcessTools.swift`
 
+*95 lines of code (123 with comments) — host-owned tool code; none of it is SDK API.*
+
 Not SDK code at all — this is the worked example of the **host-owned `Process` tool** pattern
 that `sdk-guide.md` §7 calls out: the SDK deliberately does **not** ship shell/git/test-runner
 tools (App Sandbox + Mac App Store can't run `Process`), so a Developer-ID CLI like this one
@@ -1307,6 +1346,8 @@ the cancellation behaviour: `withTaskCancellationHandler` + `Task.checkCancellat
 make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it.
 
 ## `examples/repo-qa-local/Sources/RepoQALocal/main.swift`
+
+*92 lines of code (126 with comments) — ~20 more than `repo-qa`, all of it the model layer.*
 
 The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qasourcesrepoqamainswift) above,
 with the ~20 lines that swap Apple's on-device model for an open-weight MLX model you download and
@@ -1444,6 +1485,9 @@ except the one `lab.makeSession` line. The model layer itself is ~7 lines
 change.
 
 ## `examples/workspace-buddy-local/Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift`
+
+*203 lines of code (253 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddysourcesworkspacebuddyworkspacebuddyappswift) above —
 same folder-picker, same security-scoped bookmark, same `WorkspaceTools` — but the model is an
@@ -1590,6 +1634,8 @@ sandbox changes nothing in the code, only the entitlements.
 
 ## `examples/os-matrix/Sources/OSMatrix/main.swift`
 
+*74 lines of code (97 with comments) — the whole file is shown below.*
+
 One `.macOS("26.0")` CLI that runs unchanged on macOS 26 and macOS 27 — no source `#if`, a single
 `#available` block at provider registration. Everything after that block is identical code on both
 OSes; the macOS-27-only model families (`PCCModelProvider`, open-weight via `MLXModelProvider`) are
@@ -1703,6 +1749,9 @@ handle that a 27-only app never sees. No `#if canImport` anywhere — `LocalLMLa
 linked unconditionally and its 27-only providers just aren't appended on 26.
 
 ## `examples/model-switch/Sources/ModelSwitch/AppModel.swift`
+
+*146 lines of code in this file (180 with comments); 283 across the app's three files —
+`AppModel.swift`, `ModelSwitchApp.swift`, and the ~35-line `ProviderGlue.swift` (both below).*
 
 The **online / remote providers** example (`sdk-guide.md`
 [§6b](sdk-guide.md#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)): a chat
@@ -1954,6 +2003,8 @@ token, and it's what the settings panel's **Test connection** button runs.
 
 ## `examples/model-switch/Sources/ModelSwitch/ModelSwitchApp.swift`
 
+*102 lines of code (112 with comments) — the `ChatView` UI is elided below.*
+
 The `Components` half: `AIModelsSettingsView` is the entire "AI Models" settings panel — add a
 provider, key field, per-model rows, a web-search toggle + max-searches stepper, and a **Test
 connection** button. The host supplies four things and writes no settings UI of its own.
@@ -2000,6 +2051,9 @@ web-search `Toggle`, the transcript) is ordinary SwiftUI and is elided here. The
 seam that keeps `Components` free of any dependency on `Remote`.
 
 ## `examples/aiql/Sources/AIQL/AIQLApp.swift`
+
+*392 lines of code (475 with comments) — one file: view model + pipeline + SwiftUI UI. The
+`FolderAccess` enum and the `ContentView` UI are elided below.*
 
 The **`FileBackedTool` + "AIQL" data-verb** showcase (`sdk-guide.md`
 [§8b](sdk-guide.md#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
