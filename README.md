@@ -58,6 +58,10 @@ for the full framing.
 - **[docs/tested-models.md](docs/tested-models.md)** — a point-in-time snapshot of which
   open-weight (MLX) models actually tool-call, and why several don't.
 - **[CHANGELOG.md](CHANGELOG.md)** — the public SDK surface, version by version.
+- **[skills/locallmlab-swift-app/](skills/locallmlab-swift-app/)** — a repo-local Agent Skill
+  for developers using Codex or Claude Code to build macOS Swift apps with this SDK. Codex
+  discovers it through `.agents/skills/locallmlab-swift-app`; Claude Code discovers it through
+  `.claude/skills/locallmlab-swift-app`.
 - **[examples/plate-today/](examples/plate-today/)** — Calendar + Reminders + the Todoist MCP
   server, Path B: a hand-written `Tool` adapter per connector.
 - **[examples/plate-today-tools/](examples/plate-today-tools/)** — the exact same app, rebuilt on
