@@ -208,6 +208,9 @@ either silently collides with any other app on the same Mac that also failed to 
 resolves a claimed URL scheme to exactly one app, arbitrarily, when more than one registers it), or
 simply won't route back to your app at all.
 
+Set `MCPOAuthFlow.clientMetadataURL` in the same spot if you're using CIMD instead of Dynamic
+Client Registration — see §3d.
+
 ### 2d. Wire the OAuth callback through your AppDelegate, not SwiftUI's `.onOpenURL`
 
 ```swift
@@ -313,6 +316,139 @@ own scheme** (`yourapp://oauth/callback`, from §2c — the OAuth redirect URI).
 instructions verbatim into your own documentation would silently misconfigure every user who
 follows it — their server-side app would try to redirect back into the wrong app (or nowhere)
 instead of yours.
+
+### 3a. Which MCP revision the client speaks — and why you mostly don't have to care
+
+MCP is versioned by date-stamped revisions (`2024-11-05`, `2025-03-26`, `2025-06-18`,
+`2025-11-25`). You don't pick one. On `addServer` the client offers the newest it knows
+(`MCPProtocolVersion.clientPreferred`, currently `2025-11-25`) and the server replies with the
+newest *it* knows; they meet at the highest revision both support. An old server that only
+speaks `2025-03-26` still connects and works — nothing you wrote for the `0.8.x` MCP client
+breaks.
+
+What the negotiated revision changes is how much a server *can* hand you:
+
+| Revision the server meets you at | What you get |
+|---|---|
+| `2024-11-05` / `2025-03-26` | Tools, resources, prompts. Tool results are plain text. |
+| `2025-06-18` | + structured tool results (`MCPToolResult.structuredContent`), `resource_link` results, elicitation, tool `title`s |
+| `2025-11-25` | + icons, richer elicitation field types, URL-mode elicitation |
+
+`MCPServerState.negotiatedProtocolVersion` tells you where a given connection landed (`nil`
+until connected). You rarely read it — the point of the table is that the newer fields on
+`MCPToolResult` and the elicitation seam below are simply empty / never-called against an older
+server, not errors to guard.
+
+### 3b. What a tool call gives you back: `MCPToolResult`
+
+`manager.callTool(server:tool:arguments:)` returns `Result<MCPToolResult, MCPServerError>`. The
+`MCPServerError` side is a transport/protocol failure (unreachable, malformed, auth needed). A
+tool that *ran* but reported a problem is **not** an error — it's `.success` with
+`isError == true`.
+
+```swift
+switch await manager.callTool(server: state.id, tool: "search", arguments: ["q": .string("mcp")]) {
+case .success(let result):
+    let forTheModel = result.renderedForModel   // compact rendering sized for a model's context —
+                                                // folds in structuredContent, resource links, the
+                                                // error flag, and a truncation note. The one line
+                                                // you need in most cases.
+    result.text                // human-readable text block, if any
+    result.structuredContent   // MCPValue? — JSON the server marked as structured data
+    result.resourceLinks       // [MCPResourceLink] — uri/title/mimeType pointers, not fetched
+    result.isError             // tool signalled failure; renderedForModel prefixes "Error: "
+    result.truncated           // response hit MCPResponseLimits and was cut
+case .failure(let error):
+    // transport/protocol only
+}
+```
+
+`MCPTool` / `FileBackedTool` (§7a) already call `renderedForModel` for you — this matters only
+when you call `manager.callTool` directly. `structuredContent` is validated against the tool's
+declared `outputSchema` first; a mismatch is turned into `isError`.
+
+### 3c. Server-initiated requests: elicitation (and the sampling / roots seams)
+
+Three MCP features let the server send *the client* a request mid-operation:
+
+- **elicitation** — "I need more from the user to finish this tool call" (a missing field, a
+  confirmation, which workspace). `2025-06-18`+.
+- **sampling** — "run this prompt through your model for me."
+- **roots** — "which filesystem roots may I see?"
+
+The SDK implements none of them. Each is a **handler seam**: supply a conforming type or the
+capability is never advertised and a well-behaved server never asks.
+
+```swift
+let manager = MCPServerManager(
+    handlers: MCPClientHandlers(elicitation: elicitation)   // sampling:, roots:, logging: also here
+)
+```
+
+**Elicitation is the one to wire**, and `LocalLMLabSDKComponents` ships the whole SwiftUI form:
+
+```swift
+import LocalLMLabSDKComponents
+
+@StateObject private var elicitation = MCPElicitationPresenter()   // : MCPElicitationHandler
+
+var body: some View {
+    MyContent().mcpElicitationSheet(elicitation)                   // attach once, near the root
+}
+
+let manager = MCPServerManager(handlers: MCPClientHandlers(elicitation: elicitation))
+```
+
+When a server raises `elicitation/create`, a sheet appears naming the server, renders a typed,
+validated form from the requested schema, and returns the user's `accept` / `decline` /
+`cancel`. See [the elicitation UI page](https://thisbrain.ai/locallm/mcp-elicitation.html).
+
+Your own UI or a headless policy: conform to `MCPElicitationHandler` — one `async` method on an
+`MCPElicitationRequest` (parsed `message`, typed `fields`, `serverName` / `serverURL`, optional
+URL-mode `url`) → `MCPElicitationResponse`. `callTool` also takes `allowElicitation: Bool = true`
+— pass `false` where there's no way to show a prompt (a background job) and the request is
+declined cleanly instead of hanging.
+
+**Sampling** has a security edge: a registered `MCPSamplingHandler` lets a server push a prompt
+through your model. Your handler owns the human-in-the-loop approval; the SDK gives you the seam,
+not the policy. Don't register it if you don't need it.
+
+### 3d. CIMD: skipping Dynamic Client Registration
+
+The OAuth flow above relies on **Dynamic Client Registration** — the server issues a `client_id`
+on the fly. Servers that don't support DCR are the `.oauthManual` path. **Client ID Metadata
+Documents (CIMD)** are a newer alternative: your `client_id` *is* an HTTPS URL to a small static
+JSON file describing your app — no per-server registration, no manual ID.
+
+```swift
+MCPOAuthFlow.clientMetadataURL = URL(string: "https://yourapp.example/mcp/client-metadata.json")
+```
+
+Set it once at startup, next to `MCPOAuthFlow.redirectURI`. When it's set *and* the server's
+auth metadata advertises CIMD, the client registers with it; otherwise it falls back to DCR,
+then `.oauthRegistrationNotSupported`. The document's `client_id` must equal its own URL and its
+`redirect_uris` must contain your `redirectURI`. Optional — DCR stays the zero-config default;
+CIMD is the upgrade for a production app that wants a stable, self-described identity on the
+consent screen.
+
+### 3e. Diagnostics when a user reports an MCP problem
+
+Two logging layers, both strictly off-content (never prompt/response text; bearer tokens and
+auth codes redacted):
+
+- **`os.Logger`**, always on, subsystem `ai.thisbrain.locallmlab.sdkcore` — Console.app /
+  `log stream`, no code.
+- **An opt-in in-memory buffer** you dump as text when someone hits a problem:
+
+```swift
+MCPDiagnostics.setEnabled(true)               // ring buffer, default 500 events
+MCPDiagnostics.logLevel = .debug              // .debug / .info / .notice / .error / .off
+// ... reproduce ...
+let report = MCPDiagnostics.exportText()      // hand to support; also .exportJSON()
+```
+
+Gate `logLevel` on a hidden preference so a normal user runs at `.info` and you can talk them up
+to `.debug` over a support channel; put a "Copy MCP diagnostics" button somewhere unobtrusive.
 
 ## 4. Keychain storage — automatic isolation, native API, sandbox-safe
 
@@ -458,6 +594,10 @@ That hand-matching + schema-inspection is Path B for MCP. Path A is `MCPTool(des
 hand it one of `state.tools` and it builds a working `Tool` from the live schema, no `Arguments`
 struct of your own. [`repo-qa`](../examples/repo-qa/) is that in ~70 lines; see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own).
 
+`callTool` hands back an `MCPToolResult` (§3b) — `renderedForModel` is the string you feed the
+model; both adapters call it for you. If your target server pauses a tool call to ask the user
+something, that's elicitation — wire the one-line Components handler (§3c).
+
 ### Step 6 — the model synthesizes a summary, the UI shows it
 
 `session.respond(to:)`'s result becomes your "ready" state, rendered in a scrollable text view. If
@@ -507,11 +647,13 @@ case .failure(let error):
     // MCPServerError for the full set and what each implies about whether retrying makes sense.
 }
 
-// Call a tool
+// Call a tool -> Result<MCPToolResult, MCPServerError> (§3b). A tool that ran but failed is
+// .success with isError == true, not .failure.
 let callResult = await manager.callTool(
     server: state.id, tool: "find-tasks-by-date",
     arguments: ["startDate": .string("today")]
 )
+if case .success(let result) = callResult { print(result.renderedForModel) }
 
 // React to state changes (servers dict) without SwiftUI/Combine — Core has no UI-framework
 // dependency at all
@@ -1271,6 +1413,10 @@ over an MCP dataset → this pipeline → a CSV in a folder you chose, with a lo
   for once you have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
   see §7a (ready-made vs. hand-written tools).
+- ~~No handling of server-initiated requests (elicitation, sampling, roots).~~ All three are now
+  handler seams (`MCPClientHandlers`), with a default elicitation UI in Components — see §3c. The
+  SDK still doesn't *implement* sampling or roots; it routes them to your handler if you register
+  one, else replies "method not found".
 - ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ 1.0 adds
   the model layer (§6a): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
   `LocalLMLabSDKInference`) / `makeSession`. Still optional — the MCP-only path is unchanged.
@@ -1280,10 +1426,11 @@ over an MCP dataset → this pipeline → a CSV in a folder you chose, with a lo
 - **No public API stability guarantee.** `1.0.0-beta.N` makes none. Access levels have been fixed
   reactively as real usage surfaced gaps — if you hit "X is inaccessible due to internal
   protection level" on something that looks like it should be public, it probably should. File it.
-- **No logging of prompts, responses, or tool calls, on by default or otherwise.** Core doesn't
-  write a persisted trace of what the model saw or said anywhere, and gives you nothing to opt out
-  of — there's simply nothing there. If your app wants that kind of record, you build and own it
-  yourself.
+- **No logging of prompts, responses, or tool calls.** The MCP client has `MCPDiagnostics`
+  (§3e) for connection / auth / stream troubleshooting — `os.Logger` plus an opt-in event buffer
+  — but it is strictly off-content (never prompt or response text; tokens redacted). Core writes
+  no persisted trace of what the model saw or said. If your app wants that, you build and own it
+  — the model layer's `session.events` is what you hang it off.
 
 ## 10. App Sandbox — building for the Mac App Store
 
@@ -1443,6 +1590,13 @@ dependency on `Core.xcframework` and no source access to Core's internals.
 - **`MCPResourcesView`** / **`MCPPromptsView`** — browse a session's enabled resources/prompts and
   read/expand one, via callbacks (`onAttach`/`onUse`) so your app decides what to actually do with
   the result — append it to a text field, feed a session, save it, whatever fits your UI.
+- **`MCPElicitationPresenter`** + **`View.mcpElicitationSheet(_:)`** — the ready-made handler for
+  server-initiated elicitation (§3c). `MCPElicitationPresenter()` conforms to
+  `MCPElicitationHandler`; pass it to `MCPClientHandlers(elicitation:)` and attach the sheet once
+  near your root. When a server asks for input mid-tool-call, a sheet appears naming the server
+  and renders a typed, validated form (text / date / number-with-bounds / toggle / single- and
+  multi-select), plus a URL-mode variant. Nothing to build; see
+  [the elicitation UI page](https://thisbrain.ai/locallm/mcp-elicitation.html).
 
 **Model-layer views** (all bind directly to `lab.models`, an `@Observable` `ModelRegistry` — no
 polling):
@@ -2002,7 +2156,7 @@ enum GenerationErrorDescription {
 
 ```swift
 final class MCPServerManager {
-    init()  // NOT a singleton — you own the instance
+    init(responseLimits: MCPResponseLimits = .default, handlers: MCPClientHandlers = .init())  // NOT a singleton
     private(set) var servers: [MCPServerID: MCPServerState] { get }
     var serverChanges: AsyncStream<[MCPServerID: MCPServerState]> { get }
     var estimatedTotalTokens: Int { get }
@@ -2015,7 +2169,9 @@ final class MCPServerManager {
 
     func toolsForSession() -> [MCPToolDescriptor]
     func setToolEnabled(server: MCPServerID, tool: String, enabled: Bool)
-    func callTool(server: MCPServerID, tool: String, arguments: [String: MCPValue]) async -> Result<String, MCPServerError>
+    // -> MCPToolResult (§3b), not a String. A tool that ran but failed is .success with isError == true.
+    // allowElicitation: false on a code path that can't show a prompt (headless / background).
+    func callTool(server: MCPServerID, tool: String, arguments: [String: MCPValue], allowElicitation: Bool = true) async -> Result<MCPToolResult, MCPServerError>
 
     func resourcesForSession() -> [MCPResourceDescriptor]
     func resourceTemplatesForSession() -> [MCPResourceTemplateDescriptor]
@@ -2045,7 +2201,18 @@ struct MCPServerState: Codable, Sendable {
     var resources: [MCPResourceDescriptor]
     var resourceTemplates: [MCPResourceTemplateDescriptor]
     var prompts: [MCPPromptDescriptor]
+    var negotiatedProtocolVersion: MCPProtocolVersion?   // nil until connected (§3a)
+    var serverInstructions: String?                       // server's own usage note from `initialize`
     func exportSummary() -> String      // plain-text listing of tools/resources/prompts, enabled state, token cost
+}
+
+enum MCPProtocolVersion: String, CaseIterable, Comparable, Sendable, Codable {
+    case v2024_11_05 = "2024-11-05", v2025_03_26 = "2025-03-26"
+    case v2025_06_18 = "2025-06-18", v2025_11_25 = "2025-11-25"
+    static let clientPreferred: MCPProtocolVersion = .v2025_11_25
+    var supportsStructuredContent: Bool { get }   // >= 2025-06-18
+    var supportsElicitation: Bool { get }
+    var supportsIconsAndRicherElicitation: Bool { get }   // >= 2025-11-25
 }
 
 enum MCPAuthType: String, Codable, Sendable { case none, pat, oauthManual }
@@ -2056,11 +2223,13 @@ enum MCPConnectionStatus: String, Codable, Sendable { case connected, disconnect
 
 struct MCPToolDescriptor: Codable, Sendable {
     var serverID: MCPServerID
-    var name: String
+    var name: String             // model-facing identifier
     var description: String
     var rawSchema: Data          // the tool's real JSON schema — inspect before assuming params
     var estimatedTokens: Int
     var enabled: Bool            // defaults to false for newly-discovered tools
+    var title: String?           // human display name for UI (2025-06-18+); fall back to name
+    var outputSchema: Data?      // declared shape of structuredContent, if any (2025-06-18+)
 }
 
 struct MCPResourceDescriptor: Codable, Sendable {
@@ -2098,6 +2267,21 @@ struct MCPPromptMessage: Codable, Sendable { var role: String; var text: String 
 
 indirect enum MCPValue: Codable, Sendable {
     case string(String), number(Double), bool(Bool), array([MCPValue]), object([String: MCPValue]), null
+    func strippingEmpty() -> MCPValue?      // drop ""/[]/null and objects that collapse — the
+                                            // "did the user/model actually supply this?" rule
+}
+
+// What callTool gives you back (§3b).
+struct MCPToolResult: Sendable, Codable, Equatable {
+    var text: String
+    var structuredContent: MCPValue?        // JSON the server marked structured; validated vs outputSchema
+    var resourceLinks: [MCPResourceLink]
+    var isError: Bool                        // the tool ran and reported failure
+    var truncated: Bool                      // response hit MCPResponseLimits
+    var renderedForModel: String { get }     // compact, context-sized rendering folding in all of the above
+}
+struct MCPResourceLink: Sendable, Codable, Equatable {
+    var uri: String; var name: String?; var title: String?; var description: String?; var mimeType: String?
 }
 
 enum MCPServerError: Error, Codable, Sendable {
@@ -2111,14 +2295,62 @@ enum MCPServerError: Error, Codable, Sendable {
     case credentialRejected                  // PAT rejected — no retry path but a new token
     case httpError(Int)
     case oauthRegistrationNotSupported       // no DCR — retry with .oauthManual + manualClientID
+    case responseTooLarge(String)            // server response exceeded MCPResponseLimits
 }
+```
+
+**Server-initiated request handlers** (§3c) — all optional; a capability is advertised to a
+server only when its handler is non-nil:
+
+```swift
+struct MCPClientHandlers: Sendable {
+    init(elicitation: (any MCPElicitationHandler)? = nil,
+         sampling:    (any MCPSamplingHandler)?    = nil,
+         roots:       (any MCPRootsProvider)?      = nil,
+         logging:     (any MCPLoggingSink)?        = nil)
+}
+
+protocol MCPElicitationHandler: Sendable {
+    func handleElicitation(_ request: MCPElicitationRequest) async -> MCPElicitationResponse
+}
+struct MCPElicitationRequest: Sendable, Equatable {
+    var message: String
+    var rawSchema: Data                       // the raw requestedSchema, for custom rendering
+    var fields: [MCPElicitationField]         // flattened: string(format)/number/integer/boolean/enum
+    var url: URL?                             // URL-mode elicitation (2025-11-25)
+    var serverName: String?                   // which server is asking — show this
+    var serverURL: URL?
+}
+enum MCPElicitationResponse: Sendable, Equatable { case accept([String: MCPValue]), decline, cancel }
+
+protocol MCPSamplingHandler: Sendable {      // your handler owns the human-in-the-loop approval
+    func handleSampling(_ request: MCPSamplingRequest) async -> MCPSamplingResponse?
+}
+protocol MCPRootsProvider: Sendable { func roots() async -> [MCPRoot] }
+protocol MCPLoggingSink: Sendable { func receive(_ message: MCPLogMessage) }
+```
+
+**Diagnostics** (§3e) — off-content, secrets redacted:
+
+```swift
+enum MCPDiagnostics {
+    static var logLevel: MCPLogLevel { get set }     // default .info
+    static func setEnabled(_ enabled: Bool)          // in-memory ring buffer, default off
+    static var capacity: Int { get set }             // default 500
+    static var observer: (@Sendable (MCPDiagnosticEvent) -> Void)? { get set }
+    static func exportText() -> String
+    static func exportJSON() -> Data
+    static func clear()
+}
+enum MCPLogLevel: Int, Sendable, Comparable, Codable { case debug, info, notice, error, off }
 ```
 
 **OAuth setup** (§2c–2d):
 
 ```swift
 enum MCPOAuthFlow {
-    static var redirectURI: String { get set }  // MUST override before any connect/addServer call
+    static var redirectURI: String { get set }        // MUST override before any connect/addServer call
+    static var clientMetadataURL: URL? { get set }     // optional — CIMD instead of DCR (§3d)
 }
 
 final class MCPOAuthRedirectListener {
@@ -2128,9 +2360,9 @@ final class MCPOAuthRedirectListener {
 ```
 
 **Advanced**: `protocol MCPConnection` is the transport abstraction `MCPServerManager` drives
-internally (`initialize()`, `listTools()`, `callTool(name:arguments:)`, resource/prompt
-equivalents, `close()`). You won't need this unless you're replacing the transport layer itself —
-everything above already goes through it for you.
+internally (`connect()`, `listTools()`, `callTool(name:arguments:allowElicitation:)`,
+resource/prompt equivalents, `close()`). You won't need this unless you're replacing the
+transport layer itself — everything above already goes through it for you.
 
 ### `MCPTool` (Path A for MCP)
 

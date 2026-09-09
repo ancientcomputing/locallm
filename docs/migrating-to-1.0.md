@@ -5,9 +5,11 @@ One app runs on macOS 26 and macOS 27 from a single build — Private Cloud Comp
 open-weight (MLX) models are simply absent on 26. (The `0.8.x` SDK series — MCP client and
 connectors, no model layer — continues separately for consumers that don't want it.)
 
-The jump from `0.8.x` is **mostly additive**: the MCP client, the connectors, and Keychain
-storage work the same. What's new is the model layer; what can break your build is one
-enum-resilience change and — if you wrote a custom `ModelProvider` — one protocol change.
+The jump from `0.8.x` is **mostly additive**: the connectors and Keychain storage are unchanged,
+and every MCP server that worked still works. What's new is the model layer and a batch of MCP
+spec-2025-11-25 capabilities (`sdk-guide.md` §3a–§3e); what can break your build is one
+enum-resilience change, one MCP return-type change, and — if you wrote a custom `ModelProvider`
+— one protocol change.
 
 ## 1. Platform: macOS 26 floor, Xcode 27 to build
 
@@ -61,6 +63,23 @@ over one of these *exhaustively* (no `default`), the compiler now requires `@unk
 - `ModelAvailability`, `ResidencyEvent`, `SessionEvent`, `DownloadEvent` — new in 1.0.
   (`ModelAvailability.UnavailableKind` gained a `.requiresOS(String)` case in `1.0.0-beta.2`;
   `@unknown default` already covers it.)
+
+### `MCPServerManager.callTool` now returns `MCPToolResult`, not `String`
+
+`callTool(server:tool:arguments:)` was `-> Result<String, MCPServerError>`; it's now
+`-> Result<MCPToolResult, MCPServerError>` (§3b), and takes an `allowElicitation: Bool = true`.
+If you call it directly:
+
+```diff
+- case .success(let text):
+-     feedToModel(text)
++ case .success(let result):
++     feedToModel(result.renderedForModel)   // same string you had before, plus structured/link/error folding
+```
+
+A tool that *ran* but reported failure is now `.success` with `result.isError == true` (it used
+to be `.failure(.serverError(...))` in some cases). The `MCPTool` / `FileBackedTool` adapters
+absorb all of this — no change if you go through them.
 
 ### Custom `ModelProvider` conformances (only if you wrote one)
 
@@ -127,8 +146,21 @@ Purely additive: new `Tool` structs plus `CSVCodec` / `JSONPath` building blocks
 `append:` option on `WorkspaceAccess.writeFile`. [`examples/aiql`](../examples/aiql/) is the
 worked app.
 
+Also new on the **MCP client** (`sdk-guide.md` §3a–§3e), all backward compatible:
+
+- The client negotiates **MCP `2025-11-25`** (down to `2024-11-05`). Older servers are
+  unaffected; `MCPServerState.negotiatedProtocolVersion` reports where each landed.
+- **Structured tool results** — `MCPToolResult.structuredContent` / `resourceLinks` / `isError`
+  / `truncated`, validated against the tool's `outputSchema`.
+- **Elicitation** — servers can pause a tool call to ask the user for input. Register
+  `MCPClientHandlers(elicitation:)`; `LocalLMLabSDKComponents` ships the SwiftUI form
+  (`MCPElicitationPresenter` + `.mcpElicitationSheet`). Sampling / roots have handler seams too.
+- **CIMD** — `MCPOAuthFlow.clientMetadataURL` as an alternative to Dynamic Client Registration.
+- **`MCPDiagnostics`** — off-content connection/auth/stream logging for support.
+
 None of this is required — a `LanguageModelSession` you build yourself with Core's tools still
-works exactly as in `0.8.x`.
+works exactly as in `0.8.x`, and an app that never touches elicitation or `clientMetadataURL`
+needs no code changes beyond the `callTool` return type above.
 
 ## Beta caveats
 
