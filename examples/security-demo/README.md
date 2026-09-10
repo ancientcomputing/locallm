@@ -37,7 +37,7 @@ The SDK's model is that a single tool grant is really a chain of stages:
 | Stage | What happens | This demo |
 |---|---|---|
 | 1. Registration | a tool / MCP server becomes available to the app | the app's own code (`AppModel.bootstrap`) |
-| 2. Discovery | a tool is offered to a session | fixed list (later: model-driven `search_tools`) |
+| 2. Discovery | a tool is offered to a session | fixed list |
 | **3. Activation** | **a tool's schema is put in the session** | **the connector *level* → `limited(toMaxImpact:)`** |
 | **4. Invocation** | **a specific call, with specific arguments, proceeds** | **"Confirm each" → `ConfirmingToolAuthorizer`** |
 | 5. Content ingestion | resource / prompt / tool-result text enters context | not gated here yet |
@@ -97,8 +97,10 @@ a `.mutate`/`.destructive` call is confirmed when its connector's toggle is on. 
 the model gets `DENIED: not approved` back and continues — the turn doesn't crash. No answer
 within ~120s auto-denies (a forgotten sheet can't pin a turn open).
 
-With **every toggle off**, `makeSession` gets `authorizer: nil` and behaves exactly like a bare
-`LanguageModelSession`.
+With **every toggle off**, `makeSession` gets `authorizer: nil`. There is then no
+invocation gate at all: the model can call any tool that is in the session (the ones the
+level let through, plus the MCP tools), with whatever arguments it chooses, and every call
+runs immediately. No prompt, no denial. Same behaviour as a bare `LanguageModelSession`.
 
 ### MCP tools are opaque
 

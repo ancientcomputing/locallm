@@ -78,8 +78,8 @@ struct SecurityPane: View {
 
     private var footnotes: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("With every toggle off, `makeSession` gets no authorizer — it runs like a bare "
-                  + "LanguageModelSession.", systemImage: "info.circle")
+            Label("With every toggle off there is no confirmation gate: the model runs every tool call "
+                  + "it makes, immediately.", systemImage: "info.circle")
             Label("A denied call comes back to the model as the tool result; the turn continues.",
                   systemImage: "arrow.uturn.left")
             Label("No answer within ~120s auto-denies.", systemImage: "clock")
