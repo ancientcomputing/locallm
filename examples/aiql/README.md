@@ -170,15 +170,92 @@ source because every one of its tools returns a clean table of records:
 
 - **MCP data source:** `https://econ-index.mcp.claude.com/mcp`
 
-Paste any of these into **Request** (leave the model and server at their defaults):
+### Reproduce the demo — step by step
+
+1. **Open AIQL** (Xcode ▸ Run, or `dist/AIQL.app`).
+2. **Model:** leave it at the default `mlx-community/Qwen3-14B-4bit`. First Go downloads it
+   (~8 GB, one time); needs a 16 GB Mac. On an 8 GB Mac type `mlx-community/Qwen3-8B-4bit`.
+3. **MCP data source:** paste `https://econ-index.mcp.claude.com/mcp` and let it connect
+   (public server — no sign-in).
+4. **Output folder:** click **Choose…** and pick any writable folder. `out.csv` lands there.
+5. **Request — prompt 1 (a plain ranking):**
+
+   ```
+   The 10 US states with the highest Claude usage index, and each one's automation percentage.
+   ```
+
+   Press **Go**. The progress panel shows *Connecting → Reading the data… → Building the
+   spreadsheet…*. Three tool calls happen: the data pull (`→ raw/data.json`, ~56 KB, never
+   enters the model's context), `loadTable` (`51 rows into 'states'`, plus child tables for the
+   nested arrays), and one `sqlQuery` (`10 rows, 3 columns → out.csv`). `out.csv`:
+
+   ```
+   name,anthropic_usage_index,automation_pct
+   "Washington, D.C.",...
+   California,...
+   New York,...
+   Washington,...
+   Massachusetts,...
+   Colorado,...
+   Utah,...
+   Hawaii,...
+   Nevada,...
+   Oregon,...
+   ```
+
+   The underlying query is `SELECT name, anthropic_usage_index, automation_pct FROM states
+   ORDER BY anthropic_usage_index DESC LIMIT 10`.
+
+6. **Request — prompt 2 (the same, plus a range filter):**
+
+   ```
+   US states whose automation percentage is between 45 and 50, highest usage index first —
+   state name and automation percentage.
+   ```
+
+   Press **Go** again (same folder — `out.csv` is overwritten). Now the query gains a `WHERE`:
+   `SELECT name, automation_pct FROM states WHERE automation_pct BETWEEN 45 AND 50 ORDER BY
+   anthropic_usage_index DESC`. `out.csv` — 20 rows:
+
+   ```
+   name,automation_pct
+   "Washington, D.C.",45.52
+   California,48.0
+   New York,46.9
+   Washington,48.08
+   Massachusetts,46.7
+   Oregon,49.12
+   Maryland,48.08
+   Virginia,49.37
+   Connecticut,48.59
+   New Jersey,48.97
+   Illinois,48.58
+   Rhode Island,48.85
+   Minnesota,49.54
+   Pennsylvania,48.8
+   Maine,49.81
+   Wisconsin,49.69
+   Alaska,49.83
+   Wyoming,48.94
+   North Dakota,48.49
+   West Virginia,49.9
+   ```
+
+   Colorado, Utah, Nevada and Hawaii — in prompt 1's top 10 — are gone: their automation is
+   above 50. The filter is applied by SQLite against the copied rows, not by the model, so it
+   can't be silently dropped or half-applied.
+
+Both results are byte-for-byte reproducible — same fixture rows, deterministic SQL — and match
+the SDK's `examples/aiql-eval` cases **E1** and **E2**.
+
+### More prompts to try
 
 | Request | `out.csv` |
 |---|---|
 | `every country and its usage index, highest first, top 10` | `name, anthropic_usage_index` — Australia 6.4, Singapore 5.81, … |
-| `the 10 US states with the highest Claude usage index, and their automation percentage` | `name, anthropic_usage_index, automation_pct` |
-| `US states where automation percentage is between 45 and 50, highest usage index first` | `name, automation_pct` |
-| `for each US state, its number-one job category` | `name, top_job_category` (from the `__top_job_categories` child table) |
+| `for each US state, its number-one job category` | `name, top_job_category` (from the `states__top_job_categories` child table) |
 | `all job categories ranked by their share of global Claude usage` | `name, pct` |
+| `States where coursework use is above 12 percent — state and that percentage, highest first` | `name, use_case_coursework_pct` — 5 rows |
 
 The model picks the data tool, `loadTable`s it, then writes one `SELECT` against the printed
 `CREATE TABLE`. Rows are copied from the source by the host — exact against the published index.
