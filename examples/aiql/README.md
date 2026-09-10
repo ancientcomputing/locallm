@@ -88,24 +88,23 @@ Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
 
 Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session.
 
-**1. Install the Xcode 27 beta.** Download it from
-[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
-(it installs as `Xcode-beta.app`, alongside any stable Xcode). A stable Xcode fails with
-`'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+**1. Install Xcode 27.** Get it from the Mac App Store or
+[developer.apple.com/xcode](https://developer.apple.com/xcode/).
+`Package.swift` requires `platforms: [.macOS("27.0")]`, so an older Xcode fails with `'v27' is unavailable`.
 
-**2. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
+**2. Point `swift` at Xcode 27** for the terminal you'll build from:
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
 or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
 setup — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
-`LocalLMLabSDKInference.xcframework` (the MLX runtime, which carries its own Metal shaders), from
-that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published
-release. Building the xcframeworks needs the Metal Toolchain — as a *consumer* of the prebuilt
-Inference slice you do not.
+`LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
+`export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain
+needed** — the prebuilt Inference xcframework bundles the compiled `default.metallib`; you only
+need it if you build the SDK from source.
 
 **3. Compile-check:**
 
@@ -118,11 +117,10 @@ signed `.app` with `packaging/build-and-sign.sh` (further below).
 
 ## Open in Xcode and Run
 
-A committed `AIQL.xcodeproj` is the lowest-friction way to try it. **Open it in `Xcode-beta.app`,
-not a stable Xcode** (the target is macOS 27):
+A committed `AIQL.xcodeproj` is the lowest-friction way to try it. **Open it in Xcode 27 or newer** (the target is macOS 27):
 
 ```bash
-open -a Xcode-beta AIQL.xcodeproj
+open -a Xcode AIQL.xcodeproj
 ```
 
 Pick the **AIQL** scheme and Run — a real sandboxed `.app` with the

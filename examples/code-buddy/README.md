@@ -60,7 +60,7 @@ with `git checkout .`.
 
 ## Walkthrough
 
-Do **Getting the SDK & toolchain** below first (Xcode 27 beta + the Metal Toolchain — one-time).
+Do **Getting the SDK & toolchain** below first (install Xcode 27 — one-time).
 
 **About `swift run`:** it must be run from **this package directory**
 (`locallm/examples/code-buddy/`, the one with `Package.swift`) — that's how SwiftPM finds and
@@ -205,8 +205,7 @@ Omit `[task...]` to enter the interactive `>>` loop instead of running one shot.
 ## In Xcode
 
 A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
-**File ▸ Open → `Package.swift`**, pick the **CodeBuddy** scheme, Run — in **`Xcode-beta.app`,
-not a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). It
+**File ▸ Open → `Package.swift`**, pick the **CodeBuddy** scheme, Run — in **Xcode 27 or newer** (macOS 27 target → an older Xcode fails with `'v27' is unavailable`). It
 works, with three caveats:
 
 - **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
@@ -221,37 +220,30 @@ No signing setup — a plain CLI tool signs ad-hoc automatically.
 
 ## Getting the SDK & toolchain
 
-Copy-paste each step. Steps 1–2 are one-time machine setup; step 3 sets up your terminal session
+Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
 (re-run it in every new terminal).
 
-**1. Install the Xcode 27 beta.** Download it from
-[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
-(it installs as `Xcode-beta.app`, alongside any stable Xcode). A stable Xcode fails with
-`'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+**1. Install Xcode 27.** Get it from the Mac App Store or
+[developer.apple.com/xcode](https://developer.apple.com/xcode/).
+`Package.swift` requires `platforms: [.macOS("27.0")]`, so an older Xcode fails with `'v27' is unavailable`.
 
-**2. Download the Metal Toolchain** — `mlx-swift` compiles Metal shaders and won't build without
-it. One-time; safe to re-run:
+**2. Point `swift` at Xcode 27** for the terminal you'll build from:
 
 ```bash
-xcodebuild -downloadComponent MetalToolchain
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
-**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
-
-```bash
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-```
-
-Skip it only if `xcode-select -p` already points at `Xcode-beta.app`; it lasts only for the
+Skip it only if `xcode-select -p` already points at Xcode 27; it lasts only for the
 current terminal. `Package.swift` builds against SDK `1.0.0-beta.3` with no further setup — it
 links **two** binaries (`LocalLMLabSDKCore.xcframework` + `LocalLMLabSDKInference.xcframework`,
 the MLX runtime) from that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a
-different published release.
+different published release. **No Metal Toolchain needed** — the prebuilt Inference xcframework
+bundles the compiled `default.metallib`; you only need it if you build the SDK from source.
 
-These last only for the current terminal — re-run step 3 in each new terminal (or add both
+These last only for the current terminal — re-run step 2 in each new terminal (or add both
 `export` lines to your `~/.zshrc`).
 
-**4. Build:**
+**3. Build:**
 
 ```bash
 swift build

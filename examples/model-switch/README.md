@@ -15,7 +15,7 @@ It links `LocalLMLabSDKRemote` (the online-providers layer) as a binary and `Loc
 slot in exactly as `code-buddy` links `LocalLMLabSDKInference`; left out here to keep the build
 Metal-toolchain-free.
 
-Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta to build) —
+Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 to build) —
 `RemoteModelProvider` is `@available(macOS 27)`.
 
 ## What you'll see
@@ -57,22 +57,21 @@ Nothing to download by hand — `Package.swift` (both this app's and the sibling
 `LocalLMLabSDKRemote` as binary dependencies, building against `1.0.0-beta.3` by default:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
 Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published release — see
-[`../README.md`](../README.md#building--running-an-sdk-example). A stable Xcode fails with
-`'v27' is unavailable`; use the Xcode 27 beta.
+[`../README.md`](../README.md#building--running-an-sdk-example). An older Xcode fails with
+`'v27' is unavailable`; use Xcode 27.
 
 ## Open in Xcode and Run
 
-A committed `ModelSwitch.xcodeproj` gives you the fastest look. **Open it in `Xcode-beta.app`,
-not a stable Xcode** — the target is macOS 27, so a stable Xcode fails with `'v27' is
+A committed `ModelSwitch.xcodeproj` gives you the fastest look. **Open it in Xcode 27 or newer** — the target is macOS 27, so an older Xcode fails with `'v27' is
 unavailable`. `open` uses your default Xcode (usually the stable one), so either launch
-`Xcode-beta.app` first and **File ▸ Open**, or:
+Xcode first and **File ▸ Open**, or:
 
 ```bash
-open -a Xcode-beta ModelSwitch.xcodeproj
+open -a Xcode ModelSwitch.xcodeproj
 ```
 
 Pick the **ModelSwitch** scheme and hit Run. It builds a real `.app` (proper menu bar, Dock
@@ -88,7 +87,7 @@ the Xcode build, edit `defaultSDKVersion` in `Package.swift` and `../../Componen
 ## Quick dev-loop run
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run ModelSwitch
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run ModelSwitch
 ```
 
 Useful for compiler-level iteration. Run it as a real app from the packaged build below — a bare
@@ -103,7 +102,7 @@ the app only makes outbound HTTPS calls — so with no `APP_IDENTITY` it signs *
 only); set one for a distributable build:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./packaging/build-and-sign.sh
 ```
 
 To sign it for wider use, set `APP_IDENTITY` — see the
@@ -119,7 +118,7 @@ To sign it for wider use, set `APP_IDENTITY` — see the
 | `NOTARIZE_APP` | No | `1` | `0` skips Apple notarization for fast local sign-and-test. The output isn't Gatekeeper-approved without it (`spctl` rejects it) — fine for direct-launch testing, not distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set. |
-| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta; not auto-detected. |
+| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at Xcode 27; not auto-detected. |
 
 Same script shape and env-var names as [`plate-today`](../plate-today/) and
 [`components-demo`](../components-demo/) — see `plate-today`'s script for the full codesign /

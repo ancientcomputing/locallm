@@ -48,20 +48,20 @@ for the same list). Running a signed build (`packaging/build-and-sign.sh`, below
    meetings, what's due, what's overdue — from all sources at once, not one at a time.
 4. **Done** clears the screen and signs out of Todoist.
 
-Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
+Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 to build).
 
-## Requires macOS 27 + the Xcode 27 beta
+## Requires macOS 27 + Xcode 27
 
 This branch tracks `1.0.0-beta.3`. `Package.swift` is
-`platforms: [.macOS("27.0")]`. Build with the **Xcode 27 beta**
-(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`); a stable Xcode fails with
+`platforms: [.macOS("27.0")]`. Build with the **Xcode 27**
+(`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`); an older Xcode fails with
 `'v27' is unavailable`. (The ready-made connector `Tool`s this example depends on first shipped
 in `0.8.0`, but on macOS 27 you use `1.0.0-beta.3+`.)
 
 ## Getting the SDK
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
 Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today` — set
@@ -71,11 +71,10 @@ Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today
 ## Open in Xcode and Run
 
 A committed `PlateTodayTools.xcodeproj` is the lowest-friction way to try the full app. **Open it
-in `Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
-`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+in Xcode 27 or newer** (the target is macOS 27). Launch Xcode and **File ▸ Open**, or:
 
 ```bash
-open -a Xcode-beta PlateTodayTools.xcodeproj
+open -a Xcode PlateTodayTools.xcodeproj
 ```
 
 Pick the **PlateTodayTools** scheme and Run — a real `.app` (menu bar, Dock icon,
@@ -110,7 +109,7 @@ Developer ID is what makes it distributable. See the
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -138,7 +137,7 @@ permission prompt appears **at launch**, not mid-run. (That's the Path A pattern
 entitlement for you:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 PLATETODAYTOOLS_INCLUDE_CONTACTS=1 \
 ./packaging/build-and-sign.sh

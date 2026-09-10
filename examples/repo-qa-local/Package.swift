@@ -9,7 +9,8 @@ import PackageDescription
 //
 // Builds against `defaultSDKVersion` below with no setup; LOCALLM_SDK_VERSION overrides from a shell (not Xcode).
 // Requires macOS 27 + Xcode 27 (the model layer is built on FoundationModels' `LanguageModel`
-// protocol) and the Metal Toolchain (mlx-swift compiles Metal shaders).
+// protocol). No Metal Toolchain needed — the prebuilt Inference xcframework bundles the compiled
+// default.metallib; it's only required when building the SDK from source.
 
 struct SDKRelease {
     let coreURL: String

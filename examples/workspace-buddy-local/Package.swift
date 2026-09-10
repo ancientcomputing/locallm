@@ -11,7 +11,8 @@ import PackageDescription
 // packaging/WorkspaceBuddyLocal.entitlements (adds network.client for the model download).
 //
 // Requires macOS 27 + Xcode 27 (the model layer is built on FoundationModels' `LanguageModel`
-// protocol) and the Metal Toolchain (mlx-swift compiles Metal shaders).
+// protocol). No Metal Toolchain needed — the prebuilt Inference xcframework bundles the compiled
+// default.metallib; it's only required when building the SDK from source.
 
 struct SDKRelease {
     let coreURL: String

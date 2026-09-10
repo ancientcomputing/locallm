@@ -21,18 +21,18 @@ offers. See
 [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)
 for what `Components` provides and how it's meant to be dropped into your own app.
 
-Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 beta to build).
+Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 to build).
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.3`, which needs macOS 27. Build with the **Xcode 27 beta**
-(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
+This branch tracks `1.0.0-beta.3`, which needs macOS 27. Build with the **Xcode 27**
+(`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`) — an older Xcode fails with
 `'v27' is unavailable`. Nothing to download by hand — `Package.swift` (both this app's and the
 sibling [`Components`](../../Components/) package it depends on) resolves `LocalLMLabSDKCore` as a
 binary dependency, building against `1.0.0-beta.3` by default:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
 Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published release — see
@@ -40,12 +40,11 @@ Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published releas
 
 ## Open in Xcode and Run
 
-A committed `ComponentsDemo.xcodeproj` is the fastest look. **Open it in `Xcode-beta.app`, not a
-stable Xcode** (the target is macOS 27 → a stable Xcode fails with `'v27' is unavailable`).
-Launch `Xcode-beta.app` and **File ▸ Open**, or:
+A committed `ComponentsDemo.xcodeproj` is the fastest look. **Open it in Xcode 27 or newer** (the target is macOS 27 → an older Xcode fails with `'v27' is unavailable`).
+Launch Xcode and **File ▸ Open**, or:
 
 ```bash
-open -a Xcode-beta ComponentsDemo.xcodeproj
+open -a Xcode ComponentsDemo.xcodeproj
 ```
 
 Pick the **ComponentsDemo** scheme and Run — a real `.app` (menu bar, Dock icon,
@@ -60,7 +59,7 @@ edit `defaultSDKVersion` in `../../Components/Package.swift` (Xcode ignores `LOC
 ## Quick dev-loop run
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift run
 ```
 
@@ -77,7 +76,7 @@ to sign it for wider use — see the
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./packaging/build-and-sign.sh
 ```
 
 ### Environment variables
@@ -90,7 +89,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set; usually unneeded if your `KEYCHAIN_PROFILE` already implies one team. |
-| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
+| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at Xcode 27 (`xcode-select -p` is used if unset); an older Xcode fails with `'v27' is unavailable`. |
 
 There's no MAS-signing script for this app (no equivalent of `plate-today`'s
 `build-and-sign-mas.sh`) — the standard `build-and-sign.sh` above is Developer ID / Gatekeeper

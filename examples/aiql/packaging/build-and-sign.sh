@@ -7,7 +7,7 @@ set -euo pipefail
 # carries its own Metal shaders + resource bundles), so both get copied in and signed.
 #
 # Env: APP_IDENTITY (Developer ID Application), KEYCHAIN_PROFILE (notarytool profile, only if
-# NOTARIZE_APP=1), DEVELOPER_DIR (the Xcode 27 beta), LOCALLM_SDK_VERSION, VERSION, TEAM_ID.
+# NOTARIZE_APP=1), DEVELOPER_DIR (Xcode 27 — defaults to `xcode-select -p`), LOCALLM_SDK_VERSION, VERSION, TEAM_ID.
 #
 # The sandbox + MLX path is verified end to end (download, on-disk cache, Metal shader load all
 # work under App Sandbox). The model download needs `com.apple.security.network.client` (in
@@ -23,9 +23,8 @@ VERSION="${VERSION:-0.1.0}"
 APP_IDENTITY="${APP_IDENTITY:-${SIGN_IDENTITY:--}}"
 KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE:-${NOTARY_PROFILE:-}}"
 # This example's Package.swift is swift-tools-version 6.4 (macOS 27 + the two-binary SDK), so it
-# needs the Xcode 27 beta — the stable Xcode ships an older Swift. Prefer the beta if it's there.
-DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
-[[ -d "$DEVELOPER_DIR" ]] || DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+# needs Xcode 27 (Swift 6.4+). Default to the active toolchain; override with DEVELOPER_DIR.
+DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 TEAM_ID="${TEAM_ID:-}"
 NOTARIZE_APP="${NOTARIZE_APP:-1}"
 
@@ -45,8 +44,8 @@ export DEVELOPER_DIR
 _swift_ver="$(swift --version 2>/dev/null | grep -oE 'Swift version [0-9]+\.[0-9]+' | awk '{print $3}')"
 _major="${_swift_ver%%.*}"; _minor="${_swift_ver##*.}"
 if [[ -z "$_swift_ver" ]] || (( _major < 6 || (_major == 6 && _minor < 4) )); then
-  echo "error: needs Swift 6.4+ (Xcode 27 beta). DEVELOPER_DIR=$DEVELOPER_DIR -> Swift ${_swift_ver:-unknown}." >&2
-  echo "       re-run with: DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer $0" >&2
+  echo "error: needs Swift 6.4+ (Xcode 27). DEVELOPER_DIR=$DEVELOPER_DIR -> Swift ${_swift_ver:-unknown}." >&2
+  echo "       select Xcode 27: sudo xcode-select -s /Applications/Xcode.app  (or set DEVELOPER_DIR), then re-run $0" >&2
   exit 1
 fi
 
