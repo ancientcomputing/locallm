@@ -37,10 +37,10 @@ Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently t
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.3` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27**
+This branch tracks `1.0.0-beta.4` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27**
 (`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`) — an older Xcode fails with
 `'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` resolves
-`LocalLMLabSDKCore` as a binary dependency, building against `1.0.0-beta.3` by default:
+`LocalLMLabSDKCore` as a binary dependency, building against `1.0.0-beta.4` by default:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
@@ -117,7 +117,7 @@ NOTARIZE_APP=0 \
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by `Package.swift` (not the script) — set it to build against a different published release. |
+| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.4` | Read by `Package.swift` (not the script) — set it to build against a different published release. |
 | `APP_IDENTITY` | Yes | — | A codesigning identity — a **free** "Apple Development" one works. See the [signing table](../README.md#signing-a-app--app_identity). `SIGN_IDENTITY` also works as a fallback name. |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
@@ -137,7 +137,7 @@ internal TestFlight testing.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-LOCALLM_SDK_VERSION=1.0.0-beta.3 VERSION=1.0.0-beta.3 ./packaging/build-and-sign-mas.sh
+LOCALLM_SDK_VERSION=1.0.0-beta.4 VERSION=1.0.0-beta.4 ./packaging/build-and-sign-mas.sh
 ```
 
 `APP_SIGN_IDENTITY` (an "Apple Distribution" identity), `INSTALLER_SIGN_IDENTITY` (a "3rd Party

@@ -52,11 +52,11 @@ Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently t
 
 ## Requires macOS 27 + Xcode 27
 
-This branch tracks `1.0.0-beta.3`. `Package.swift` is
+This branch tracks `1.0.0-beta.4`. `Package.swift` is
 `platforms: [.macOS("27.0")]`. Build with the **Xcode 27**
 (`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`); an older Xcode fails with
 `'v27' is unavailable`. (The ready-made connector `Tool`s this example depends on first shipped
-in `0.8.0`, but on macOS 27 you use `1.0.0-beta.3+`.)
+in `0.8.0`, but on macOS 27 you use `1.0.0-beta.4+`.)
 
 ## Getting the SDK
 
@@ -64,7 +64,7 @@ in `0.8.0`, but on macOS 27 you use `1.0.0-beta.3+`.)
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
-Builds against `1.0.0-beta.3` by default; same version mechanism as `plate-today` — set
+Builds against `1.0.0-beta.4` by default; same version mechanism as `plate-today` — set
 `LOCALLM_SDK_VERSION` in a shell to pin another release, or see
 [`../README.md`](../README.md#building--running-an-sdk-example).
 

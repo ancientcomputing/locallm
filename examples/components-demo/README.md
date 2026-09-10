@@ -25,11 +25,11 @@ Requires macOS 27+ on Apple Silicon (currently the macOS 27 beta; Xcode 27 to bu
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.3`, which needs macOS 27. Build with the **Xcode 27**
+This branch tracks `1.0.0-beta.4`, which needs macOS 27. Build with the **Xcode 27**
 (`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`) — an older Xcode fails with
 `'v27' is unavailable`. Nothing to download by hand — `Package.swift` (both this app's and the
 sibling [`Components`](../../Components/) package it depends on) resolves `LocalLMLabSDKCore` as a
-binary dependency, building against `1.0.0-beta.3` by default:
+binary dependency, building against `1.0.0-beta.4` by default:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
@@ -83,7 +83,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./packaging/build-and-s
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
+| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.4` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
 | `APP_IDENTITY` | No | ad-hoc | Any codesigning identity, or unset for a local ad-hoc build. See the [signing table](../README.md#signing-a-app--app_identity). |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |

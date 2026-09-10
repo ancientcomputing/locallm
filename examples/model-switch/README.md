@@ -54,7 +54,7 @@ web search** ticked in the Providers panel.
 
 Nothing to download by hand — `Package.swift` (both this app's and the sibling
 [`Components`](../../Components/) package it depends on) resolves `LocalLMLabSDKCore` /
-`LocalLMLabSDKRemote` as binary dependencies, building against `1.0.0-beta.3` by default:
+`LocalLMLabSDKRemote` as binary dependencies, building against `1.0.0-beta.4` by default:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
@@ -112,7 +112,7 @@ To sign it for wider use, set `APP_IDENTITY` — see the
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.3` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
+| `LOCALLM_SDK_VERSION` | No | `1.0.0-beta.4` | Read by this app's `Package.swift` and `Components`' own — set it to build against a different published release. |
 | `APP_IDENTITY` | No | ad-hoc | Any codesigning identity, or unset for a local ad-hoc build. See the [signing table](../README.md#signing-a-app--app_identity). |
 | `VERSION` | No | `0.1.0` | Stamped into `CFBundleShortVersionString`/`CFBundleVersion`. |
 | `NOTARIZE_APP` | No | `1` | `0` skips Apple notarization for fast local sign-and-test. The output isn't Gatekeeper-approved without it (`spctl` rejects it) — fine for direct-launch testing, not distribution. |
