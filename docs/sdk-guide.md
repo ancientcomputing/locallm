@@ -1280,9 +1280,10 @@ code you write. `PendingToolCall.summary` is a `Codable` `PendingToolCallSummary
 exactly that hop; `DecisionGate` (Core) handles the resume-once race between the reply and a
 cancellation.
 
-**MCP tools are opaque.** The SDK can't rate a tool it didn't write, so every `MCPTool` is
-`.mutate` — `limited(toMaxImpact:)` can't grade an MCP server, only include or exclude it, and
-`ConfirmingToolAuthorizer` will confirm even a read-shaped MCP call. With `makeSession(includeMCPTools:
+**The SDK can't see inside an MCP tool.** It didn't write it, so it can't know if a call is a
+read or a delete — every `MCPTool` is rated `.mutate`. `limited(toMaxImpact:)` can only include
+or exclude a whole MCP server, not grade it, and `ConfirmingToolAuthorizer` will confirm even a
+read-shaped MCP call. With `makeSession(includeMCPTools:
 true)` the SDK tags them `.mcp` origin so `denyMCPTools` / `confirmMCPTools` and a rule's
 `call.origin` check apply. A host that builds its own MCP-backed `Tool` type (e.g. one proxying
 to a connection in another process) conforms it to `OriginTaggedTool` to keep that origin.
