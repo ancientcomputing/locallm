@@ -44,7 +44,7 @@ This is a library, not an app — there's nothing to sign or package, just `swif
 test`. `Package.swift` builds against SDK `1.0.0-beta.3` by default, same as the example apps:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
 Set `LOCALLM_SDK_VERSION` in a shell to build against a different published release — see

@@ -42,7 +42,7 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 Each SDK example (everything except the `api-lab/` and `localai-cli*/` folders) is a standalone
 SwiftPM package. It resolves `LocalLMLabSDKCore` (and, where used, `LocalLMLabSDKInference` /
 `LocalLMLabSDKRemote`) as a **binary** dependency from a GitHub Release on this repo — nothing to
-download or unzip by hand. Requires **macOS 27** on Apple Silicon and the **Xcode 27 beta** (a
+download or unzip by hand. Requires **macOS 27** on Apple Silicon and the **Xcode 27** (a
 stable Xcode fails with `'v27' is unavailable`).
 
 The examples on this `1.0.0-beta` branch build against SDK **`1.0.0-beta.3`**; the ones on `main`
@@ -65,10 +65,10 @@ build against the latest stable release. No environment variable is needed for e
 1. Get the code — either `git clone https://github.com/ancientcomputing/locallm`, or open the
    repo's page on **github.com**, click the green **`<> Code`** button, choose **Download ZIP**,
    and unzip. (That button is on the GitHub website, not in Xcode.)
-2. **Open it in the Xcode 27 beta — `Xcode-beta.app`, not a stable Xcode.** Every example targets
-   macOS 27; a stable Xcode fails with `'v27' is unavailable`. Double-clicking a project opens it
+2. **Open it in Xcode 27 or newer.** Every example targets
+   macOS 27; an older Xcode fails with `'v27' is unavailable`. Double-clicking a project opens it
    in your *default* Xcode, which is usually the stable one — instead, right-click the file ▸
-   **Open With ▸ Xcode-beta**, or launch `Xcode-beta.app` first and use **File ▸ Open**. (The
+   **Open With ▸ Xcode**, or launch Xcode first and use **File ▸ Open**. (The
    *Xcode ▸ Settings ▸ Locations ▸ Command Line Tools* selection does **not** change this — it
    only affects the terminal `swift` / `xcodebuild`.) Then:
    - **The seven SwiftUI examples** (`components-demo`, `model-switch`, `plate-today`,
@@ -112,9 +112,9 @@ of those strings verbatim.
 ```bash
 cd examples/model-switch
 # no account — local ad-hoc build:
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./packaging/build-and-sign.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./packaging/build-and-sign.sh
 # free Apple ID:
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   APP_IDENTITY="Apple Development: Your Name (TEAMID)" NOTARIZE_APP=0 ./packaging/build-and-sign.sh
 ```
 
@@ -122,13 +122,13 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
 
 ```bash
 cd examples/repo-qa
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift run RepoQA facebook/react "how does the reconciler work?"
 ```
 
 ```bash
 cd examples/model-switch          # a SwiftUI app — opens a window, takes no arguments
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift run ModelSwitch
 ```
 
@@ -139,7 +139,7 @@ resolution doesn't inherit shell environment variables.
 ```bash
 cd examples/repo-qa
 LOCALLM_SDK_VERSION=1.0.0-beta.2 \
-  DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift run RepoQA facebook/react
 ```
 

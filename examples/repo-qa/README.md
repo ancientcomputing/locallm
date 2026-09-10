@@ -38,7 +38,7 @@ Deepwiki calls.
 
 ## Quick start
 
-Do **Getting the SDK & toolchain** below first (you need the Xcode 27 beta — one-time). Then,
+Do **Getting the SDK & toolchain** below first (you need Xcode 27 — one-time). Then,
 from this directory:
 
 ```bash
@@ -50,15 +50,14 @@ swift run RepoQA anthropics/claude-code "What is the plugin system?"
 Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
 (re-run it in every new terminal).
 
-**1. Install the Xcode 27 beta.** Download it from
-[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
-(it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
-Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+**1. Install Xcode 27.** Get it from the Mac App Store or
+[developer.apple.com/xcode](https://developer.apple.com/xcode/).
+`Package.swift` requires `platforms: [.macOS("27.0")]`, so an older Xcode fails with `'v27' is unavailable`.
 
-**2. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
+**2. Point `swift` at Xcode 27** for the terminal you'll build from:
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
@@ -88,8 +87,7 @@ swift run RepoQA facebook/react                 # no question → "what does thi
 ## In Xcode
 
 This is a command-line tool, so — unlike the SwiftUI examples — there's no `.xcodeproj` to ship:
-**File ▸ Open → `Package.swift`**, pick the **RepoQA** scheme, Run. Do it in **`Xcode-beta.app`,
-not a stable Xcode** (the manifest targets macOS 27 → a stable Xcode fails with `'v27' is
+**File ▸ Open → `Package.swift`**, pick the **RepoQA** scheme, Run. Do it in **Xcode 27 or newer** (the manifest targets macOS 27 → an older Xcode fails with `'v27' is
 unavailable`). Output goes to the Xcode console. Two things differ from the terminal:
 
 - **Set the arguments in the scheme**, not on a command line:

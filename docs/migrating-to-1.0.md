@@ -19,7 +19,7 @@ enum-resilience change, one MCP return-type change, and — if you wrote a custo
 
 No platform bump — `1.0.0-beta.2` keeps the `0.8.x` floor. You still need the **Xcode 27 beta**
 to build: the xcframeworks are compiled with the macOS 27 SDK (27-only symbols weak-linked), and
-a stable Xcode fails with `'v27' is unavailable`. Register the macOS-27-only providers behind
+an older Xcode fails with `'v27' is unavailable`. Register the macOS-27-only providers behind
 `if #available(macOS 27, *)` — see [`sdk-guide.md` §1a](sdk-guide.md).
 
 ## 2. Point your manifest at the new release

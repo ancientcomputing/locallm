@@ -33,17 +33,17 @@ real Calendar/Reminders/OAuth access):
    meetings, what's due, what's overdue — drawn from all three sources at once, not one at a time.
 4. **Done** clears the screen and signs out of Todoist.
 
-Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 beta to build).
+Requires macOS 27+ on Apple Silicon with Apple Intelligence enabled (currently the macOS 27 beta; Xcode 27 to build).
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-beta.3` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27 beta**
-(`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`) — a stable Xcode fails with
+This branch tracks `1.0.0-beta.3` — macOS 27 for everything except the on-device `system` model (macOS 26 floor). Build with the **Xcode 27**
+(`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`) — an older Xcode fails with
 `'v27' is unavailable`. Nothing to download or unzip by hand — `Package.swift` resolves
 `LocalLMLabSDKCore` as a binary dependency, building against `1.0.0-beta.3` by default:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
 Set `LOCALLM_SDK_VERSION` to build against a different published release — from a shell, not
@@ -54,11 +54,10 @@ how to change the SDK version.
 ## Open in Xcode and Run
 
 A committed `PlateToday.xcodeproj` is the lowest-friction way to try the full app. **Open it in
-`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
-`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+Xcode 27 or newer** (the target is macOS 27). Launch Xcode and **File ▸ Open**, or:
 
 ```bash
-open -a Xcode-beta PlateToday.xcodeproj
+open -a Xcode PlateToday.xcodeproj
 ```
 
 Pick the **PlateToday** scheme and Run. It builds a real `.app` — menu bar, Dock icon,
@@ -88,7 +87,7 @@ pin a different SDK release for the Xcode build, edit `defaultSDKVersion` in `Pa
 ## Quick dev-loop run (no signing, no TCC/OAuth)
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift run
 ```
 
@@ -108,7 +107,7 @@ hold the permission grants); a Developer ID is what makes it distributable. See 
 [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
 ./packaging/build-and-sign.sh
@@ -124,7 +123,7 @@ NOTARIZE_APP=0 \
 | `NOTARIZE_APP` | No | `1` | Set to `0` to skip Apple notarization for fast local sign-and-test iteration. **The output isn't Gatekeeper-approved without notarization** (`spctl` rejects it) — fine for direct-launch testing, not for distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works as a fallback name. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set; usually unneeded if your `KEYCHAIN_PROFILE` already implies one team. |
-| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at the Xcode 27 beta — the script does **not** auto-detect it, and a stable Xcode fails with `'v27' is unavailable`. |
+| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at Xcode 27 (`xcode-select -p` is used if unset); an older Xcode fails with `'v27' is unavailable`. |
 | `PLATETODAY_INCLUDE_LOCATION_WEATHER` | No | `0` | Build-time opt-in for the Location + Weather tools. Off by default — Location Services can be flaky, and unlike Calendar/Reminders/Contacts, its TCC grant can't be cleanly reset with `tccutil reset Location <bundle-id>` (only `tccutil reset All` or a manual System Settings removal works). |
 | `PLATETODAY_INCLUDE_CONTACTS` | No | `0` | Build-time opt-in for the Contacts connector (on-demand enrichment, not part of the default daily-summary flow — avoids an extra TCC prompt by default). |
 | `PLATETODAY_APP_SANDBOX` | No | `0` | Build-time opt-in for an App Sandbox build (proof-of-concept for Mac App Store compatibility — see `docs/sdk-guide.md` §10 for what's confirmed working under sandbox). |
@@ -137,7 +136,7 @@ exact pipeline has been run for real: Transporter accepted the upload and the bu
 internal TestFlight testing.
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 LOCALLM_SDK_VERSION=1.0.0-beta.3 VERSION=1.0.0-beta.3 ./packaging/build-and-sign-mas.sh
 ```
 
@@ -164,7 +163,7 @@ the `NSContactsUsageDescription` string and the `com.apple.security.personal-inf
 entitlement for you:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARIZE_APP=0 PLATETODAY_INCLUDE_CONTACTS=1 \
 ./packaging/build-and-sign.sh

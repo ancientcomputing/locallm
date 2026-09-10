@@ -29,34 +29,28 @@ load all work under the sandbox, and the second run starts generating immediatel
 
 ## Getting the SDK & toolchain
 
-Copy-paste each step. Steps 1–2 are one-time machine setup; step 3 sets up your terminal session
+Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
 (re-run it in every new terminal).
 
-**1. Install the Xcode 27 beta.** Download it from
-[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
-(it installs as `Xcode-beta.app`, alongside any stable Xcode). A stable Xcode fails with
-`'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+**1. Install Xcode 27.** Get it from the Mac App Store or
+[developer.apple.com/xcode](https://developer.apple.com/xcode/).
+`Package.swift` requires `platforms: [.macOS("27.0")]`, so an older Xcode fails with `'v27' is unavailable`.
 
-**2. Download the Metal Toolchain** — `mlx-swift` compiles Metal shaders and won't build without
-it. One-time; safe to re-run:
+**2. Point `swift` at Xcode 27** for the terminal you'll build from:
 
 ```bash
-xcodebuild -downloadComponent MetalToolchain
-```
-
-**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
-
-```bash
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
 or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
 setup — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
-`LocalLMLabSDKInference.xcframework` (the MLX runtime, which carries its own Metal shaders), from
-that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
+`LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
+`export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain
+needed** — the prebuilt Inference xcframework bundles the compiled `default.metallib`; you only
+need it if you build the SDK from source.
 
-**4. Compile-check:**
+**3. Compile-check:**
 
 ```bash
 swift build
@@ -68,11 +62,10 @@ signed `.app` with `packaging/build-and-sign.sh` (further below).
 ## Open in Xcode and Run
 
 A committed `WorkspaceBuddyLocal.xcodeproj` is the lowest-friction way to try it. **Open it in
-`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
-`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+Xcode 27 or newer** (the target is macOS 27). Launch Xcode and **File ▸ Open**, or:
 
 ```bash
-open -a Xcode-beta WorkspaceBuddyLocal.xcodeproj
+open -a Xcode WorkspaceBuddyLocal.xcodeproj
 ```
 
 Pick the **WorkspaceBuddyLocal** scheme and Run — a real sandboxed `.app` with the
@@ -114,7 +107,7 @@ NOTARIZE_APP=0 \
   ./packaging/build-and-sign.sh
 ```
 
-(`DEVELOPER_DIR` and `LOCALLM_SDK_VERSION` come from step 3.) The signed `.app` lands in `dist/`;
+(`DEVELOPER_DIR` and `LOCALLM_SDK_VERSION` come from step 2.) The signed `.app` lands in `dist/`;
 open it, click **Choose Folder…**, pick a throwaway directory, type a request, and hit **Go**.
 **First Go downloads the model** (~4.5 GB for the default), with a progress bar. After that it's
 local and offline — the second run starts generating immediately.

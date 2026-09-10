@@ -290,7 +290,7 @@ been here since `0.7.0`. Full walkthrough: [`docs/sdk-guide.md` §6a](docs/sdk-g
 ### Changed
 
 - **Platform floor is `macOS 27`.** Core's model layer builds on FoundationModels'
-  `LanguageModel` protocol (macOS 27); a stable Xcode fails with `'v27' is unavailable`.
+  `LanguageModel` protocol (macOS 27); an older Xcode fails with `'v27' is unavailable`.
 - **`LocalLMLabSDKVersion.current`** is now stamped from the release version at build time
   (was a hardcoded string). A release xcframework reports its exact tag; a source/path build
   reports the committed in-dev version.

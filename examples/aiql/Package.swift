@@ -16,8 +16,8 @@ import PackageDescription
 // LocalLMLabSDKCore.xcframework AND LocalLMLabSDKInference.xcframework (the MLX runtime).
 //
 // Requires macOS 27 + Xcode 27 (the model layer is built on FoundationModels' `LanguageModel`
-// protocol) and, to build the xcframework, the Metal Toolchain — as a binaryTarget consumer you
-// likely do not (the prebuilt Inference slice bundles default.metallib).
+// protocol). No Metal Toolchain needed — the prebuilt Inference xcframework bundles the compiled
+// default.metallib; it's only required when building the SDK from source.
 
 struct SDKRelease {
     let coreURL: String

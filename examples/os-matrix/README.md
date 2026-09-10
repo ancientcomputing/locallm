@@ -6,9 +6,9 @@ Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different beha
 ## Requirements
 
 - **Apple Silicon**, macOS **26 or 27**.
-- **Xcode 27 beta to build** — `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
+- **Xcode 27 to build** — `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
   The binary *runs* on macOS 26, but it's compiled with the macOS 27 SDK (the macOS-27-only
-  symbols are weak-linked). A stable Xcode fails with `'v27' is unavailable`.
+  symbols are weak-linked). An older Xcode fails with `'v27' is unavailable`.
 - **Apple Intelligence enabled** (System Settings → *Apple Intelligence & Siri*). Without it,
   `system` reports unavailable and the prompt step errors — the availability table still prints.
 - **Network** for the `getWeather` tool (it calls Open-Meteo, a public API — no key). Offline,
@@ -22,7 +22,7 @@ default (set `LOCALLM_SDK_VERSION` in a shell to pin another release — see
 [`../README.md`](../README.md#building--running-an-sdk-example)):
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run OSMatrix
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run OSMatrix
 ```
 
 > **`error: package … tools version 6.4.0 … installed version is 6.3.3`** — your Swift
@@ -35,8 +35,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run OSMatrix
 ### In Xcode
 
 A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
-**File ▸ Open → `Package.swift`**, pick the **OSMatrix** scheme, Run — in **`Xcode-beta.app`, not
-a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). Output
+**File ▸ Open → `Package.swift`**, pick the **OSMatrix** scheme, Run — in **Xcode 27 or newer** (macOS 27 target → an older Xcode fails with `'v27' is unavailable`). Output
 goes to the Xcode console. No arguments needed for the default run; for `--download <hf-repo>` add both entries
 under **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**. No signing setup — a plain CLI tool
 signs ad-hoc automatically. The point of the example is running the *same* build on a macOS 26
@@ -69,7 +68,7 @@ run ends by pointing at `--download`.
 ### `--download` — pull an open-weight model (macOS 27 only)
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
 ```
 

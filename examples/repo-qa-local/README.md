@@ -33,7 +33,7 @@ half of the code is byte-for-byte identical.
 
 ## Quick start
 
-Do **Getting the SDK & toolchain** below first (you need the Xcode 27 beta and the Metal
+Do **Getting the SDK & toolchain** below first (you need Xcode 27 and the Metal
 Toolchain — one-time). Then, from this directory:
 
 ```bash
@@ -45,36 +45,30 @@ it's local and offline.
 
 ## Getting the SDK & toolchain
 
-Copy-paste each step. Steps 1–2 are one-time machine setup; step 3 sets up your terminal session
+Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
 (re-run it in every new terminal).
 
-**1. Install the Xcode 27 beta.** Download it from
-[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
-(it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
-Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+**1. Install Xcode 27.** Get it from the Mac App Store or
+[developer.apple.com/xcode](https://developer.apple.com/xcode/).
+`Package.swift` requires `platforms: [.macOS("27.0")]`, so an older Xcode fails with `'v27' is unavailable`.
 
-**2. Download the Metal Toolchain** — `mlx-swift` compiles Metal shaders and won't build without
-it. One-time; safe to re-run:
+**2. Point `swift` at Xcode 27** for the terminal you'll build from:
 
 ```bash
-xcodebuild -downloadComponent MetalToolchain
-```
-
-**3. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
-
-```bash
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Leaves your system default alone; lasts only for the current terminal. `Package.swift` builds
 against SDK `1.0.0-beta.3` with no further setup — it links **two** binaries,
 `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the MLX runtime), from
-that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
+that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published
+release. **No Metal Toolchain needed** — the prebuilt Inference xcframework bundles the compiled
+`default.metallib`; you only need it if you build the SDK from source.
 
-These last only for the current terminal — re-run step 3 in each new terminal (or add both
+These last only for the current terminal — re-run step 2 in each new terminal (or add both
 `export` lines to your `~/.zshrc`).
 
-**4. Build:**
+**3. Build:**
 
 ```bash
 swift build
@@ -87,7 +81,7 @@ models tool-call reliably.
 
 ## Running it
 
-Assumes the two `export`s from step 3 are set in this terminal.
+Assumes the two `export`s from step 2 are set in this terminal.
 
 ```bash
 swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
@@ -99,8 +93,7 @@ swift run RepoQALocal --apple anthropics/claude-code "What is the plugin system?
 ## In Xcode
 
 A command-line tool, so there's no `.xcodeproj` to ship (unlike the SwiftUI examples):
-**File ▸ Open → `Package.swift`**, pick the **RepoQALocal** scheme, Run — in **`Xcode-beta.app`,
-not a stable Xcode** (macOS 27 target → a stable Xcode fails with `'v27' is unavailable`). Output
+**File ▸ Open → `Package.swift`**, pick the **RepoQALocal** scheme, Run — in **Xcode 27 or newer** (macOS 27 target → an older Xcode fails with `'v27' is unavailable`). Output
 goes to the Xcode console.
 
 - **Set the arguments in the scheme**: **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments** —
