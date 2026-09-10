@@ -46,11 +46,15 @@ This example is stages **3 and 4** — the two the SDK ships today.
 
 ### The invariant it protects
 
-> **Untrusted content can *request* capability widening but never *grant* it.**
+> **Untrusted content can *request* an action but never *authorize* it.**
 
-Injected text can make the model *try* something; the grant only ever comes from a policy rule
-or a human. You see this in the demo: a denied call comes back to the model as an ordinary tool
-result (`DENIED: not approved`) and the model adapts — it never escalates.
+A prompt-injection line in a document can make the model *attempt* a tool call — say
+`deleteCalendarEvent`. That attempt is only a request. Whether the call runs is decided by your
+policy rules or by a human at the confirmation card, never by the fact that the model tried. So
+the worst injected text can do is waste a turn (a denied call, a "couldn't do that" answer): it
+cannot make a change you didn't approve, and it cannot reach a tool the level didn't already put
+in the session. In the demo you see the deny half of this — deny a card and the model gets
+`DENIED: not approved` back as the tool result and moves on; the deletion never happens.
 
 ---
 
