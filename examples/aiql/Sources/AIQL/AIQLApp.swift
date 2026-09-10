@@ -213,7 +213,11 @@ final class AIQLModel: ObservableObject {
 
         let session: LocalLMLabSession
         do {
-            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions, includeMCPTools: false)
+            // effort: .off — skip the model's <think> pass. The Qwen3 family has the
+            // template toggle; the pipeline is mechanical (pick a tool, name a table, write
+            // one SELECT) so the reasoning trace buys nothing but latency.
+            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,
+                                          includeMCPTools: false, options: SessionOptions(effort: .off))
         } catch {
             return .failed("Couldn't start the model: \(error.localizedDescription)")
         }
