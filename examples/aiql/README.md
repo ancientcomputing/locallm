@@ -65,8 +65,7 @@ standard `SELECT`. Everything downstream is deterministic. The model describes t
 never orchestrates a multi-step sequence, so it can't drop a step — the failure mode that made a
 range filter silently vanish when it was step 4 of a 6-call chain. A wrong column name comes
 back as a SQLite `Error:` (with the real columns appended) that it fixes and retries, not a
-wrong number. Verified end to end with `mlx-community/Qwen3-8B-4bit` and `Qwen3-14B-4bit`
-(the SDK's `examples/aiql-eval` harness).
+wrong number. Verified end to end with `mlx-community/Qwen3-8B-4bit` and `Qwen3-14B-4bit`.
 
 ## What it highlights for SDK developers
 
@@ -249,8 +248,7 @@ source because every one of its tools returns a clean table of records:
    above 50. The filter is applied by SQLite against the copied rows, not by the model, so it
    can't be silently dropped or half-applied.
 
-Both results are byte-for-byte reproducible — same fixture rows, deterministic SQL — and match
-the SDK's `examples/aiql-eval` cases **E1** and **E2**.
+Both results are byte-for-byte reproducible — same source rows, deterministic SQL.
 
 ### More prompts to try
 
@@ -275,10 +273,9 @@ and B", "only rows containing …", "for each X, the …". The model turns it in
 `mlx-community/Qwen3-14B-4bit` (the default, ~8 GB) needs a 16 GB Mac to clear the
 size-vs-memory preflight (weights ≤ 70% of physical RAM).
 
-`mlx-community/Qwen3-8B-4bit` (~4.3 GB) runs the pipeline cleanly — the SDK's eval harness
-(`examples/aiql-eval`) is 9/9 on it (and on 14B) across single-table filters, ranges, a
-child-table join, a two-dataset `JOIN`, and `GROUP BY … HAVING`. A bigger model mainly buys a
-touch more reliability on request→column matching. A 4B model usually works.
+`mlx-community/Qwen3-8B-4bit` (~4.3 GB) runs the pipeline cleanly — single-table filters,
+ranges, a child-table join, a two-dataset `JOIN`, `GROUP BY … HAVING`. A bigger model mainly
+buys a touch more reliability on request→column matching. A 4B model usually works.
 
 The session is built with `options: SessionOptions(effort: .off)` — the Qwen3 chat template's
 thinking toggle is turned off, so the model skips its `<think>…</think>` pass and answers
