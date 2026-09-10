@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		113B97457A101B8D9C6133E5 /* LocalLMLabSDKComponents in Frameworks */ = {isa = PBXBuildFile; productRef = 4E03DABB15EFD4DABB2A5604 /* LocalLMLabSDKComponents */; };
+		1524566AC49263A64F6D7F13 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A379DE888012049E8C8BEDF5 /* Keychain.swift */; };
 		253813E879A696D81A255157 /* DemoSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 639A0770108472F66E004355 /* DemoSecurity.swift */; };
 		3FED5331B1F736C922527845 /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = CBEDC32AC948B2FDB9D85E08 /* LocalLMLabSDKCore */; };
 		76BC38F0024E7D13DD2E84E9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19C7FE95779CFE932F4FC0F /* ContentView.swift */; };
@@ -25,6 +26,7 @@
 		5E4DE1FAA7F9579DE56E622C /* RunPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunPane.swift; sourceTree = "<group>"; };
 		639A0770108472F66E004355 /* DemoSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSecurity.swift; sourceTree = "<group>"; };
 		846F36ACE675B23AC3021D14 /* SecurityPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityPane.swift; sourceTree = "<group>"; };
+		A379DE888012049E8C8BEDF5 /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
 		C19C7FE95779CFE932F4FC0F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		C3E3E929D5CE4C090BA5C486 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		C7CACF4A044EAF8678571CB6 /* Components */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Components; path = ../../Components; sourceTree = SOURCE_ROOT; };
@@ -50,6 +52,7 @@
 				C3E3E929D5CE4C090BA5C486 /* AppModel.swift */,
 				C19C7FE95779CFE932F4FC0F /* ContentView.swift */,
 				639A0770108472F66E004355 /* DemoSecurity.swift */,
+				A379DE888012049E8C8BEDF5 /* Keychain.swift */,
 				5E4DE1FAA7F9579DE56E622C /* RunPane.swift */,
 				0FC6120BC7C96EAB67061EE1 /* SecurityDemoApp.swift */,
 				846F36ACE675B23AC3021D14 /* SecurityPane.swift */,
@@ -160,6 +163,7 @@
 				ED7AB392867D355FDA75E509 /* AppModel.swift in Sources */,
 				76BC38F0024E7D13DD2E84E9 /* ContentView.swift in Sources */,
 				253813E879A696D81A255157 /* DemoSecurity.swift in Sources */,
+				1524566AC49263A64F6D7F13 /* Keychain.swift in Sources */,
 				ECC6FBAEE00DB940A3ECFBFC /* RunPane.swift in Sources */,
 				8ACC710A12C26C06D98471E4 /* SecurityDemoApp.swift in Sources */,
 				FC8F0F4FE2288B1ED11F97F3 /* SecurityPane.swift in Sources */,
