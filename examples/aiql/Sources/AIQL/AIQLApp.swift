@@ -174,7 +174,8 @@ final class AIQLModel: ObservableObject {
         // dataset" over admin/overview tools.
         let ranked = serverTools.sorted { lhs, rhs in Self.dataLikelihood(lhs.name) > Self.dataLikelihood(rhs.name) }
         let dataTools: [any Tool] = ranked.prefix(4).compactMap {
-            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000)
+            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000,
+                                    followUp: "load it into a table with loadTable, then query it with one sqlQuery")
         }
         guard !dataTools.isEmpty else { return .failed("Couldn't read that server's tools — its data format isn't supported yet.") }
 
@@ -271,6 +272,7 @@ final class AIQLModel: ObservableObject {
         case .credentialRejected: return "it rejected the saved sign-in."
         case .httpError(let status): return "it returned HTTP \(status)."
         case .oauthRegistrationNotSupported: return "it needs a manually configured OAuth client."
+        case .responseTooLarge: return "the server's response was too large to read."
         @unknown default: return "\(error)"
         }
     }
