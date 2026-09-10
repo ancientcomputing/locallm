@@ -37,7 +37,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`model-switch`](#examplesmodel-switchsourcesmodelswitchappmodelswift) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`security-demo`](#examplessecurity-demosourcessecuritydemodemosecurityswift) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
 | [`code-buddy`](#examplescode-buddysourcescodebuddymainswift) | 298 | 387 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
-| [`aiql`](#examplesaiqlsourcesaiqlaiqlappswift) | 392 | 475 | a plain-English request → the spreadsheet you asked for, via an MCP dataset, sandboxed SwiftUI, zero fabricated values |
+| [`aiql`](#examplesaiqlsourcesaiqlaiqlappswift) | 381 | 468 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values |
 
 The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most,
 and each section's **Tally** breaks that down. The rest is ordinary SwiftUI, Foundation, and
@@ -2258,16 +2258,17 @@ the entire confirmation UI. Nothing in the three panel views touches the SDK —
 
 ## `examples/aiql/Sources/AIQL/AIQLApp.swift`
 
-*392 lines of code (475 with comments) — one file: view model + pipeline + SwiftUI UI. The
+*381 lines of code (468 with comments) — one file: view model + pipeline + SwiftUI UI. The
 `FolderAccess` enum and the `ContentView` UI are elided below.*
 
-The **`FileBackedTool` + "AIQL" data-verb** showcase (`sdk-guide.md`
+The **`FileBackedTool` + `loadTable` + `sqlQuery`** showcase (`sdk-guide.md`
 [§8b](sdk-guide.md#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
 type a local model, an MCP data source, and a plain-English request; the app pulls the dataset
-into a file (so the raw payload never enters the model's context) and runs it through
-`describeJson → jsonToCsv → filter/sort/select` to a CSV. The model only names the operations and
-the columns — every row-level step is an SDK primitive, so there's nothing for an 8–14B model to
-fabricate. Links `LocalLMLabSDKInference` for the MLX model; `FolderAccess` is verbatim from
+into a file (so the raw payload never enters the model's context), `loadTable`s it into an
+ephemeral SQLite table, and has the model write **one read-only `SELECT`** to a CSV. The model
+names a table and describes one query — it never handles a row, and can't drop a step, because
+there's only ever one query call. `WHERE` / `BETWEEN` / `ORDER BY … LIMIT` / `JOIN` run inside
+SQLite. Links `LocalLMLabSDKInference` for the MLX model; `FolderAccess` is verbatim from
 `workspace-buddy-local` (`sdk-guide.md` §8) and elided.
 
 ```swift
@@ -2292,7 +2293,7 @@ final class AIQLModel: ObservableObject {
         case failed(String)
     }
 
-    @Published var modelRepo = "mlx-community/Qwen3-8B-4bit"
+    @Published var modelRepo = "mlx-community/Qwen3-14B-4bit"
     @Published var serverURLString = "https://econ-index.mcp.claude.com/mcp"
     @Published var request = ""
     @Published private(set) var folderURL: URL?
@@ -2363,38 +2364,44 @@ final class AIQLModel: ObservableObject {
         // count — a small model degrades past ~8 tools; prefer names that look like "get a dataset".
         let ranked = serverTools.sorted { Self.dataLikelihood($0.name) > Self.dataLikelihood($1.name) }
         let dataTools: [any Tool] = ranked.prefix(4).compactMap {
-            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000)   // ← SDK  — payload → file, receipt → model
+            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000,   // ← SDK  — payload → file, receipt → model
+                                    followUp: "load it into a table with loadTable, then query it with one sqlQuery")
         }
         guard !dataTools.isEmpty else { return .failed("Couldn't read that server's tools — its data format isn't supported yet.") }
 
-        // The data verbs: each takes root at init, reads one workspace file, writes a CSV, returns
-        // a one-line receipt — the row data never reaches the model.
+        // loadTable stages a JSON records file into an ephemeral SQLite table (auto-detects the
+        // records array, sniffs column types, explodes a nested array into a child table) and
+        // returns its CREATE TABLE. sqlQuery runs ONE read-only SELECT to a CSV. describeJson /
+        // csvInfo are for discovery + verification. The row data never reaches the model.
         var tools: [any Tool] = dataTools
+        tools.append(LoadTableTool(root: root))                      // ← SDK
+        tools.append(SQLQueryTool(root: root))                       // ← SDK
         tools.append(DescribeJSONTool(root: root))                   // ← SDK
         tools.append(CSVInfoTool(root: root))                        // ← SDK
-        tools.append(JSONToCSVTool(root: root))                      // ← SDK
-        tools.append(SelectColumnsTool(root: root))                  // ← SDK
-        tools.append(FilterRowsTool(root: root))                     // ← SDK
-        tools.append(SortRowsTool(root: root))                       // ← SDK
-        tools.append(ConcatRowsTool(root: root))                     // ← SDK
 
+        let dataToolNames = dataTools.map(\.name).joined(separator: ", ")
         let instructions = """
-        You turn a data question into a fixed sequence of tool calls that ends with a CSV file. \
-        You never write row data yourself …
-        1. Pick the ONE data tool whose result answers the question and call it with `saveAs` set \
-           to "raw/data.json". … use `saveAsAppend: true` for each further page.
-        2. describeJson  path "raw/data.json".
-        3. jsonToCsv  inputPath "raw/data.json", outputPath "all.csv": rowsAt = the array path, \
-           columns = {header, path} per field.
-        4. Apply ONLY the refinements the question asks for → sortRows with `limit` for "top N", \
-           filterRows for "only/without/where". Do NOT add a filter or sort it didn't ask for.
-        5. selectColumns → "out.csv", exactly the fields the question named.
-        6. csvInfo  path "out.csv", then reply with the column names and row count. Don't print rows.
+        You answer a data question by loading the pulled data into tables and running ONE SQL \
+        query. You never write row data yourself …
+        1. Pick the ONE data tool whose result answers the question — from: \(dataToolNames) — \
+           and call it with `saveAs` set to "raw/data.json" (a second dataset → "raw/data2.json"; \
+           `saveAsAppend: true` for each further page).
+        2. loadTable  jsonPath "raw/data.json", a short tableName, recordsAt "". Read the \
+           CREATE TABLE it returns — use ONLY those column names. A nested array is a child \
+           table "<table>__<field>"; join it with "<child>.<table>_id = <table>.id".
+        3. sqlQuery — ONE call: one SELECT, outputPath "out.csv". A numeric range → BETWEEN; \
+           "top N" → ORDER BY … LIMIT N; "highest <X> first" → ORDER BY <X> DESC (never a rank \
+           column). The moment it succeeds you are done.
+        4. csvInfo  path "out.csv", then reply in one sentence with the column names and row \
+           count. Do not print the rows.
         """  // (full prompt in the source)
 
         let session: LocalLMLabSession                               // ← SDK
         do {
-            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions, includeMCPTools: false)   // ← SDK
+            // effort: .off — skip the model's <think> pass. The Qwen3 family has the template
+            // toggle; the pipeline is mechanical, so the reasoning trace buys nothing but latency.
+            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,   // ← SDK
+                                          includeMCPTools: false, options: SessionOptions(effort: .off))   // ← SDK
         } catch {
             return .failed("Couldn't start the model: \(error.localizedDescription)")
         }
