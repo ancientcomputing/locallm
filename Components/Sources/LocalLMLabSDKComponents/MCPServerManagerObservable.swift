@@ -53,6 +53,8 @@ extension MCPServerError: @retroactive LocalizedError {
         case .httpError(let code): return "Connection failed (HTTP \(code))."
         case .oauthRegistrationNotSupported:
             return "This server requires a pre-registered OAuth app. Switch auth type to \"OAuth (manual client)\" and enter a Client ID from the server's developer console."
+        case .responseTooLarge(let reason):
+            return "The server's response was too large to accept (\(reason))."
         @unknown default:
             return "An unknown error occurred."
         }
