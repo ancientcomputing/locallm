@@ -280,6 +280,13 @@ size-vs-memory preflight (weights ≤ 70% of physical RAM).
 child-table join, a two-dataset `JOIN`, and `GROUP BY … HAVING`. A bigger model mainly buys a
 touch more reliability on request→column matching. A 4B model usually works.
 
+The session is built with `options: SessionOptions(effort: .off)` — the Qwen3 chat template's
+thinking toggle is turned off, so the model skips its `<think>…</think>` pass and answers
+faster. The pipeline is mechanical enough (pick a tool, name a table, write one `SELECT`) that
+the reasoning trace adds latency without changing the query. A model that always reasons
+(DeepSeek-R1) would surface `unsupportedCapability` instead; on non-toggle models `.off` is a
+no-op.
+
 Any MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
 and its `qat` sibling — their shipped `model.safetensors.index.json` disagrees with the actual
 weight files, so the load fails (and the bad size in it trips the preflight).
