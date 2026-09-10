@@ -6,13 +6,17 @@ import LocalLMLabSDKRemote
 import Observation
 
 // Owns the SDK objects and the run loop. The host-app responsibilities the example takes on
-// itself (a real app would have UI for these) are all in `bootstrap()`:
-//   - register the frontier providers it has API keys for
+// itself (a real app would have polished UI for these):
+//   - register the frontier providers it has API keys for (env var, or pasted into the UI)
 //   - grant Calendar access
 //   - connect the Todoist MCP server and enable the two tools this demo uses
 //
 // `run(prompt:)` is the part worth reading: it turns `DemoSecurity` into a tool list + an
 // authorizer and hands them to `lab.makeSession`.
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
 
 enum FrontierProvider: String, CaseIterable, Identifiable {
     case anthropic
@@ -26,6 +30,10 @@ enum FrontierProvider: String, CaseIterable, Identifiable {
     var keyEnv: String { self == .anthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY" }
     var modelEnv: String { self == .anthropic ? "SECURITYDEMO_ANTHROPIC_MODEL" : "SECURITYDEMO_OPENAI_MODEL" }
     var defaultModel: String { self == .anthropic ? "claude-sonnet-4-5" : "gpt-4o" }
+
+    /// UserDefaults key for a pasted API key. **Demo persistence only** — a real app stores
+    /// API keys in the Keychain, not UserDefaults (same note as examples/model-switch).
+    var defaultsKey: String { "securitydemo.apiKey.\(rawValue)" }
 }
 
 @MainActor
@@ -47,7 +55,13 @@ final class AppModel {
     var toolLog: [String] = []
     var isRunning = false
     var elapsed: TimeInterval = 0
-    var setupNote: String?
+
+    /// Shown above the output. Provider status, then any Calendar / Todoist setup problem.
+    var providerNote: String?
+    private var connectorNotes: [String] = []
+    var setupNote: String? {
+        ([providerNote].compactMap { $0 } + connectorNotes).joined(separator: "\n").nilIfEmpty
+    }
 
     private let todoistURL = URL(string: "https://ai.todoist.net/mcp")!
     // find-tasks lets the model resolve "Buy milk" -> a task id, which complete-tasks needs
@@ -66,25 +80,45 @@ final class AppModel {
         bootstrapTask = Task { await bootstrap() }
     }
 
-    private func bootstrap() async {
-        let env = ProcessInfo.processInfo.environment
+    /// An API key for `p`: environment first (set when launched from a terminal or the Xcode
+    /// scheme), then one pasted into the UI on a previous launch.
+    func storedKey(for p: FrontierProvider) -> String {
+        if let env = ProcessInfo.processInfo.environment[p.keyEnv], !env.isEmpty { return env }
+        return UserDefaults.standard.string(forKey: p.defaultsKey) ?? ""
+    }
 
-        var configs: [RemoteProviderConfig] = []
-        for p in FrontierProvider.allCases {
-            guard let key = env[p.keyEnv], !key.isEmpty else { continue }
-            var cfg = p == .anthropic
-                ? RemoteProviderConfig.anthropic(apiKey: key)
-                : RemoteProviderConfig.openAI(apiKey: key)
-            cfg.allowArbitraryModelIDs = true
-            configs.append(cfg)
+    func hasKey(for p: FrontierProvider) -> Bool { !storedKey(for: p).isEmpty }
+
+    /// Persist a pasted key and register (or replace) that provider live — no relaunch.
+    func saveKey(_ raw: String, for p: FrontierProvider) {
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        UserDefaults.standard.set(key, forKey: p.defaultsKey)
+        registerProvider(p, key: key)
+        if !availableProviders.contains(p) { availableProviders.append(p) }
+        if availableProviders.count == 1 { provider = p }
+        providerNote = availableProviders.isEmpty ? providerNote : nil
+    }
+
+    private func registerProvider(_ p: FrontierProvider, key: String) {
+        var cfg = p == .anthropic
+            ? RemoteProviderConfig.anthropic(apiKey: key)
+            : RemoteProviderConfig.openAI(apiKey: key)
+        cfg.allowArbitraryModelIDs = true
+        lab.models.replace(RemoteModelProvider(cfg))   // register-or-swap by scheme
+    }
+
+    private func bootstrap() async {
+        // `lab` exists from the start (possibly with no providers) so a key pasted into the UI
+        // can be registered live.
+        lab = LocalLMLab()
+        for p in FrontierProvider.allCases where hasKey(for: p) {
+            registerProvider(p, key: storedKey(for: p))
             availableProviders.append(p)
         }
-
-        lab = LocalLMLab(configuration: .init(providers: configs.map { RemoteModelProvider($0) }))
-
         if let first = availableProviders.first { provider = first }
         if availableProviders.isEmpty {
-            setupNote = "Set ANTHROPIC_API_KEY and/or OPENAI_API_KEY, then relaunch."
+            providerNote = "Paste an Anthropic or OpenAI API key below to run."
         }
 
         // Calendar — a real app has its own permission screen; here we just ask on launch.
@@ -95,7 +129,7 @@ final class AppModel {
 
         // Todoist MCP — connect in-process and enable the two tools the demo drives.
         let auth: (type: MCPAuthType, token: String?) = {
-            if let t = env["TODOIST_MCP_TOKEN"], !t.isEmpty { return (.pat, t) }
+            if let t = ProcessInfo.processInfo.environment["TODOIST_MCP_TOKEN"], !t.isEmpty { return (.pat, t) }
             return (.none, nil)
         }()
         switch await lab.mcp.addServer(url: todoistURL, displayName: "todoist",
@@ -111,9 +145,7 @@ final class AppModel {
         }
     }
 
-    private func appendSetup(_ line: String) {
-        setupNote = [setupNote, line].compactMap { $0 }.joined(separator: "\n")
-    }
+    private func appendSetup(_ line: String) { connectorNotes.append(line) }
 
     // MARK: run — DemoSecurity → SDK
 

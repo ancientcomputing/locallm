@@ -3,6 +3,13 @@ import SwiftUI
 struct RunPane: View {
     @Bindable var model: AppModel
 
+    // Which provider the key field targets, and its text. A real app uses the Keychain and a
+    // proper settings screen (see examples/model-switch); this is the minimum to unblock a
+    // double-clicked .app that has no env vars.
+    @State private var keyProvider: FrontierProvider = .anthropic
+    @State private var keyField = ""
+    @State private var userExpandedKeys = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -25,6 +32,8 @@ struct RunPane: View {
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(model.isRunning || model.availableProviders.isEmpty)
             }
+
+            apiKeyRow
 
             TextEditor(text: Binding(get: { model.prompt }, set: { model.prompt = $0 }))
                 .font(.system(size: 13))
@@ -57,5 +66,30 @@ struct RunPane: View {
             }
         }
         .padding(20)
+    }
+
+    @ViewBuilder private var apiKeyRow: some View {
+        // Open whenever no provider is configured; the user can also open it to replace a key.
+        DisclosureGroup(isExpanded: Binding(
+            get: { model.availableProviders.isEmpty || userExpandedKeys },
+            set: { userExpandedKeys = $0 })) {
+            HStack(spacing: 6) {
+                Picker("", selection: $keyProvider) {
+                    ForEach(FrontierProvider.allCases) { p in
+                        Text(model.hasKey(for: p) ? "\(p.label) ✓" : p.label).tag(p)
+                    }
+                }
+                .labelsHidden().fixedSize()
+                SecureField("paste API key", text: $keyField)
+                    .textFieldStyle(.roundedBorder)
+                Button("Save") {
+                    model.saveKey(keyField, for: keyProvider)
+                    keyField = ""
+                }
+                .disabled(keyField.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        } label: {
+            Text("API keys").font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
