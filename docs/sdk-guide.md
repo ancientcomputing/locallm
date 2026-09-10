@@ -1220,6 +1220,70 @@ real source of argument validation. `MCPTool(descriptor:manager:)` is a throwing
 call it per-tool inside a loop and skip (or fall back to a hand-written Path B adapter for) any
 tool whose schema doesn't build, rather than letting one malformed tool take down your whole list.
 
+### 7c. Tool authorization: two levers — which tools, and whether they ask first
+
+A model with a mutating tool will sometimes call it wrongly: a model mistake, a prompt-injection
+string in a document it's summarizing, or an MCP server whose tools you didn't write. Core gives
+you two independent levers over that. [`examples/security-demo`](../examples/security-demo) is
+the runnable version of everything below.
+
+**Lever 1 — selection.** Which tools are in the session at all. Not just on/off: `ToolImpact`
+(`.read` < `.mutate` < `.destructive`) is a ceiling.
+
+```swift
+let tools = (calendarTools + workspaceTools).limited(toMaxImpact: .mutate)   // no delete tools
+```
+
+`Sequence<any Tool>.limited(toMaxImpact:)` drops every tool above the ceiling (an unrated tool
+counts as `.mutate` — never `.read`). It's a plain filter you apply before `makeSession`, so it
+works on **any** runtime — a bare `LanguageModelSession`, a headless service, macOS 26. This is
+how you offer a "Read-only / Changes / Full" choice per capability. Every ready-made SDK tool
+declares its impact (`ImpactRatedTool`).
+
+**Lever 2 — invocation.** Whether an in-list tool actually *runs* this call. `ToolCallAuthorizer`
+is the checkpoint between "the model chose to call this" and "the side effect happens." It's
+opt-in — `makeSession(...)` with no `authorizer:` behaves exactly as before.
+
+```swift
+let session = try lab.makeSession(
+    route: "chat",
+    tools: tools,
+    authorizer: RuleBasedToolAuthorizer(
+        rules: [.confirm(atOrAbove: .mutate), .denyMCPTools],
+        confirm: { call in await myConfirmationUI.ask(call) }))
+```
+
+- **`RuleBasedToolAuthorizer`** (Core) is pure logic: `denyTool` / `denyMCPTools` /
+  `deny(atOrAbove:)` / `allowTool` / `confirm(atOrAbove:)` / `confirmMCPTools`,
+  most-restrictive-wins. A `.confirm…` rule invokes your `confirm` closure; with no closure it
+  fails closed to deny.
+- **`ConfirmingToolAuthorizer`** (Core) is "ask a human per call." It takes a
+  `ToolConfirmationChannel`; in a single-process SwiftUI app that's
+  `ToolConfirmationPresenter` (Components) plus `.toolConfirmationSheet(presenter)` on a root
+  view — no sheet UI of your own. `authorize(_:)` is `async`, and this denies after a timeout
+  (default 120s) so a forgotten sheet can't pin a turn open.
+- A denied call comes back to the model as the tool result `"DENIED: <reason>"` (for
+  `String`-returning tools — all the SDK's and `MCPTool`), so the model adapts rather than the
+  turn failing.
+
+The authorizer is a floor, not a ceiling: it can't grant access to a tool that isn't in the
+list, and it doesn't restrain your own code calling `CalendarAccess.deleteEvent(...)` directly.
+It gates model-initiated calls only.
+
+**Across processes.** If your app runs the session in a headless helper and the UI in another
+process, implement `ToolConfirmationChannel` with your transport — that's the *only* security
+code you write. `PendingToolCall.summary` is a `Codable` `PendingToolCallSummary` (`toolName` /
+`argumentsDescription` / `origin` / `impact`; drops the non-serializable `arguments`) built for
+exactly that hop; `DecisionGate` (Core) handles the resume-once race between the reply and a
+cancellation.
+
+**MCP tools are opaque.** The SDK can't rate a tool it didn't write, so every `MCPTool` is
+`.mutate` — `limited(toMaxImpact:)` can't grade an MCP server, only include or exclude it, and
+`ConfirmingToolAuthorizer` will confirm even a read-shaped MCP call. With `makeSession(includeMCPTools:
+true)` the SDK tags them `.mcp` origin so `denyMCPTools` / `confirmMCPTools` and a rule's
+`call.origin` check apply. A host that builds its own MCP-backed `Tool` type (e.g. one proxying
+to a connection in another process) conforms it to `OriginTaggedTool` to keep that origin.
+
 ## 8. Filesystem access: security-scoped bookmarks (example, not in Core)
 
 > **You hit this when** you want the model to read or edit files in a folder the user picks —
@@ -1681,7 +1745,9 @@ and gotchas — use this one when you just need to check a signature.
     func snapshot() -> LocalLMLabState                 // route map + residency + installed records; NOT weights
     func restore(from state: LocalLMLabState)
     // from LocalLMLab+makeSession:
-    func makeSession(route: RouteName, tools: [any Tool] = [], instructions: String? = nil, includeMCPTools: Bool = true) throws -> LocalLMLabSession
+    func makeSession(route: RouteName, tools: [any Tool] = [], instructions: String? = nil,
+                     includeMCPTools: Bool = true, options: SessionOptions = .init(),
+                     authorizer: (any ToolCallAuthorizer)? = nil) throws -> LocalLMLabSession   // authorizer: §7c
 }
 
 struct LocalLMLabState: Codable, Sendable, Equatable {
