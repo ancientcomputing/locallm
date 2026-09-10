@@ -3,7 +3,7 @@
 The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
 `workspace-buddy-local`, `os-matrix`, and `aiql`), `// ← SDK (Remote)` (online providers —
-`model-switch`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
+`model-switch` and `security-demo`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
@@ -35,6 +35,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`workspace-buddy-local`](#examplesworkspace-buddy-localsourcesworkspacebuddylocalworkspacebuddylocalappswift) | 252 | 323 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-todaysourcesplatetodayplatetodayappswift) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
 | [`model-switch`](#examplesmodel-switchsourcesmodelswitchappmodelswift) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
+| [`security-demo`](#examplessecurity-demosourcessecuritydemodemosecurityswift) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
 | [`code-buddy`](#examplescode-buddysourcescodebuddymainswift) | 298 | 387 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
 | [`aiql`](#examplesaiqlsourcesaiqlaiqlappswift) | 392 | 475 | a plain-English request → the spreadsheet you asked for, via an MCP dataset, sandboxed SwiftUI, zero fabricated values |
 
@@ -2092,6 +2093,168 @@ private struct SettingsScreen: View {
 whole settings surface; the `ChatView` (model `Picker` bound to `model.availableModels`, a
 web-search `Toggle`, the transcript) is ordinary SwiftUI and is elided here. The closures are the
 seam that keeps `Components` free of any dependency on `Remote`.
+
+## `examples/security-demo/Sources/SecurityDemo/DemoSecurity.swift`
+
+*~250 lines of code across 6 files; the SDK surface is two of them — this one and `AppModel.swift` below. The three view files (`SecurityPane`, `RunPane`, `ContentView`) and `SecurityDemoApp` are ordinary SwiftUI, elided; `Keychain.swift` is ~30 lines of `SecItem*` with no SDK in it (a credential belongs in the Keychain, not `UserDefaults` — that's the only reason it exists).*
+
+This file is the whole idea: a "Security panel" is **two SDK levers**, and nothing else. `DemoSecurity` is the observable UI state; `DemoPolicy` is the immutable snapshot a run takes so editing the panel mid-turn can't change a session already built (the same split `SecurityPolicy` uses in LocalLM Lab).
+
+```swift
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import Observation
+
+enum ConnectorLevel: String, CaseIterable, Identifiable, Sendable {
+    case readOnly = "Read-only"
+    case changes  = "Changes"
+    case full     = "Full"
+    var id: String { rawValue }
+
+    // A connector "level" is just a ToolImpact ceiling.
+    var maxImpact: ToolImpact {                                       // ← SDK  — .read < .mutate < .destructive
+        switch self {
+        case .readOnly: return .read
+        case .changes:  return .mutate
+        case .full:     return .destructive
+        }
+    }
+}
+
+@MainActor @Observable
+final class DemoSecurity {
+    var calendarLevel: ConnectorLevel = .changes
+    var calendarConfirm = true
+    var todoistConfirm  = true
+
+    func snapshot() -> DemoPolicy {
+        DemoPolicy(calendarLevel: calendarLevel, calendarConfirm: calendarConfirm, todoistConfirm: todoistConfirm)
+    }
+}
+
+struct DemoPolicy: Sendable {
+    var calendarLevel: ConnectorLevel
+    var calendarConfirm: Bool
+    var todoistConfirm: Bool
+
+    // No confirmation wanted anywhere ⇒ makeSession gets no authorizer, runs like a bare session.
+    var wantsConfirmation: Bool { calendarConfirm || todoistConfirm }
+
+    // Lever 1 — selection. Drop every Calendar tool above the level's ceiling.
+    func limitedCalendarTools(_ tools: [any Tool]) -> [any Tool] {
+        tools.limited(toMaxImpact: calendarLevel.maxImpact)           // ← SDK  — Sequence<any Tool> extension
+    }
+
+    // Lever 2 — invocation. Per-call: reads always run; a mutating/destructive call is
+    // confirmed when its connector's toggle is on.
+    func requirement(for call: PendingToolCall) -> ConfirmingToolAuthorizer.Requirement {   // ← SDK (types)
+        guard call.impact >= .mutate else { return .allow }           // ← SDK  — call.impact
+        switch call.origin {                                          // ← SDK  — .host vs .mcp
+        case .host: return calendarConfirm ? .confirm : .allow
+        case .mcp:  return todoistConfirm  ? .confirm : .allow
+        @unknown default: return .confirm
+        }
+    }
+}
+```
+
+## `examples/security-demo/Sources/SecurityDemo/AppModel.swift`
+
+*130 lines of code (226 with comments).* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`.
+
+```swift
+import LocalLMLabSDKComponents                                        // ← Components
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKRemote                                            // ← SDK (Remote)
+
+@MainActor @Observable
+final class AppModel {
+    let security = DemoSecurity()
+    @ObservationIgnored let presenter = ToolConfirmationPresenter()    // ← Components  — the ToolConfirmationChannel
+    private(set) var lab: LocalLMLab!                                  // ← SDK
+
+    // MARK: bootstrap  (a real app has UI for all of this)
+
+    private func bootstrap() async {
+        lab = LocalLMLab()                                            // ← SDK  — empty; a pasted key is registered live
+        for p in FrontierProvider.allCases where hasKey(for: p) {
+            registerProvider(p, key: storedKey(for: p))               // ← SDK (Remote)  — see below
+            availableProviders.append(p)
+        }
+
+        let access = await CalendarAccess.requestAccess()             // ← SDK  — EventKit + the Info.plist-key check
+        if !access.granted { appendSetup(access.error ?? "…") }
+
+        // Todoist MCP — connected in-process; OAuth on a 401 opens the browser (redirect wired
+        // in SecurityDemoApp via MCPOAuthFlow.redirectURI, same as components-demo).
+        switch await lab.mcp.addServer(url: todoistURL, displayName: "todoist",   // ← SDK
+                                       authType: auth.type, patToken: auth.token) {
+        case .success(let state):
+            for tool in todoistTools where state.tools.contains(where: { $0.name == tool }) {
+                lab.mcp.setToolEnabled(server: state.id, tool: tool, enabled: true)   // ← SDK
+            }
+        case .failure(let error): appendSetup("Couldn't connect Todoist MCP: \(error)…")
+        }
+    }
+
+    // A pasted API key: persist to the Keychain, register the provider now — no relaunch.
+    private func registerProvider(_ p: FrontierProvider, key: String) {
+        var cfg = p == .anthropic
+            ? RemoteProviderConfig.anthropic(apiKey: key)             // ← SDK (Remote) (preset)
+            : RemoteProviderConfig.openAI(apiKey: key)                // ← SDK (Remote) (preset)
+        cfg.allowArbitraryModelIDs = true                            // ← SDK (Remote)
+        lab.models.replace(RemoteModelProvider(cfg))                  // ← SDK  — register-or-swap by scheme
+    }
+
+    // MARK: run — DemoPolicy → SDK
+
+    func run() async {
+        // …ticker Task for the elapsed timer, elided…
+        do {
+            guard let modelID = ModelID(scheme: provider.scheme, rest: modelName) else { … }   // ← SDK
+            lab.models.route("frontier", to: modelID)                 // ← SDK
+
+            let policy = security.snapshot()
+
+            // Lever 1 — selection. ClockTool is always on (a .read; the model needs "today").
+            let hostTools: [any Tool] = [ClockTool()] + policy.limitedCalendarTools([   // ← SDK  — Core's EventKit tools
+                GetUpcomingEventsTool(), AddCalendarEventTool(),
+                UpdateCalendarEventTool(), DeleteCalendarEventTool(),
+            ])
+
+            // Lever 2 — invocation. nil when the panel asks for no confirmation.
+            let authorizer: (any ToolCallAuthorizer)? = policy.wantsConfirmation   // ← SDK (type)
+                ? ConfirmingToolAuthorizer(channel: presenter,                     // ← SDK
+                                           requirement: { call in policy.requirement(for: call) })
+                : nil
+
+            let session = try lab.makeSession(                        // ← SDK
+                route: "frontier",
+                tools: hostTools,
+                instructions: "…",
+                includeMCPTools: true,      // pulls the enabled Todoist tools, tagged .mcp origin
+                authorizer: authorizer)
+
+            for await ev in session.events {                          // ← SDK  — toolCallStarted / toolCallFinished → the "Tool calls" list
+                // …append to model.toolLog…
+            }
+
+            output = try await session.respond(to: prompt)           // ← SDK
+        } catch {
+            output = "Error: " + ((error as? LocalLMLabError)?.errorDescription ?? "\(error)")   // ← SDK
+        }
+    }
+}
+```
+
+**Tally**: of ~130 lines of actual code in `AppModel`, ~18 touch the SDK — and every one is
+either setup (`LocalLMLab()`, `registerProvider`, `addServer` + `setToolEnabled`,
+`CalendarAccess.requestAccess`) or the one `run()` call site: `route` → build `hostTools` with
+`limited(toMaxImpact:)` → wrap in `ConfirmingToolAuthorizer` → `makeSession(authorizer:)` →
+`respond`. `DemoSecurity.swift` adds ~8 more, all in `DemoPolicy` — the two levers themselves.
+The `ToolConfirmationPresenter` + `.toolConfirmationSheet(_:)` (in `ContentView`, one line) is
+the entire confirmation UI. Nothing in the three panel views touches the SDK — they bind to
+`DemoSecurity`, and the snapshot does the rest.
 
 ## `examples/aiql/Sources/AIQL/AIQLApp.swift`
 
