@@ -135,8 +135,8 @@ Requires **macOS 27** on Apple Silicon and **Xcode 27** — `RemoteModelProvider
 You need an **Anthropic or OpenAI API key**. Two ways to provide one:
 
 - **Paste it into the app** — the **API keys** row (open by default until a key is set). Stored
-  in `UserDefaults` and reused on the next launch. *Demo persistence only — a real app uses the
-  Keychain (see [`examples/model-switch`](../model-switch)).*
+  in the **Keychain** ([`Keychain.swift`](Sources/SecurityDemo/Keychain.swift), ~25 lines — a
+  credential doesn't belong in `UserDefaults`) and reused on the next launch.
 - **Environment** — `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, read when the app is launched from a
   terminal or the Xcode scheme. Optional model overrides: `SECURITYDEMO_ANTHROPIC_MODEL` /
   `SECURITYDEMO_OPENAI_MODEL` (defaults `claude-sonnet-4-5` / `gpt-4o`).
@@ -150,11 +150,15 @@ bundled `.app` with a registered URL scheme; a bare `swift run` binary has neith
 Already have a Todoist API token? Set `TODOIST_MCP_TOKEN` to skip the browser. If Todoist can't
 connect, the Calendar-only demo still works.
 
-To force the OAuth flow again:
+Everything the app stores is in the Keychain under a `lab.locallm.sdk.reference.securitydemo*`
+service. To clear it:
 
 ```bash
+# the Todoist OAuth token (forces the browser flow again)
 security delete-generic-password -s "lab.locallm.sdk.reference.securitydemo.mcpoauth" \
   -a "https://ai.todoist.net/mcp"
+# a pasted API key
+security delete-generic-password -s "lab.locallm.sdk.reference.securitydemo" -a "apiKey.anthropic"
 ```
 
 ---

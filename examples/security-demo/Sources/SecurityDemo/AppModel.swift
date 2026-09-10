@@ -31,9 +31,8 @@ enum FrontierProvider: String, CaseIterable, Identifiable {
     var modelEnv: String { self == .anthropic ? "SECURITYDEMO_ANTHROPIC_MODEL" : "SECURITYDEMO_OPENAI_MODEL" }
     var defaultModel: String { self == .anthropic ? "claude-sonnet-4-5" : "gpt-4o" }
 
-    /// UserDefaults key for a pasted API key. **Demo persistence only** — a real app stores
-    /// API keys in the Keychain, not UserDefaults (same note as examples/model-switch).
-    var defaultsKey: String { "securitydemo.apiKey.\(rawValue)" }
+    /// Keychain account name for a pasted API key (see `Keychain.swift`).
+    var keychainAccount: String { "apiKey.\(rawValue)" }
 }
 
 @MainActor
@@ -81,19 +80,20 @@ final class AppModel {
     }
 
     /// An API key for `p`: environment first (set when launched from a terminal or the Xcode
-    /// scheme), then one pasted into the UI on a previous launch.
+    /// scheme), then one pasted into the UI on a previous launch (from the Keychain).
     func storedKey(for p: FrontierProvider) -> String {
         if let env = ProcessInfo.processInfo.environment[p.keyEnv], !env.isEmpty { return env }
-        return UserDefaults.standard.string(forKey: p.defaultsKey) ?? ""
+        return Keychain.string(for: p.keychainAccount) ?? ""
     }
 
     func hasKey(for p: FrontierProvider) -> Bool { !storedKey(for: p).isEmpty }
 
-    /// Persist a pasted key and register (or replace) that provider live — no relaunch.
+    /// Persist a pasted key to the Keychain and register (or replace) that provider live — no
+    /// relaunch.
     func saveKey(_ raw: String, for p: FrontierProvider) {
         let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
-        UserDefaults.standard.set(key, forKey: p.defaultsKey)
+        Keychain.set(key, for: p.keychainAccount)
         registerProvider(p, key: key)
         if !availableProviders.contains(p) { availableProviders.append(p) }
         if availableProviders.count == 1 { provider = p }
