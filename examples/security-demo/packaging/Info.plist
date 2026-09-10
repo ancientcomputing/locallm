@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key><string>Security Demo</string>
+	<key>CFBundleExecutable</key><string>SecurityDemo</string>
+	<key>CFBundleIdentifier</key><string>lab.locallm.sdk.reference.securitydemo</string>
+	<key>CFBundleName</key><string>Security Demo</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+	<key>LSMinimumSystemVersion</key><string>27.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<!-- EventKit (Core's CalendarTools.swift) needs this string or macOS shows no prompt and
+	     silently refuses — a bare `swift run` binary has no Info.plist, which is why this app
+	     is packaged as a real .app by build-app.sh. -->
+	<key>NSCalendarsFullAccessUsageDescription</key><string>Security Demo adds and updates calendar events to demonstrate tool authorization.</string>
+	<!-- OAuth redirect target for an MCP server (e.g. Todoist). MCPOAuthFlow.redirectURI in
+	     SecurityDemoApp.init() must match this scheme. Distinct from the other examples'
+	     schemes so they can coexist. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key><string>lab.locallm.sdk.reference.securitydemo.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>securitydemo</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
