@@ -1,9 +1,12 @@
 # AIQL — ask your data
 
-**AIQL** is a small Mac app for someone who lives in a marketing or analytics tool, not a
-terminal. You give it three things — a local model, an **MCP data source**, and a plain-English
-request — and press **Go**. It pulls the dataset, turns it into the spreadsheet you asked for,
-and drops a `.csv` into a folder you chose.
+**AIQL** is a small Mac app for someone who lives in a marketing or sales tool, not a terminal.
+Say you need the results of a campaign or a slice of the sales pipeline, but you don't write
+SQL: you describe what you want in plain English — *"the email addresses of everyone who said
+they were interested in the survey"* — and AIQL turns that into a SQL query, runs it against
+the data, and hands you the rows. You give it three things — a local model, an **MCP data
+source**, and the request — and press **Go**; it pulls the dataset, runs your query, and drops
+a `.csv` into a folder you chose.
 
 The data is read by a model running **on your Mac** — nothing is sent to an online AI provider.
 And the model never touches the rows: it writes one **SQL query**, the host runs it read-only,
