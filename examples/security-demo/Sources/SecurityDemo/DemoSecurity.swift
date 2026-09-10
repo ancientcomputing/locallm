@@ -53,8 +53,9 @@ struct DemoPolicy: Sendable {
     var calendarConfirm: Bool
     var todoistConfirm: Bool
 
-    /// True when any confirmation is wanted — if not, `makeSession` gets no authorizer and
-    /// runs exactly like a bare `LanguageModelSession`.
+    /// True when any confirmation is wanted. When false, `run()` passes `authorizer: nil` to
+    /// `makeSession`: no invocation gate, so every tool call the model makes runs immediately,
+    /// unconfirmed. (The level still limits *which* tools are in the session.)
     var wantsConfirmation: Bool { calendarConfirm || todoistConfirm }
 
     /// Lever 1 — selection: filter the Calendar tool list down to `calendarLevel`.

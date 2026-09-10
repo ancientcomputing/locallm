@@ -1242,7 +1242,10 @@ declares its impact (`ImpactRatedTool`).
 
 **Lever 2 — invocation.** Whether an in-list tool actually *runs* this call. `ToolCallAuthorizer`
 is the checkpoint between "the model chose to call this" and "the side effect happens." It's
-opt-in — `makeSession(...)` with no `authorizer:` behaves exactly as before.
+opt-in: with no `authorizer:`, `makeSession` installs no invocation gate — every tool in the
+list is callable by the model, with whatever arguments it chooses, and every call runs
+immediately with no confirmation and no way to deny it. That is the pre-authorizer behaviour,
+unchanged.
 
 ```swift
 let session = try lab.makeSession(
