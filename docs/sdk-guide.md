@@ -904,6 +904,14 @@ for try await snapshot in session.languageModelSession.streamResponse(to: task) 
 `makeSession(route:tools:instructions:)` call, tools = Workspace tools + its host-owned
 `GitTool` / `RunTestsTool`.*
 
+**`options: SessionOptions`** carries per-call knobs — provider-native web search, sampling
+(`temperature` / `topP` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
+to think**: on the MLX tier it flips the chat template's thinking toggle for models that have
+one (the Qwen3 family — a model that always reasons, e.g. DeepSeek-R1, raises
+`unsupportedCapability` instead; a model with no toggle is a no-op). On the remote providers
+`.off` maps to the provider default — there is no true "reasoning off" on those APIs, so pass
+`.low` to minimise it. `aiql` uses `.off` (§8b). `.low`…`.max` don't reach MLX.
+
 ### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
 
 **Use it when** your UI needs to show what's happening *around* generation — a spinner per
@@ -1473,7 +1481,9 @@ uses; the individual verbs stay as pure-Swift primitives for a pipeline that wan
 control or no SQLite link.
 
 [`examples/aiql`](../examples/aiql/) is the end-to-end SwiftUI app — a plain-English request
-over an MCP dataset → this pipeline → a CSV in a folder you chose, with a local MLX model.
+over an MCP dataset → this pipeline → a CSV in a folder you chose, with a local MLX model. It
+builds the session with `SessionOptions(effort: .off)` so the Qwen3 model skips its `<think>`
+pass — the pipeline is mechanical enough that the reasoning trace only adds latency (§6a).
 
 ## 9. What's NOT in Core yet
 
