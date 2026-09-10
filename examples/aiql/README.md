@@ -6,8 +6,8 @@ request — and press **Go**. It pulls the dataset, turns it into the spreadshee
 and drops a `.csv` into a folder you chose.
 
 The data is read by a model running **on your Mac** — nothing is sent to an online AI provider.
-And the model never actually touches the rows: it decides *which* dataset, *which* columns, and
-*how* to sort or filter; SDK primitives do every row-level step. So the model can't miscopy or
+And the model never touches the rows: it writes one **SQL query**, the host runs it read-only,
+and only the answer's shape (column names, row count) comes back. So the model can't miscopy or
 invent a single value.
 
 This is the SwiftUI counterpart to the pipeline in
@@ -21,60 +21,59 @@ This is the SwiftUI counterpart to the pipeline in
 3. **Run the pipeline** in the folder you chose:
 
    ```
-   the data tool    → raw/data.json   (FileBackedTool `saveAs` — the raw payload never enters the model's context)
-   describeJson       raw/data.json    (find the records and their real field names)
-   buildSpreadsheet → out.csv          (one call: columns + filters + sort + limit; the host reads every record)
+   the data tool  → raw/data.json   (FileBackedTool `saveAs` — the raw payload never enters the model's context)
+   loadTable        raw/data.json    → an ephemeral SQLite table; returns its CREATE TABLE
+   sqlQuery       → out.csv          (one read-only SELECT; the host runs it, the rows never reach the model)
    ```
 
-The progress panel shows each step in plain language as it happens ("Building the spreadsheet…").
-When it's done, the CSV preview appears with a **Show in Finder** button.
+The progress panel shows each step in plain language ("Reading the data…", "Building the
+spreadsheet…"). When it's done, the CSV preview appears with a **Show in Finder** button.
 
 ## What the model actually does
 
-The pipeline above is a fixed program written in Swift. The model fills in the blanks — it
-never runs a loop, evaluates a condition, or handles a value.
+The pipeline is a fixed program in Swift. The model fills in the blanks — it never runs a loop,
+evaluates a condition, or handles a value.
 
-**Hardcoded in `AIQLApp.swift` / the data verbs** — the same every run:
+**Hardcoded in `AIQLApp.swift` / the Core tools** — the same every run:
 
-- the step order (pull → `describeJson` → `buildSpreadsheet` → `csvInfo`) and the file name at
-  each stage, spelled out in the session instructions
-- the query stages *inside* `buildSpreadsheet` — project → filter → dedupe → sort/limit →
-  select — run in a fixed order in Swift, whatever order the model listed the arguments in
-- every row-level operation: JSON parsing, field extraction, "top N" (a mechanical
-  sort + `limit`), filtering, sorting, column projection — all pure Swift in `TabularEngine`,
-  which only ever returns a receipt (row/column counts, first 3 rows)
-- which tools the model even sees: the server's tools are ranked by how "dataset-like" the
-  name looks and only the top 4 are wrapped; the raw-file reader is withheld
+- the step order (pull → `loadTable` → `sqlQuery` → `csvInfo`) and the file name at each stage
+- `loadTable`: finding the records array, flattening records to typed columns, splitting a
+  nested array into a child table, the bulk insert — all Swift
+- `sqlQuery`: the SELECT runs against a connection opened **read-only**, behind a
+  `sqlite3_set_authorizer` allowlist (SELECT/READ/FUNCTION only — no writes, no `ATTACH`), one
+  statement, a timeout, a row cap. Only a receipt (columns, row count, first rows) returns
+- which tools the model even sees: the server's tools are ranked by how "dataset-like" the name
+  looks and only the top few are wrapped; the raw-file reader is withheld
 - the raw payload's path — `FileBackedTool`'s `saveAs` parks it in `raw/data.json`; it never
   enters the model's context
 
-**The model decides** — one data-tool pick, then one `buildSpreadsheet` form:
+**The model decides** — a data-tool pick, a table name, then one `SELECT`:
 
-1. which one data tool answers the question (and whether to paginate)
-2. the records array's path — copied from `describeJson`'s output, not inferred
-3. `columns`: for each field the request names, a `{header, path}` pair. This is the one
-   genuinely semantic step — matching "usage index" in the request to the `usage_index` key in
-   the schema
-4. `filters`: one entry per condition the request states (a numeric range is two entries);
-   `sortBy` / `sortDescending` for "highest"/"lowest"; `limit` for "top N"
-5. a one-sentence summary (counts only)
+1. which data tool answers the question (and whether to paginate; a second dataset → a second
+   `loadTable`)
+2. a short name for each table
+3. **the SQL** — one `SELECT` against the `CREATE TABLE`(s) `loadTable` printed. Matching the
+   request's wording to the real column names is the one genuinely semantic step; `WHERE` /
+   `BETWEEN` / `ORDER BY … LIMIT` / `JOIN` / `GROUP BY` are mechanical SQLite
 
-So the intelligence budget is small and bounded: fuzzy request→schema matching, and picking
-the right tool. Everything downstream is deterministic. The model describes the query once; it
-never sequences the stages, so it can't drop one — the failure mode that made a range filter
-silently vanish when it was step 4 of a 6-call chain. Its remaining failure mode is naming the
-wrong field or array, which surfaces as an `Error:` it retries, not a wrong number.
+So the intelligence budget is small and bounded: request→schema matching, and writing one
+standard `SELECT`. Everything downstream is deterministic. The model describes the query once; it
+never orchestrates a multi-step sequence, so it can't drop a step — the failure mode that made a
+range filter silently vanish when it was step 4 of a 6-call chain. A wrong column name comes
+back as a SQLite `Error:` (with the real columns appended) that it fixes and retries, not a
+wrong number. Verified end to end with `mlx-community/Qwen3-8B-4bit` and `Qwen3-14B-4bit`
+(the SDK's `examples/aiql-eval` harness).
 
 ## What it highlights for SDK developers
 
-It's three existing examples stitched together, plus the "AIQL" data verbs:
+Three existing examples stitched together, plus the SQL tools:
 
 | from | what it contributes |
 |---|---|
 | [`workspace-buddy-local`](../workspace-buddy-local) | SwiftUI + App Sandbox + `MLXModelProvider` download + `NSOpenPanel` folder picker + security-scoped bookmark |
 | [`plate-today`](../plate-today) | `MCPServerManager` + the OAuth redirect wired through `AppDelegate` (not SwiftUI's `.onOpenURL`) + `CFBundleURLTypes` |
 | [`repo-qa`](../repo-qa) | building tools from a live MCP schema — here `FileBackedTool.mcp(descriptor:manager:root:)` |
-| SDK §8b | `describeJson` · `buildSpreadsheet` (the whole `jsonToCsv`+`filterRows`+`sortRows`+`selectColumns` query in one call) · `csvInfo` |
+| SDK §8b | `loadTable` + `sqlQuery` — JSON records → an ephemeral SQLite table → one read-only `SELECT` → CSV. `describeJson` / `csvInfo` for discovery/verification |
 
 Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
 
@@ -175,38 +174,32 @@ source because every one of its tools returns a clean table of records:
 
 Paste any of these into **Request** (leave the model and server at their defaults):
 
-| Request | `out.csv` you get back |
+| Request | `out.csv` |
 |---|---|
-| `every country and its usage index, highest first, top 10` | `country,usage_index` — Australia 6.4, Singapore 5.81, … |
-| `the 15 US states with the highest Claude usage index, and their automation percentage` | `state,usage_index,automation_pct` |
-| `US states where automation percentage is between 48 and 51, highest usage index first` | `state,usage_index,automation_pct` |
-| `the top 20 work tasks people use Claude for, with each task's share percentage` | `rank,task,share_pct` |
-| `countries where coursework use is above 20 percent, highest usage index first` | `country,usage_index,coursework_pct` |
-| `all job categories ranked by their share of global Claude usage` | `category,share_pct` |
+| `every country and its usage index, highest first, top 10` | `name, anthropic_usage_index` — Australia 6.4, Singapore 5.81, … |
+| `the 10 US states with the highest Claude usage index, and their automation percentage` | `name, anthropic_usage_index, automation_pct` |
+| `US states where automation percentage is between 45 and 50, highest usage index first` | `name, automation_pct` |
+| `for each US state, its number-one job category` | `name, top_job_category` (from the `__top_job_categories` child table) |
+| `all job categories ranked by their share of global Claude usage` | `name, pct` |
 
-Each is **one `buildSpreadsheet` call** — the model picks the dataset tool, then fills one form
-(columns, filters, sort, limit) and the host runs the stages in a fixed order. The first request
-is verified end to end from the command line (same server) on `mlx-community/Qwen3-8B-4bit`:
-`out.csv` exact against the published index. The app wraps this pipeline in a UI; its progress
-panel is fed by `session.events`.
+The model picks the data tool, `loadTable`s it, then writes one `SELECT` against the printed
+`CREATE TABLE`. Rows are copied from the source by the host — exact against the published index.
+The app wraps this pipeline in a UI; its progress panel is fed by `session.events`.
 
 **Writing your own.** Name a dataset ("every country", "US states", "work tasks", "job
-categories"), the columns you want, and any refinements: "top N" / "highest … first" → a sort,
-"where X is above/below N" / "between A and B" / "only rows containing …" → filters. The model
-describes the query in one call; the data verbs do every row-level step, so `out.csv` can't
-contain a value the source didn't have, and there is no step sequence for a small model to drop.
+categories"), the columns you want, and any refinements: "top N" / "highest … first", "between A
+and B", "only rows containing …", "for each X, the …". The model turns it into one read-only
+`SELECT`; the host runs it, so `out.csv` can't contain a value the source didn't have.
 
 ## Model choice
 
-`mlx-community/Qwen3-14B-4bit` (the default, ~8 GB) is the most reliable at the one step that
-isn't mechanical — matching the request's wording to the dataset's real field names. It needs a
-16 GB Mac to clear the size-vs-memory preflight (weights must be ≤ 70% of physical RAM).
+`mlx-community/Qwen3-14B-4bit` (the default, ~8 GB) needs a 16 GB Mac to clear the
+size-vs-memory preflight (weights ≤ 70% of physical RAM).
 
-`mlx-community/Qwen3-8B-4bit` (~4.3 GB) also runs it — `buildSpreadsheet` means even a
-multi-condition request is one tool call, so the 8B's old failure (dropping a filter from a long
-call chain) is gone; what a bigger model still buys is more reliable column discovery. A 4B
-model usually works. The data verbs already remove what small models get wrong on raw data
-(transcription, and "top N", now a mechanical sort).
+`mlx-community/Qwen3-8B-4bit` (~4.3 GB) runs the pipeline cleanly — the SDK's eval harness
+(`examples/aiql-eval`) is 9/9 on it (and on 14B) across single-table filters, ranges, a
+child-table join, a two-dataset `JOIN`, and `GROUP BY … HAVING`. A bigger model mainly buys a
+touch more reliability on request→column matching. A 4B model usually works.
 
 Any MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
 and its `qat` sibling — their shipped `model.safetensors.index.json` disagrees with the actual
@@ -220,8 +213,8 @@ availability badges, on-disk sizes, and an "Add from Hugging Face" field — use
 
 ## More
 
-- [`docs/sdk-guide.md` §8b](../../docs/sdk-guide.md) — the "AIQL" data verbs, in prose.
-  §6a — the model layer. §8 — App Sandbox + the folder picker.
+- [`docs/sdk-guide.md` §8b](../../docs/sdk-guide.md) — `loadTable` + `sqlQuery` and the "AIQL"
+  data verbs, in prose. §6a — the model layer. §8 — App Sandbox + the folder picker.
 - [`workspace-buddy-local`](../workspace-buddy-local) — the sandbox + MLX + folder-picker base
   this builds on.
 - [`plate-today`](../plate-today) — the MCP + OAuth-redirect base.

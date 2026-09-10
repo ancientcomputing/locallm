@@ -45,19 +45,28 @@ landed. New public surface:
   `result.isError == true`. The `MCPTool` / `FileBackedTool` adapters absorb this — no change if
   you go through them. See [`docs/migrating-to-1.0.md`](docs/migrating-to-1.0.md).
 
-### Added — `LocalLMLabSDKCore`
+### Added — `LocalLMLabSDKCore`: AIQL SQL layer (`loadTable` + `sqlQuery`)
 
-- **`BuildSpreadsheetTool`** (`buildSpreadsheet`) — the whole `jsonToCsv → filterRows →
-  dedupeRows → sortRows → selectColumns` chain (section 8b) as one `Tool`. The model fills a
-  single `Arguments` (`recordsAt`, `columns`, `filters`, `matchAny`, `sortBy` /
-  `sortDescending`, `limit`, `distinctOn`) and the host runs the stages in a fixed order. A
-  numeric range is two `filters` entries (`gte` + `lte`) on one column. A `filters` / `sortBy`
-  / `distinctOn` field that no record carries returns `Error:` rather than a silently empty
-  column. Added because small local models (8–14B) reliably *describe* a query but drift when
-  *orchestrating* a multi-call chain — most often dropping the filter when it is the third
-  refinement. The individual verbs are unchanged and stay for per-stage pipelines.
-- [`examples/aiql`](examples/aiql/) uses `buildSpreadsheet` in place of the verb chain; its
-  instruction prompt drops from six steps to four, and its default model is
+- **`LoadTableTool`** (`loadTable`) — stages a JSON records file into an ephemeral SQLite table
+  at `<root>/aiql.sqlite`. Auto-detects the records array (ambiguity → a listing error), sniffs
+  `INTEGER`/`REAL`/`TEXT` per column (numeric strings included), flattens one level of nested
+  objects to dotted columns, and **splits any nested array into a `<table>__<field>` child
+  table** (`<table>_id` link + `idx` + the element's fields; a scalar element → a `value`
+  column) so a small model writes a `JOIN` instead of `json_each`. Returns the `CREATE TABLE`(s)
+  plus sample rows.
+- **`SQLQueryTool`** (`sqlQuery`) — runs one read-only `SELECT` → CSV. Opened
+  `SQLITE_OPEN_READONLY` behind a `sqlite3_set_authorizer` allowlist (SELECT/READ/FUNCTION only —
+  no DML, DDL, `ATTACH`, writing `PRAGMA`s), single statement enforced, 15 s timeout, 100k-row
+  output cap. A "no such column" error appends the loaded tables + their columns so the model's
+  retry stops guessing. Two loaded tables `JOIN` in one `SELECT` — the cross-dataset case.
+- No package dependency — `import SQLite3` is the system library; `Core`'s `dependencies` stays
+  `[]`.
+- Replaces `BuildSpreadsheetTool` (added earlier in this cycle, never published): `sqlQuery`
+  stops orchestration drift the same way — one call — while closing every gap (joins,
+  aggregates, computed columns), validated end to end on `mlx-community/Qwen3-8B-4bit` and
+  `Qwen3-14B-4bit` (`examples/aiql-eval` in the SDK dev repo). The individual verbs
+  (`jsonToCsv` / `filterRows` / …) stay as pure-Swift primitives.
+- [`examples/aiql`](examples/aiql/) uses `loadTable` + `sqlQuery`; its default model is
   `mlx-community/Qwen3-14B-4bit`.
 
 ## 1.0.0-beta.3 — 2026-09-06
