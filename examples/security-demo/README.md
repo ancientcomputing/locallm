@@ -132,16 +132,16 @@ Requires **macOS 27** on Apple Silicon and **Xcode 27** — `RemoteModelProvider
 `@available(macOS 27)`. It resolves the SDK as a **binary** dependency from this repo's
 `1.0.0-beta.4` GitHub Release; nothing to download by hand.
 
-API keys come from the environment; set at least one (the model Picker only shows providers
-whose key is present):
+You need an **Anthropic or OpenAI API key**. Two ways to provide one:
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export OPENAI_API_KEY=sk-...
-# optional model overrides (defaults: claude-sonnet-4-5 / gpt-4o)
-export SECURITYDEMO_ANTHROPIC_MODEL=claude-sonnet-4-5
-export SECURITYDEMO_OPENAI_MODEL=gpt-4o
-```
+- **Paste it into the app** — the **API keys** row (open by default until a key is set). Stored
+  in `UserDefaults` and reused on the next launch. *Demo persistence only — a real app uses the
+  Keychain (see [`examples/model-switch`](../model-switch)).*
+- **Environment** — `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, read when the app is launched from a
+  terminal or the Xcode scheme. Optional model overrides: `SECURITYDEMO_ANTHROPIC_MODEL` /
+  `SECURITYDEMO_OPENAI_MODEL` (defaults `claude-sonnet-4-5` / `gpt-4o`).
+
+The model Picker shows only providers with a key.
 
 **Todoist** connects to `https://ai.todoist.net/mcp` on launch via **OAuth** — a browser tab
 opens the first time and the `securitydemo://oauth/callback` redirect brings you back (hence a
@@ -165,20 +165,14 @@ Calendar (EventKit) needs a real `.app` with an `Info.plist`, and the OAuth redi
 registered `securitydemo://` scheme — so `swift run` compiles but can't do either. Two ways to
 get a running app:
 
-- **Xcode** — open `SecurityDemo.xcodeproj` and Run. It's ad-hoc/Automatic signed for this Mac
-  only; a **free** Apple Development identity is enough (the Calendar prompt is only dependable
-  under a real signature). Pass the API keys via the scheme's *Run ▸ Arguments ▸ Environment
-  Variables*.
+- **Xcode** — open `SecurityDemo.xcodeproj` and Run. It's Automatic-signed for this Mac only; a
+  **free** Apple Development identity is enough (the Calendar prompt is only dependable under a
+  real signature).
 - **A distributable `.app`** — `packaging/build-and-sign.sh` (set `APP_IDENTITY` for a
-  Developer ID build, or leave it unset for ad-hoc). Then:
+  Developer ID build, or leave it unset for ad-hoc), then `open "dist/Security Demo.app"`.
 
-  ```bash
-  ANTHROPIC_API_KEY=... OPENAI_API_KEY=... "dist/Security Demo.app/Contents/MacOS/SecurityDemo"
-  ```
-
-  Running the executable directly (not `open`) is the simple way to pass env vars.
-
-First launch asks for Calendar access, then opens the Todoist OAuth tab.
+Either way, paste an API key into the app's **API keys** row on first launch — no env var
+needed. First launch also asks for Calendar access, then opens the Todoist OAuth tab.
 
 ---
 
