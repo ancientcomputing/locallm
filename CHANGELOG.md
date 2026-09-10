@@ -13,6 +13,38 @@ models still need macOS 27. See the `1.0.0-beta.2` notes below and
 
 ## 1.0.0-beta.4 — unreleased
 
+### Added — MCP client: protocol revision `2025-11-25` (`docs/sdk-guide.md` §3a–§3e)
+
+The client now negotiates MCP `2025-11-25` (down to `2024-11-05`); every server that worked
+before still works. `MCPServerState.negotiatedProtocolVersion` reports where each connection
+landed. New public surface:
+
+- **`MCPToolResult`** — `callTool` returns this instead of a `String` (**breaking**, see below):
+  `text`, `structuredContent` (validated against the tool's `outputSchema`), `resourceLinks`,
+  `isError`, `truncated`, and `renderedForModel` for a context-sized rendering.
+  `MCPResourceLink`.
+- **Server-initiated requests** — `MCPClientHandlers` plus `MCPElicitationHandler` /
+  `MCPSamplingHandler` / `MCPRootsProvider` / `MCPLoggingSink` and their value types. A
+  capability is advertised to a server only when its handler is registered.
+  `MCPServerManager.init(responseLimits:handlers:)`. `callTool(…, allowElicitation:)`.
+- **`Components`** ships the elicitation UI — `MCPElicitationPresenter` (a ready-made
+  `MCPElicitationHandler`) and `View.mcpElicitationSheet(_:)`.
+- **CIMD** — `MCPOAuthFlow.clientMetadataURL`, an alternative to Dynamic Client Registration.
+- **`MCPDiagnostics`** — `logLevel`, an opt-in exportable event buffer, and an `observer` hook
+  for MCP connection / auth / stream troubleshooting. Off-content; secrets redacted.
+  `docs/mcp-diagnostics.md`.
+- `MCPProtocolVersion`, `MCPServerCapabilities`, `MCPServerIdentity`;
+  `MCPServerState.serverInstructions`; `MCPToolDescriptor.title` / `.outputSchema`;
+  `MCPResourceDescriptor.title`; `MCPServerError.responseTooLarge`; `MCPValue.strippingEmpty()`.
+
+### Changed — `LocalLMLabSDKCore` (breaking)
+
+- **`MCPServerManager.callTool` returns `Result<MCPToolResult, MCPServerError>`**, was
+  `Result<String, MCPServerError>`. Direct callers: use `result.renderedForModel` for the same
+  string you had. A tool that ran but reported failure is now `.success` with
+  `result.isError == true`. The `MCPTool` / `FileBackedTool` adapters absorb this — no change if
+  you go through them. See [`docs/migrating-to-1.0.md`](docs/migrating-to-1.0.md).
+
 ### Added — `LocalLMLabSDKCore`
 
 - **`BuildSpreadsheetTool`** (`buildSpreadsheet`) — the whole `jsonToCsv → filterRows →

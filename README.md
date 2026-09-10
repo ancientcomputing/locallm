@@ -52,6 +52,8 @@ for the full framing.
 - **[docs/sdk-guide.md](docs/sdk-guide.md)** — the full developer guide: linking Core, the model
   layer (§6a), entitlements, all three MCP auth types, Keychain storage, App Sandbox/MAS signing,
   ready-made vs. hand-written tool-calling (§7a), and a full function/type reference (§12).
+- **[docs/mcp-diagnostics.md](docs/mcp-diagnostics.md)** — the MCP client's logging: one
+  verbosity knob, Apple's unified log, and an exportable buffer for user bug reports.
 - **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** — `0.8.x` → `1.0` (macOS 27).
 - **[docs/api-surface.md](docs/api-surface.md)** — machine-generated public API list (the check
   behind §12).
