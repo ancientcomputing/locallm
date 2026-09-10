@@ -5,7 +5,7 @@ panel** that decides how much of that it's actually allowed to do. The whole UI 
 plus a **Run** button, a timer, and an output pane. No connector picker, no MCP-connection
 screen: the point is the panel and the two SDK constructs it maps to.
 
-It's the runnable companion to the SDK's tool-authority model — everything below is
+It's the runnable companion to the SDK's tool-authorization docs — everything below is
 self-contained, but [`docs/sdk-guide.md`](../../docs/sdk-guide.md) has the wider tour.
 
 ---
@@ -30,17 +30,18 @@ happens, and the Security panel is built for all three:
 None of this is the model being malicious. It's the gap between *"this capability exists"* and
 *"I meant it to be used **this** way, **right now**."*
 
-### Authority is a lattice, not a checkpoint
+### Giving a model a tool is really several steps
 
-The SDK's model is that a single tool grant is really a chain of stages:
+It looks like one yes/no, but there are separate points where you can say no — and the SDK
+lets you control different ones:
 
 | Stage | What happens | This demo |
 |---|---|---|
 | 1. Registration | a tool / MCP server becomes available to the app | the app's own code (`AppModel.bootstrap`) |
-| 2. Discovery | a tool is offered to a session | fixed list |
-| **3. Activation** | **a tool's schema is put in the session** | **the connector *level* → `limited(toMaxImpact:)`** |
+| 2. Discovery | a tool is picked for a session | fixed list |
+| **3. Activation** | **the model is told the tool exists and how to call it** | **the connector *level* → `limited(toMaxImpact:)`** |
 | **4. Invocation** | **a specific call, with specific arguments, proceeds** | **"Confirm each" → `ConfirmingToolAuthorizer`** |
-| 5. Content ingestion | resource / prompt / tool-result text enters context | not gated here yet |
+| 5. Reading | text from a tool result, an MCP resource, or a prompt lands in the model's context | not gated here yet |
 
 This example is stages **3 and 4** — the two the SDK ships today.
 
@@ -106,7 +107,7 @@ invocation gate at all: the model can call any tool that is in the session (the 
 level let through, plus the MCP tools), with whatever arguments it chooses, and every call
 runs immediately. No prompt, no denial. Same behaviour as a bare `LanguageModelSession`.
 
-### MCP tools are opaque
+### The SDK can't see inside an MCP tool
 
 Todoist's tools (`find-tasks`, `add-tasks`, `complete-tasks`) come from the server; the SDK
 can't rate them, so they're all `.mutate`. That means **no level split** for MCP — only the
@@ -202,13 +203,14 @@ Each step changes one panel control and re-runs. Watch the **Tool calls** list a
      the model reports it couldn't and moves on.
    - Todoist shows **two** cards: `find-tasks` (to turn "Buy milk" into a task id — MCP tools
      are 1:1 passthroughs, no name lookup like the Calendar connector) then `complete-tasks`.
-   *(Gate 1 ceiling + Gate 2 catching a destructive edit + deny-and-adapt.)*
+   *(The level hid the delete tool; the confirmation card caught the fake delete; a denied
+   call doesn't crash the turn.)*
 
 3. Set Calendar → **Full**, re-run the delete → now a card appears for `DeleteCalendarEventTool`
-   → **Allow**. *(Gate 1 re-includes the tool.)*
+   → **Allow**. *(Raising the level puts the tool back.)*
 
 4. Turn **Confirm each tool call** off for Todoist, re-run → the task completes with no card.
-   *(Gate 2 off; Gate 1 unchanged — the tools are still there, they just don't ask.)*
+   *(Confirmation off; the level unchanged — the tools are still there, they just don't ask.)*
 
 5. Trigger any card and walk away. After ~120s it **auto-denies** and the card closes.
    *(The `ConfirmingToolAuthorizer` timeout.)*
@@ -228,9 +230,9 @@ The SDK ships the mechanism; the host owns the rest:
   designs its own.
 - TCC prompts, sandbox entitlements, a unique OAuth redirect scheme.
 
-Later stages of the authority model — model-driven discovery/activation (`search_tools`), and
-content provenance so policy can refuse to widen capability while untrusted text (an MCP
-resource or prompt) is in the turn — aren't in this example yet.
+Two later pieces aren't in this example yet: letting the model *find and switch on* tools
+itself (`search_tools`), and telling the policy when the current turn contains text from an
+untrusted source — a pasted document, an MCP resource — so it can hold back.
 
 ---
 
