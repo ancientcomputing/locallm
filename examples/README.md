@@ -45,7 +45,7 @@ SwiftPM package. It resolves `LocalLMLabSDKCore` (and, where used, `LocalLMLabSD
 download or unzip by hand. Requires **macOS 27** on Apple Silicon and the **Xcode 27** (a
 stable Xcode fails with `'v27' is unavailable`).
 
-The examples on this `1.0.0-beta` branch build against SDK **`1.0.0-beta.3`**; the ones on `main`
+The examples on this `1.0.0-beta` branch build against SDK **`1.0.0-beta.4`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
 
 ### What each example needs
@@ -151,13 +151,13 @@ previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these �
 dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
 
 ```swift
-let defaultSDKVersion = "1.0.0-beta.3"
+let defaultSDKVersion = "1.0.0-beta.4"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-beta.2": SDKRelease(url: "…/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
-                               checksum: "e3e687e5…"),
     "1.0.0-beta.3": SDKRelease(url: "…/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
                                checksum: "a49b8b…"),
+    "1.0.0-beta.4": SDKRelease(url: "…/v1.0.0-beta.4/LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip",
+                               checksum: "60439d6b…"),
 ]
 ```
 

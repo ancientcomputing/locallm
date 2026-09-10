@@ -234,7 +234,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Skip it only if `xcode-select -p` already points at Xcode 27; it lasts only for the
-current terminal. `Package.swift` builds against SDK `1.0.0-beta.3` with no further setup — it
+current terminal. `Package.swift` builds against SDK `1.0.0-beta.4` with no further setup — it
 links **two** binaries (`LocalLMLabSDKCore.xcframework` + `LocalLMLabSDKInference.xcframework`,
 the MLX runtime) from that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a
 different published release. **No Metal Toolchain needed** — the prebuilt Inference xcframework

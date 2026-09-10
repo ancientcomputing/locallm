@@ -75,10 +75,10 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
-or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.4` with no further
 setup — `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
 (`WorkspaceAccess`/`WorkspaceTools`, this app's whole point, first shipped in SDK `0.8.0`, but on
-macOS 27 you use `1.0.0-beta.3+`.)
+macOS 27 you use `1.0.0-beta.4+`.)
 
 **3. Compile-check:**
 

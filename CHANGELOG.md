@@ -11,7 +11,7 @@ macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
 
-## 1.0.0-beta.4 — unreleased
+## 1.0.0-beta.4 — 2026-09-10
 
 ### Added — MCP client: protocol revision `2025-11-25` (`docs/sdk-guide.md` §3a–§3e)
 
@@ -68,6 +68,15 @@ landed. New public surface:
   (`jsonToCsv` / `filterRows` / …) stay as pure-Swift primitives.
 - [`examples/aiql`](examples/aiql/) uses `loadTable` + `sqlQuery`; its default model is
   `mlx-community/Qwen3-14B-4bit`.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip       60439d6b5a145dcb81bd238664ae5567c791de3fe5dad9359b8c42e7d5b4d84d
+LocalLMLabSDKClaude-1.0.0-beta.4.xcframework.zip     d4d8a589fb5754b9c1680b6c9bcc6aa040fa404c3e2724e061af30a1a99719c8
+LocalLMLabSDKInference-1.0.0-beta.4.xcframework.zip  d132d2c70ff21682c083f4f63e0b46aad9b1b4109f9d6bd8f76814e2d664dc6a
+LocalLMLabSDKRemote-1.0.0-beta.4.xcframework.zip     05537423397429592402638a82b118a11e963b325c0ab5a8c48c17484a14ab9e
+```
 
 ## 1.0.0-beta.3 — 2026-09-06
 

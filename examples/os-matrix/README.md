@@ -17,7 +17,7 @@ Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different beha
 
 ## Run
 
-`Package.swift` resolves the SDK as a binary dependency, building against `1.0.0-beta.3` by
+`Package.swift` resolves the SDK as a binary dependency, building against `1.0.0-beta.4` by
 default (set `LOCALLM_SDK_VERSION` in a shell to pin another release — see
 [`../README.md`](../README.md#building--running-an-sdk-example)):
 
