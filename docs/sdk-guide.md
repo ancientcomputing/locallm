@@ -450,6 +450,10 @@ let report = MCPDiagnostics.exportText()      // hand to support; also .exportJS
 Gate `logLevel` on a hidden preference so a normal user runs at `.info` and you can talk them up
 to `.debug` over a support channel; put a "Copy MCP diagnostics" button somewhere unobtrusive.
 
+Full detail — every log category, what `MCPDiagnostics.observer` gives you, the redaction
+guarantees, and the end-to-end support flow — is in
+[`mcp-diagnostics.md`](mcp-diagnostics.md).
+
 ## 4. Keychain storage — automatic isolation, native API, sandbox-safe
 
 > **You don't reach for this — you get it for free.** There is no "set up credential storage"
