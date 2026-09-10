@@ -4,13 +4,11 @@
 //   Go  →  (1) connect to the MCP server (public, or an OAuth sign-in in the browser)
 //          (2) download the local model if it isn't cached yet
 //          (3) run the pipeline: pull the dataset into a file (FileBackedTool — the raw payload
-//              never enters the model's context), then describeJson to find the fields, then one
-//              buildSpreadsheet call (columns + filters + sort + limit) → a CSV in the folder
-//              you chose.
+//              never enters the model's context), loadTable it into an ephemeral SQLite table,
+//              then one read-only sqlQuery (SELECT) → a CSV in the folder you chose.
 //
-// The model only describes the query — which fields, which filters, which sort; the SDK
-// primitive (BuildSpreadsheetTool, on the Core data verbs) does every row-level step in a fixed
-// order, so there is nothing for the model to fabricate and no step for it to drop. See
+// The model only writes the SQL — the host runs it read-only and the rows never enter the
+// model's context, so there is nothing to fabricate. loadTable + sqlQuery are Core tools; see
 // docs/sdk-guide.md §8b.
 //
 // Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
@@ -181,43 +179,35 @@ final class AIQLModel: ObservableObject {
         guard !dataTools.isEmpty else { return .failed("Couldn't read that server's tools — its data format isn't supported yet.") }
 
         var tools: [any Tool] = dataTools
+        tools.append(LoadTableTool(root: root))
+        tools.append(SQLQueryTool(root: root))
         tools.append(DescribeJSONTool(root: root))
-        tools.append(BuildSpreadsheetTool(root: root))
         tools.append(CSVInfoTool(root: root))
 
         let dataToolNames = dataTools.map(\.name).joined(separator: ", ")
         let instructions = """
-        You turn a data question into a short, fixed sequence of tool calls that ends with a CSV \
-        file. You never write row data yourself — the tools do every row-level step.
+        You answer a data question by loading the pulled data into tables and running ONE SQL \
+        query. You never write row data yourself.
 
         Run these steps in order, without asking for confirmation:
 
         1. Pick the ONE data tool whose result answers the question — from: \(dataToolNames) — and \
            call it with its `saveAs` argument set to "raw/data.json". Never call a data tool \
-           without `saveAs`; the result is large. If the source is paged (a page / offset / \
-           cursor argument) call it once per page with the same `saveAs` path plus \
-           `saveAsAppend: true` until you have every page.
-        2. describeJson  path "raw/data.json". Its output has lines like `items[0].name  string`. \
-           The records array is the part before `[0]` (here: `items`); the fields are the parts \
-           after `[0].` (here: `name`).
-        3. buildSpreadsheet — ONE call: inputPath "raw/data.json", outputPath "out.csv".
-             - recordsAt: the array path from step 2 (no "[0]"). Empty if the root is the array.
-             - columns: one {header, path} per field the question names. `path` is the field \
-               name from step 2; `header` is what the question calls it. Also include any field \
-               you filter or sort on. Omit columns entirely to get every field.
-             - filters: one entry per condition the question states. A numeric range — \
-               "between A and B", "from A to B" — is TWO entries on that column: {op: gte, \
-               value: A} and {op: lte, value: B}. "over N" → gt; "at least N" → gte; \
-               "under N" → lt; "no more than N" → lte; "is X" → eq; "contains X" → contains. \
-               Leave filters empty if the question asks for none.
-             - sortBy / sortDescending: set when the question says highest / largest / top / \
-               most (descending) or lowest / smallest / fewest (ascending).
-             - limit: the N in "top N" / "first N" / "N …". Omit when the question gives no number.
+           without `saveAs`; the result is large. If the question needs a second dataset, pull \
+           that too, to "raw/data2.json". For a paged source call it once per page with the same \
+           `saveAs` path plus `saveAsAppend: true` until you have every page.
+        2. loadTable  jsonPath "raw/data.json", a short tableName, recordsAt "" (let it find the \
+           records). Do the same for any second file. Read each CREATE TABLE it returns — use \
+           ONLY those column names. A nested array comes back as a child table \
+           "<table>__<field>"; join it with "<child>.<table>_id = <table>.id".
+        3. sqlQuery — ONE call: one SELECT, outputPath "out.csv". Standard SQLite. A numeric \
+           range → BETWEEN. "top N" → ORDER BY … LIMIT N. For "highest / most <X> first" sort by \
+           <X> itself DESC, never a rank column. Combine two tables → JOIN on the columns whose \
+           sample values match. The moment it succeeds you are done — do NOT call sqlQuery again.
         4. csvInfo  path "out.csv"  — then reply in one sentence with the column names and the \
            row count. Do not print the rows.
 
-        If a tool returns text starting with "Error:", read it, fix that one call's arguments, \
-        and retry it.
+        If a tool returns text starting with "Error:", read it, fix that one call, and retry it.
         """
 
         let session: LocalLMLabSession
@@ -299,8 +289,9 @@ final class AIQLModel: ObservableObject {
 
     static func friendlyStep(for toolName: String) -> String {
         switch toolName {
+        case "loadTable": return "Reading the data…"
         case "describeJson": return "Looking at how the data is organised…"
-        case "buildSpreadsheet": return "Building the spreadsheet…"
+        case "sqlQuery": return "Building the spreadsheet…"
         case "csvInfo": return "Checking the result…"
         default: return "Fetching the data…"
         }
