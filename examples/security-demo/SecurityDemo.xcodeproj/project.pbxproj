@@ -1,0 +1,381 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		113B97457A101B8D9C6133E5 /* LocalLMLabSDKComponents in Frameworks */ = {isa = PBXBuildFile; productRef = 4E03DABB15EFD4DABB2A5604 /* LocalLMLabSDKComponents */; };
+		253813E879A696D81A255157 /* DemoSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 639A0770108472F66E004355 /* DemoSecurity.swift */; };
+		3FED5331B1F736C922527845 /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = CBEDC32AC948B2FDB9D85E08 /* LocalLMLabSDKCore */; };
+		76BC38F0024E7D13DD2E84E9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19C7FE95779CFE932F4FC0F /* ContentView.swift */; };
+		8ACC710A12C26C06D98471E4 /* SecurityDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC6120BC7C96EAB67061EE1 /* SecurityDemoApp.swift */; };
+		ECC6FBAEE00DB940A3ECFBFC /* RunPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4DE1FAA7F9579DE56E622C /* RunPane.swift */; };
+		ED47F23083ED77B4A5590037 /* LocalLMLabSDKRemote in Frameworks */ = {isa = PBXBuildFile; productRef = 1980D64DA4869B5584F49761 /* LocalLMLabSDKRemote */; };
+		ED7AB392867D355FDA75E509 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3E3E929D5CE4C090BA5C486 /* AppModel.swift */; };
+		FC8F0F4FE2288B1ED11F97F3 /* SecurityPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846F36ACE675B23AC3021D14 /* SecurityPane.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0FC6120BC7C96EAB67061EE1 /* SecurityDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDemoApp.swift; sourceTree = "<group>"; };
+		39B281F86AFAB73DD711B895 /* SecurityDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SecurityDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B09A4043FEE8D480923D2A5 /* security-demo */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "security-demo"; path = .; sourceTree = SOURCE_ROOT; };
+		5E4DE1FAA7F9579DE56E622C /* RunPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunPane.swift; sourceTree = "<group>"; };
+		639A0770108472F66E004355 /* DemoSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSecurity.swift; sourceTree = "<group>"; };
+		846F36ACE675B23AC3021D14 /* SecurityPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityPane.swift; sourceTree = "<group>"; };
+		C19C7FE95779CFE932F4FC0F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		C3E3E929D5CE4C090BA5C486 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C7CACF4A044EAF8678571CB6 /* Components */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Components; path = ../../Components; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B7F0FFB9C5AFDB6C0ACBE5BA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3FED5331B1F736C922527845 /* LocalLMLabSDKCore in Frameworks */,
+				113B97457A101B8D9C6133E5 /* LocalLMLabSDKComponents in Frameworks */,
+				ED47F23083ED77B4A5590037 /* LocalLMLabSDKRemote in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		044C6058938FD2993B48CDCC /* SecurityDemo */ = {
+			isa = PBXGroup;
+			children = (
+				C3E3E929D5CE4C090BA5C486 /* AppModel.swift */,
+				C19C7FE95779CFE932F4FC0F /* ContentView.swift */,
+				639A0770108472F66E004355 /* DemoSecurity.swift */,
+				5E4DE1FAA7F9579DE56E622C /* RunPane.swift */,
+				0FC6120BC7C96EAB67061EE1 /* SecurityDemoApp.swift */,
+				846F36ACE675B23AC3021D14 /* SecurityPane.swift */,
+			);
+			path = SecurityDemo;
+			sourceTree = "<group>";
+		};
+		4BB86FA5D87D19521EDB9F81 = {
+			isa = PBXGroup;
+			children = (
+				7B70CD5804DE1DAD7A743040 /* Packages */,
+				9D1944342E783DDF40269971 /* Sources */,
+				5D446EC93F04AA4F3C313431 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5D446EC93F04AA4F3C313431 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				39B281F86AFAB73DD711B895 /* SecurityDemo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7B70CD5804DE1DAD7A743040 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				C7CACF4A044EAF8678571CB6 /* Components */,
+				5B09A4043FEE8D480923D2A5 /* security-demo */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		9D1944342E783DDF40269971 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				044C6058938FD2993B48CDCC /* SecurityDemo */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EE94E9571E337096BE994AD2 /* SecurityDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 63D22F25A469D826FE5C4EB0 /* Build configuration list for PBXNativeTarget "SecurityDemo" */;
+			buildPhases = (
+				5EF2B4BC4B446A8138FE6EF3 /* Sources */,
+				B7F0FFB9C5AFDB6C0ACBE5BA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SecurityDemo;
+			packageProductDependencies = (
+				CBEDC32AC948B2FDB9D85E08 /* LocalLMLabSDKCore */,
+				4E03DABB15EFD4DABB2A5604 /* LocalLMLabSDKComponents */,
+				1980D64DA4869B5584F49761 /* LocalLMLabSDKRemote */,
+			);
+			productName = SecurityDemo;
+			productReference = 39B281F86AFAB73DD711B895 /* SecurityDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1A9909BEBC0D2C8ED7F44779 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					EE94E9571E337096BE994AD2 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 3A890690C253DEF2371F8642 /* Build configuration list for PBXProject "SecurityDemo" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 4BB86FA5D87D19521EDB9F81;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6C0219A8AEFC271FB6A3DE0C /* XCLocalSwiftPackageReference "../../Components" */,
+				04735EA06D5474AD33C9A834 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5D446EC93F04AA4F3C313431 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EE94E9571E337096BE994AD2 /* SecurityDemo */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5EF2B4BC4B446A8138FE6EF3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ED7AB392867D355FDA75E509 /* AppModel.swift in Sources */,
+				76BC38F0024E7D13DD2E84E9 /* ContentView.swift in Sources */,
+				253813E879A696D81A255157 /* DemoSecurity.swift in Sources */,
+				ECC6FBAEE00DB940A3ECFBFC /* RunPane.swift in Sources */,
+				8ACC710A12C26C06D98471E4 /* SecurityDemoApp.swift in Sources */,
+				FC8F0F4FE2288B1ED11F97F3 /* SecurityPane.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		517097E7DB801269CA7207A9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A01A050F5F0D4C86628037F5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = xcodeproj/SecurityDemo.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/SecurityDemo-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.securitydemo;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		A78E60F0EAF4180645F57533 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BAFB8B695B4B08F4F6179BEE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = xcodeproj/SecurityDemo.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/SecurityDemo-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.securitydemo;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3A890690C253DEF2371F8642 /* Build configuration list for PBXProject "SecurityDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A78E60F0EAF4180645F57533 /* Debug */,
+				517097E7DB801269CA7207A9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		63D22F25A469D826FE5C4EB0 /* Build configuration list for PBXNativeTarget "SecurityDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A01A050F5F0D4C86628037F5 /* Debug */,
+				BAFB8B695B4B08F4F6179BEE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		04735EA06D5474AD33C9A834 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+		6C0219A8AEFC271FB6A3DE0C /* XCLocalSwiftPackageReference "../../Components" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Components;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1980D64DA4869B5584F49761 /* LocalLMLabSDKRemote */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKRemote;
+		};
+		4E03DABB15EFD4DABB2A5604 /* LocalLMLabSDKComponents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKComponents;
+		};
+		CBEDC32AC948B2FDB9D85E08 /* LocalLMLabSDKCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1A9909BEBC0D2C8ED7F44779 /* Project object */;
+}

@@ -1,0 +1,77 @@
+# XcodeGen spec for the "double-click, Run" variant of Security Demo.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates SecurityDemo.xcodeproj
+#
+# The generated SecurityDemo.xcodeproj IS committed — a fresh clone opens it and Runs. Edit
+# project.yml, not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the way
+# to make a distributable .app.
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode (the Calendar TCC prompt is only dependable under a real team signature).
+# One Apple ID → picked automatically; none → Run says "requires a development team" until you
+# add an Apple ID (Xcode ▸ Settings ▸ Accounts, free is enough) or switch the target to "Sign to
+# Run Locally". packaging/build-and-sign.sh is unaffected — it signs with whatever APP_IDENTITY
+# you pass (ad-hoc if unset).
+#
+# Links Core + Components (from ../../Components) and Remote (its own binaryTarget) — same three
+# as examples/model-switch.
+name: SecurityDemo
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  SecurityDemo:
+    build:
+      targets:
+        SecurityDemo: all
+    run:
+      config: Debug
+packages:
+  SecurityDemoPackage:
+    path: .
+  Components:
+    path: ../../Components
+targets:
+  SecurityDemo:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/SecurityDemo
+    info:
+      path: xcodeproj/SecurityDemo-Info.plist
+      properties:
+        CFBundleDisplayName: Security Demo
+        CFBundleName: Security Demo
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+        NSCalendarsFullAccessUsageDescription: Security Demo adds and updates calendar events to demonstrate tool authorization.
+        CFBundleURLTypes:
+          - CFBundleURLName: lab.locallm.sdk.reference.securitydemo.oauth
+            CFBundleURLSchemes: [securitydemo]
+    # XcodeGen owns (regenerates) this file — separate from packaging/SecurityDemo.entitlements,
+    # which build-and-sign.sh owns.
+    entitlements:
+      path: xcodeproj/SecurityDemo.entitlements
+      properties:
+        com.apple.security.personal-information.calendars: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.securitydemo
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: Components
+        product: LocalLMLabSDKCore
+      - package: Components
+        product: LocalLMLabSDKComponents
+      - package: SecurityDemoPackage
+        product: LocalLMLabSDKRemote
