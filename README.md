@@ -1,43 +1,86 @@
 # LocalLM Lab
 
-LocalLM Lab is a macOS app for running local AI models — it turns your Mac
-into a private, offline chatbot with an OpenAI-compatible API, and gives
-other apps and scripts a way to call the same local model directly.
+**LocalLM Lab** is a macOS app (macOS 26+, Apple Silicon, Apple Intelligence
+enabled) that turns your Mac into a private chatbot with an OpenAI-compatible
+API — fully offline with Apple's on-device model or open-weight models you
+download and run locally, or pointed at a hosted provider when you want one —
+and gives other apps and scripts a way to call whichever model you've picked.
 
-Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](https://thisbrain.ai/locallm)
+It's a single Dock app with five panels:
 
-## What's in this repo
+- **Prompt Playground** — a chat window over the model you've selected.
+- **AI Models** — add and switch between Apple's on-device model, Private Cloud
+  Compute, open-weight models you download and run locally via MLX, and hosted
+  providers (Claude, GPT, OpenRouter, or any OpenAI-compatible server, with
+  provider-native web search).
+- **Connectors** — System Clock, Filesystem, Weather, Calendar, Reminders,
+  Contacts, and Location access the model can use as tools, each gated by your
+  permission.
+- **MCP Servers** — connect Model Context Protocol servers (tool discovery,
+  OAuth, Keychain-backed tokens) and hand their tools to the model.
+- **API Lab** — an OpenAI-compatible `/v1` endpoint served by the app itself
+  (localhost, plus optional LAN HTTPS with a self-signed cert). Point any
+  OpenAI-SDK tool at your Mac.
 
-- **[toolkit/](toolkit/)** — the `localai-cli` toolkit (zip + `.sha256`), one per
-  release, checked in here. Latest: `localai-toolkit-1.0.0-beta.3-arm64.zip`. Full CLI
-  reference: [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
-- **[examples/](examples/)** — Code samples, split by feature:
-  - **api-lab/** — Scripts and a sample chat app for the API Lab feature
-    (LocalLM Lab's OpenAI-compatible HTTP endpoint).
-  - **localai-cli/** — Python examples calling the `localai-cli` toolkit
-    directly (no HTTP server, subprocess + JSON on stdin/stdout).
-  - **localai-cli-swift/** — The same examples in Swift.
-  - **plate-today/**, **plate-today-tools/**, **repo-qa/**, **workspace-buddy/**,
-    **components-demo/**, **code-buddy/**, **os-matrix/**, and **model-switch/** —
-    reference apps for the LocalLM Lab SDK, see below.
-- **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
-  managing MCP servers, built on the SDK's public API.
+It began local-only — hence the name — and 1.0 added the hosted providers behind
+the same interface, so "local" is now the default rather than the only option.
+On macOS 26 only Apple's on-device model runs; open-weight (MLX) models and the
+hosted providers need macOS 27. **Private Cloud Compute** is wired up but needs
+an Apple entitlement that is still pending, so it is inert in this beta.
+
+**Download:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm), or the
+DMG + `.sha256` on
+[`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases).
 
 ## LocalLM Lab SDK
 
-> **1.0.0-beta — model layer builds for macOS 26 & 27** — offer Apple's on-device model, Private
-> Cloud Compute, Claude (Foundation Models *or* the online API), online providers (GPT /
-> OpenRouter / any OpenAI-compatible server, with provider-native web search), and locally-run
-> open-weight (MLX) models behind one API. `SystemModelProvider` works on macOS 26; the rest
-> need macOS 27. Coming from `0.8.x`? See **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)**
-> — it's mostly additive, with one enum-resilience compile caveat.
+The engine LocalLM Lab runs on is also published as an SDK — binary xcframeworks
+you link into your own native macOS app. `LocalLMLabSDKCore` carries the
+connectors, a full MCP client, Core's Workspace (filesystem) tools, and the 1.0
+model layer — routing and residency across every provider behind one API, with
+`SystemModelProvider` (Apple on-device) built in. Add the provider modules you
+need: `LocalLMLabSDKInference` (open-weight models via MLX),
+`LocalLMLabSDKClaude` (Claude through the Foundation Models interface, via `ClaudeForFoundationModels`),
+`LocalLMLabSDKRemote` (hosted providers — GPT, Claude's online API, OpenRouter,
+any OpenAI-compatible server), and `LocalLMLabSDKComponents` (prebuilt SwiftUI).
+Proven under App Sandbox, with a signed path to both Developer ID distribution
+and the Mac App Store — it is not a demo dependency, LocalLM Lab itself runs on
+it. Full developer guide:
+**[docs/sdk-guide.md](docs/sdk-guide.md)**. Deeper walkthrough of the SDK and its
+reference apps is [further down](#building-on-the-sdk).
 
-Building your own native macOS app instead? `LocalLMLabSDKCore` links directly into your app's
-binary — Calendar/Reminders/Contacts/Location access, a full MCP client (tool discovery, OAuth,
-Keychain-backed token storage), Core's Workspace tools, and (1.0) the model layer — routing +
-residency across `SystemModelProvider` / `ClaudeModelProvider` / `MLXModelProvider`. Proven under
-App Sandbox with a signed path to both Developer ID distribution and the Mac App Store. It's not
-a demo dependency — LocalLM Lab itself runs on this SDK.
+## About this repo
+
+`ancientcomputing/locallm` is the public home for everything shipped to LocalLM
+Lab users and SDK developers. The app and SDK *source* stay in private repos;
+what's public here is:
+
+- **[SDK releases](CHANGELOG.md)** — the SwiftPM consumption manifests, binary
+  xcframeworks (one GitHub Release per version, tag `v<version>`), the developer
+  guide, and a machine-checked [API surface](docs/api-surface.md).
+- **[examples/](examples/)** — a dozen small, runnable SDK reference apps (one
+  per integration path), plus scripts for the `localai-cli` toolkit and the
+  OpenAI-compatible API Lab endpoint. Full list with descriptions in the
+  [Building on the SDK](#building-on-the-sdk) section below.
+- **[toolkit/](toolkit/)** — the `localai-cli` toolkit (zip + `.sha256`).
+  `0.6`–`1.0.0-beta.3` are checked in here; from `1.0.0-beta.4` on it ships as a
+  release asset on
+  [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
+  alongside the app DMG. See that folder's README to download and verify; full
+  CLI reference at
+  [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html).
+- **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
+  managing MCP servers and models, built on the SDK's public API.
+- **[skills/locallmlab-swift-app/](skills/locallmlab-swift-app/)** — a repo-local
+  Agent Skill for building SDK apps with Claude Code or Codex.
+
+## Building on the SDK
+
+> **1.0.0-beta — the model layer builds for macOS 26 & 27.** `SystemModelProvider` works on
+> macOS 26; MLX, `ClaudeForFoundationModels`, the hosted providers, and Private Cloud Compute
+> need macOS 27. Coming from `0.8.x`? See
+> **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** — it's mostly additive, with one
+> enum-resilience compile caveat.
 
 Two ways to turn a connector or MCP server into something the on-device model can actually call as
 a tool. **Path A**: drop in a ready-made `Tool` Core already ships for it —
@@ -64,33 +107,48 @@ for the full framing.
   for developers using Codex or Claude Code to build macOS Swift apps with this SDK. Codex
   discovers it through `.agents/skills/locallmlab-swift-app`; Claude Code discovers it through
   `.claude/skills/locallmlab-swift-app`.
-- **[examples/plate-today/](examples/plate-today/)** — Calendar + Reminders + the Todoist MCP
-  server, Path B: a hand-written `Tool` adapter per connector.
-- **[examples/plate-today-tools/](examples/plate-today-tools/)** — the exact same app, rebuilt on
-  Core's ready-made Tools (Path A) instead — diff the two to see precisely what changes.
-- **[examples/repo-qa/](examples/repo-qa/)** — a minimal command-line tool, Path A for MCP: builds
-  a `Tool` for a real no-auth MCP server's (Deepwiki's) own tools straight from their live schema.
-- **[examples/workspace-buddy/](examples/workspace-buddy/)** — a local AI-assisted coding example:
-  pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`
-  (Path A).
-- **[examples/components-demo/](examples/components-demo/)** — a reference app built on
-  `Components`' prebuilt MCP server picker UI instead of wiring one tool programmatically.
-- **[examples/repo-qa-local/](examples/repo-qa-local/)** — `repo-qa` with the answer coming from
-  a locally-run open-weight MLX model instead of Apple's on-device one. The smallest model-layer
-  + `LocalLMLabSDKInference` example.
-- **[examples/workspace-buddy-local/](examples/workspace-buddy-local/)** — `workspace-buddy` with
-  a downloadable MLX model. The one example running the model layer inside App Sandbox.
-- **[examples/code-buddy/](examples/code-buddy/)** — the model layer end to end: a CLI coding
-  agent routing `.heavy` / `.light` to locally-run MLX models, with Core's Workspace tools and
-  an MCP docs server.
-- **[examples/os-matrix/](examples/os-matrix/)** — one `.macOS("26.0")` CLI that runs on both
-  macOS 26 and 27 with no source `#if`, showing `ModelAvailability.requiresOS` gating.
-- **[examples/model-switch/](examples/model-switch/)** — the online / remote providers: add a
-  provider + API key, tick web search, and switch between every configured model (on-device,
-  PCC, Claude-4-FM, GPT, Claude online, OpenRouter) from one chat window. Uses `Components`'
-  `AIModelsSettingsView` for the settings panel.
-- **[docs/annotated-examples.md](docs/annotated-examples.md)** — every reference app's full
-  source, with every SDK touchpoint marked inline.
+
+### Reference apps
+
+Roughly simplest to fullest — every one runnable, with full annotated source in
+[docs/annotated-examples.md](docs/annotated-examples.md):
+
+- **[examples/repo-qa/](examples/repo-qa/)** — a minimal CLI: Apple's on-device model calling a
+  real no-auth MCP server's (Deepwiki's) tools, built straight from their live schema (Path A).
+- **[examples/os-matrix/](examples/os-matrix/)** — one CLI binary that runs on macOS 26 **and**
+  27 with no source `#if`, model families gated by OS at registration
+  (`ModelAvailability.requiresOS`).
+- **[examples/repo-qa-local/](examples/repo-qa-local/)** — `repo-qa` again, but the answer comes
+  from a downloaded open-weight MLX model. The smallest model-layer + `LocalLMLabSDKInference`
+  example.
+- **[examples/components-demo/](examples/components-demo/)** — a working "add / manage MCP
+  servers" screen assembled from prebuilt `Components` views, no MCP UI hand-written.
+- **[examples/plate-today-tools/](examples/plate-today-tools/)** — Calendar + Reminders + the
+  Todoist (OAuth MCP) server → a spoken-language day summary, on Core's ready-made tools (Path A).
+- **[examples/plate-today/](examples/plate-today/)** — the same day summary, built with
+  hand-written `Tool` adapters (Path B). Diff the two to see exactly what changes.
+- **[examples/workspace-buddy/](examples/workspace-buddy/)** — sandboxed AI edits to a
+  user-picked folder via Core's `WorkspaceTools`, on-device model, a security-scoped bookmark
+  that survives relaunch.
+- **[examples/workspace-buddy-local/](examples/workspace-buddy-local/)** — `workspace-buddy` +
+  a downloaded MLX model, running the model layer **inside** the App Sandbox, streaming.
+- **[examples/model-switch/](examples/model-switch/)** — GPT / Claude (online API) / OpenRouter
+  + on-device behind one chat call site, with provider-run web search and citations. Uses
+  `Components`' `AIModelsSettingsView` for the settings panel.
+- **[examples/security-demo/](examples/security-demo/)** — a "Security" panel mapping to
+  `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they prompt), a
+  frontier model against Calendar + a Todoist MCP server. The runnable companion to the
+  tool-authorization docs.
+- **[examples/code-buddy/](examples/code-buddy/)** — a CLI coding agent: two models with
+  routing, Core's Workspace + host `Process` tools, an MCP docs server, a persistent REPL
+  session.
+- **[examples/aiql/](examples/aiql/)** — a plain-English request → one read-only SQL `SELECT`
+  over an MCP dataset → the CSV you asked for. Sandboxed SwiftUI, a downloaded local model,
+  zero fabricated values (the model writes the query, the host runs it read-only).
+
+Plus **[examples/api-lab/](examples/api-lab/)** (scripts + a chat app for the OpenAI-compatible
+endpoint) and **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cli-swift/](examples/localai-cli-swift/)**
+(calling the `localai-cli` toolkit directly), which don't link the SDK.
 
 ## Roadmap
 
