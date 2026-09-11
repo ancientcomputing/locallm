@@ -1,0 +1,369 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A857591E197763C585F5E82 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3C82FFAD7EC2BC797F1967 /* AppModel.swift */; };
+		5A0D73B41B8390B64603FBCD /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = F4B154FEF70BD06424523FD9 /* LocalLMLabSDKCore */; };
+		87EBB9B4048145652745717C /* ModelSwitchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB14159899588803E8E6F718 /* ModelSwitchApp.swift */; };
+		99C77F27F9654F0C8C0E29D5 /* LocalLMLabSDKRemote in Frameworks */ = {isa = PBXBuildFile; productRef = 5CFDC25BB5A7D4D3DFDC0110 /* LocalLMLabSDKRemote */; };
+		DE1153DD66CF8D0E04A5DB14 /* ProviderGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C393611EAE1342AB79C4640E /* ProviderGlue.swift */; };
+		FA1226107E6D7BFF0534D39E /* LocalLMLabSDKComponents in Frameworks */ = {isa = PBXBuildFile; productRef = 3BF421DD79A24BD701EE89D3 /* LocalLMLabSDKComponents */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		756DA25283FD61E759569B8C /* Components */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Components; path = ../../Components; sourceTree = SOURCE_ROOT; };
+		9AFE3E367BE5D7A7A8AEA285 /* ModelSwitch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ModelSwitch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF3C82FFAD7EC2BC797F1967 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C393611EAE1342AB79C4640E /* ProviderGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderGlue.swift; sourceTree = "<group>"; };
+		DB14159899588803E8E6F718 /* ModelSwitchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSwitchApp.swift; sourceTree = "<group>"; };
+		E4020AD084B65DACFB3B29A5 /* model-switch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "model-switch"; path = .; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		567A74288E41BF4E384C07C0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A0D73B41B8390B64603FBCD /* LocalLMLabSDKCore in Frameworks */,
+				FA1226107E6D7BFF0534D39E /* LocalLMLabSDKComponents in Frameworks */,
+				99C77F27F9654F0C8C0E29D5 /* LocalLMLabSDKRemote in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		38C767307FF054EBCDE1B6B5 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				AC5473015211557F7F550229 /* ModelSwitch */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		AC5473015211557F7F550229 /* ModelSwitch */ = {
+			isa = PBXGroup;
+			children = (
+				AF3C82FFAD7EC2BC797F1967 /* AppModel.swift */,
+				DB14159899588803E8E6F718 /* ModelSwitchApp.swift */,
+				C393611EAE1342AB79C4640E /* ProviderGlue.swift */,
+			);
+			path = ModelSwitch;
+			sourceTree = "<group>";
+		};
+		AF0B1AEE11919BF41AB4C85D = {
+			isa = PBXGroup;
+			children = (
+				C258614AD0985EF98090FD6B /* Packages */,
+				38C767307FF054EBCDE1B6B5 /* Sources */,
+				D1FB76D1F0C9169EBCAC923B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C258614AD0985EF98090FD6B /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				756DA25283FD61E759569B8C /* Components */,
+				E4020AD084B65DACFB3B29A5 /* model-switch */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		D1FB76D1F0C9169EBCAC923B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9AFE3E367BE5D7A7A8AEA285 /* ModelSwitch.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D11043225ED4E28351E6DD71 /* ModelSwitch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 826A5D7B632A717AA09E599D /* Build configuration list for PBXNativeTarget "ModelSwitch" */;
+			buildPhases = (
+				65A5179F8C7CD17FE3337022 /* Sources */,
+				567A74288E41BF4E384C07C0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ModelSwitch;
+			packageProductDependencies = (
+				F4B154FEF70BD06424523FD9 /* LocalLMLabSDKCore */,
+				3BF421DD79A24BD701EE89D3 /* LocalLMLabSDKComponents */,
+				5CFDC25BB5A7D4D3DFDC0110 /* LocalLMLabSDKRemote */,
+			);
+			productName = ModelSwitch;
+			productReference = 9AFE3E367BE5D7A7A8AEA285 /* ModelSwitch.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		58D11EFE54476A6FDB981153 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					D11043225ED4E28351E6DD71 = {
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 69196E96F9212FC72585B49D /* Build configuration list for PBXProject "ModelSwitch" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = AF0B1AEE11919BF41AB4C85D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4BDC707E2E34ADA0FF4383C8 /* XCLocalSwiftPackageReference "../../Components" */,
+				8A3EC1415D45DFB573A738C7 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D1FB76D1F0C9169EBCAC923B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D11043225ED4E28351E6DD71 /* ModelSwitch */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		65A5179F8C7CD17FE3337022 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A857591E197763C585F5E82 /* AppModel.swift in Sources */,
+				87EBB9B4048145652745717C /* ModelSwitchApp.swift in Sources */,
+				DE1153DD66CF8D0E04A5DB14 /* ProviderGlue.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		83517DC389D87B0BFF722509 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/ModelSwitch-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.modelswitch;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		90BFC838246BBECB8A016F37 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B53FD4795AFD58AB5E254572 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		EEBB35C20979518FCBB1FE92 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/ModelSwitch-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.modelswitch;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		69196E96F9212FC72585B49D /* Build configuration list for PBXProject "ModelSwitch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90BFC838246BBECB8A016F37 /* Debug */,
+				B53FD4795AFD58AB5E254572 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		826A5D7B632A717AA09E599D /* Build configuration list for PBXNativeTarget "ModelSwitch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				83517DC389D87B0BFF722509 /* Debug */,
+				EEBB35C20979518FCBB1FE92 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4BDC707E2E34ADA0FF4383C8 /* XCLocalSwiftPackageReference "../../Components" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Components;
+		};
+		8A3EC1415D45DFB573A738C7 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3BF421DD79A24BD701EE89D3 /* LocalLMLabSDKComponents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKComponents;
+		};
+		5CFDC25BB5A7D4D3DFDC0110 /* LocalLMLabSDKRemote */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKRemote;
+		};
+		F4B154FEF70BD06424523FD9 /* LocalLMLabSDKCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 58D11EFE54476A6FDB981153 /* Project object */;
+}

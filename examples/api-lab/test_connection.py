@@ -14,9 +14,9 @@ EXPECTED BEHAVIOR (if everything is working)
 WHAT FAILURE LOOKS LIKE
     - A connection error ("Connection refused" / timeout) almost always
       means the API server is turned Off in LocalLM Lab, or the port
-      below doesn't match what's shown in API Settings.
+      below doesn't match what's shown in API Lab.
     - A 401 error means the token below is wrong or was regenerated
-      since you copied it — copy the current token from API Settings.
+      since you copied it — copy the current token from API Lab.
     - Any other error will be printed with a short explanation.
 """
 
@@ -45,11 +45,11 @@ def main():
     except APIConnectionError:
         print("❌ FAIL — could not connect.")
         print("   Check that the API server is turned On in LocalLM Lab,")
-        print(f"   and that {BASE_URL} matches the Base URL shown in API Settings.")
+        print(f"   and that {BASE_URL} matches the Base URL shown in API Lab.")
         sys.exit(1)
     except AuthenticationError:
         print("❌ FAIL — authentication rejected (bad or stale token).")
-        print("   Copy the current token from API Settings and update TOKEN above.")
+        print("   Copy the current token from API Lab and update TOKEN above.")
         sys.exit(1)
     except OpenAIError as e:
         print(f"❌ FAIL — unexpected API error: {e}")

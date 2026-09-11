@@ -8,7 +8,7 @@
 // below is pre-filled with the exact server/tool/prompt from that page.
 //
 // SETUP (about a minute)
-//     1. Run LocalLM Lab, open the MCP Servers panel (menu bar tray icon).
+//     1. Run LocalLM Lab, open the MCP Servers panel.
 //     2. Add Server -> URL: https://mcp.deepwiki.com/mcp, display name:
 //        "DeepWiki", auth type: None. Click Add - no sign-in required.
 //     3. In the DeepWiki entry, enable the "read_wiki_structure" tool
@@ -40,7 +40,7 @@ let env = ProcessInfo.processInfo.environment
 let localaiCLIPath = env["LOCALAI_CLI_PATH"]
     ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("localai-cli").path
 let localaiConfigPath = env["LOCALAI_CONFIG_PATH"]
-    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/localai-config.json"
+    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/app-config.json"
 
 // Exactly the server URL, tool, and example prompt from web/mcp-servers.html's
 // DeepWiki section - nothing to fill in yourself.

@@ -3,7 +3,7 @@ run_localai_mcp.py — call localai-cli with an MCP server tool, from Python
 
 WHAT THIS SCRIPT DOES
     Same pattern as run_localai.py (spawn localai-cli, JSON on stdin/stdout,
-    no LocalLM Lab server involved), but requests an MCP-server tool instead
+    no HTTP server), but requests an MCP-server tool instead
     of (or alongside) a built-in connector, via the "mcp_tools" field:
 
         "mcp_tools": [{"server": "<mcp server URL>", "tool": "<tool name>"}]
@@ -23,7 +23,7 @@ REQUIREMENTS
     - At least one MCP server connected and enabled via LocalLM Lab's MCP
       Servers screen, with the specific tool below enabled on it. Open MCP
       Servers in LocalLM Lab to see the exact server URL and tool names —
-      both must match exactly what's in localai-config.json's "mcp_servers"
+      both must match exactly what's in app-config.json's "mcp_servers"
       array.
 
 EXPECTED BEHAVIOR (if everything is working)
@@ -35,7 +35,7 @@ EXPECTED BEHAVIOR (if everything is working)
 
 WHAT FAILURE LOOKS LIKE
     - {"error": "MCP server \"...\" is not configured"} — the URL in
-      MCP_SERVER below doesn't match any server in localai-config.json;
+      MCP_SERVER below doesn't match any server in app-config.json;
       double check it against LocalLM Lab's MCP Servers screen.
     - {"error": "MCP server \"...\" is not enabled"} — the server is
       configured but its toggle is off in MCP Servers.
@@ -58,10 +58,10 @@ LOCALAI_CLI_PATH = os.environ.get(
 )
 LOCALAI_CONFIG_PATH = os.environ.get(
     "LOCALAI_CONFIG_PATH",
-    os.path.expanduser("~/Library/Application Support/LocalLM Lab/localai-config.json"),
+    os.path.expanduser("~/Library/Application Support/LocalLM Lab/app-config.json"),
 )
 # Must match a server's "url" and one of its tools' "name" exactly, as they
-# appear in localai-config.json's "mcp_servers" array (see MCP Servers in
+# appear in app-config.json's "mcp_servers" array (see MCP Servers in
 # LocalLM Lab). Both server and tool must already be enabled there.
 MCP_SERVER = os.environ.get("LOCALAI_MCP_SERVER", "https://example-mcp-server.com/mcp")
 MCP_TOOL = os.environ.get("LOCALAI_MCP_TOOL", "example_tool")

@@ -1,41 +1,155 @@
 # Workspace Buddy
 
-The SDK's fourth reference app, and its first that writes to disk: pick a folder, describe a
-change, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools` (Path A,
-see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
-A local, more modest take on AI-assisted coding — not Claude Code, but a real demonstration of
-what's possible entirely on-device.
+**Workspace Buddy** is a small Mac app for AI-assisted edits to a folder of files. You pick a
+folder, type a request in plain English — "add a header comment to every file", "rename `oldName`
+to `newName` throughout" — and the on-device model reads the files and makes the changes. It's a
+modest, entirely-local take on AI-assisted coding: not Claude Code, but everything runs on your
+Mac, and the model can only touch the one folder you chose.
 
-Requires macOS 26+ on Apple Silicon with Apple Intelligence enabled.
+**What it highlights for SDK developers:**
 
-## Requires SDK 0.8.0+
+- **Giving a model safe, scoped access to files.** Core's `WorkspaceTools` — list, read, create,
+  and edit files — are ready-made tools you drop into the model's tool array; you write no file
+  I/O and no per-tool code. Every path they touch is confined to the folder the user picked
+  ("Path A" — see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
+- **A user-picked folder that survives relaunch, under App Sandbox.** The app is always sandboxed
+  (the Mac App Store requires it). A sandboxed app can't simply reopen a folder the user chose
+  last time — it has to save a *security-scoped bookmark*. This app shows that pattern end to
+  end: `NSOpenPanel` → bookmark → the same folder still accessible on the next launch. One
+  entitlement, no permission dialog.
+- **Choosing which tools to expose.** Core also ships a delete tool; this app deliberately leaves
+  it out — a coding assistant that can delete files unprompted is a bigger risk than one that
+  only reads, creates, and edits. (More in
+  [*What this app does, and doesn't, do*](#what-this-app-does-and-doesnt-do) below.)
 
-Same situation as `plate-today-tools`/`repo-qa`, same reason: this app's whole point is
-`WorkspaceAccess`/`WorkspaceTools`, which shipped starting with `0.8.0`. Building against
-`0.7.0`/`0.7.1` **fails to compile** — `cannot find 'ListWorkspaceFilesTool' in scope` — not
-"runs with less functionality."
+## What you'll see
 
-## Getting the SDK
+Run the signed build (`packaging/build-and-sign.sh`, below — a plain `swift run` is compile-only
+here). Open the `.app`, click **Choose Folder…**, pick a throwaway directory, type a request, hit
+**Go**. The model works for a few seconds, then the files in that folder change on disk — check
+with `git diff` or your editor.
+
+Requires macOS 27 on Apple Silicon with Apple Intelligence enabled.
+
+## About the model
+
+This app uses **Apple's on-device Foundation model** — the small language model built into macOS,
+the same one Apple Intelligence features use. It runs locally with zero setup, but it's modest:
+a few billion parameters, tuned for short well-scoped tasks, with a context window of only
+~8,000 tokens (so it can't hold a large file, let alone a whole project, at once).
+
+Realistic asks: "rename `oldName` to `newName` in this file", "add a doc comment to each
+function", "convert this JSON to YAML". It will struggle with big files, many files in one
+request, or open-ended refactors, and it tool-calls less reliably than a larger model.
+
+**Prompts to try.** Point it at a throwaway folder with a handful of small text/code files (a
+copy of some project's `Sources/`, or just make a few by hand), then paste one of these:
+
+- `List the files here, then add a one-line comment with the file's name to the top of each .swift file.`
+- `In README.md, replace every occurrence of "TODO" with "DONE".`
+- `Create a file called NOTES.md with a two-sentence summary of what this folder contains.`
+- `Rename the function greet to sayHello in Sources/App/main.swift, including any calls to it in that file.`
+- `Read config.json and write the same data as config.yaml next to it.`
+
+Each is one well-scoped change to one or two named files — the shape the on-device model handles
+reliably. After **Go**, confirm with `git diff` (or your editor); the model's summary is not the
+source of truth, the files on disk are.
+
+For more capability while staying local, [`workspace-buddy-local`](../workspace-buddy-local) is
+this same app running a downloadable open-weight model (e.g. an 8B). The SDK can also route to
+Claude if a cloud model is acceptable — see [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
+
+## Getting the SDK & toolchain
+
+Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your terminal session
+(re-run it in every new terminal).
+
+**1. Install the Xcode 27 beta.** Download it from
+[developer.apple.com/xcode](https://developer.apple.com/xcode/) and drag it to `/Applications`
+(it installs as `Xcode-beta.app`, alongside any stable Xcode). This example needs it — a stable
+Xcode fails with `'v27' is unavailable` because `Package.swift` requires `platforms: [.macOS("27.0")]`.
+
+**2. Point `swift` at the Xcode 27 beta** for the terminal you'll build from:
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 swift build
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
 ```
 
-## Real build: `packaging/build-and-sign.sh`
+Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.3` with no further
+setup — `export LOCALLM_SDK_VERSION=<version>` to pin a different published release.
+(`WorkspaceAccess`/`WorkspaceTools`, this app's whole point, first shipped in SDK `0.8.0`, but on
+macOS 27 you use `1.0.0-beta.3+`.)
+
+**3. Compile-check:**
 
 ```bash
-LOCALLM_SDK_VERSION=0.8.0 \
-APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+swift build
+```
+
+This just proves it builds. To *actually run* it: open the Xcode project (next), or make a
+signed `.app` with `packaging/build-and-sign.sh` (further below).
+
+## Open in Xcode and Run
+
+A committed `WorkspaceBuddy.xcodeproj` is the lowest-friction way to try it. **Open it in
+`Xcode-beta.app`, not a stable Xcode** (the target is macOS 27 → a stable Xcode fails with
+`'v27' is unavailable`). Launch `Xcode-beta.app` and **File ▸ Open**, or:
+
+```bash
+open -a Xcode-beta WorkspaceBuddy.xcodeproj
+```
+
+Pick the **WorkspaceBuddy** scheme and Run — a real sandboxed `.app` (menu bar, Dock icon, the
+`files.user-selected.read-write` entitlement). Click **Choose Folder…**, pick a throwaway
+directory, type a request, hit **Go**.
+
+**Signing.** The project is set to **Automatic** with no hard-coded team, so Xcode signs the Run
+build with your **Apple Development** identity. That matters here: a security-scoped bookmark is
+bound to the app's signing identity, and an ad-hoc identity changes on every rebuild — so under
+ad-hoc you re-pick the folder after every rebuild, and the "bookmark survives relaunch" point of
+this example never actually shows. A stable team signature fixes that.
+
+| Your Xcode setup | What happens on Run |
+|---|---|
+| One Apple ID in **Xcode ▸ Settings ▸ Accounts** (**free** is enough) | picked automatically — stable `Apple Development` signing, bookmark persists across rebuilds |
+| No Apple ID | Run stops with *"requires a development team"* — add a free Apple ID, **or** target ▸ **Signing & Capabilities** ▸ **Sign to Run Locally** (ad-hoc; runs, but you re-pick the folder each rebuild) |
+
+Only the Xcode Run build is affected. `packaging/build-and-sign.sh` (below) ignores the project
+file and signs with whatever `APP_IDENTITY` you pass it.
+
+Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml`, not the `.xcodeproj`,
+then `xcodegen generate`.
+
+## Running it
+
+Unlike the CLI examples, this is a sandboxed SwiftUI `.app`, and the whole point — a
+security-scoped bookmark surviving relaunch — only means anything with the sandbox on and the
+`com.apple.security.files.user-selected.read-write` entitlement in place. A bare `swift run` gets
+neither, so it's compile-only. Two ways to get a real, entitled build:
+
+- **The Xcode project above** — the fast path; a locally-signed `.app` you can run and iterate on.
+- **`packaging/build-and-sign.sh`** — for a `.app` you can hand to another Mac (Developer-ID
+  signed and notarizable). It needs a signing identity; a **free "Apple Development"** one is
+  enough for a local run (an ad-hoc build won't hold the sandbox grant), a Developer ID for
+  distribution. See the
+  [signing table in `../README.md`](../README.md#signing-a-app--app_identity).
+
+```bash
+APP_IDENTITY="Apple Development: Your Name (TEAMID)" \
 NOTARIZE_APP=0 \
-./packaging/build-and-sign.sh
+  ./packaging/build-and-sign.sh
 ```
 
-Unlike `plate-today`, sandboxing here is **not** a build-time opt-in — this app is sandboxed
-unconditionally. That's what actually makes the security-scoped bookmark pattern in §8 necessary
-to demonstrate: unsandboxed, a plainly-remembered folder path would just keep working across
-relaunches, and the example wouldn't prove anything about the SDK's real guidance. No
-`NS*UsageDescription` key or TCC prompt is involved — `NSOpenPanel` plus the
-`com.apple.security.files.user-selected.read-write` entitlement is the whole story.
+(`NOTARIZE_APP=0` skips the Apple notarization round-trip — fine for launching the result
+yourself, not for handing it to another Mac. `DEVELOPER_DIR` and `LOCALLM_SDK_VERSION` come from
+step 2.) The signed `.app` lands in `dist/`; open it, click **Choose Folder…**, pick a throwaway
+directory, type a request in the box, and hit **Go**.
+
+Sandboxing here is **not** a build-time opt-in the way it is for `plate-today` — this app is
+always sandboxed. No `NS*UsageDescription` key or TCC prompt is involved; `NSOpenPanel` plus that
+one entitlement is the whole story.
 
 ## What this app does, and doesn't, do
 
@@ -53,21 +167,22 @@ relaunches, and the example wouldn't prove anything about the SDK's real guidanc
 - **Single-turn per request** — type a request, get a response, type another. Not a full
   multi-turn chat with conversation history; a straightforward extension if you want one.
 
-## Verified live (private repo, source dependency)
+## Verified live
 
-Built, Developer-ID signed, launched as a real sandboxed `.app`; picked a real throwaway scratch
-folder via the actual `NSOpenPanel`; asked it, in plain English, to change one string in an
-existing file — the on-device model called `readWorkspaceFile` then `editWorkspaceFile`, and the
-change landed correctly on disk (verified byte-for-byte afterward). A separate request asking it
-to create a new file with specific content also worked, and a follow-up read of the earlier-edited
-file correctly reflected the change, confirming no stale-cache issues.
+Built, Developer-ID signed, launched as a real sandboxed `.app`; picked a throwaway scratch folder
+via the actual `NSOpenPanel`; asked it, in plain English, to change one string in an existing file
+— the on-device model called `readWorkspaceFile` then `editWorkspaceFile`, and the change landed
+correctly on disk (verified byte-for-byte afterward). A separate request to create a new file also
+worked, and a follow-up read reflected the earlier edit — no stale-cache issues.
 
 ## More
 
+- [`workspace-buddy-local`](../workspace-buddy-local) — this same app running a **downloadable
+  open-weight model** (e.g. an 8B) instead of Apple's, inside App Sandbox.
+- [`plate-today-tools`](../plate-today-tools) — another Path-A app (ready-made Tools), also
+  sandbox-capable, also a GUI.
 - [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) —
-  the prose walkthrough of `WorkspaceAccess`/`WorkspaceTools` and why `editFile` is
-  search-and-replace rather than a diff format.
+  `WorkspaceAccess` / `WorkspaceTools`, and why `editFile` is search-and-replace, not a diff
+  format. §10 — App Sandbox.
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
   every SDK touchpoint marked.
-- [`plate-today-tools`](../plate-today-tools) — the other sandboxed-by-default-capable example, for
-  comparison (there, sandboxing is opt-in).

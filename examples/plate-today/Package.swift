@@ -10,34 +10,29 @@ import PackageDescription
 
 // MARK: - Which SDK version to build against
 
-// Deliberately NOT implicit, and deliberately NOT silently defaulted. This manifest previously
-// baked in a single hardcoded url/checksum, which is how it ended up pointed at a draft release
-// that 404s on an anonymous `swift build` (confirmed live), then at a TEMPORARY stand-in
-// (ancientcomputing/locallm-staging) with a comment nobody was forced to actually read before
-// building. Neither gave a developer honest, visible control over which SDK release they're
-// pulling, or a clear failure when that choice was never made. Now: set LOCALLM_SDK_VERSION
-// explicitly, e.g. `LOCALLM_SDK_VERSION=0.7.0 swift build`, or this manifest fails fast with a
-// clear message instead of silently resolving to whichever version happened to be hardcoded.
 struct SDKRelease {
     let url: String
     let checksum: String
 }
 
-// The source of truth for which SDK versions this Package.swift knows how to build against —
-// add a new entry here whenever a new Core.xcframework release is published.
+// `defaultSDKVersion` is the release this branch's examples build against with no setup — what
+// "clone, open in Xcode, Run" uses. `knownSDKReleases` carries it plus the previous release.
+// To build against a different published version: set LOCALLM_SDK_VERSION in your shell (works
+// for `swift build` / CI, NOT inside Xcode — its package resolution ignores shell env vars), or
+// edit `defaultSDKVersion` here. For a release not listed, add its entry — the URL follows the
+// pattern below and the checksum is the `.sha256` file next to the zip on that GitHub release —
+// or just replace the two strings in place.
+let defaultSDKVersion = "1.0.0-beta.3"
+
 let knownSDKReleases: [String: SDKRelease] = [
-    "0.7.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
-        checksum: "8853f891f782cb052dd49850e6490558ba68b21b6970a0e1b83d393ab50f8289"
+    "1.0.0-beta.2": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.2/LocalLMLabSDKCore-1.0.0-beta.2.xcframework.zip",
+        checksum: "e3e687e503d3c563e6548b472dc8eb415475f0402845e9b4a56c58c15105c974"
     ),
-    "0.7.1": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.1/LocalLMLabSDKCore-0.7.1.xcframework.zip",
-        checksum: "d165bc1fbed790ac2264502c0cfa16336b68d2d7d9d282964742bd8b73f08e21"
+    "1.0.0-beta.3": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
+        checksum: "a49b8bfcde340d8b86bf106d2af2cb9d84f3839a3bc1695016f3952a3fcdfb92"
     ),
-    "0.8.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.8.0/LocalLMLabSDKCore-0.8.0.xcframework.zip",
-        checksum: "3a7369e3fbd88de0bcf5cbe2e0a4202b2b919b67c20f364fb8bb2572fd1b9703"
-    )
 ]
 
 func failManifest(_ message: String) -> Never {
@@ -45,14 +40,7 @@ func failManifest(_ message: String) -> Never {
     exit(1)
 }
 
-guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] else {
-    failManifest("""
-    error: LOCALLM_SDK_VERSION is not set.
-    Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.7.0 swift build
-    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    """)
-}
+let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] ?? defaultSDKVersion
 
 guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
     failManifest("""
@@ -80,13 +68,26 @@ let includeLocationWeather = ProcessInfo.processInfo.environment["PLATETODAY_INC
 // PLATETODAY_INCLUDE_TODOIST=0 to exclude it temporarily during that kind of loop.
 let includeTodoist = ProcessInfo.processInfo.environment["PLATETODAY_INCLUDE_TODOIST"] != "0"
 
+// Build-time opt-in, default OFF — same shape as Location/Weather above, for the same kind of
+// reason: Contacts isn't part of plate-today's daily-summary narrative (see SearchContactsTool's
+// own comment), so it's an on-demand enrichment tool the model reaches for only if relevant, not
+// a fourth thing checked every run — and defaulting it off avoids an extra TCC prompt for anyone
+// just trying the default build. Set PLATETODAY_INCLUDE_CONTACTS=1 to include it.
+let includeContacts = ProcessInfo.processInfo.environment["PLATETODAY_INCLUDE_CONTACTS"] == "1"
+
 var swiftSettings: [SwiftSetting] = []
 if includeLocationWeather { swiftSettings.append(.define("PLATETODAY_INCLUDE_LOCATION_WEATHER")) }
 if includeTodoist { swiftSettings.append(.define("PLATETODAY_INCLUDE_TODOIST")) }
+if includeContacts { swiftSettings.append(.define("PLATETODAY_INCLUDE_CONTACTS")) }
 
 let package = Package(
     name: "PlateToday",
     platforms: [.macOS("26.0")],
+    products: [
+        // Vend the Core binary as a library product so the XcodeGen .xcodeproj variant
+        // (project.yml) can depend on it by name. `swift build` doesn't need this.
+        .library(name: "LocalLMLabSDKCore", targets: ["LocalLMLabSDKCore"])
+    ],
     targets: [
         .binaryTarget(
             name: "LocalLMLabSDKCore",
@@ -96,7 +97,16 @@ let package = Package(
         .executableTarget(
             name: "PlateToday",
             dependencies: ["LocalLMLabSDKCore"],
-            swiftSettings: swiftSettings
+            swiftSettings: swiftSettings,
+            linkerSettings: [
+                // SwiftPM's Swift Build system (default in the Xcode 27 toolchain) gives a bare
+                // executable target no LC_RPATH, so `@rpath/LocalLMLabSDKCore.framework/...`
+                // resolves to nothing and the app aborts at launch ("no LC_RPATH's found").
+                // The Core framework sits next to the executable — in `swift build` output and,
+                // once packaged, in Contents/MacOS — so point rpath at @executable_path. Same
+                // fix as code-buddy.
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])
+            ]
         )
     ]
 )

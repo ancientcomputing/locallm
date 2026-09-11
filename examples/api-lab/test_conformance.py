@@ -133,11 +133,11 @@ def main():
     except APIConnectionError:
         print("❌ Could not connect at all.")
         print("   Check that the API server is turned On in LocalLM Lab,")
-        print(f"   and that {BASE_URL} matches the Base URL shown in API Settings.")
+        print(f"   and that {BASE_URL} matches the Base URL shown in API Lab.")
         sys.exit(1)
     except AuthenticationError:
         print("❌ Authentication rejected on the very first request.")
-        print("   Copy the current token from API Settings and update TOKEN above.")
+        print("   Copy the current token from API Lab and update TOKEN above.")
         sys.exit(1)
     except OpenAIError:
         pass  # let individual checks below handle/report other errors

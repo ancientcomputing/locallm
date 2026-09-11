@@ -13,7 +13,7 @@ APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APP_NAME="Workspace Buddy"
 VERSION="${VERSION:-0.1.0}"
-APP_IDENTITY="${APP_IDENTITY:-${SIGN_IDENTITY:-}}"
+APP_IDENTITY="${APP_IDENTITY:-${SIGN_IDENTITY:--}}"
 KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE:-${NOTARY_PROFILE:-}}"
 DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 TEAM_ID="${TEAM_ID:-}"
@@ -60,7 +60,18 @@ notarize_and_wait() {
   fi
 }
 
-require_env APP_IDENTITY "$APP_IDENTITY"
+if [[ "$APP_IDENTITY" == "-" ]]; then
+  ADHOC=1
+  SIGN_FLAGS=""            # ad-hoc: no hardened runtime (it rejects the Team-signed SDK frameworks
+  NOTARIZE_APP=0           # under an ad-hoc outer signature) and no secure timestamp
+  echo "APP_IDENTITY not set - signing ad-hoc. The .app runs on THIS Mac only: Gatekeeper rejects"
+  echo "an ad-hoc app anywhere else, and TCC / App Sandbox grants are unreliable. Set APP_IDENTITY"
+  echo "to any codesigning identity (a free 'Apple Development' cert from Xcode > Settings >"
+  echo "Accounts works) to fix that; a Developer ID + NOTARIZE_APP=1 to distribute."
+else
+  ADHOC=0
+  SIGN_FLAGS="--options runtime --timestamp"
+fi
 if [[ "$NOTARIZE_APP" == "1" ]]; then
   require_env KEYCHAIN_PROFILE "$KEYCHAIN_PROFILE"
 fi
@@ -72,8 +83,8 @@ require_command spctl
 require_command xcrun
 require_command python3
 
-if ! security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >/dev/null 2>&1; then
-  echo "APP_IDENTITY is not installed or is not valid for codesigning: $APP_IDENTITY" >&2
+if [[ "$ADHOC" == "0" ]] && ! security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >/dev/null 2>&1; then
+  echo "APP_IDENTITY is not a valid codesigning identity: $APP_IDENTITY" >&2
   security find-identity -v -p codesigning || true
   exit 1
 fi
@@ -103,14 +114,20 @@ xcrun actool --output-format human-readable-text --notices --warnings --errors \
 echo "Building Workspace Buddy for arm64..."
 swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift"
 
-BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/WorkspaceBuddy"
+# Ask SwiftPM where it actually put the products rather than hardcoding a triple subdir. The
+# classic build system uses `<build-path>/<triple>/release`; the Swift Build system (default in
+# the Xcode 27 toolchain) uses `<build-path>/out/Products/Release`. --show-bin-path is correct
+# for whichever ran, and doesn't rebuild.
+BIN_DIR="$(swift build --package-path "$APP_ROOT" -c release --arch arm64 --build-path "$BUILD_DIR/swift" --show-bin-path)"
+
+BINARY="$BIN_DIR/WorkspaceBuddy"
 # Core is built as a dynamic library product, so WorkspaceBuddy links against it via @rpath at
 # runtime rather than statically — see plate-today-tools' build-and-sign.sh for the fuller
 # writeup of why a packaged .app needs the Core artifact copied in explicitly and re-signed, and
 # why the on-disk shape (flat dylib vs. framework bundle) differs between this private repo's
 # path-dependency build and the public locallm copy's binaryTarget build.
-CORE_DYLIB="$BUILD_DIR/swift/arm64-apple-macosx/release/libLocalLMLabSDKCore.dylib"
-CORE_FRAMEWORK="$BUILD_DIR/swift/arm64-apple-macosx/release/LocalLMLabSDKCore.framework"
+CORE_DYLIB="$BIN_DIR/libLocalLMLabSDKCore.dylib"
+CORE_FRAMEWORK="$BIN_DIR/LocalLMLabSDKCore.framework"
 if [[ -f "$CORE_DYLIB" ]]; then
   CORE_ARTIFACT_NAME="libLocalLMLabSDKCore.dylib"
   CORE_ARTIFACT_SRC="$CORE_DYLIB"
@@ -136,6 +153,11 @@ cp "$ICON_BUILD_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "$ICON_BUILD_DIR/Assets.car" "$RESOURCES_DIR/Assets.car"
 cp "$BINARY" "$MACOS_DIR/WorkspaceBuddy"
 cp -R "$CORE_ARTIFACT_SRC" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
+# The published Core.xcframework zip currently carries AppleDouble (`._*`) sidecar files and
+# stray xattrs; codesign --deep --strict rejects a bundle containing that "detritus". Strip it
+# from the copy we're about to sign. (Root fix belongs in the SDK's xcframework zip step.)
+find "$MACOS_DIR/$CORE_ARTIFACT_NAME" -name '._*' -delete
+xattr -cr "$MACOS_DIR/$CORE_ARTIFACT_NAME"
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 chmod +x "$MACOS_DIR/WorkspaceBuddy"
 
@@ -143,9 +165,9 @@ echo "Verifying binary is arm64..."
 file "$MACOS_DIR/WorkspaceBuddy"
 
 echo "Signing app bundle..."
-codesign --force --options runtime --timestamp --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
-codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/WorkspaceBuddy"
-codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"
+codesign --force $SIGN_FLAGS --sign "$APP_IDENTITY" "$MACOS_DIR/$CORE_ARTIFACT_NAME"
+codesign --force $SIGN_FLAGS --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$MACOS_DIR/WorkspaceBuddy"
+codesign --force $SIGN_FLAGS --entitlements "$ENTITLEMENTS" --sign "$APP_IDENTITY" "$APP_DIR"
 
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 

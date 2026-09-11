@@ -10,7 +10,7 @@ WHAT THIS SCRIPT DOES
     to make in LocalLM Lab.
 
 SETUP (about a minute)
-    1. Run LocalLM Lab, open the MCP Servers panel (menu bar tray icon).
+    1. Run LocalLM Lab, open the MCP Servers panel.
     2. Add Server → URL: https://mcp.deepwiki.com/mcp, display name:
        "DeepWiki", auth type: None. Click Add — no sign-in required.
     3. In the DeepWiki entry, enable the "read_wiki_structure" tool (every
@@ -39,7 +39,7 @@ LOCALAI_CLI_PATH = os.environ.get(
 )
 LOCALAI_CONFIG_PATH = os.environ.get(
     "LOCALAI_CONFIG_PATH",
-    os.path.expanduser("~/Library/Application Support/LocalLM Lab/localai-config.json"),
+    os.path.expanduser("~/Library/Application Support/LocalLM Lab/app-config.json"),
 )
 
 # Exactly the server URL, tool, and example prompt from web/mcp-servers.html's

@@ -24,6 +24,15 @@ let package = Package(
             name: "ComponentsDemo",
             dependencies: [
                 .product(name: "LocalLMLabSDKComponents", package: "Components")
+            ],
+            linkerSettings: [
+                // SwiftPM's Swift Build system (default in the Xcode 27 toolchain) gives a bare
+                // executable target no LC_RPATH, so `@rpath/LocalLMLabSDKCore.framework/...`
+                // (Core reaches here transitively through Components) resolves to nothing and the
+                // app aborts at launch ("no LC_RPATH's found"). The Core framework sits next to
+                // the executable — in `swift build` output and, once packaged, in Contents/MacOS
+                // — so point rpath at @executable_path. Same fix as code-buddy.
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])
             ]
         )
     ]

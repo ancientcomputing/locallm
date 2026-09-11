@@ -12,7 +12,7 @@ These scripts test a running LocalLM Lab **API** endpoint using the official
 
 ## Setup
 
-1. In LocalLM Lab, open **API Settings** and turn the server **On**.
+1. In LocalLM Lab, open **API Lab** and turn the server **On**.
 2. Copy the **Base URL** and **Token** shown there.
 3. Install the OpenAI SDK if you don't have it: `pip install openai`
 4. Either set environment variables before running any script:
@@ -49,7 +49,7 @@ wrong port, stale token) or something worth reporting.
 
 If a script can't connect at all, double check:
 - The API server is toggled **On** in LocalLM Lab
-- The port in `CONFIG`/env vars matches what's shown in API Settings
+- The port in `CONFIG`/env vars matches what's shown in API Lab
   (remember: on localhost, LocalLM Lab may auto-pick a different port if
   your configured one was busy — always check the Settings screen for the
   actual port in use)

@@ -10,7 +10,7 @@ WHAT THIS SCRIPT DOES
     connectors/MCP tools LocalLM Lab already has permission for:
         - Calendar and Reminders come in as the "calendar"/"reminders"
           connectors (same as run_localai.py's "clock", just two more
-          built-ins — see Local AI Settings).
+          built-ins — see the Connectors screen).
         - Todoist comes in as an MCP tool call (same pattern as
           run_localai_mcp.py) against Todoist's hosted MCP server,
           find-tasks-by-date.
@@ -22,7 +22,7 @@ WHAT THIS SCRIPT DOES
     Todoist using that date — rather than guessing or using a stale/training
     notion of "today".
 
-    Before ever calling localai-cli, this script reads localai-config.json
+    Before ever calling localai-cli, this script reads app-config.json
     itself and checks all four sources are actually usable: the three
     connectors enabled, and the Todoist server connected + enabled with
     find-tasks-by-date enabled on it. This is a deliberate preflight, not
@@ -38,7 +38,7 @@ REQUIREMENTS
       localai-playground-run next to this script (or LOCALAI_CLI_PATH set),
       LocalLM Lab running (connector/MCP calls relay through its chooser
       process over a local socket).
-    - In LocalLM Lab's Local AI Settings: "System Clock", "Calendar", and
+    - In LocalLM Lab's Connectors screen: "System Clock", "Calendar", and
       "Reminders" connectors enabled (Calendar/Reminders each prompt for
       their own TCC grant the first time; System Clock has no permission
       dialog).
@@ -56,8 +56,8 @@ EXPECTED BEHAVIOR (if everything is working)
 WHAT FAILURE LOOKS LIKE
     - "localai-cli not found at ..." — same fix as run_localai.py.
     - {"error": "config file not found: ..."} at the very first check — no
-      localai-config.json exists yet; run LocalLM Lab at least once and open
-      Local AI Settings/MCP Servers so it gets created.
+      app-config.json exists yet; run LocalLM Lab at least once and open
+      the Connectors and MCP Servers screens so it gets created.
     - A preflight checklist with one or more "MISSING" lines and no model
       call at all — this is the expected, helpful-message path when
       something isn't set up yet. Each line names the exact panel/toggle to
@@ -80,18 +80,18 @@ LOCALAI_CLI_PATH = os.environ.get(
 )
 LOCALAI_CONFIG_PATH = os.environ.get(
     "LOCALAI_CONFIG_PATH",
-    os.path.expanduser("~/Library/Application Support/LocalLM Lab/localai-config.json"),
+    os.path.expanduser("~/Library/Application Support/LocalLM Lab/app-config.json"),
 )
 # Same default Todoist hosted MCP server + tool the SDK's Plate Today example
 # uses. Override if you connected Todoist at a different URL, or want a
-# different tool (both need to match what's in localai-config.json's
+# different tool (both need to match what's in app-config.json's
 # "mcp_servers" array exactly — see MCP Servers in LocalLM Lab).
 TODOIST_MCP_URL = os.environ.get("LOCALAI_MCP_SERVER", "https://ai.todoist.net/mcp")
 TODOIST_MCP_TOOL = os.environ.get("LOCALAI_MCP_TOOL", "find-tasks-by-date")
 # ------------------------------------------------------------------------
 
 # Panel labels for the message printed when a connector isn't enabled —
-# "clock" shows up in Local AI Settings as "System Clock", not "Clock".
+# "clock" shows up in the Connectors screen as "System Clock", not "Clock".
 CONNECTOR_LABELS = {"clock": "System Clock", "calendar": "Calendar", "reminders": "Reminders"}
 REQUIRED_CONNECTORS = ["clock", "calendar", "reminders"]
 
@@ -100,7 +100,7 @@ def load_config(path: str) -> dict:
     if not os.path.isfile(path):
         raise RuntimeError(
             f"config file not found: {path}\n"
-            "Run LocalLM Lab at least once and open Local AI Settings/MCP "
+            "Run LocalLM Lab at least once and open the Connectors and MCP Servers screens "
             "Servers so it gets created."
         )
     with open(path, "r") as f:
@@ -122,7 +122,7 @@ def preflight(config: dict) -> list:
         else:
             results.append((
                 connector, False,
-                f'not enabled — turn on "{CONNECTOR_LABELS[connector]}" in Local AI Settings',
+                f'not enabled — turn on "{CONNECTOR_LABELS[connector]}" in the Connectors screen',
             ))
 
     server = next(

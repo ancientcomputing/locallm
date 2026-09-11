@@ -52,7 +52,7 @@ def main():
     except APIConnectionError:
         print("❌ FAIL — could not connect.")
         print("   Check that the API server is turned On in LocalLM Lab,")
-        print(f"   and that {BASE_URL} matches the Base URL shown in API Settings.")
+        print(f"   and that {BASE_URL} matches the Base URL shown in API Lab.")
         sys.exit(1)
     except AuthenticationError:
         print("❌ FAIL — authentication rejected (bad or stale token).")
