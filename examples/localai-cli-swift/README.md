@@ -152,10 +152,11 @@ file is this repo's script-runner boilerplate, not something to copy.
    `~/Library/Application Support/LocalLM Lab/app-config.json` — `localai-cli`
    only reads it. Connector and MCP calls run inside LocalLM Lab's own
    process, so the app must be **running**, not just installed.
-2. Get the `localai-toolkit-<version>-arm64.zip` from
-   [`../../toolkit/`](../../toolkit/) (checked into the repo — see that folder's
-   README) and unzip it — `localai-cli` and `localai-playground-run` are a
-   matched pair.
+2. Get the `localai-toolkit-<version>-arm64.zip` — a release asset on
+   [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
+   from `1.0.0-beta.4` on, or [`../../toolkit/`](../../toolkit/) for older
+   versions (see that folder's README) — and unzip it. `localai-cli` and
+   `localai-playground-run` are a matched pair.
 3. Put both binaries in this folder (or set `LOCALAI_CLI_PATH`).
 
 ## Run

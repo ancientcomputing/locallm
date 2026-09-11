@@ -29,9 +29,12 @@ descriptions. Neither is the "real" one — both ship in Core, and an app can mi
 [`../docs/sdk-guide.md` §7a](../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
 for the full framing.
 
-The `localai-cli` examples require the CLI toolkit itself, shipped in
-[../toolkit/](../toolkit/). See that folder's README to download and
-install it, and [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
+The `localai-cli` examples require the CLI toolkit itself. From `1.0.0-beta.4`
+on it ships as a release asset on
+[`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
+alongside the app DMG (older versions are checked into [../toolkit/](../toolkit/)).
+See that folder's README to download and install it, and
+[thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
 for the full CLI reference.
 
 Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](https://thisbrain.ai/locallm)
