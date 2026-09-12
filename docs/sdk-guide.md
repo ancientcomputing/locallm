@@ -15,9 +15,12 @@ change. `Components` in particular is newer and smaller than `Core`.
 ## Start here: run a real example before reading further
 
 This guide's actual on-ramp is the working code under [`examples/`](../examples/), not the prose
-below — each one is a real, signed, runnable app you can clone and read end to end, not a
-snippet. Pick the one closest to what you're building, then come back to the guide for the parts
-you want to understand more deeply. Ordered smallest → largest:
+below — each one is real, runnable code you can clone and read end to end, not a snippet. Most
+are real signed `.app`s ([`aiql`](../examples/aiql/) is the most complete: App Sandbox, MCP, the
+model layer, and the SQL pipeline all in one place); a few (`repo-qa`, `os-matrix`, `code-buddy`,
+`repo-qa-local`) are plain command-line tools with no packaging step at all. Pick the one closest
+to what you're building, then come back to the guide for the parts you want to understand more
+deeply. Ordered smallest → largest:
 
 | If you want to... | Start with | Lines of code |
 |---|---|--:|
