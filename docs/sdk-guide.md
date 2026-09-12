@@ -7,10 +7,10 @@ open-weight downloads, online-provider settings). Everything here has been
 exercised against real signed apps and real live MCP servers, not just written from the API
 surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
 [`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
-ready-made Tools instead of hand-written ones, see §7a), [`examples/repo-qa`](../examples/repo-qa)
+ready-made Tools instead of hand-written ones, see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)), [`examples/repo-qa`](../examples/repo-qa)
 (a minimal command-line `MCPTool` example against a no-auth server),
 [`examples/workspace-buddy`](../examples/workspace-buddy) (a local AI-assisted coding example —
-pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, §8a — WorkspaceAccess/WorkspaceTools), and
+pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, [§8a](#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) — WorkspaceAccess/WorkspaceTools), and
 [`examples/components-demo`](../examples/components-demo) for the working reference apps this
 guide is drawn from.
 
@@ -85,7 +85,7 @@ prompt browsing, model picker, AI Models settings panel), add `Components` the s
 The release carries **four xcframeworks** plus `Components` as source, all keyed off the same
 `LOCALLM_SDK_VERSION`; link only the ones you use: **`Core`** (always), **`Claude`** (Claude via
 Foundation Models — forces a macOS 27 target), **`Inference`** (local open-weight / MLX models),
-**`Remote`** (online providers — GPT / Claude online / OpenRouter, see §6b), and **`Components`**
+**`Remote`** (online providers — GPT / Claude online / OpenRouter, see [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)), and **`Components`**
 (SwiftUI, consumed as source, not an xcframework). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
 (Remote + Components) are the multi-binary manifest shapes to copy from.
 
@@ -93,7 +93,7 @@ Foundation Models — forces a macOS 27 target), **`Inference`** (local open-wei
 
 As of `1.0.0-beta.2`, `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`
 all have a **macOS 26 deployment floor** — and `LocalLMLabSDKRemote` (added in `1.0.0-beta.3`)
-has a macOS 26 *manifest* floor too, though `RemoteModelProvider` itself is 27-only (see §6b).
+has a macOS 26 *manifest* floor too, though `RemoteModelProvider` itself is 27-only (see [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)).
 One app, one link, runs on both — with the model families that need macOS 27 (Private Cloud
 Compute, open-weight / MLX, online providers) simply absent on 26. The
 `#available` check is one block, at provider registration; everything after it is identical code.
@@ -131,7 +131,7 @@ let answer = try await session.respond(to: prompt)
 - Linking `LocalLMLabSDKInference` on macOS 26 is fine; you just can't register
   `MLXModelProvider` there (guard it behind `#available(macOS 27, *)`).
 - **Claude is the exception.** `LocalLMLabSDKClaude` (a separate binaryTarget on the same
-  release — see §6a) depends on `ClaudeForFoundationModels`, which is hard-pinned to macOS 27,
+  release — see [§6a](#6a-the-model-layer-local-models-routing-sessions)) depends on `ClaudeForFoundationModels`, which is hard-pinned to macOS 27,
   so linking it forces a **macOS 27 deployment target** on whatever links it. To ship a macOS 26
   app *and* offer Claude, put the Claude path in a separate macOS-27-only executable/helper the
   way the LocalLM Lab app does (its `--serve` helper is split into a 27 binary and a 26 binary,
@@ -142,9 +142,9 @@ let answer = try await session.respond(to: prompt)
 Three things are **required**, not optional extras — skipping any one of them produces a confusing
 failure (a silent TCC denial, or a crash on a missing entitlement) rather than a clear error.
 
-### 2a. Info.plist usage-description strings
+### 2a. Info.plist usage-description strings (if using Calendar/Reminders)
 
-For every connector you use (Calendar/Reminders shown here — see §7 (Connectors) for the full connector
+For every connector you use (Calendar/Reminders shown here — see [§7](#7-connectors-calendar-reminders-contacts-location) (Connectors) for the full connector
 list and its Info.plist/entitlement requirements):
 
 ```xml
@@ -154,7 +154,7 @@ list and its Info.plist/entitlement requirements):
 <string>Your own explanation of why your app needs this.</string>
 ```
 
-### 2b. Entitlements
+### 2b. Entitlements (if using Calendar/Reminders)
 
 ```xml
 <key>com.apple.security.personal-information.calendars</key>
@@ -180,7 +180,7 @@ ways.** The specific failure sequence (confirmed live, more than once):
    sign. Sign the binary, then sign the whole bundle **with `--entitlements` again** — that second
    pass is the one that actually matters.
 
-### 2c. OAuth redirect URI — MUST set this yourself
+### 2c. OAuth redirect URI — MUST set this yourself (if using MCP OAuth)
 
 If you connect to any MCP server that uses OAuth (most hosted MCP servers do — e.g. Todoist), you
 **must** set `MCPOAuthFlow.redirectURI` to your own app's URL scheme before calling `connect`:
@@ -209,9 +209,9 @@ resolves a claimed URL scheme to exactly one app, arbitrarily, when more than on
 simply won't route back to your app at all.
 
 Set `MCPOAuthFlow.clientMetadataURL` in the same spot if you're using CIMD instead of Dynamic
-Client Registration — see §3d.
+Client Registration — see [§3d](#3d-cimd-skipping-dynamic-client-registration).
 
-### 2d. Wire the OAuth callback through your AppDelegate, not SwiftUI's `.onOpenURL`
+### 2d. Wire the OAuth callback through your AppDelegate, not SwiftUI's `.onOpenURL` (if using MCP OAuth)
 
 ```swift
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -245,7 +245,7 @@ scene instance unless told otherwise.
 > **Reach for this when** your app's pitch is "connect your own tools" — Todoist, GitHub,
 > Linear, an internal MCP server — rather than you hardcoding every integration one by one.
 > `MCPServerManager.addServer` discovers a server's tools at connect time and hands you back
-> plain descriptors; *you* decide which become model tools (§6, §7a). The auth handling below
+> plain descriptors; *you* decide which become model tools ([§6](#6-general-api-reference), [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)). The auth handling below
 > is the entire reason connecting isn't a one-liner: a server needs no auth, a static token,
 > or a browser OAuth round-trip, and you usually can't tell which up front.
 >
@@ -256,7 +256,7 @@ scene instance unless told otherwise.
 > `Components`' `MCPServerPickerView`).
 
 Adding an MCP server involves one of three auth types, exposed as `MCPAuthType`. `Components`'
-`MCPServerPickerView` (see §11, the Components package) already builds a UI over all three if you'd rather not build
+`MCPServerPickerView` (see [§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer), the Components package) already builds a UI over all three if you'd rather not build
 your own — this section explains what each requires, either way.
 
 | `MCPAuthType` | Real-world example | What your UI must collect |
@@ -312,7 +312,7 @@ your own UI; it's already the most specific information available.
 
 If you write user-facing setup instructions for a Slack-shaped (`.oauthManual`) server — registering
 an app and setting a redirect URL on the *server's* side — that redirect URL must be **your app's
-own scheme** (`yourapp://oauth/callback`, from §2c — the OAuth redirect URI). Copying another app's setup
+own scheme** (`yourapp://oauth/callback`, from [§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth) — the OAuth redirect URI). Copying another app's setup
 instructions verbatim into your own documentation would silently misconfigure every user who
 follows it — their server-side app would try to redirect back into the wrong app (or nowhere)
 instead of yours.
@@ -363,7 +363,7 @@ case .failure(let error):
 }
 ```
 
-`MCPTool` / `FileBackedTool` (§7a) already call `renderedForModel` for you — this matters only
+`MCPTool` / `FileBackedTool` ([§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)) already call `renderedForModel` for you — this matters only
 when you call `manager.callTool` directly. `structuredContent` is validated against the tool's
 declared `outputSchema` first; a mismatch is turned into `isError`.
 
@@ -474,7 +474,7 @@ Both stores also use the native Keychain Services API (`SecItemAdd`/`SecItemCopy
 directly, not a shell-out to a system command-line tool — safe to use from a sandboxed app
 (including one distributed through the Mac App Store), where shelling out to system binaries is
 unreliable or outright unavailable. Confirmed live under App Sandbox, not just by code review —
-see §10 (App Sandbox — building for the Mac App Store).
+see [§10](#10-app-sandbox--building-for-the-mac-app-store) (App Sandbox — building for the Mac App Store).
 
 The one thing to know: if `Bundle.main.bundleIdentifier` is `nil` (an unbundled CLI/test target,
 not a real `.app`), storage falls back to a fixed, non-isolating string — this is expected and fine
@@ -515,8 +515,8 @@ init() {
 ```
 
 This is the single most important line to copy correctly into your own app — the OAuth scheme
-override from §2c (the OAuth redirect URI), set before any `connect`/`addServer` call could possibly need it. Your
-`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler (§2d — wiring the OAuth callback) at this
+override from [§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth) (the OAuth redirect URI), set before any `connect`/`addServer` call could possibly need it. Your
+`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler ([§2d](#2d-wire-the-oauth-callback-through-your-appdelegate-not-swiftuis-onopenurl-if-using-mcp-oauth) — wiring the OAuth callback) at this
 point, and `.handlesExternalEvents(matching: [])` is declared as part of the `Scene` body that
 follows — both need to be in place *before* the window is shown, not bolted on reactively later.
 
@@ -562,10 +562,10 @@ don't write it, but it fires at the same moment — the first time the model inv
 let access = await Connectors.requestAccess(.calendar)
 ```
 
-Core's `Connectors.requestAccess` (see §7) handles the no-Info.plist-key and
+Core's `Connectors.requestAccess` (see [§7](#7-connectors-calendar-reminders-contacts-location)) handles the no-Info.plist-key and
 previously-denied cases with clearer errors than calling EventKit directly yourself. The system
 prompt macOS shows here is only possible because of the entitlement + Info.plist usage string from
-§2a/2b; without those, this call fails silently rather than prompting (see §2's
+[§2a](#2a-infoplist-usage-description-strings-if-using-calendarreminders)/2b; without those, this call fails silently rather than prompting (see [§2](#2-required-setup-before-you-can-use-calendarreminders-or-mcp-oauth)'s
 failure-sequence writeup). If the user denies, a well-behaved tool returns a plain string like
 `"Calendar access not granted."` — not an error/throw — so the model receives that as the tool's
 result and can reason about it in its final summary, rather than the whole request failing. A
@@ -580,7 +580,7 @@ let connectResult = await manager.addServer(url: serverURL, displayName: "My Ser
 ```
 
 This single call does capability negotiation *and* auth. If the server has no valid cached token
-for this app (see §4, Keychain storage — checked under `Bundle.main.bundleIdentifier`-scoped
+for this app (see [§4](#4-keychain-storage--automatic-isolation-native-api-sandbox-safe), Keychain storage — checked under `Bundle.main.bundleIdentifier`-scoped
 storage), `addServer` internally triggers the OAuth authorize flow, which opens the system browser
 — this is the moment a real browser window appears on the user's screen. The call suspends until
 either the user completes sign-in (the browser redirects back to your app's own scheme, which your
@@ -598,9 +598,9 @@ That hand-matching + schema-inspection is Path B for MCP. Path A is `MCPTool(des
 hand it one of `state.tools` and it builds a working `Tool` from the live schema, no `Arguments`
 struct of your own. [`repo-qa`](../examples/repo-qa/) is that in ~70 lines; see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own).
 
-`callTool` hands back an `MCPToolResult` (§3b) — `renderedForModel` is the string you feed the
+`callTool` hands back an `MCPToolResult` ([§3b](#3b-what-a-tool-call-gives-you-back-mcptoolresult)) — `renderedForModel` is the string you feed the
 model; both adapters call it for you. If your target server pauses a tool call to ask the user
-something, that's elicitation — wire the one-line Components handler (§3c).
+something, that's elicitation — wire the one-line Components handler ([§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams)).
 
 ### Step 6 — the model synthesizes a summary, the UI shows it
 
@@ -630,7 +630,7 @@ signed in" behavior works.
 > **This is the MCP client's mechanics** — connect, list tools, call a tool, observe state
 > changes, tear down, plus resources and prompts. Use `MCPServerManager` directly when you're
 > building your own server-management UI or a headless/CLI integration; if you want a
-> ready-made UI over exactly this, `Components` (§11) wraps all of it. The **resources /
+> ready-made UI over exactly this, `Components` ([§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)) wraps all of it. The **resources /
 > prompts** methods at the end matter only for servers that expose readable content or
 > prompt templates, not just tools.
 >
@@ -651,7 +651,7 @@ case .failure(let error):
     // MCPServerError for the full set and what each implies about whether retrying makes sense.
 }
 
-// Call a tool -> Result<MCPToolResult, MCPServerError> (§3b). A tool that ran but failed is
+// Call a tool -> Result<MCPToolResult, MCPServerError> ([§3b](#3b-what-a-tool-call-gives-you-back-mcptoolresult)). A tool that ran but failed is
 // .success with isError == true, not .failure.
 let callResult = await manager.callTool(
     server: state.id, tool: "find-tasks-by-date",
@@ -666,7 +666,7 @@ for await servers in manager.serverChanges {
 }
 
 // Or, if you're in a SwiftUI app and want @Published-style reactivity, Components already ships
-// this wrapper — MCPServerManagerObservable, see §11 (Components) — so you don't need to write it
+// this wrapper — MCPServerManagerObservable, see [§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer) (Components) — so you don't need to write it
 // yourself unless you want to.
 
 // Post-use
@@ -679,7 +679,7 @@ tools to actually pass to your AI engine (context-budget management) is entirely
 SDK doesn't filter this for you. Real servers can expose 40+ tools; don't naively pass all of them
 into a `LanguageModelSession` without picking the ones your prompt actually needs. See
 `MCPToolDescriptor.estimatedTokens` if you want to reason about this quantitatively, or use
-`Components`' `MCPServerPickerView` (§11 — Components), which already builds a per-tool enable/disable UI
+`Components`' `MCPServerPickerView` ([§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer) — Components), which already builds a per-tool enable/disable UI
 over exactly this.
 
 **On tool-calling from FoundationModels**: Core's tools are plain data (`MCPToolDescriptor`,
@@ -724,7 +724,7 @@ above to find out which real `GenerationError` case is actually firing.
 content, e.g. a document or dataset) and **prompts** (server-defined templates). `manager.
 resourcesForSession()`/`.promptsForSession()` list what's currently enabled;
 `manager.readResource(server:uri:)`/`manager.getPrompt(server:name:arguments:)` fetch the real
-content. `Components`' `MCPResourcesView`/`MCPPromptsView` (§11 — Components) already build a UI over
+content. `Components`' `MCPResourcesView`/`MCPPromptsView` ([§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer) — Components) already build a UI over
 both if you don't want to write your own.
 
 ## 6a. The model layer: local models, routing, sessions
@@ -764,7 +764,7 @@ let lab = LocalLMLab(configuration: .init(providers: [
     MLXModelProvider(),                                      // from LocalLMLabSDKInference — see below
 ]))
 // To also run on macOS 26, register only SystemModelProvider() unconditionally and the
-// rest inside `if #available(macOS 27, *)` — see §1a.
+// rest inside `if #available(macOS 27, *)` — see [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build).
 
 lab.models      // the @Observable ModelRegistry — providers, routes, residency, downloads
 lab.mcp         // MCPServerManager, unchanged from 0.8.x
@@ -910,7 +910,7 @@ to think**: on the MLX tier it flips the chat template's thinking toggle for mod
 one (the Qwen3 family — a model that always reasons, e.g. DeepSeek-R1, raises
 `unsupportedCapability` instead; a model with no toggle is a no-op). On the remote providers
 `.off` maps to the provider default — there is no true "reasoning off" on those APIs, so pass
-`.low` to minimise it. `aiql` uses `.off` (§8b). `.low`…`.max` don't reach MLX.
+`.low` to minimise it. `aiql` uses `.off` ([§8b](#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)). `.low`…`.max` don't reach MLX.
 
 ### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
 
@@ -1064,7 +1064,7 @@ may have no due date at all, unlike an event's date, which is required). `Contac
 addContact` creates a new contact; `.updateContact`/`.deleteContact` locate an existing one by
 given name, with an optional current family name to disambiguate. `newPhoneNumbers`/`newEmails`
 on `updateContact`, when provided, replace that contact's entire existing list rather than adding
-to it. Full signatures are in §12 (the full function/type reference) below.
+to it. Full signatures are in [§12](#12-full-functiontype-reference) (the full function/type reference) below.
 
 **Why name-based lookup, not an identifier** (`EventSummary`/`ReminderSummary`/`ContactSummary`
 still carry `eventIdentifier`/`calendarItemIdentifier`/`identifier` for any consumer that wants
@@ -1097,7 +1097,7 @@ your own confirmation UI, restricted by your own app-level setting — is entire
 decision as the integrating developer.
 
 Each connector requires its own Info.plist usage-description key and entitlement, same pattern as
-§2a/2b — see there for Calendar/Reminders; Contacts needs
+[§2a](#2a-infoplist-usage-description-strings-if-using-calendarreminders)/2b — see there for Calendar/Reminders; Contacts needs
 `NSContactsUsageDescription` + `com.apple.security.personal-information.addressbook`, Location
 needs `NSLocationUsageDescription` + `com.apple.security.personal-information.location`.
 `examples/plate-today`'s `SearchContactsTool` and (build-time opt-in) location/weather tools are
@@ -1154,7 +1154,7 @@ cross-check that tool-calling works at all.
 > **Examples per path:** Path A — [`plate-today-tools`](../examples/plate-today-tools/)
 > (connectors), [`repo-qa`](../examples/repo-qa/) (`MCPTool`),
 > [`workspace-buddy`](../examples/workspace-buddy/) / [`code-buddy`](../examples/code-buddy/)
-> (Workspace tools). Path B — [`plate-today`](../examples/plate-today/) (connectors) and §5
+> (Workspace tools). Path B — [`plate-today`](../examples/plate-today/) (connectors) and [§5](#5-walking-through-a-reference-apps-user-experience-step-by-step)
 > Step 5 (MCP, by hand).
 
 Everything above (`CalendarAccess`, `RemindersAccess`, `ContactsAccess`, `LocationAccess`,
@@ -1202,13 +1202,13 @@ that guidance is baked in verbatim rather than left for you to rediscover indepe
   entirely, unless your app's system prompt/session state grounds it (pairing these with
   `ClockTool` is the practical mitigation, not a guarantee).
 
-**Path B — write your own adapter**, exactly as §5 Step 4 walks through by hand: call
+**Path B — write your own adapter**, exactly as [§5](#5-walking-through-a-reference-apps-user-experience-step-by-step) Step 4 walks through by hand: call
 `CalendarAccess`/`RemindersAccess`/`ContactsAccess`/`LocationAccess` directly, choose your own
 tool names, schemas, and descriptions. Full control, but you're on your own for the pitfalls
 above. Both paths coexist — Path A is a thin wrapper over Path B, not a replacement for it, so
 mixing (ready-made Calendar tools alongside a hand-written Contacts adapter, say) is fine.
 
-**MCP gets the same two paths.** §5 Step 5 is Path B for MCP: match a tool by name out of
+**MCP gets the same two paths.** [§5](#5-walking-through-a-reference-apps-user-experience-step-by-step) Step 5 is Path B for MCP: match a tool by name out of
 `state.tools`, inspect its `rawSchema` yourself, hand-write a matching `@Generable` `Arguments`
 struct. `MCPTool` is Path A — it builds a `Tool` at runtime directly from an `MCPToolDescriptor`,
 no `Arguments` struct required:
@@ -1301,7 +1301,7 @@ to a connection in another process) conforms it to `OriginTaggedTool` to keep th
 > **You hit this when** you want the model to read or edit files in a folder the user picks —
 > a coding assistant, a "summarize this project" tool, a notes agent. Two halves: getting a
 > usable URL that survives relaunch under sandboxing (this section — **copy-paste example
-> code, not a Core API**) and then acting on it (§8a — that half *is* Core:
+> code, not a Core API**) and then acting on it ([§8a](#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) — that half *is* Core:
 > `WorkspaceAccess` + the Workspace `Tool`s).
 >
 > **Examples:** [`workspace-buddy`](../examples/workspace-buddy/) is the sandboxed folder
@@ -1311,7 +1311,7 @@ to a connection in another process) conforms it to `OriginTaggedTool` to keep th
 Unlike the four connectors above, filesystem access to a user-picked file or folder is **not**
 part of Core, and isn't planned to be. The reason is structural, not an oversight: the actual
 picker UI (`NSOpenPanel`) has to live in your app — Core has no UI of its own, by design, same as
-the MCP server connect/auth UI in §3 (MCP auth options). There's no meaningful "unified API" to offer here the
+the MCP server connect/auth UI in [§3](#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them) (MCP auth options). There's no meaningful "unified API" to offer here the
 way there is for the four TCC-gated connectors, since the picker itself is host-app UI, not
 something a library call can produce.
 
@@ -1416,7 +1416,7 @@ Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWo
 unprompted is a meaningfully bigger risk than one that can only read/create/edit — but it's there
 if your own app wants it.
 
-**One real gotcha, not covered by §8's own example**: that section's `withFolderAccess<T>(_:)` is
+**One real gotcha, not covered by [§8](#8-filesystem-access-security-scoped-bookmarks-example-not-in-core)'s own example**: that section's `withFolderAccess<T>(_:)` is
 synchronous, bracketing a single, quick access. If you're handing these tools to a
 `LanguageModelSession` — which can invoke several of them over the course of one
 `respond(to:)` call — the security-scoped access window has to stay open for that *whole* async
@@ -1483,26 +1483,26 @@ control or no SQLite link.
 [`examples/aiql`](../examples/aiql/) is the end-to-end SwiftUI app — a plain-English request
 over an MCP dataset → this pipeline → a CSV in a folder you chose, with a local MLX model. It
 builds the session with `SessionOptions(effort: .off)` so the Qwen3 model skips its `<think>`
-pass — the pipeline is mechanical enough that the reasoning trace only adds latency (§6a).
+pass — the pipeline is mechanical enough that the reasoning trace only adds latency ([§6a](#6a-the-model-layer-local-models-routing-sessions)).
 
 ## 9. What's NOT in Core yet
 
 - **No filesystem picker/bookmark UI in Core, and not planned** — a folder picker is host-app
-  UI and Core ships no UI at all. But you're not writing it from scratch: §8 (Filesystem
+  UI and Core ships no UI at all. But you're not writing it from scratch: [§8](#8-filesystem-access-security-scoped-bookmarks-example-not-in-core) (Filesystem
   access — security-scoped bookmarks) has a complete, copy-pasteable `FolderAccess`
   (`NSOpenPanel` + security-scoped bookmark persistence + the async-aware access window a
   `LanguageModelSession` needs), and
   [`workspace-buddy`](../examples/workspace-buddy/) is a full reference app that does exactly
-  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` (§8a — Workspace tools) — the read/write/edit logic
+  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` ([§8a](#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) — Workspace tools) — the read/write/edit logic
   for once you have a resolved folder URL.
 - ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
-  see §7a (ready-made vs. hand-written tools).
+  see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own) (ready-made vs. hand-written tools).
 - ~~No handling of server-initiated requests (elicitation, sampling, roots).~~ All three are now
-  handler seams (`MCPClientHandlers`), with a default elicitation UI in Components — see §3c. The
+  handler seams (`MCPClientHandlers`), with a default elicitation UI in Components — see [§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams). The
   SDK still doesn't *implement* sampling or roots; it routes them to your handler if you register
   one, else replies "method not found".
 - ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ 1.0 adds
-  the model layer (§6a): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
+  the model layer ([§6a](#6a-the-model-layer-local-models-routing-sessions)): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
   `LocalLMLabSDKInference`) / `makeSession`. Still optional — the MCP-only path is unchanged.
 - **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need
   an `@unknown default` — new cases can land in a minor version. (Same for `ResidencyEvent` /
@@ -1511,7 +1511,7 @@ pass — the pipeline is mechanical enough that the reasoning trace only adds la
   reactively as real usage surfaced gaps — if you hit "X is inaccessible due to internal
   protection level" on something that looks like it should be public, it probably should. File it.
 - **No logging of prompts, responses, or tool calls.** The MCP client has `MCPDiagnostics`
-  (§3e) for connection / auth / stream troubleshooting — `os.Logger` plus an opt-in event buffer
+  ([§3e](#3e-diagnostics-when-a-user-reports-an-mcp-problem)) for connection / auth / stream troubleshooting — `os.Logger` plus an opt-in event buffer
   — but it is strictly off-content (never prompt or response text; tokens redacted). Core writes
   no persisted trace of what the model saw or said. If your app wants that, you build and own it
   — the model layer's `session.events` is what you hang it off.
@@ -1524,7 +1524,7 @@ Here's exactly what's needed and what was actually verified.
 
 ### 10a. Entitlements
 
-Add `com.apple.security.app-sandbox` alongside whichever connector entitlements from §2b
+Add `com.apple.security.app-sandbox` alongside whichever connector entitlements from [§2b](#2b-entitlements-if-using-calendarreminders)
 you're already using:
 
 ```xml
@@ -1550,9 +1550,9 @@ specific connector).
   see the caution below).
 - **The MCP client, end-to-end**, including OAuth: connect, sign in via the system browser,
   redirect back into the app, tool calls. No entitlement needed beyond `network.client` — the
-  OAuth redirect is a URL-scheme handoff (§2c–2d, the OAuth redirect/callback), not a local HTTP listener, so
+  OAuth redirect is a URL-scheme handoff ([§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth)–2d, the OAuth redirect/callback), not a local HTTP listener, so
   `com.apple.security.network.server` is not needed for this.
-- **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, §4) — round-tripped
+- **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, [§4](#4-keychain-storage--automatic-isolation-native-api-sandbox-safe)) — round-tripped
   correctly under the sandboxed per-app-container Keychain access group.
 
 **Not yet tested under sandbox**: Contacts, Location's accuracy/reverse-geocoding behavior beyond
@@ -1571,7 +1571,7 @@ no prompt" result while testing a newly-sandboxed build, reset first:
 tccutil reset Calendar <your-bundle-id>
 tccutil reset Reminders <your-bundle-id>
 tccutil reset AddressBook <your-bundle-id>
-tccutil reset All <your-bundle-id>   # Location can't be reset individually, see §7 (Connectors)
+tccutil reset All <your-bundle-id>   # Location can't be reset individually, see [§7](#7-connectors-calendar-reminders-contacts-location) (Connectors)
 ```
 
 ### 10d. One-time Apple Developer Portal setup for MAS signing
@@ -1642,13 +1642,13 @@ App Store.
 ## 11. Components: prebuilt SwiftUI (MCP servers + the model layer)
 
 > **Reach for this when** you want a working settings surface — for **MCP servers** (add /
-> remove / reconnect, all three auth types from §3, per-tool and per-resource enable/disable,
+> remove / reconnect, all three auth types from [§3](#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them), per-tool and per-resource enable/disable,
 > resource + prompt browsing) **or the model layer** (pick a model, download an open-weight
 > one from Hugging Face with a progress bar, see on-disk size, configure an online provider +
 > key + web search) — without building that UI yourself. It's SwiftUI, entirely optional, and
 > layered strictly on Core's public API (nothing here you couldn't write). **Skip it if** your
 > app has no user-facing configuration, or your design is too bespoke to reuse these views —
-> go straight to `MCPServerManager` (§6) or `lab.models` (§6a).
+> go straight to `MCPServerManager` ([§6](#6-general-api-reference)) or `lab.models` ([§6a](#6a-the-model-layer-local-models-routing-sessions)).
 >
 > **Examples that use it:** [`components-demo`](../examples/components-demo/) — essentially
 > the whole app is the MCP views; [`model-switch`](../examples/model-switch/) — the online-provider
@@ -1665,9 +1665,9 @@ dependency on `Core.xcframework` and no source access to Core's internals.
 
 - **`MCPServerManagerObservable`** — an `ObservableObject` wrapper around `MCPServerManager`, for
   SwiftUI apps that want `@Published`-style reactivity without writing the wrapper themselves (see
-  §6's note).
+  [§6](#6-general-api-reference)'s note).
 - **`MCPServerPickerView`** — add/list/reconnect/disconnect/remove MCP servers, all three auth
-  types from §3, per-tool and per-resource enable/disable, and a "Save As…" action that
+  types from [§3](#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them), per-tool and per-resource enable/disable, and a "Save As…" action that
   exports a server's tools/resources/prompts to a text file.
 - **`MCPOAuthWaitingView`** — shown while an OAuth sign-in is in flight in the system browser;
   `MCPServerPickerView` already uses this internally during its own add-server flow.
@@ -1675,7 +1675,7 @@ dependency on `Core.xcframework` and no source access to Core's internals.
   read/expand one, via callbacks (`onAttach`/`onUse`) so your app decides what to actually do with
   the result — append it to a text field, feed a session, save it, whatever fits your UI.
 - **`MCPElicitationPresenter`** + **`View.mcpElicitationSheet(_:)`** — the ready-made handler for
-  server-initiated elicitation (§3c). `MCPElicitationPresenter()` conforms to
+  server-initiated elicitation ([§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams)). `MCPElicitationPresenter()` conforms to
   `MCPElicitationHandler`; pass it to `MCPClientHandlers(elicitation:)` and attach the sheet once
   near your root. When a server asks for input mid-tool-call, a sheet appears naming the server
   and renders a typed, validated form (text / date / number-with-bounds / toggle / single- and
@@ -1703,7 +1703,7 @@ polling):
   `[RemoteProviderDraft]` (persist keys to the Keychain) and the `onSave` / `onRemove` / `onTest`
   closures that turn a draft into a `RemoteModelProvider` and call `lab.models.replace(_:)`.
   `Components` has **no dependency on `LocalLMLabSDKRemote`** — the closures are the seam, so a
-  macOS-26 chooser can present the panel and hand the 27-only work to a helper. See §6b.
+  macOS-26 chooser can present the panel and hand the 27-only work to a helper. See [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote).
 - **`ProviderSettingsSection`** — one provider block: API-key field, a **Configured ✓** badge, a
   per-model row editor (add / trash), an **Enable web search** toggle + **Max searches** stepper
   once configured, and a **Test connection** button (one result per model, via the host's
@@ -1725,9 +1725,12 @@ and your own Keychain, at launch, with whatever you've saved.
 
 ## 12. Full function/type reference
 
-Everything public in `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`,
-grouped by area. This is the flat list; sections 1–11 above are the narrative version with context
-and gotchas — use this one when you just need to check a signature.
+Everything public in `LocalLMLabSDKCore`, `LocalLMLabSDKClaude`, `LocalLMLabSDKInference`,
+`LocalLMLabSDKRemote`, and `LocalLMLabSDKComponents`, grouped by area. This is the flat list;
+sections 1–11 above are the narrative version with context and gotchas.
+
+**You don't need to read this section in order.** Jump straight to the area you need and check
+the signature; the numbered sections above are the intended learning path.
 
 > The machine-checked source of truth is [`api-surface.md`](api-surface.md) (regenerated from the
 > compiled `.swiftinterface`s). If this section and that one disagree, that one is right — file it.
@@ -1761,7 +1764,7 @@ and gotchas — use this one when you just need to check a signature.
     // from LocalLMLab+makeSession:
     func makeSession(route: RouteName, tools: [any Tool] = [], instructions: String? = nil,
                      includeMCPTools: Bool = true, options: SessionOptions = .init(),
-                     authorizer: (any ToolCallAuthorizer)? = nil) throws -> LocalLMLabSession   // authorizer: §7c
+                     authorizer: (any ToolCallAuthorizer)? = nil) throws -> LocalLMLabSession   // authorizer: [§7c](#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)
 }
 
 struct LocalLMLabState: Codable, Sendable, Equatable {
@@ -1828,7 +1831,7 @@ struct ClaudeModelSpec: Sendable, Hashable { /* one Claude model — id, display
 
 // --- RemoteModelProvider — LocalLMLabSDKRemote (separate xcframework; manifest floor macOS 26,
 // like Core — linking it never forces a 27 deployment target; the provider itself reports
-// .requiresOS("macOS 27") at runtime on 26, same as pcc) — §6b ---
+// .requiresOS("macOS 27") at runtime on 26, same as pcc) — [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) ---
 @available(macOS 27, *)
 struct RemoteModelProvider: ModelProvider {
     init(_ config: RemoteProviderConfig)
@@ -1841,7 +1844,7 @@ struct RemoteProviderConfig: Sendable, Equatable {
     var dialect: Dialect
     var baseURL: URL
     var auth: Auth
-    var models: [RemoteModel]                   // SDK ships no defaults — see §6b
+    var models: [RemoteModel]                   // SDK ships no defaults — see [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)
     var capabilities: Set<Capability>            // .webSearch, …
     var defaultOptions: SessionOptions
     var allowArbitraryModelIDs: Bool = false     // true → any "scheme:<string>" routes (OpenRouter)
@@ -1859,7 +1862,7 @@ extension RemoteProviderConfig {
     enum Capability: String, Sendable, Hashable, Codable { case webSearch, structuredOutput, imageInput }
 
     // Presets — conveniences, zero privilege. Model lists are empty by default (the SDK ships no
-    // model ids the host didn't ask for — a hardcoded default drifts and 404s; §6b).
+    // model ids the host didn't ask for — a hardcoded default drifts and 404s; [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)).
     static func openAI(apiKey: String, models: [RemoteModel] = []) -> Self
     static func anthropic(apiKey: String, models: [RemoteModel] = []) -> Self
     static func openRouter(apiKey: String, models: [RemoteModel] = []) -> Self   // allowArbitraryModelIDs = true
@@ -1981,7 +1984,7 @@ struct LocalLMLabSession: Sendable {
     var retryOnContextOverflow: RetryPolicy         // .disabled by default; set before respond()
     var languageModelSession: LanguageModelSession { get }   // Apple's session — use directly to opt out of the retry wrapper
     var events: AsyncStream<SessionEvent> { get }
-    var citations: [Citation] { get }               // web-search sources accumulated this session (§6b)
+    var citations: [Citation] { get }               // web-search sources accumulated this session ([§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote))
     func reconcileServerToolArtifacts()             // re-derive citations/events from the transcript after a manual edit
     var contextBudget: ContextBudget { get }
     func cancel()
@@ -1993,16 +1996,16 @@ enum SessionEvent: Sendable {
     case contextCompacted(removedEntries: Int)
     case toolCallStarted(id: String, name: String)
     case toolCallFinished(id: String, name: String, failed: Bool)
-    case serverToolCall(ServerToolActivity)         // provider-run web search/fetch — §6b
+    case serverToolCall(ServerToolActivity)         // provider-run web search/fetch — [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)
 }
 
-// --- per-query options + the web-search side channel (§6b) ---------------
+// --- per-query options + the web-search side channel ([§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)) ---------------
 struct SessionOptions: Sendable, Equatable {
     var webSearch: Bool = false
     var webSearchMaxUses: Int? = nil
     var webSearchAllowedDomains: [String] = []
     var webSearchBlockedDomains: [String] = []
-    var effort: Effort? = nil            // reasoning level; nil = provider default (§6a "options: SessionOptions")
+    var effort: Effort? = nil            // reasoning level; nil = provider default ([§6a](#6a-the-model-layer-local-models-routing-sessions) "options: SessionOptions")
     var temperature: Double? = nil
     var topP: Double? = nil
     var maxOutputTokens: Int? = nil
@@ -2076,12 +2079,12 @@ enum LocalLMLabSDKVersion { static let current: String }   // "1.0.0-beta.N", "1
 `MLXModelProvider` / `MLXPreflightLimits` are in **`LocalLMLabSDKInference`**,
 `ClaudeModelProvider` / `ClaudeModelSpec` in **`LocalLMLabSDKClaude`**, and
 `RemoteModelProvider` / `RemoteProviderConfig` / `RemoteError` in **`LocalLMLabSDKRemote`** (each
-a separate xcframework on the same release — §1a, §6b); `ModelPickerView` / `ClaudeAuthField` /
-`AIModelsSettingsView` are in **`LocalLMLabSDKComponents`** (§11).
+a separate xcframework on the same release — [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build), [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)); `ModelPickerView` / `ClaudeAuthField` /
+`AIModelsSettingsView` are in **`LocalLMLabSDKComponents`** ([§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)).
 
 ### Tool authority (`ToolCallAuthorizer`, `ToolImpact`, confirmation)
 
-The two levers from §7c, as types. Everything here is in `LocalLMLabSDKCore` except the last
+The two levers from [§7c](#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first), as types. Everything here is in `LocalLMLabSDKCore` except the last
 two, in `LocalLMLabSDKComponents`.
 
 ```swift
@@ -2115,7 +2118,7 @@ struct PendingToolCallSummary: Codable, Sendable, Equatable {
 }
 enum ToolOrigin: Sendable, Codable, Equatable { case host; case mcp(server: MCPServerID, displayName: String) }
 
-// makeSession(..., authorizer:) — §12 "The model layer" — installs the gate; nil = unchanged, no gate.
+// makeSession(..., authorizer:) — [§12](#12-full-functiontype-reference) "The model layer" — installs the gate; nil = unchanged, no gate.
 
 struct RuleBasedToolAuthorizer: ToolCallAuthorizer {   // pure logic, most-restrictive rule wins
     enum Rule: Sendable {
@@ -2239,7 +2242,7 @@ final class LocationAccess {
 
 ### Ready-made connector Tools (Path A)
 
-Thin `Tool`-conforming wrappers around the connectors above — see §7a (Path A vs Path B) for the framing. Each takes
+Thin `Tool`-conforming wrappers around the connectors above — see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own) (Path A vs Path B) for the framing. Each takes
 an optional custom `description` at init, same pattern as `ClockTool`/`WeatherTool` below.
 
 ```swift
@@ -2328,7 +2331,7 @@ struct GetCurrentLocationTool: Tool {
 ### Filesystem workspace (`WorkspaceAccess`/`WorkspaceTools`)
 
 Not a connector — no `requestAccess()`, no OS permission dialog. Operates on a root `URL` your
-app already resolved via a security-scoped bookmark (§8 — Filesystem access); the picker itself is the one-time
+app already resolved via a security-scoped bookmark ([§8](#8-filesystem-access-security-scoped-bookmarks-example-not-in-core) — Filesystem access); the picker itself is the one-time
 consent. `WorkspaceAccess` is the raw data layer; `WorkspaceTools` are the matching Path A `Tool`s,
 each taking the resolved root `URL` at init.
 
@@ -2387,7 +2390,7 @@ struct DeleteWorkspaceFileTool: Tool {
 }
 
 // The "AIQL" data verbs — each init(root:description:), reads one workspace file, writes a CSV
-// (see §8b for the full table and pipeline shape). CSVCodec + JSONPath are public building blocks.
+// (see [§8b](#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline) for the full table and pipeline shape). CSVCodec + JSONPath are public building blocks.
 struct JSONToCSVTool: Tool     { let name = "jsonToCsv" }      // SELECT cols FROM json_array
 struct SelectColumnsTool: Tool { let name = "selectColumns" }  // SELECT a AS x, b
 struct FilterRowsTool: Tool    { let name = "filterRows" }     // WHERE
@@ -2401,7 +2404,7 @@ struct LoadTableTool: Tool     { let name = "loadTable" }     // JSON records ->
 struct SQLQueryTool: Tool      { let name = "sqlQuery" }      // one read-only SELECT -> CSV
 
 // Host-applied decorator: wraps a dynamic-schema tool, adds a root-level `saveAs` that writes the
-// wrapped tool's raw result to a workspace file instead of returning it. §8b.
+// wrapped tool's raw result to a workspace file instead of returning it. [§8b](#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline).
 struct FileBackedTool: Tool {
     typealias Arguments = GeneratedContent
     init(name: String, description: String, argumentsJSONSchema: Data, root: URL,
@@ -2462,7 +2465,7 @@ final class MCPServerManager {
 
     func toolsForSession() -> [MCPToolDescriptor]
     func setToolEnabled(server: MCPServerID, tool: String, enabled: Bool)
-    // -> MCPToolResult (§3b), not a String. A tool that ran but failed is .success with isError == true.
+    // -> MCPToolResult ([§3b](#3b-what-a-tool-call-gives-you-back-mcptoolresult)), not a String. A tool that ran but failed is .success with isError == true.
     // allowElicitation: false on a code path that can't show a prompt (headless / background).
     func callTool(server: MCPServerID, tool: String, arguments: [String: MCPValue], allowElicitation: Bool = true) async -> Result<MCPToolResult, MCPServerError>
 
@@ -2494,7 +2497,7 @@ struct MCPServerState: Codable, Sendable {
     var resources: [MCPResourceDescriptor]
     var resourceTemplates: [MCPResourceTemplateDescriptor]
     var prompts: [MCPPromptDescriptor]
-    var negotiatedProtocolVersion: MCPProtocolVersion?   // nil until connected (§3a)
+    var negotiatedProtocolVersion: MCPProtocolVersion?   // nil until connected ([§3a](#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care))
     var serverInstructions: String?                       // server's own usage note from `initialize`
     func exportSummary() -> String      // plain-text listing of tools/resources/prompts, enabled state, token cost
 }
@@ -2564,7 +2567,7 @@ indirect enum MCPValue: Codable, Sendable {
                                             // "did the user/model actually supply this?" rule
 }
 
-// What callTool gives you back (§3b).
+// What callTool gives you back ([§3b](#3b-what-a-tool-call-gives-you-back-mcptoolresult)).
 struct MCPToolResult: Sendable, Codable, Equatable {
     var text: String
     var structuredContent: MCPValue?        // JSON the server marked structured; validated vs outputSchema
@@ -2592,7 +2595,7 @@ enum MCPServerError: Error, Codable, Sendable {
 }
 ```
 
-**Server-initiated request handlers** (§3c) — all optional; a capability is advertised to a
+**Server-initiated request handlers** ([§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams)) — all optional; a capability is advertised to a
 server only when its handler is non-nil:
 
 ```swift
@@ -2623,7 +2626,7 @@ protocol MCPRootsProvider: Sendable { func roots() async -> [MCPRoot] }
 protocol MCPLoggingSink: Sendable { func receive(_ message: MCPLogMessage) }
 ```
 
-**Diagnostics** (§3e) — off-content, secrets redacted:
+**Diagnostics** ([§3e](#3e-diagnostics-when-a-user-reports-an-mcp-problem)) — off-content, secrets redacted:
 
 ```swift
 enum MCPDiagnostics {
@@ -2638,12 +2641,12 @@ enum MCPDiagnostics {
 enum MCPLogLevel: Int, Sendable, Comparable, Codable { case debug, info, notice, error, off }
 ```
 
-**OAuth setup** (§2c–2d):
+**OAuth setup** ([§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth)–2d):
 
 ```swift
 enum MCPOAuthFlow {
     static var redirectURI: String { get set }        // MUST override before any connect/addServer call
-    static var clientMetadataURL: URL? { get set }     // optional — CIMD instead of DCR (§3d)
+    static var clientMetadataURL: URL? { get set }     // optional — CIMD instead of DCR ([§3d](#3d-cimd-skipping-dynamic-client-registration))
 }
 
 final class MCPOAuthRedirectListener {
@@ -2714,7 +2717,7 @@ Builds a `Tool` at runtime directly from an `MCPToolDescriptor`'s real JSON Sche
 hand-written `Arguments` struct. `Arguments` is `GeneratedContent` (not a static type), and
 `parameters` is computed from the tool's schema rather than derived from `Arguments` the usual
 way. The initializer is throwing — a tool whose schema doesn't build should be skipped, not let
-crash your whole tool list; see §7a (the two tool-calling paths) for the recommended loop shape.
+crash your whole tool list; see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own) (the two tool-calling paths) for the recommended loop shape.
 
 ```swift
 struct MCPTool: Tool {
@@ -2785,7 +2788,7 @@ struct ClaudeAuthField: View {
 
 // Online providers (1.0.0-beta.3) — the "AI Models" settings panel. Host owns [RemoteProviderDraft]
 // (keys → Keychain) and maps a draft → RemoteProviderConfig in the closures. Components does not
-// link LocalLMLabSDKRemote; see §6b and examples/model-switch/ProviderGlue.swift.
+// link LocalLMLabSDKRemote; see [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) and examples/model-switch/ProviderGlue.swift.
 struct AIModelsSettingsView: View {
     init(registry: ModelRegistry, providers: Binding<[RemoteProviderDraft]>,
          onSave: @escaping (RemoteProviderDraft) -> Void,
@@ -2804,7 +2807,7 @@ struct ProviderSettingsSection: View {
 struct RemoteProviderDraft: Identifiable, Hashable, Sendable {
     var scheme, displayName, baseURL, apiKey: String
     var kind: RemoteProviderKind
-    var models: [String]                 // .new(_:) leaves this empty — host prefills (docs/12 §10)
+    var models: [String]                 // .new(_:) leaves this empty — host prefills (docs/12 [§10](#10-app-sandbox--building-for-the-mac-app-store))
     var webSearchSupported, webSearchEnabled, configured: Bool
     var maxSearches: Int
     var statusText: String?
