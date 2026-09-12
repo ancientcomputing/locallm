@@ -398,6 +398,15 @@ instead of yours.
 
 ### 3a. Which MCP revision the client speaks — and why you mostly don't have to care
 
+> **Reach for this when** you're debugging why a field you expect (structured content,
+> elicitation, icons) isn't showing up, or you're curious what a specific server can do — most
+> integrations never need to read this.
+>
+> **Examples that use it:** every example that connects to a real server ([`repo-qa`](../examples/repo-qa/),
+> [`plate-today-tools`](../examples/plate-today-tools/), [`components-demo`](../examples/components-demo/))
+> negotiates a revision automatically; none of them reads `negotiatedProtocolVersion` directly in
+> normal use.
+
 MCP is versioned by date-stamped revisions (`2024-11-05`, `2025-03-26`, `2025-06-18`,
 `2025-11-25`). You don't pick one. On `addServer` the client offers the newest it knows
 (`MCPProtocolVersion.clientPreferred`, currently `2025-11-25`) and the server replies with the
@@ -419,6 +428,13 @@ until connected). You rarely read it — the point of the table is that the newe
 server, not errors to guard.
 
 ### 3b. What a tool call gives you back: `MCPToolResult`
+
+> **Reach for this when** you're calling `manager.callTool` directly instead of going through
+> `MCPTool`/`FileBackedTool` ([§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own),
+> which already read this for you) — e.g. inside your own hand-written `Tool` adapter.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/)'s `TodoistTasksTool` calls
+> `manager.callTool` directly and switches on the result.
 
 `manager.callTool(server:tool:arguments:)` returns `Result<MCPToolResult, MCPServerError>`. The
 `MCPServerError` side is a transport/protocol failure (unreachable, malformed, auth needed). A
@@ -447,6 +463,15 @@ when you call `manager.callTool` directly. `structuredContent` is validated agai
 declared `outputSchema` first; a mismatch is turned into `isError`.
 
 ### 3c. Server-initiated requests: elicitation (and the sampling / roots seams)
+
+> **Reach for this when** a server you connect to might need something from the user mid-call —
+> a missing field, a confirmation — rather than failing the tool call outright. Skip this if
+> every server you use is fully self-contained (no `elicitation/create` calls).
+>
+> **Examples that use it:** none of the SDK's example apps wire elicitation up yet — see
+> [the elicitation UI page](https://thisbrain.ai/locallm/mcp-elicitation.html) for it live in
+> LocalLM Lab itself, or `MCPElicitationPresenter`'s doc comment for the Components-side pattern
+> below.
 
 Three MCP features let the server send *the client* a request mid-operation:
 
@@ -494,6 +519,14 @@ not the policy. Don't register it if you don't need it.
 
 ### 3d. CIMD: skipping Dynamic Client Registration
 
+> **Reach for this when** you want a stable, self-described client identity on a server's OAuth
+> consent screen instead of a fresh anonymous registration each time — a production-app upgrade,
+> not a requirement. DCR (the default, no setup) already works for every `.none`/auto-OAuth
+> server; skip this unless you specifically want CIMD's identity guarantee.
+>
+> **Examples that use it:** none of the SDK's example apps set `clientMetadataURL` — they all run
+> on the zero-config DCR default.
+
 The OAuth flow above relies on **Dynamic Client Registration** — the server issues a `client_id`
 on the fly. Servers that don't support DCR are the `.oauthManual` path. **Client ID Metadata
 Documents (CIMD)** are a newer alternative: your `client_id` *is* an HTTPS URL to a small static
@@ -511,6 +544,13 @@ CIMD is the upgrade for a production app that wants a stable, self-described ide
 consent screen.
 
 ### 3e. Diagnostics when a user reports an MCP problem
+
+> **Reach for this when** a user hits an MCP connection problem you can't reproduce locally and
+> need them to send you something actionable — not something to wire up proactively for every app.
+>
+> **Examples that use it:** none of the SDK's example apps enable the diagnostics buffer; see
+> [`mcp-diagnostics.md`](mcp-diagnostics.md) for the full support-flow writeup this section
+> summarizes.
 
 Two logging layers, both strictly off-content (never prompt/response text; bearer tokens and
 auth codes redacted):
