@@ -946,11 +946,22 @@ relaunch.
 macOS-27-pinned, so it can't live in the macOS-26-floored Core); `LocalLMLabSDKRemote` is a
 fourth, with no such pin — its manifest floor stays macOS 26, so linking it never forces a 27
 deployment target, even though `RemoteModelProvider` itself only registers successfully on 27.
-Register every 27-only provider — `PCC`, `Claude`, `MLX`, `Remote` alike — inside
-`if #available(macOS 27, *)` — [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build).
-On macOS 26 `lab.models.availability(for:)` reports those schemes as
+
+Within a single macOS-26-floor target, register every 27-only provider you're able to link there —
+`PCC`, `MLX`, `Remote` alike — inside `if #available(macOS 27, *)`
+([§1a](#1a-targeting-macos-26-and-macos-27-from-one-build)). **Claude can't join that group at
+all**: linking `LocalLMLabSDKClaude` forces a macOS 27 *deployment target* on whatever target links
+it, so it can't even be conditionally imported into a macOS-26-floor target the way `Inference` and
+`Remote` can — an `#available` runtime check doesn't help, because the problem is at link/build
+time, not run time. Registering `ClaudeModelProvider` at all means doing it in a separate,
+macOS-27-only target ([§1a](#1a-targeting-macos-26-and-macos-27-from-one-build) and
+[`os-matrix`'s README, "Adding Claude"](../examples/os-matrix/#adding-claude)).
+
+On macOS 26, `lab.models.availability(for:)` reports `pcc`, `claude`, and `mlx` as
 `.unavailable(kind: .requiresOS("macOS 27"), …)` and `lab.models.schemesRequiringNewerOS` lists
-them.
+them — this is true for `claude` even in an app that, like `os-matrix`, never links
+`LocalLMLabSDKClaude` at all (see the `ModelAvailability` section below for what that scheme
+reports once the OS floor is actually met but no provider was ever registered for it).
 
 `ModelProvider` is a protocol — **implement it yourself when** you have a model source the SDK
 doesn't ship (a remote inference endpoint, a different local runtime). Its one core requirement
@@ -1143,6 +1154,24 @@ API key) · `.unavailable(kind:detail:)` where `kind` is machine-readable
 `.noProvider`, `.requiresOS(String)`) so you can branch without parsing `detail`.
 `.requiresOS("macOS 27")` is what `pcc` / `claude` / `mlx` return on macOS 26. Components'
 `ModelPickerView` binds to this directly (disabled "Requires macOS 27" rows).
+
+**This works even for a scheme whose provider your app never links or registers at all.**
+`availability(for:)` recognizes `pcc`, `claude`, and `mlx` as known scheme names and reports their
+OS requirement from that name alone — it does not require a matching `ModelProvider` to be
+registered (or even linked) first. `os-matrix` shows this concretely: its `Package.swift` never
+links `LocalLMLabSDKClaude`, and its code never constructs a `ClaudeModelProvider`, yet its
+availability table still queries `claude:sonnet5` and correctly prints `requires macOS 27` for it
+when run on macOS 26 — see the "Why the `claude:sonnet5` row appears" note in
+[`os-matrix`'s README](../examples/os-matrix/#on-macos-26).
+
+**Once the OS gate is satisfied, the `.requiresOS` reason goes away — and a different one can take
+its place.** Run that same never-registered `claude:sonnet5` query on macOS 27 (confirmed live) and
+it no longer reports `.requiresOS`; it reports `.unavailable(kind: .noProvider, detail: "No model
+provider registered for scheme 'claude'")` instead — a `ModelAvailability.Kind` case, not a
+`.requiresOS`. `.requiresOS` only ever means "this scheme's OS floor isn't met **yet**"; it says
+nothing about whether a provider for that scheme is actually registered once the floor is met. See
+the "On macOS 27" section of [`os-matrix`'s README](../examples/os-matrix/#on-macos-27) for the
+side-by-side output.
 
 ### `WorkspaceAccess` + the Workspace tools — let the model touch files
 

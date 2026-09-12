@@ -1,7 +1,16 @@
 # os-matrix — one SDK build for macOS 26 and macOS 27
 
+**What this example is for:** showing how little OS-version branching your app actually needs in
+order to support both macOS 26 and macOS 27 from a single shipped binary. It is deliberately *not*
+a tour of what the SDK can do with a model — it does almost nothing with the models themselves (one
+tool-calling turn) so that the 26/27 pattern isn't buried under unrelated feature code. Almost every other
+example in this repo targets macOS 27 only; this is the one example that targets both.
+
 Run it on a macOS 26 machine and a macOS 27 machine. Same binary, different behaviour — no
-`#if os`, no separate build, just one `#available` check at provider registration.
+`#if os`, no separate build, just **one** `#available` check, made **once**, at provider
+registration. Everything downstream of that check — `makeSession`, `respond`, `events`,
+`contextBudget`, the connector tools — is identical code that runs the same way regardless of
+which OS it's actually on.
 
 ## Requirements
 
@@ -60,10 +69,60 @@ Asking the on-device model (with tools) …
 macOS 26: open-weight (MLX) model download is unavailable — needs macOS 27.
 ```
 
+**Why the `claude:sonnet5` row appears even though this example never adds Claude:** it's included
+on purpose, as a deliberate fourth data point. The table queries `lab.models.availability(for:)`
+for four model IDs, but this package never links `LocalLMLabSDKClaude` and never registers a
+`ClaudeModelProvider` anywhere (see "Adding Claude" below — that section is the *first* place
+Claude actually gets added to anything, in a different, macOS-27-only target). On macOS 26 that
+shows up as `requires macOS 27` — the same thing `pcc` shows, since it also isn't registered on 26.
+The **On macOS 27** section right below shows what happens once that OS gate is satisfied: the
+`claude` row keeps failing, but the real, now-visible reason turns out to be different from `pcc`'s.
+
 ### On macOS 27
 
-Same binary: `system` and `pcc` report `available`, `mlx` reports `not downloaded`, and the
-run ends by pointing at `--download`.
+Same binary, no rebuild — this is a real run on the same Mac, same `swift run OSMatrix`:
+
+```
+Running on macOS 27.0.0
+
+Model families:
+  system                                     available
+  pcc                                        available
+  claude:sonnet5                             unavailable — No model provider registered for scheme 'claude'
+  mlx:mlx-community/Qwen3-4B-4bit            not downloaded
+
+Asking the on-device model (with tools)…
+→ It's 9:18 AM PDT on Saturday, September 12, 2026. In Tokyo, the weather is partly cloudy with
+  71°F (feels like 77°F), 90% humidity, and a 2 mph wind. The 7-day forecast includes drizzle,
+  mainly clear skies, thunderstorms, and rain showers.
+
+Open-weight (MLX) models are available on macOS 27. Download and run one with:
+  swift run OSMatrix --download mlx-community/Qwen3-4B-4bit
+In code that's `try await lab.models.startDownload("<hugging-face-repo-id>")` — an async call
+your app makes (e.g. from a "Download" button). There is no CLI for it in the SDK;
+`lab.models.downloads` is the observable a picker binds to for a progress bar.
+```
+
+Compare this directly against the macOS 26 block above — same four-row table, same code path,
+different rows:
+
+- **`system`** — `available` on both. The one row that never changes.
+- **`pcc`** — `requires macOS 27` on 26, `available` on 27. `PCCModelProvider` is registered
+  on 27 (inside the `#available` block) and not registered at all on 26.
+- **`mlx`** — `requires macOS 27` on 26 (not registered there either), `not downloaded` on 27
+  (registered, but this specific machine hadn't fetched `Qwen3-4B-4bit` yet — a machine that
+  already has it cached would show `available` here instead, same as `pcc`/`system`).
+- **`claude`** — `requires macOS 27` on 26, but **not** `available` on 27 — it's
+  `unavailable — No model provider registered for scheme 'claude'`. This is the concrete payoff
+  of the note above: on macOS 26 the `claude` scheme is OS-gated (`.requiresOS`); once that gate
+  is satisfied on macOS 27, `availability(for:)` reveals the *other* reason it's unusable — no
+  `ClaudeModelProvider` was ever registered, because this example never links
+  `LocalLMLabSDKClaude` at all. Two different `.unavailable` reasons, same scheme, depending on
+  which one the OS check still leaves standing — see "Adding Claude" below for what registering
+  it for real would take.
+
+The model's weather/time answer will read differently on your own run (different day, different
+weather) — the table above it is the part worth comparing run to run.
 
 ### `--download` — pull an open-weight model (macOS 27 only)
 

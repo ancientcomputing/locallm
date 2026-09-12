@@ -368,8 +368,8 @@ struct PlateTodayApp: App {
 }
 ```
 
-**Tally**: of ~230 lines of actual code (excluding comments/blank lines), roughly a dozen touch the
-SDK directly — everything else is ordinary SwiftUI state/view code and FoundationModels session
+**Tally**: of ~230 lines of actual code (excluding comments/blank lines), 17 touch the SDK directly
+(marked above) — everything else is ordinary SwiftUI state/view code and FoundationModels session
 setup that would look the same regardless of where the tools' data comes from.
 
 ## `examples/plate-today-tools`
@@ -419,7 +419,7 @@ final class PlateTodayToolsModel: ObservableObject {
 
     @Published private(set) var state: State = .idle
 
-    let manager = MCPServerManager()                                  // ← SDK
+    private let manager = MCPServerManager()                          // ← SDK
     private let todoistURL = URL(string: ProcessInfo.processInfo.environment["TODOIST_MCP_URL"] ?? "https://ai.todoist.net/mcp")!
 
     func start() {
@@ -537,24 +537,40 @@ touches nothing TCC-gated, so there's no permission prompt to need a real bundle
 
 ```swift
 // Repo Q&A — a third reference app, deliberately different in shape from plate-today/
-// plate-today-tools: a plain command-line tool, not a signed GUI .app. MCP network calls need no
-// macOS permission, so a bare `swift run` binary works end to end.
+// plate-today-tools: a plain command-line tool, not a signed GUI .app. Where plate-today
+// demonstrates Calendar/Reminders (TCC-gated, needs a real bundle + entitlements to get a
+// permission prompt at all — see that app's own top-of-file comment), this app touches nothing
+// TCC-gated: MCP network calls need no macOS permission, so a bare `swift run` binary works
+// end to end, no packaging/ directory, no code signing, no Info.plist. That's the point of this
+// example existing separately rather than as a third tool bolted onto plate-today-tools — it
+// shows Core's MCPTool (Path A — see docs/sdk-guide.md §7a) in its simplest possible setting.
 //
 // Narrative: ask a free-form question about any public GitHub repository's own documentation,
-// answered by Apple's on-device model calling Deepwiki's real hosted MCP server, no auth, no API
-// key — MCPTool built at runtime directly from Deepwiki's own JSON Schema, no hand-written
-// Arguments struct for any of its three tools.
+// answered by Apple's on-device model calling Deepwiki's real hosted MCP server
+// (https://mcp.deepwiki.com/mcp, no auth, no API key) — MCPTool built at runtime directly from
+// Deepwiki's own JSON Schema, no hand-written Arguments struct for either tool actually offered
+// (see the tool-building loop below for why only two of Deepwiki's three tools are offered).
+//
+//   swift run RepoQA anthropics/claude-code "What is the plugin system?"
+//   swift run RepoQA facebook/react                      # defaults to a general "what is this?" question
 
 import Foundation
 import FoundationModels
 import LocalLMLabSDKCore                                              // ← SDK
+
+// Status/progress goes to stderr; only the model's final answer goes to stdout, so
+// `swift run RepoQA … 2>/dev/null` gives you just the answer. (repo-qa-local does the same.)
+func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
 
 @available(macOS 26.0, *)
 @MainActor
 func run() async {
     let arguments = CommandLine.arguments.dropFirst()
     guard let repoName = arguments.first, !repoName.isEmpty else {
-        FileHandle.standardError.write(Data("usage: swift run RepoQA <owner/repo> [question]\n".utf8))
+        note("""
+        usage: swift run RepoQA <owner/repo> [question]
+        example: swift run RepoQA anthropics/claude-code "What is the plugin system?"
+        """)
         exit(1)
     }
     let question = arguments.dropFirst().joined(separator: " ")
@@ -562,51 +578,71 @@ func run() async {
 
     let model = SystemLanguageModel.default
     guard case .available = model.availability else {
-        print("On-device model unavailable: \(model.availability)")
+        note("On-device model unavailable: \(model.availability)")
         return
     }
 
     // No requestAccess() call anywhere in this file — MCP is the one connector type that was
-    // never TCC-gated, so there's no permission step to request before connecting. Contrast with
+    // never TCC-gated (see docs/sdk-guide.md's Connectors section vs. its MCP section), so
+    // there's no permission step to request before connecting. Contrast with
     // plate-today-tools' requestConnectorAccess(), needed there specifically because Calendar/
     // Reminders are gated and this file's equivalent tools aren't.
     let manager = MCPServerManager()                                  // ← SDK
+    note("Connecting to Deepwiki…")
     let connectResult = await manager.addServer(                      // ← SDK
         url: URL(string: "https://mcp.deepwiki.com/mcp")!,
         displayName: "Deepwiki"
     )
     guard case .success(let state) = connectResult else {
-        print("Could not connect to Deepwiki: \(connectResult)")
+        note("Could not connect to Deepwiki: \(connectResult)")
         return
     }
 
-    // Builds a Tool for every tool Deepwiki actually offers, from its own live schema — nothing
-    // here names "ask_question" specifically, or knows its argument shapes in advance. A tool
-    // whose schema doesn't build (MCPTool's init throws) is skipped rather than aborting the
-    // whole run.
+    // Builds a Tool for each of Deepwiki's tools from its own live schema — nothing here knows
+    // ask_question's or read_wiki_structure's argument shapes in advance, MCPTool derives both
+    // from the server's real JSON Schema at runtime. One deliberate exclusion, not a schema
+    // failure: read_wiki_contents dumps a repo's ENTIRE wiki, unscoped, no pagination — confirmed
+    // live against anthropics/claude-code at 541,359 characters (~165,000 tokens) for a single
+    // call, ~20x this model's whole ~8,000-token context window. The on-device model has no way to
+    // know that in advance from the tool's name/description alone, and picked it for a plain
+    // "what is the plugin system?" question in real testing, hard-failing the whole session. This
+    // is exactly the risk docs/sdk-guide.md §3 already warns about ("don't naively pass all of
+    // them into a LanguageModelSession without picking the ones your prompt actually needs") —
+    // MCPTool itself has no way to know a tool's real-world response size from its schema, since
+    // JSON Schema describes shape, not payload size; that judgment call is the integrating app's
+    // to make, same as everywhere else Core hands you a raw capability and leaves the curation to
+    // you. A tool whose schema doesn't build (MCPTool's init throws) is still skipped with a
+    // warning rather than aborting the whole run.
     var tools: [any Tool] = []
     for descriptor in state.tools {
+        guard descriptor.name != "read_wiki_contents" else {
+            note("Skipping \(descriptor.name): excluded by this example — see the comment above.")
+            continue
+        }
         do {
             tools.append(try MCPTool(descriptor: descriptor, manager: manager))  // ← SDK (Path A)
         } catch {
-            print("Skipping \(descriptor.name): \(error)")
+            note("Skipping \(descriptor.name): \(error)")
         }
     }
     guard !tools.isEmpty else {
-        print("Deepwiki didn't offer any usable tools.")
+        note("Deepwiki didn't offer any usable tools.")
         return
     }
+    note("Built \(tools.count) tool(s) from Deepwiki's live schema: \(tools.map(\.name).joined(separator: ", "))")
 
     let session = LanguageModelSession(tools: tools) {
         "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     }
 
     let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
+    note("\nAsking: \(prompt)\n")
+
     do {
         let response = try await session.respond(to: prompt)
         print(response.content)
     } catch {
-        print("Error: \(await GenerationErrorDescription.describe(error))")  // ← SDK
+        note("Error: \(await GenerationErrorDescription.describe(error))")  // ← SDK
     }
 }
 
@@ -617,12 +653,17 @@ if #available(macOS 26.0, *) {
 }
 ```
 
-**Tally**: of ~70 lines of actual code, five touch the SDK — this is the entire surface area
-needed to go from nothing to "the on-device model calling a real, remote MCP tool it's never seen
-before." No `Arguments` struct, no `Tool`-conforming type of this app's own — `ask_question`'s
-real schema (including a `repoName: string | string[]` union JSON Schema doesn't have a single
-Swift equivalent for) converts automatically, degrading the union to a plain string leaf per
-`MCPToolAdapter`'s documented behavior for constructs past the common case.
+**Tally**: of the file's 66 non-comment/non-blank lines, five touch the SDK — this is the entire
+surface area needed to go from nothing to "the on-device model calling a real, remote MCP tool
+it's never seen before." No `Arguments` struct, no `Tool`-conforming type of this app's own —
+`ask_question`'s real schema (including a `repoName: string | string[]` union JSON Schema doesn't
+have a single Swift equivalent for) converts automatically, degrading the union to a plain string
+leaf per `MCPToolAdapter`'s documented behavior for constructs past the common case. Note the
+`read_wiki_contents` exclusion above the tool-building loop: it's app-level curation, not an SDK
+behavior — `MCPTool` will happily wrap any tool a server advertises, real-world response size and
+all; deciding which of a server's tools are actually safe to hand a small on-device model is
+entirely this app's judgment call, the same point docs/sdk-guide.md §6 makes about tool selection
+generally.
 
 ## `examples/workspace-buddy`
 
@@ -1166,7 +1207,7 @@ func run() async {
     signal(SIGINT, SIG_IGN)
     let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
     sigint.setEventHandler {
-        if interrupt.fire() { note("\nquitting…"); session.cancel(); exit(130) }   // ← SDK
+        if interrupt.fire() { note("\nquitting…"); exit(130) }   // process exit; no explicit session.cancel() here
         note("\n^C  interrupting this turn — Ctrl-C again to quit")
     }
     sigint.resume()
@@ -1223,11 +1264,12 @@ func run() async {
 await run()
 ```
 
-**Tally**: of ~160 lines of actual code, ~22 touch the SDK — and that ~22 is the *entire* model
-layer: pick providers, name routes, preflight/download, make a session, stream it, watch
-`.events`. Everything MLX-specific is four lines (`MLXModelProvider`, `validate`, `download`,
-and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude` instead (a macOS-27
-target — see `sdk-guide.md` §1a) and the rest of the file is unchanged.
+**Tally**: of the file's 203 non-comment/non-blank lines, 31 touch the SDK directly (marked
+above) — and that 31 is the *entire* model layer: pick providers, name routes, preflight/download,
+make a session, stream it, watch `.events`, plus the eight ready-made Workspace `Tool`s and the
+MCP add-server/tool-disable calls. Everything MLX-specific is four lines (`MLXModelProvider`,
+`validate`, `download`, and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude`
+instead (a macOS-27 target — see `sdk-guide.md` §1a) and the rest of the file is unchanged.
 `RouteName` is the only new type the caller names by hand. The REPL loop and Ctrl-C handling add
 no SDK surface — one persistent `LocalLMLabSession` spans every turn, and `session.cancel()` /
 Task cancellation is the whole cancel story.
@@ -1481,12 +1523,12 @@ if #available(macOS 26.0, *) {
 }
 ```
 
-**Tally**: of ~75 lines of actual code, ~14 touch the SDK — and everything below the
-`--- everything below is repo-qa, unchanged ---` marker is character-for-character `repo-qa`
-except the one `lab.makeSession` line. The model layer itself is ~7 lines
-(`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` / `availability` / `validate` /
-`download`); `--apple` proves the same route can point at Apple's on-device model with no other
-change.
+**Tally**: of the file's 92 non-comment/non-blank lines, 18 touch the SDK directly (marked above)
+— and everything below the `--- everything below is repo-qa, unchanged ---` marker is
+character-for-character `repo-qa` except the one `lab.makeSession` line. The model layer itself is
+~8 lines (`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` / `availability` / `validate` /
+`download`, plus the diagnostic `note(...)` line that reads `LocalLMLabSDKVersion.current`);
+`--apple` proves the same route can point at Apple's on-device model with no other change.
 
 ## `examples/workspace-buddy-local`
 
@@ -1672,8 +1714,8 @@ struct WorkspaceBuddyLocalApp: App {
 ```
 
 **Tally**: of ~110 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
-UI section both elided), ~17 touch the SDK. Against `workspace-buddy`'s four (four Tool
-instantiations + one error formatter), the delta is the model layer (provider/lab/route setup,
+UI section both elided), 17 touch the SDK (marked above). Against `workspace-buddy`'s five (four
+Tool instantiations + one error formatter), the delta is the model layer (provider/lab/route setup,
 the first-run `availability` check, the `validate` + `download` progress loop) plus the streaming
 turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond`.
 The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
@@ -1700,6 +1742,7 @@ import LocalLMLabSDKInference                                         // ← SDK
 
 // See Package.swift / README.md for the four scenarios. Run on macOS 26 and macOS 27 — same
 // binary, no source `#if`, one `#available` check at provider registration.
+//
 //   swift run OSMatrix
 //   swift run OSMatrix --download mlx-community/Qwen3-4B-4bit   # macOS 27 only; ~2–5 GB
 
@@ -1710,7 +1753,7 @@ func run() async throws {
         i + 1 < args.count ? args[i + 1] : nil
     }
 
-    // ── register what the running OS supports ──
+    // ── Scenario 4: register what the running OS supports ──────────────────────────────────
     // SystemModelProvider works on macOS 26 and 27. The rest need macOS 27, so they go in one
     // #available block. Everything AFTER this line is identical on both OSes.
     var providers: [any ModelProvider] = [SystemModelProvider()]      // ← SDK
@@ -1721,7 +1764,7 @@ func run() async throws {
     let lab = LocalLMLab(configuration: .init(providers: providers))  // ← SDK
     lab.models.route("chat", to: .system)                             // ← SDK
 
-    // ── model availability table ──
+    // ── Model availability table ──────────────────────────────────────────────────────────
     let v = ProcessInfo.processInfo.operatingSystemVersion
     print("Running on macOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)\n")
     print("Model families:")
@@ -1734,14 +1777,14 @@ func run() async throws {
         print("\n  (\(lab.models.schemesRequiringNewerOS.joined(separator: ", ")) need macOS 27 — a picker shows these as disabled rows)")
     }
 
-    // ── `--download` — a feature that only exists on macOS 27 ──
+    // ── Scenario 2: `--download` — a feature that only exists on macOS 27 ──────────────────
     if let repo = downloadRepo {
         guard #available(macOS 27, *), !lab.models.downloadableProviders.isEmpty else {   // ← SDK
             print("\n--download needs macOS 27 (open-weight models run via MLX, which is macOS 27+).")
             return
         }
         print("\nDownloading \(repo) from Hugging Face — fetches the weights (typically 2–5 GB)…")
-        let installed = try await lab.models.startDownload(repo)      // ← SDK  (resolves once weights are on disk)
+        let installed = try await lab.models.startDownload(repo)   // ← SDK (resolves once the weights are on disk)
         let size = installed.sizeBytes.map { " (\($0 / 1_000_000) MB)" } ?? ""
         print("Done: \(installed.id.rawValue)\(size). It's now .available — route a session to it:")
         print("  lab.models.route(\"chat\", to: ModelID(\"\(installed.id.rawValue)\")!)")
@@ -1749,20 +1792,22 @@ func run() async throws {
         return
     }
 
-    // ── connector tools that work on both OSes ──
+    // ── Scenario 3: connector tools that work on both OSes ─────────────────────────────────
     let tools: [any Tool] = [ClockTool(), WeatherTool()]              // ← SDK
 
-    // ── the same call, identical on 26 and 27 ──
+    // ── Scenario 1: the same call, identical on 26 and 27 ──────────────────────────────────
     let session = try lab.makeSession(route: "chat", tools: tools,    // ← SDK
         instructions: "You have getCurrentTime and getWeather tools. Use them; be concise.")
     print("\nAsking the on-device model (with tools)…")
     let answer = try await session.respond(to: "What time is it, and what's the weather in Tokyo?")   // ← SDK
     print("→ \(answer)")
 
+    // ── Scenario 2 again: the hint, when --download wasn't passed ──────────────────────────
     if #available(macOS 27, *), !lab.models.downloadableProviders.isEmpty {   // ← SDK
-        print("\nOpen-weight (MLX) models are available on macOS 27. Download one with:")
+        print("")
+        print("Open-weight (MLX) models are available on macOS 27. Download and run one with:")
         print("  swift run OSMatrix --download mlx-community/Qwen3-4B-4bit")
-        print("In code that's `try await lab.models.startDownload(\"<hf-repo-id>\")`; `lab.models.downloads` is the observable a picker binds to for a progress bar.")
+        print("In code that's `try await lab.models.startDownload(\"<hugging-face-repo-id>\")` — an async call your app makes (e.g. from a \"Download\" button). There is no CLI for it in the SDK; `lab.models.downloads` is the observable a picker binds to for a progress bar.")
     } else {
         print("\nOpen-weight (MLX) models need macOS 27 — unavailable here.")
     }
@@ -1789,11 +1834,15 @@ do {
 }
 ```
 
-**Tally**: of ~90 lines of actual code, ~15 touch the SDK — and every one of the OS-conditional
-lines is inside the single `if #available(macOS 27, *)` block at the top. `describe(_:)` is a
-plain `switch` over `ModelAvailability`; `.requiresOS` is the one case a 26-aware app has to
-handle that a 27-only app never sees. No `#if canImport` anywhere — `LocalLMLabSDKInference` is
-linked unconditionally and its 27-only providers just aren't appended on 26.
+**Tally**: of the file's 74 non-comment/non-blank lines, 18 touch the SDK directly (marked above)
+— and every one of the OS-conditional lines is inside the single `if #available(macOS 27, *)`
+block at the top (or, for the download flow, a second `#available` check that reads the same
+providers). `describe(_:)` is a plain `switch` over `ModelAvailability`; `.requiresOS` is the one
+case a 26-aware app has to handle that a 27-only app never sees. No `#if canImport` anywhere —
+`LocalLMLabSDKInference` is linked unconditionally and its 27-only providers just aren't appended
+on 26. See [`os-matrix`'s README](../examples/os-matrix/#run) for real output from both OSes —
+the macOS 27 output there was captured live on this machine; the macOS 26 output wasn't
+independently re-verified in this pass.
 
 ## `examples/model-switch`
 
@@ -1998,7 +2047,8 @@ final class AppModel {
 
 ### `Sources/ModelSwitch/ProviderGlue.swift`
 
-*~35 lines of code — the `~30 lines of glue` the section above keeps referring to.*
+*35 lines of code — the small provider-config glue `AppModel.swift` and `ModelSwitchApp.swift`
+both call into.*
 
 ```swift
 // examples/model-switch/Sources/ModelSwitch/ProviderGlue.swift
@@ -2050,7 +2100,7 @@ extension RemoteProviderDraft {
 **Tally**: the whole model layer here is `lab.models.replace(_:)` / `.removeProvider(scheme:)` to
 reconfigure at runtime, `.route` + `makeSession(options:)` per turn, and `session.events` /
 `session.citations` for the web-search side-channel. Everything provider-specific — dialects,
-base URLs, auth, presets — is data inside `RemoteProviderConfig`, built once in the ~40-line
+base URLs, auth, presets — is data inside `RemoteProviderConfig`, built once in the 35-line
 `ProviderGlue.swift`. `probe(for:)` is the one call that hits the network without spending a
 token, and it's what the settings panel's **Test connection** button runs.
 
@@ -2258,11 +2308,12 @@ final class AppModel {
 }
 ```
 
-**Tally**: of ~130 lines of actual code in `AppModel`, ~18 touch the SDK — and every one is
-either setup (`LocalLMLab()`, `registerProvider`, `addServer` + `setToolEnabled`,
+**Tally**: of the file's 130 non-comment/non-blank lines, 21 touch the SDK directly (marked
+above, plus 2 more marked `← Components`) — and every SDK one is either setup (`LocalLMLab()`,
+`registerProvider`, `addServer` + `setToolEnabled`,
 `CalendarAccess.requestAccess`) or the one `run()` call site: `route` → build `hostTools` with
 `limited(toMaxImpact:)` → wrap in `ConfirmingToolAuthorizer` → `makeSession(authorizer:)` →
-`respond`. `DemoSecurity.swift` adds ~8 more, all in `DemoPolicy` — the two levers themselves.
+`respond`. `DemoSecurity.swift` adds 6 more, all in `DemoPolicy` — the two levers themselves.
 The `ToolConfirmationPresenter` + `.toolConfirmationSheet(_:)` (in `ContentView`, one line) is
 the entire confirmation UI. Nothing in the three panel views touches the SDK — they bind to
 `DemoSecurity`, and the snapshot does the rest.
@@ -2493,8 +2544,12 @@ struct AIQLApp: App {
 **Tally**: the model layer is the same ~7 lines as `repo-qa-local` (`MLXModelProvider` / `LocalLMLab`
 / `route` / `availability` / `validate` / `download` / `makeSession`). Everything new here is the
 pipeline: `FileBackedTool.mcp(descriptor:manager:root:)` wraps each MCP data tool so its payload
-lands in a file instead of the model's context, and the eight data-verb `Tool`s
-(`describeJson` / `jsonToCsv` / `selectColumns` / `filterRows` / `sortRows` / `concatRows` /
-`csvInfo`) each do one mechanical CSV transform and return only a receipt. The `instructions`
-string doing the orchestration is the real work of this example — the SDK surface it drives is
-about a dozen one-line `Tool` instantiations plus `WorkspaceAccess` to read the result back.
+lands in a file instead of the model's context, and four data-verb `Tool`s
+(`LoadTableTool` / `SQLQueryTool` / `DescribeJSONTool` / `CSVInfoTool`, marked above) do the
+mechanical work: `loadTable` stages a JSON records file into an ephemeral SQLite table,
+`sqlQuery` runs exactly one read-only `SELECT` to a CSV, and `describeJson`/`csvInfo` are for
+discovery and verification — the row data itself never passes through the model. The
+`instructions` string doing the orchestration is the real work of this example — the SDK surface
+it drives is the four data-verb `Tool`s plus up to four `FileBackedTool.mcp`-wrapped MCP tools
+(`ranked.prefix(4)`, marked above), eight one-line `Tool` instantiations at most, plus
+`WorkspaceAccess` to read the result back.
