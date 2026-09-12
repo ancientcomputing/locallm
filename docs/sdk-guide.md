@@ -1025,6 +1025,13 @@ whole model layer inside App Sandbox and is the worked example.
 - `unloadResident(_:)` / `unloadAllResident()` — drop weights explicitly (e.g. before a
   memory-heavy operation elsewhere in your app).
 
+**For a production build, pin the repos you ship against**: `MLXModelProvider(pinnedRevisions:
+["mlx-community/Qwen3-8B-4bit": "abc1234…"])` downloads that exact commit instead of tracking
+`main`. Without a pin, a repo owner moving `main` to different weights silently changes what your
+app fetches on a user's next fresh download — the same file path, a different model. A repo not
+listed in `pinnedRevisions` still tracks `main` as before; pin only the ones your app's behavior
+depends on being stable.
+
 ### `makeSession` + `LocalLMLabSession` — a session with your tools + MCP tools merged
 
 > **Use it instead of constructing `LanguageModelSession` yourself when** you want the SDK to
@@ -1165,8 +1172,28 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
   between sessions without rebuilding `LocalLMLab`.
 - **Web search** — set `capabilities.insert(.webSearch)` + `defaultOptions.webSearch = true`
   (per-provider), or `SessionOptions(webSearch: true)` per turn. Works on OpenAI, Anthropic
-  Messages, OpenRouter, and `ClaudeModelProvider` (Foundation Models). `session.events`
-  yields `.serverToolCall` with the queries; `session.citations` carries the sources.
+  Messages, OpenRouter, and `ClaudeModelProvider` (Foundation Models). `session.events` yields
+  `.serverToolCall(ServerToolActivity)` — its `.kind` is `.webSearch(queries:hits:)`, `hits`
+  being `[WebHit]` (`url`/`title`/`snippet`) — so a "Searched: …" activity line doesn't need to
+  wait for the final answer. `session.citations: [Citation]` (`url`/`title`/`citedText`) carries
+  the sources once the turn finishes — render these as footnotes, since a provider's web-search
+  answer without visible sources reads as an unverifiable claim. `SessionOptions.userLocation`
+  (`city`/`region`/`country`/`timezone`) localizes results when the provider supports it — set
+  it if your search-heavy queries are location-sensitive ("restaurants near me").
+
+**If a user can paste a `baseURL` or import a provider profile, call `config.validated()`
+before registering it.** `baseURL` and `auth` are just data — if your UI lets someone type or
+import them (a custom `.openAICompatible` endpoint, an imported settings file), that string is
+an SSRF-shaped primitive inside your app's sandbox, and it decides where a real API key gets
+sent. `try config.validated()` throws `RemoteProviderConfig.ValidationIssue` for a non-HTTPS
+`baseURL` to a non-local host (the key would go over the wire in clear text), a non-`http(s)`
+scheme (`file:`, `ftp:`, …), a malformed custom header name, or a CR/LF in a credential (header
+injection) — catch it and reject the input rather than registering the provider anyway. This is
+a **syntax check, not a trust check**: it doesn't confirm the host is the one the user meant to
+talk to, so still warn before sending an existing key to a *changed* host, and tell users a
+remote request carries the full prompt, transcript, and tool definitions to that endpoint. Skip
+this for providers your own code constructs from a preset (`.openAI(apiKey:)`, etc.) — there's
+nothing user-supplied to validate.
 
 **Settings UI:** `Components`' `AIModelsSettingsView` renders the whole "AI Models" panel
 (add provider + key, per-model rows, web-search toggle, Test connection). `Components` does
@@ -1588,11 +1615,15 @@ one (accumulating a result that arrives in pages). Use `editFile` for a targeted
 an existing file, same add-vs-update split Calendar/Reminders/Contacts already use.
 
 Path A ready-made Tools ship too, same shape as everywhere else in Core: `ListWorkspaceFilesTool`,
-`ReadWorkspaceFileTool`, `WriteWorkspaceFileTool`, `EditWorkspaceFileTool`, `DeleteWorkspaceFileTool`
-— each takes the root `URL` at init. `DeleteWorkspaceFileTool` isn't wired into
-`examples/workspace-buddy`'s default tool list — a coding assistant that can delete files
-unprompted is a meaningfully bigger risk than one that can only read/create/edit — but it's there
-if your own app wants it.
+`ReadWorkspaceFileTool`, `WriteWorkspaceFileTool`, `EditWorkspaceFileTool`, `DeleteWorkspaceFileTool`,
+`SearchWorkspaceTool` (plain-text or regex), `WorkspaceTreeTool` (an indented directory listing),
+`ApplyPatchTool` (a unified-diff patch, potentially touching several files in one call), and
+`ReadFileRangeTool` (a byte/line window into a large file without reading it whole) — each takes
+the root `URL` at init. `DeleteWorkspaceFileTool` isn't wired into `examples/workspace-buddy`'s
+default tool list — a coding assistant that can delete files unprompted is a meaningfully bigger
+risk than one that can only read/create/edit — but it's there if your own app wants it.
+[`code-buddy`](../examples/code-buddy/) is the example that uses the full set, including
+`SearchWorkspaceTool` and `ApplyPatchTool` for its coding-agent workflow.
 
 **One real gotcha, not covered by [§8](#8-filesystem-access-security-scoped-bookmarks-example-not-in-core)'s own example**: that section's `withFolderAccess<T>(_:)` is
 synchronous, bracketing a single, quick access. If you're handing these tools to a
@@ -2582,6 +2613,26 @@ struct DeleteWorkspaceFileTool: Tool {
     let name = "deleteWorkspaceFile"
     init(root: URL, description: String? = nil)
     struct Arguments { var path: String }
+}
+struct SearchWorkspaceTool: Tool {
+    let name = "searchWorkspace"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var query: String; var isRegex: Bool?; var include: String? }
+}
+struct WorkspaceTreeTool: Tool {
+    let name = "workspaceTree"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String?; var maxDepth: Int? }
+}
+struct ApplyPatchTool: Tool {
+    let name = "applyPatch"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var diff: String }
+}
+struct ReadFileRangeTool: Tool {
+    let name = "readFileRange"
+    init(root: URL, description: String? = nil)
+    struct Arguments { var path: String; var offset: Int; var limit: Int }
 }
 
 // The "AIQL" data verbs — each init(root:description:), reads one workspace file, writes a CSV
