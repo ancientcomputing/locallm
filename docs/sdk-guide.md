@@ -507,6 +507,15 @@ When a server raises `elicitation/create`, a sheet appears naming the server, re
 validated form from the requested schema, and returns the user's `accept` / `decline` /
 `cancel`. See [the elicitation UI page](https://thisbrain.ai/locallm/mcp-elicitation.html).
 
+**Try it live, in under a minute, without writing any code** — LocalLM Lab itself already wires
+up this exact form. In the app's MCP Servers panel, Add Server with URL
+`https://example-server.modelcontextprotocol.io/mcp`, any name, Auth: None; Add opens a browser
+to a generic consent screen — approve it. Once connected, enable only the `elicitInputs` tool
+(toggle the other eight off — keeps the context budget clean and the model from wandering off to
+call something else instead), then in Prompt Playground ask it to "Call the elicitInputs tool."
+The sheet appears with a mix of field types; its header names whatever the server calls itself
+(≈ "example-servers/everything is asking for input"). Confirmed live, 2026-09-12.
+
 Your own UI or a headless policy: conform to `MCPElicitationHandler` — one `async` method on an
 `MCPElicitationRequest` (parsed `message`, typed `fields`, `serverName` / `serverURL`, optional
 URL-mode `url`) → `MCPElicitationResponse`. `callTool` also takes `allowElicitation: Bool = true`
