@@ -1032,6 +1032,12 @@ whole model layer inside App Sandbox and is the worked example.
   model under memory pressure.
 - `unloadResident(_:)` / `unloadAllResident()` — drop weights explicitly (e.g. before a
   memory-heavy operation elsewhere in your app).
+- `lab.models.residency` — `.lastUsedOnly` (default) evicts opportunistically under
+  `residentModelLimit`; `.keepWarm([.heavy, .light])` prewarms those specific routes' models
+  immediately (setting it triggers the load) instead of waiting for the first turn to pay the
+  load cost. `residentModelLimit` still caps how many can actually stay loaded together, so
+  `.keepWarm` on two routes needs the limit raised to at least 2 or the second prewarm evicts
+  the first — same LRU cache either way.
 
 **For a production build, pin the repos you ship against**: `MLXModelProvider(pinnedRevisions:
 ["mlx-community/Qwen3-8B-4bit": "abc1234…"])` downloads that exact commit instead of tracking
