@@ -33,7 +33,7 @@ you want to understand more deeply. Ordered smallest → largest:
 
 | If you want to... | Start with | Lines of code |
 |---|---|--:|
-| The two-lever tool-authorization model (`limited(toMaxImpact:)` + `ConfirmingToolAuthorizer`) end to end | [`security-demo`](../examples/security-demo) | ~250 |
+| Tool authorization's two levers (`limited(toMaxImpact:)` + `ConfirmingToolAuthorizer`) end to end | [`security-demo`](../examples/security-demo) | ~250 |
 | The model layer running *inside* App Sandbox, streaming its answer | [`workspace-buddy-local`](../examples/workspace-buddy-local) | 252 |
 | Online providers (GPT / Claude online / OpenRouter) with web search + citations | [`model-switch`](../examples/model-switch) | 283 |
 | A CLI coding agent — two models with routing, workspace + host `Process` tools, MCP | [`code-buddy`](../examples/code-buddy) | 298 |
@@ -59,8 +59,11 @@ Both are supported, and neither supersedes the other — they solve different pr
   but no external process to depend on, and full control over the resulting `.app`'s distribution
   (Developer ID + notarization, or Mac App Store). 1.0 also adds the **model layer**
   ([§6a](#6a-the-model-layer-local-models-routing-sessions)) — offer Apple's on-device model,
-  Claude, and locally-run open-weight (MLX) models behind one API, with routing and residency
-  the SDK owns. Add `LocalLMLabSDKInference` too for the MLX runtime.
+  Claude (via `ClaudeForFoundationModels`), locally-run open-weight (MLX) models, *and* hosted
+  APIs (OpenAI, Anthropic's Messages API, OpenRouter, or any OpenAI-compatible server —
+  [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)) behind one API,
+  with routing and residency the SDK owns. Add `LocalLMLabSDKInference` for the MLX runtime,
+  `LocalLMLabSDKRemote` for hosted APIs — link only what you use.
 
 If you're not sure which fits, `examples/localai-cli/plate_today.py` and this SDK's
 `examples/plate-today` are the same "what's on my plate today" feature built both ways — a direct,
