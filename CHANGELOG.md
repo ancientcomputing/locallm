@@ -72,10 +72,10 @@ landed. New public surface:
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip       60439d6b5a145dcb81bd238664ae5567c791de3fe5dad9359b8c42e7d5b4d84d
-LocalLMLabSDKClaude-1.0.0-beta.4.xcframework.zip     d4d8a589fb5754b9c1680b6c9bcc6aa040fa404c3e2724e061af30a1a99719c8
-LocalLMLabSDKInference-1.0.0-beta.4.xcframework.zip  d132d2c70ff21682c083f4f63e0b46aad9b1b4109f9d6bd8f76814e2d664dc6a
-LocalLMLabSDKRemote-1.0.0-beta.4.xcframework.zip     05537423397429592402638a82b118a11e963b325c0ab5a8c48c17484a14ab9e
+LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip       3ed0e79b6914e6b48b7ae27f3fdda139f71e3d60f603daf54901716c8c972cb3
+LocalLMLabSDKClaude-1.0.0-beta.4.xcframework.zip     e9c618eaa543f8f78952b91149e873d027fac27ca02c4bc42f0cfd4f3cb45449
+LocalLMLabSDKInference-1.0.0-beta.4.xcframework.zip  fa8feb19883f9a465a69f39d756f1b41b515c8298c891b06fef5da5b81b2a03c
+LocalLMLabSDKRemote-1.0.0-beta.4.xcframework.zip     a73a06bf04a2dd3b1a15b40770f12c0565f8cbf1a97eaa604317b09e3a860454
 ```
 
 ## 1.0.0-beta.3 — 2026-09-06
