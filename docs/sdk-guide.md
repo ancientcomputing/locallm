@@ -1088,10 +1088,18 @@ for await event in session.events {
     case .toolCallFinished(let id, let name, let failed): clearRunning(name, failed: failed)
     case .contextCompacted(let removed):       toast("Trimmed \(removed) old messages")
     case .modelLoadProgress(let fraction):     updateBar(fraction)   // with a local model
+    case .routeSwitched(let modelID):          statusLine = "Now on \(modelID)"
+    case .serverToolCall(let activity):        showActivity(activity)   // provider-run web search — [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)
     @unknown default: break
     }
 }
 ```
+
+All six cases, in one place: `.toolCallStarted`/`.toolCallFinished` (client tool calls),
+`.contextCompacted` (the retry-and-trim above), `.modelLoadProgress` (a local model's first
+load), `.routeSwitched` (the route this session was on just repointed to a different model —
+rare, but real if your app calls `lab.models.route(_:to:)` mid-session), and
+`.serverToolCall` (a provider running web search/fetch on its own infrastructure — §6b).
 
 ### `ContextBudget` + `RetryPolicy` — surviving a long session
 
@@ -1168,10 +1176,13 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
 ```
 
 - **`RemoteProviderConfig`** — `scheme`, `dialect` (`.openAIChat` / `.openAIResponses` /
-  `.anthropicMessages` / `.openAICompatible`), `baseURL`, `auth`, `models`, `capabilities`,
+  `.anthropicMessages` — three, not four; a custom OpenAI-compatible server still speaks
+  `.openAIChat`, just at a different `baseURL`), `baseURL`, `auth` (`.apiKey(_:)` for the common
+  case; `.header(name:value:)` for a server that wants its key in a non-standard header instead
+  of `Authorization`; `.none` for a server with no auth at all), `models`, `capabilities`,
   `defaultOptions`. No vendor is privileged — Claude-over-HTTP is just `dialect:
   .anthropicMessages`. Presets: `.openAI`, `.openAIResponses`, `.anthropic`, `.openRouter`,
-  `.openAICompatible`.
+  `.openAICompatible` (the last one sets `.openAIChat` under the hood).
 - **`RemoteModelProvider.probe(for:timeout:)`** — a **zero-token** check of key + model +
   reachability. Returns `.available` / `.needsCredential` (401/403) / `.unsupportedModel`
   (404 or absent from `GET /models`) / `.providerError` (429 / 5xx / timeout). Call it before
