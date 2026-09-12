@@ -107,7 +107,7 @@ What that does, and doesn't do:
 
 ```bash
 # in locallm/examples/code-buddy/
-swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// doc comment line above three declarations: the Rectangle struct, and the isSquare and scaled functions. Each comment should briefly say what that declaration is. Keep every existing line's indentation exactly as it is. Change nothing else."
+swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// doc comment above the Rectangle struct, and above the isSquare and scaled functions. Each comment should briefly say what it does."
 ```
 
 - `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
@@ -115,24 +115,31 @@ swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// 
 - the quoted string — the **task**. One shot: it reads `Geometry.swift` and edits it in place.
   (It won't touch the planted bug — this task is only about comments.)
 
-> **Spell the task out, and keep the list short.** A vague ask like *"add doc comments to every
-> public declaration"* sends an 8B model into a spiral — *which files? how do I find them? can I
-> bulk-edit?* — and it sometimes concludes there's nothing to do. Naming the file, listing what
-> counts, and pinning down the mechanics (*"keep the indentation", "change nothing else"*) is the
-> difference between a reliable one-shot and a coin flip. The list length matters too: this
-> walkthrough originally asked for doc comments on all 8 public declarations in `Rectangle`
-> (struct, 2 stored properties, initializer, 2 computed properties, 2 functions) in one shot.
-> That's 8 separate edits worth of "think, then call a tool" for an 8B model, and — because each
-> edit shifts the line numbers a diff-based `applyPatch` hunk is anchored to — the more edits in
-> one request, the more likely a later hunk's context goes stale and the model has to stop,
-> re-read the file, and retry. Three declarations is enough to show the pattern without the
-> spiral. Even then a local 8B may write terse comments or nudge a line's whitespace —
-> **step 4 is where you check and keep or discard**. This prompt discipline is a property of
-> small local models, not a code-buddy quirk; it pays off in `workspace-buddy-local` and `aiql`
-> too.
+> **Name the file and the declarations — then get out of the way.** A vague ask like *"add doc
+> comments to every public declaration"* sends an 8B model into a spiral — *which files? how do I
+> find them? can I bulk-edit?* — and it sometimes concludes there's nothing to do. Naming the
+> file and listing exactly which declarations count fixes that. But don't over-specify the
+> mechanics on top of that: an earlier version of this task also spelled out *"keep every
+> existing line's indentation exactly as it is, change nothing else."* That reads like it should
+> help, but in practice it gave the model something to fixate on — it would second-guess the
+> file's actual indentation, sometimes convince itself a line was indented differently than it
+> is, and burn its whole turn retrying edits against that imagined structure. Dropped, the same
+> task completed cleanly and correctly every time. The rule that held up: name the *what*, trust
+> `editWorkspaceFile` (which already fails loudly on a mismatch) for the *how*.
+>
+> This example also doesn't wire up `applyPatch` (the SDK's unified-diff, multi-file tool) at
+> all — only `editWorkspaceFile`'s single-snippet find/replace. `applyPatch` exists for changes
+> that need cross-file atomicity, which this single-file task never needed, and an 8B model
+> authoring a multi-hunk diff from scratch is a meaningfully harder ask than "quote the exact
+> line and give me its replacement." If your own task genuinely spans multiple files, add
+> `ApplyPatchTool(root: root)` back to the `tools` array in `main.swift`. Even with just
+> `editWorkspaceFile`, a local 8B may occasionally write a terser comment than you'd like —
+> **step 4 is where you check and keep or discard**. This prompt/tool-scope discipline is a
+> property of small local models, not a code-buddy quirk; it pays off in `workspace-buddy-local`
+> and `aiql` too.
 
 While it runs, its narration (including a lot of visible "thinking" — these small models are
-verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ applyPatch`, …)
+verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ editWorkspaceFile`, …)
 goes to **stderr**. First run also downloads the two xcframeworks and the model (~4.5 GB for the
 default `heavy` route).
 
@@ -182,7 +189,7 @@ git -C /tmp/cb-demo diff             # the model's uncommitted fix — one line 
 ```
 
 `git` here is **read-only** — code-buddy exposes `status`, `diff`, `log`, `show`, `blame` and a
-few more; `commit` / `checkout` / `reset` are refused (it changes files through `applyPatch` /
+few more; `commit` / `checkout` / `reset` are refused (it changes files through
 `editWorkspaceFile`, never git). `run_tests` runs exactly the `--test-cmd` you pass (default
 `swift test`) in the workspace, with a 4-minute timeout. Both are this example's own code, not
 the SDK's — see
@@ -267,7 +274,7 @@ model. Weights land in `~/.cache/huggingface/hub/` — shared with
 | `LocalLMLab` + `MLXModelProvider` | two routes to locally-run MLX models, `residentModelLimit: 1` |
 | `lab.models.route` / `availability` / `validate` / `download` | pre-flight + streamed download on first run |
 | `lab.makeSession(route:tools:instructions:)` | resolves route → model, assembles tools |
-| Core Workspace tools | `workspaceTree`, `searchWorkspace`, `readWorkspaceFile`, `readFileRange`, `applyPatch`, `editWorkspaceFile`, `writeWorkspaceFile`, `listWorkspaceFiles` |
+| Core Workspace tools | `workspaceTree`, `searchWorkspace`, `readWorkspaceFile`, `readFileRange`, `editWorkspaceFile`, `writeWorkspaceFile`, `listWorkspaceFiles` (`applyPatch` also exists on the SDK but isn't wired up here — see the step-3 callout) |
 | Host-owned `Process` tools (not from the SDK) | `git` (read-only allow-list) and `run_tests` (`--test-cmd`) in [`ProcessTools.swift`](Sources/CodeBuddy/ProcessTools.swift) — exercised by walkthrough step 5 |
 | `lab.mcp` | one no-auth MCP server (DeepWiki), auto-merged into the session's tools |
 | `LocalLMLabSession.events` | the stderr `→ tool` / `✓ tool` trace |
