@@ -1826,11 +1826,69 @@ struct ClaudeModelProvider: ModelProvider {
 }
 struct ClaudeModelSpec: Sendable, Hashable { /* one Claude model — id, display name, context window */ }
 
+// --- RemoteModelProvider — LocalLMLabSDKRemote (separate xcframework; manifest floor macOS 26,
+// like Core — linking it never forces a 27 deployment target; the provider itself reports
+// .requiresOS("macOS 27") at runtime on 26, same as pcc) — §6b ---
+@available(macOS 27, *)
+struct RemoteModelProvider: ModelProvider {
+    init(_ config: RemoteProviderConfig)
+    func probe(for id: ModelID, timeout: Duration = .seconds(8)) async -> ModelAvailability   // zero-token key/model/reachability check
+    func turnArtifacts(in transcript: Transcript) -> TurnArtifacts   // server-tool activity + citations for the last turn
+}
+struct RemoteProviderConfig: Sendable, Equatable {
+    var scheme: String                          // the app names it — not privileged like "claude"
+    var displayName: String
+    var dialect: Dialect
+    var baseURL: URL
+    var auth: Auth
+    var models: [RemoteModel]                   // SDK ships no defaults — see §6b
+    var capabilities: Set<Capability>            // .webSearch, …
+    var defaultOptions: SessionOptions
+    var allowArbitraryModelIDs: Bool = false     // true → any "scheme:<string>" routes (OpenRouter)
+    init(scheme: String, displayName: String, dialect: Dialect, baseURL: URL, auth: Auth,
+         models: [RemoteModel] = [], capabilities: Set<Capability> = [],
+         defaultOptions: SessionOptions = .init(), allowArbitraryModelIDs: Bool = false)
+}
+struct RemoteModel: Sendable, Hashable, Codable, Identifiable {
+    var id: String; var displayName: String; var contextWindow: Int?
+    init(id: String, displayName: String? = nil, contextWindow: Int? = nil)
+}
+extension RemoteProviderConfig {
+    enum Dialect: String, Sendable, Hashable, Codable { case openAIChat, openAIResponses, anthropicMessages }
+    enum Auth: Sendable, Hashable { case apiKey(String); case header(name: String, value: String); case none }
+    enum Capability: String, Sendable, Hashable, Codable { case webSearch, structuredOutput, imageInput }
+
+    // Presets — conveniences, zero privilege. Model lists are empty by default (the SDK ships no
+    // model ids the host didn't ask for — a hardcoded default drifts and 404s; §6b).
+    static func openAI(apiKey: String, models: [RemoteModel] = []) -> Self
+    static func anthropic(apiKey: String, models: [RemoteModel] = []) -> Self
+    static func openRouter(apiKey: String, models: [RemoteModel] = []) -> Self   // allowArbitraryModelIDs = true
+    static func openAICompatible(scheme: String, displayName: String, baseURL: URL, apiKey: String?) -> Self
+
+    // Security review F9: run this on any config whose baseURL/auth came from outside your own
+    // code (a pasted URL, an imported profile) — throws ValidationIssue rather than silently
+    // sending a key to an untrusted or non-HTTPS host. Syntax check, not a trust check.
+    func validated() throws -> RemoteProviderConfig
+    enum ValidationIssue: Error, LocalizedError, Equatable {
+        case insecureBaseURL(host: String)      // non-HTTPS to a non-local host
+        case unsupportedURLScheme(String)       // not http(s)
+        case missingHost
+        case malformedHeaderName(String)
+        case controlCharactersInCredential       // CR/LF in a credential — header injection
+    }
+}
+enum RemoteError: Error, LocalizedError {   // wrapped in LocalLMLabError.generation
+    case http(status: Int, message: String)
+    case transport(Error)
+    case dialectNotImplemented(String)
+}
+
 // --- MLXModelProvider — LocalLMLabSDKInference (separate xcframework, macOS 27) ---
 @available(macOS 27, *)
 struct MLXModelProvider: DownloadableModelProvider {
     static var scheme: String { "mlx" }
-    init(cacheDirectory: URL? = nil, residentModelLimit: Int = 1, preflightLimits: MLXPreflightLimits = .init())
+    init(cacheDirectory: URL? = nil, residentModelLimit: Int = 1, preflightLimits: MLXPreflightLimits = .init(),
+         pinnedRevisions: [String: String] = [:])   // repo id -> HF revision/commit, for reproducible downloads
     var residencyEventStream: AsyncStream<ResidencyEvent>?
     var advertisedModels: [ModelID] { get }
     var installed: [InstalledModel] { get }
@@ -1923,6 +1981,8 @@ struct LocalLMLabSession: Sendable {
     var retryOnContextOverflow: RetryPolicy         // .disabled by default; set before respond()
     var languageModelSession: LanguageModelSession { get }   // Apple's session — use directly to opt out of the retry wrapper
     var events: AsyncStream<SessionEvent> { get }
+    var citations: [Citation] { get }               // web-search sources accumulated this session (§6b)
+    func reconcileServerToolArtifacts()             // re-derive citations/events from the transcript after a manual edit
     var contextBudget: ContextBudget { get }
     func cancel()
     // + respond(...) / streamResponse(...) wrappers (LocalLMLabSession+respond) that apply retryOnContextOverflow
@@ -1933,6 +1993,60 @@ enum SessionEvent: Sendable {
     case contextCompacted(removedEntries: Int)
     case toolCallStarted(id: String, name: String)
     case toolCallFinished(id: String, name: String, failed: Bool)
+    case serverToolCall(ServerToolActivity)         // provider-run web search/fetch — §6b
+}
+
+// --- per-query options + the web-search side channel (§6b) ---------------
+struct SessionOptions: Sendable, Equatable {
+    var webSearch: Bool = false
+    var webSearchMaxUses: Int? = nil
+    var webSearchAllowedDomains: [String] = []
+    var webSearchBlockedDomains: [String] = []
+    var effort: Effort? = nil            // reasoning level; nil = provider default (§6a "options: SessionOptions")
+    var temperature: Double? = nil
+    var topP: Double? = nil
+    var maxOutputTokens: Int? = nil
+    var userLocation: UserLocation? = nil   // for web-search localisation
+    init(webSearch: Bool = false, webSearchMaxUses: Int? = nil, webSearchAllowedDomains: [String] = [],
+         webSearchBlockedDomains: [String] = [], effort: Effort? = nil, temperature: Double? = nil,
+         topP: Double? = nil, maxOutputTokens: Int? = nil, userLocation: UserLocation? = nil)
+    var serverTools: Set<ServerTool> { get }        // derived from webSearch/webSearchMaxUses/etc.
+    func merged(onto base: SessionOptions) -> SessionOptions   // per-call wins; nil falls through to base
+}
+/// Reasoning/thinking effort, ordered off → max. `.off` is a real guarantee only on the local MLX
+/// tier — it suppresses the `<think>` block for toggle-capable chat templates (Qwen3 and its
+/// siblings); a model that always reasons (DeepSeek-R1 and its distills) throws
+/// `LanguageModelError.unsupportedCapability(.reasoning)` instead of silently ignoring it. Remote
+/// providers (OpenAI/Claude online/OpenRouter) and Apple on-device/PCC have no true "off" switch
+/// and treat `.off` as `nil` (provider default) — to minimize reasoning on those, pass `.low`.
+enum Effort: String, Sendable, Hashable, CaseIterable, Codable { case off, low, medium, high, xhigh, max }
+struct UserLocation: Sendable, Equatable, Codable {
+    var city: String?; var region: String?; var country: String?; var timezone: String?
+    init(city: String? = nil, region: String? = nil, country: String? = nil, timezone: String? = nil)
+}
+enum ServerTool: Sendable, Hashable {     // provider-executed, distinct from a client Tool
+    case webSearch(maxUses: Int? = nil, allowedDomains: [String] = [], blockedDomains: [String] = [])
+    case webFetch
+}
+struct ServerToolActivity: Sendable, Equatable, Identifiable {
+    let id: String
+    var kind: Kind
+    enum Kind: Sendable, Equatable {
+        case webSearch(queries: [String], hits: [WebHit])
+        case webFetch(url: String)
+    }
+}
+struct WebHit: Sendable, Equatable, Codable { var url: String; var title: String; var snippet: String? }
+struct Citation: Sendable, Equatable, Codable, Identifiable {
+    var id: String; var url: String; var title: String; var citedText: String?
+}
+/// What `RemoteModelProvider.turnArtifacts(in:)` (and Claude's provider) extract from a turn's
+/// transcript metadata — how `session.citations` and `.serverToolCall` events get populated.
+/// Most callers read `session.citations` / the event stream instead of this directly.
+struct TurnArtifacts: Sendable, Equatable {
+    var serverToolActivities: [ServerToolActivity] = []
+    var citations: [Citation] = []
+    static let none: TurnArtifacts
 }
 struct RetryPolicy: Sendable {
     var maxRetries: Int                                          // 0 disables
@@ -1959,10 +2073,87 @@ enum LocalLMLabError: Error, LocalizedError {   // the one public error type the
 enum LocalLMLabSDKVersion { static let current: String }   // "1.0.0-beta.N", "1.0.0" at GA
 ```
 
-`MLXModelProvider` / `MLXPreflightLimits` are in **`LocalLMLabSDKInference`** and
-`ClaudeModelProvider` / `ClaudeModelSpec` in **`LocalLMLabSDKClaude`** (each a separate
-xcframework on the same release — §1a); `ModelPickerView` / `ClaudeAuthField` are in
-**`LocalLMLabSDKComponents`** (§11).
+`MLXModelProvider` / `MLXPreflightLimits` are in **`LocalLMLabSDKInference`**,
+`ClaudeModelProvider` / `ClaudeModelSpec` in **`LocalLMLabSDKClaude`**, and
+`RemoteModelProvider` / `RemoteProviderConfig` / `RemoteError` in **`LocalLMLabSDKRemote`** (each
+a separate xcframework on the same release — §1a, §6b); `ModelPickerView` / `ClaudeAuthField` /
+`AIModelsSettingsView` are in **`LocalLMLabSDKComponents`** (§11).
+
+### Tool authority (`ToolCallAuthorizer`, `ToolImpact`, confirmation)
+
+The two levers from §7c, as types. Everything here is in `LocalLMLabSDKCore` except the last
+two, in `LocalLMLabSDKComponents`.
+
+```swift
+// --- lever 1: selection --------------------------------------------------
+extension Sequence where Element == any Tool {
+    func limited(toMaxImpact ceiling: ToolImpact) -> [any Tool]   // drops tools above ceiling; unrated = .mutate
+}
+protocol ImpactRatedTool: Tool { var impact: ToolImpact { get } }   // every ready-made SDK tool conforms
+enum ToolImpact: Int, Sendable, Codable, Comparable, CaseIterable { case read, mutate, destructive }
+protocol OriginTaggedTool: Tool { var toolOrigin: ToolOrigin { get } }   // a host's own MCP-backed Tool conforms to keep .mcp origin
+
+// --- lever 2: invocation --------------------------------------------------
+protocol ToolCallAuthorizer: Sendable {
+    func authorize(_ call: PendingToolCall) async -> ToolCallDecision
+}
+enum ToolCallDecision: Sendable {
+    case allow
+    case deny(reason: String)   // -> the model sees tool result "DENIED: <reason>" (String-output tools)
+}
+struct PendingToolCall: Sendable {
+    let toolName: String
+    let arguments: GeneratedContent?       // structured; nil only for a rare third-party From-only Arguments
+    let argumentsDescription: String       // always present
+    let origin: ToolOrigin                 // .host | .mcp(server:displayName:)
+    let impact: ToolImpact
+    init(toolName: String, arguments: GeneratedContent?, argumentsDescription: String, origin: ToolOrigin, impact: ToolImpact)
+    var summary: PendingToolCallSummary { get }   // the Codable projection, for crossing a process boundary
+}
+struct PendingToolCallSummary: Codable, Sendable, Equatable {
+    let toolName: String; let argumentsDescription: String; let origin: ToolOrigin; let impact: ToolImpact
+}
+enum ToolOrigin: Sendable, Codable, Equatable { case host; case mcp(server: MCPServerID, displayName: String) }
+
+// makeSession(..., authorizer:) — §12 "The model layer" — installs the gate; nil = unchanged, no gate.
+
+struct RuleBasedToolAuthorizer: ToolCallAuthorizer {   // pure logic, most-restrictive rule wins
+    enum Rule: Sendable {
+        case denyTool(String)
+        case denyMCPTools
+        case deny(atOrAbove: ToolImpact)
+        case allowTool(String)
+        case confirm(atOrAbove: ToolImpact)
+        case confirmMCPTools
+    }
+    init(rules: [Rule], denyReason: String = "blocked by this app's tool policy",
+         confirm: @escaping @Sendable (PendingToolCall) async -> Bool = { _ in false })
+    static func confirmingMutations(confirm: @escaping @Sendable (PendingToolCall) async -> Bool) -> RuleBasedToolAuthorizer
+    static func confirmingDestructive(confirm: @escaping @Sendable (PendingToolCall) async -> Bool) -> RuleBasedToolAuthorizer
+}
+
+protocol ToolConfirmationChannel: Sendable {   // the transport a "ask a human" authorizer suspends on
+    func requestDecision(for call: PendingToolCall) async -> Bool
+}
+struct ConfirmingToolAuthorizer: ToolCallAuthorizer {   // "ask a human per call," via any ToolConfirmationChannel
+    enum Requirement: Sendable { case allow; case confirm; case deny(reason: String) }
+    init(channel: any ToolConfirmationChannel, timeout: Duration = .seconds(120),
+         requirement: @escaping @Sendable (PendingToolCall) -> Requirement = { _ in .confirm })
+}
+final class DecisionGate: @unchecked Sendable {   // guards the resume-once race between a reply and the timeout
+    init()
+    func attach(_ continuation: CheckedContinuation<Bool, Never>)
+    func resume(_ value: Bool)
+}
+
+// --- LocalLMLabSDKComponents: the reference ToolConfirmationChannel + SwiftUI sheet ---
+final class ToolConfirmationPresenter: ObservableObject, ToolConfirmationChannel {
+    init(fallbackTimeout: Duration = .seconds(120))
+    func resolve(_ id: ToolConfirmationRequest.ID, allow: Bool)
+}
+struct ToolConfirmationRequest: Identifiable, Sendable { let id: UUID; let call: PendingToolCall }
+// View.toolConfirmationSheet(_ presenter: ToolConfirmationPresenter) — attach once, near the root
+```
 
 ### Connectors (Calendar, Reminders, Contacts, Location)
 
@@ -2145,6 +2336,10 @@ each taking the resolved root `URL` at init.
 enum WorkspaceAccess {
     struct WorkspaceError: Error { var message: String }
     struct WorkspaceEntry: Codable, Sendable { var name: String; var isDirectory: Bool; var modifiedDate: Date?; var size: Int? }
+    struct SearchMatch: Codable, Sendable, Equatable { var path: String; var line: Int; var text: String }
+    struct PatchResult: Codable, Sendable, Equatable {
+        var changed: [String]; var created: [String]; var deleted: [String]; var hunksApplied: Int
+    }
 
     static func listFiles(in root: URL, subpath: String?) -> Result<[WorkspaceEntry], WorkspaceError>
     static func readFile(in root: URL, path: String) -> Result<String, WorkspaceError>
@@ -2153,6 +2348,14 @@ enum WorkspaceAccess {
     // search-and-replace, not a unified-diff format — oldString must match exactly once unless replaceAll
     static func editFile(in root: URL, path: String, oldString: String, newString: String, replaceAll: Bool) -> Result<Void, WorkspaceError>
     static func deleteFile(in root: URL, path: String) -> Result<Void, WorkspaceError>
+    // unified-diff patch, potentially touching several files under root in one call — behind ApplyPatchTool
+    static func applyPatch(in root: URL, diff: String) -> Result<PatchResult, WorkspaceError>
+    // plain-text or regex; behind SearchWorkspaceTool
+    static func search(in root: URL, query: String, isRegex: Bool = false, include: String? = nil, maxResults: Int = 200) -> Result<[SearchMatch], WorkspaceError>
+    // an indented directory listing; behind WorkspaceTreeTool
+    static func tree(in root: URL, subpath: String? = nil, maxDepth: Int = 2) -> Result<String, WorkspaceError>
+    // a byte/line window into a large file without reading it whole; behind ReadFileRangeTool
+    static func readFileRange(in root: URL, path: String, offset: Int, limit: Int) -> Result<String, WorkspaceError>
 }
 
 struct ListWorkspaceFilesTool: Tool {
@@ -2252,7 +2455,10 @@ final class MCPServerManager {
     func reconnect(_ id: MCPServerID) async -> Result<MCPServerState, MCPServerError>
     func disconnect(_ id: MCPServerID)
     func removeServer(_ id: MCPServerID)
-    func restore(from persisted: [(id: MCPServerID, url: URL, displayName: String, tools: [MCPToolDescriptor], estimatedTokens: Int, enabled: Bool, authType: MCPAuthType, manualClientID: String?)])
+    // drops every in-memory server without touching Keychain tokens — pair with restore(from:)
+    // for a config-profile Load, where removeServer's per-server credential clear is the wrong call
+    func removeAllKeepingCredentials()
+    func restore(from persisted: [(id: MCPServerID, url: URL, displayName: String, tools: [MCPToolDescriptor], estimatedTokens: Int, enabled: Bool, authType: MCPAuthType, manualClientID: String?, resources: [(uri: String, name: String, enabled: Bool)])])
 
     func toolsForSession() -> [MCPToolDescriptor]
     func setToolEnabled(server: MCPServerID, tool: String, enabled: Bool)
@@ -2447,9 +2653,60 @@ final class MCPOAuthRedirectListener {
 ```
 
 **Advanced**: `protocol MCPConnection` is the transport abstraction `MCPServerManager` drives
-internally (`connect()`, `listTools()`, `callTool(name:arguments:allowElicitation:)`,
-resource/prompt equivalents, `close()`). You won't need this unless you're replacing the
-transport layer itself — everything above already goes through it for you.
+internally (`connect() async -> Result<MCPServerIdentity, MCPServerError>`, `listTools()`,
+`callTool(name:arguments:allowElicitation:)`, resource/prompt equivalents, `close()`). You won't
+need this unless you're replacing the transport layer itself — everything above already goes
+through it for you. `connect()`'s result is what a fresh handshake actually told you:
+
+```swift
+struct MCPServerIdentity: Sendable, Codable, Equatable {
+    var protocolVersion: MCPProtocolVersion
+    var serverName: String
+    var serverTitle: String              // display name (BaseMetadata `title`, 2025-06-18+); falls back to serverName
+    var serverVersion: String?
+    var instructions: String?            // free-text usage guidance some servers return
+    var capabilities: MCPServerCapabilities
+}
+// Which optional round-trips are worth firing — absent means "not supported," so a tools-only
+// server never gets an unnecessary resources/list call and its method-not-found error.
+struct MCPServerCapabilities: Sendable, Codable, Equatable {
+    var tools: Bool; var toolsListChanged: Bool
+    var resources: Bool; var resourcesListChanged: Bool; var resourcesSubscribe: Bool
+    var prompts: Bool; var promptsListChanged: Bool
+    var logging: Bool; var completions: Bool
+    var hasExperimental: Bool            // server declared something in `experimental`, kept opaque
+}
+// How the connection talks to the server. Only .handshake exists today (every revision through
+// 2025-11-25); 2026-07-28's stateless model adds a second case later without changing callers.
+enum MCPConnectionMode: Sendable, Equatable {
+    case handshake(MCPProtocolVersion)
+    var negotiatedVersion: MCPProtocolVersion { get }
+}
+```
+
+**Credential presence, without a Keychain prompt.** A host that lets a user swap the entire MCP
+server list in one shot — a config-profile Load — needs to know, for each server about to be
+restored, whether reconnecting will need a fresh sign-in. A server that authenticates via
+reactive/auto-discovered OAuth carries `MCPAuthType.none` in its persisted entry (only `.pat` and
+`.oauthManual` are declared up front), so the only way to tell is to check whether a token
+already exists — without decrypting it, which would trigger the Keychain's user-consent prompt
+even on a build that isn't yet trusted for the item (e.g. a fresh ad-hoc-signed dev build):
+
+```swift
+enum MCPStoredCredentialKind: String, Sendable, Equatable { case oauth, pat }
+enum MCPCredentialProbe {
+    // presence-only SecItem query (kSecReturnData false) — never decrypts the secret
+    static func storedKind(for server: URL) -> MCPStoredCredentialKind?
+    // true when a sign-in would be needed to use `server` — i.e. it declares up-front auth, or a
+    // token for it is already stored
+    static func requiresAuth(declared authType: MCPAuthType, server: URL) -> Bool
+}
+```
+
+Pair this with `removeAllKeepingCredentials()` + `restore(from:)` above: clear every in-memory
+server without touching Keychain tokens, then restore the new list — a server that reappears in
+it reconnects without a fresh sign-in, and `MCPCredentialProbe` is what your Save/Load UI uses to
+tell the user which servers will need one.
 
 ### `MCPTool` (Path A for MCP)
 
