@@ -68,6 +68,15 @@ concrete comparison of what each path actually requires.
 
 ## 1. Linking Core
 
+> **Reach for this when** you've picked the SDK over the toolkit (see
+> [above](#which-integration-path-should-i-use--this-sdk-or-the-toolkit)) — this is the one
+> required step before any other code in this guide will compile.
+>
+> **Examples that use it:** every example under [`examples/`](../examples/) links `Core` this
+> way — [`plate-today`](../examples/plate-today/)'s `Package.swift` is the simplest single-binary
+> case to copy from; [`code-buddy`](../examples/code-buddy/) and
+> [`model-switch`](../examples/model-switch/) show the multi-binary shapes below.
+
 `LocalLMLabSDKCore` ships as a `Core.xcframework` binary, published as a GitHub Release asset on
 this repo. Add it to your own `Package.swift` as a `binaryTarget`, pointing at the exact release
 you want:
@@ -114,6 +123,14 @@ Foundation Models — forces a macOS 27 target), **`Inference`** (local open-wei
 (Remote + Components) are the multi-binary manifest shapes to copy from.
 
 ### 1a. Targeting macOS 26 and macOS 27 from one build
+
+> **Reach for this when** you want one shipping binary to run on both macOS 26 and macOS 27,
+> with the 27-only model families (PCC, open-weight/MLX, online providers) simply absent on 26.
+> Skip this if you're only ever targeting macOS 27.
+>
+> **Examples that use it:** [`os-matrix`](../examples/os-matrix/) is exactly this pattern, built
+> to run unchanged on both OS versions — read it end to end for the live version of the snippet
+> below.
 
 As of `1.0.0-beta.2`, `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, and `LocalLMLabSDKComponents`
 all have a **macOS 26 deployment floor** — and `LocalLMLabSDKRemote` (added in `1.0.0-beta.3`)
@@ -163,10 +180,27 @@ let answer = try await session.respond(to: prompt)
 
 ## 2. Required setup before you can use Calendar/Reminders or MCP OAuth
 
+> **Reach for this when** your app will touch Calendar/Reminders, or connect to any MCP server
+> that needs OAuth. Skip this whole section if you're doing neither yet — e.g. an on-device-model
+> app with no connectors, or an MCP integration against no-auth/PAT-only servers only (Contacts
+> and Location have their own, separate setup — see [§7](#7-connectors-calendar-reminders-contacts-location)).
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) and
+> [`plate-today-tools`](../examples/plate-today-tools/) need all four subsections below (Calendar
+> + Reminders + Todoist OAuth); [`components-demo`](../examples/components-demo/) needs only the
+> OAuth ones (2c/2d).
+
 Three things are **required**, not optional extras — skipping any one of them produces a confusing
 failure (a silent TCC denial, or a crash on a missing entitlement) rather than a clear error.
 
 ### 2a. Info.plist usage-description strings (if using Calendar/Reminders)
+
+> **Reach for this when** you're about to request Calendar or Reminders access for the first
+> time — add these before your first `CalendarAccess`/`RemindersAccess` call, not after a
+> TCC denial.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
+> [`plate-today-tools`](../examples/plate-today-tools/).
 
 For every connector you use (Calendar/Reminders shown here — see [§7](#7-connectors-calendar-reminders-contacts-location) (Connectors) for the full connector
 list and its Info.plist/entitlement requirements):
@@ -179,6 +213,12 @@ list and its Info.plist/entitlement requirements):
 ```
 
 ### 2b. Entitlements (if using Calendar/Reminders)
+
+> **Reach for this when** you're preparing your app's entitlements file for the first
+> Calendar/Reminders build — required alongside [2a](#2a-infoplist-usage-description-strings-if-using-calendarreminders), not instead of it.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
+> [`plate-today-tools`](../examples/plate-today-tools/).
 
 ```xml
 <key>com.apple.security.personal-information.calendars</key>
@@ -205,6 +245,13 @@ ways.** The specific failure sequence (confirmed live, more than once):
    pass is the one that actually matters.
 
 ### 2c. OAuth redirect URI — MUST set this yourself (if using MCP OAuth)
+
+> **Reach for this when** any MCP server you'll connect to might use OAuth — set this before your
+> first `connect`/`addServer` call, not after one fails.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
+> [`plate-today-tools`](../examples/plate-today-tools/) (Todoist) and
+> [`components-demo`](../examples/components-demo/).
 
 If you connect to any MCP server that uses OAuth (most hosted MCP servers do — e.g. Todoist), you
 **must** set `MCPOAuthFlow.redirectURI` to your own app's URL scheme before calling `connect`:
@@ -236,6 +283,14 @@ Set `MCPOAuthFlow.clientMetadataURL` in the same spot if you're using CIMD inste
 Client Registration — see [§3d](#3d-cimd-skipping-dynamic-client-registration).
 
 ### 2d. Wire the OAuth callback through your AppDelegate, not SwiftUI's `.onOpenURL` (if using MCP OAuth)
+
+> **Reach for this when** you're wiring the URL-scheme handling for the redirect from
+> [2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth) — needed the moment you
+> register a custom `CFBundleURLSchemes` entry.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
+> [`plate-today-tools`](../examples/plate-today-tools/) and
+> [`components-demo`](../examples/components-demo/).
 
 ```swift
 final class AppDelegate: NSObject, NSApplicationDelegate {
