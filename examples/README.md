@@ -46,8 +46,11 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 Each SDK example (everything except the `api-lab/` and `localai-cli*/` folders) is a standalone
 SwiftPM package. It resolves `LocalLMLabSDKCore` (and, where used, `LocalLMLabSDKInference` /
 `LocalLMLabSDKRemote`) as a **binary** dependency from a GitHub Release on this repo — nothing to
-download or unzip by hand. Requires **macOS 27** on Apple Silicon and the **Xcode 27** (a
-stable Xcode fails with `'v27' is unavailable`).
+download or unzip by hand. Requires **Apple Silicon** and the **Xcode 27** toolchain to build (a
+stable Xcode fails with `'v27' is unavailable`). **macOS 27 is recommended** — most of the SDK's
+advanced model-layer features (Private Cloud Compute, open-weight/MLX, Claude, online providers)
+need it — but it isn't universal: [`os-matrix/`](os-matrix/) is built and tested to run unchanged
+on **macOS 26** too (see its README).
 
 The examples on this `1.0.0-beta` branch build against SDK **`1.0.0-beta.4`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
