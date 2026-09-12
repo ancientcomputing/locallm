@@ -5,8 +5,8 @@ import PackageDescription
 // code-buddy — the public copy of the SDK's reference coding agent (source maintained
 // privately, copied here). Unlike plate-today, this one links BOTH SDK binaries:
 // LocalLMLabSDKCore.xcframework AND LocalLMLabSDKInference.xcframework (the MLX runtime —
-// mlx-swift-lm + Metal statically linked, ~49 MB / ~11 MB zipped). Core source never leaves
-// the private repo; Inference is a binary for the same reason.
+// mlx-swift-lm + Metal statically linked, ~49 MB / ~11 MB zipped). Core never ships as
+// source, only as a binary; Inference is a binary for the same reason.
 //
 // Builds against `defaultSDKVersion` below with no setup; LOCALLM_SDK_VERSION overrides from a
 // shell (not Xcode). Requires macOS 27 + Xcode 27 (the SDK's model layer is built on

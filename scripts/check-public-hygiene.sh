@@ -23,6 +23,7 @@ report() {  # <label> <ripgrep-or-grep-args...>
   # -I skip binary, -n line numbers; the pattern set is passed by the caller
   if hits="$(git grep -nIE "$@" -- \
       ':!scripts/check-public-hygiene.sh' \
+      ':!.github/workflows/public-hygiene.yml' \
       ':!LICENSE' ':!NOTICE' 2>/dev/null)"; then
     echo "✗ $label"
     echo "$hits" | sed 's/^/    /'

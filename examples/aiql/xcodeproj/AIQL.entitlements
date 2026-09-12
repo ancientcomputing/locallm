@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<!-- Unconditional sandbox, like workspace-buddy — this is what makes the security-scoped
-	     bookmark pattern (docs/02-sdk-developer-guide.md §8) necessary to demonstrate. -->
+	     bookmark pattern (docs/sdk-guide.md §8) necessary to demonstrate. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<!-- Read/write to the folder the user picks via NSOpenPanel — the pipeline writes raw/data.json

@@ -124,7 +124,7 @@ BINARY="$BIN_DIR/WorkspaceBuddy"
 # Core is built as a dynamic library product, so WorkspaceBuddy links against it via @rpath at
 # runtime rather than statically — see plate-today-tools' build-and-sign.sh for the fuller
 # writeup of why a packaged .app needs the Core artifact copied in explicitly and re-signed, and
-# why the on-disk shape (flat dylib vs. framework bundle) differs between this private repo's
+# why the on-disk shape (flat dylib vs. framework bundle) differs between a source
 # path-dependency build and the public locallm copy's binaryTarget build.
 CORE_DYLIB="$BIN_DIR/libLocalLMLabSDKCore.dylib"
 CORE_FRAMEWORK="$BIN_DIR/LocalLMLabSDKCore.framework"

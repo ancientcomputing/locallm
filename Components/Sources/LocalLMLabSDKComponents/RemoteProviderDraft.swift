@@ -1,7 +1,7 @@
 import Foundation
 
 /// The editable state of one online provider in an "AI Models" settings panel
-/// (docs/12-remote-model-providers.md §5). Components owns this UI-facing shape; the **host**
+/// (docs/sdk-guide.md §6b). Components owns this UI-facing shape; the **host**
 /// maps it to a `RemoteProviderConfig` (from `LocalLMLabSDKRemote`, which Components does not
 /// depend on) and calls `lab.models.replace(RemoteModelProvider(config))`, persisting the key
 /// to its own Keychain. `RemoteProviderDraft.applied(to:)` in the example app shows the ~20

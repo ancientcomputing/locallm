@@ -157,7 +157,7 @@ BINARY="$BUILD_DIR/swift/arm64-apple-macosx/release/PlateTodayTools"
 # Same @rpath dynamic-library situation as build-and-sign.sh — see that script's comment for the
 # full "Library not loaded" failure-mode writeup this works around, including why the on-disk
 # shape (flat dylib vs. LocalLMLabSDKCore.framework) depends on whether Core comes from source
-# (this private repo) or a binaryTarget (the public locallm copy).
+# (a source path-dependency) or a binaryTarget (the public locallm copy).
 CORE_DYLIB="$BUILD_DIR/swift/arm64-apple-macosx/release/libLocalLMLabSDKCore.dylib"
 CORE_FRAMEWORK="$BUILD_DIR/swift/arm64-apple-macosx/release/LocalLMLabSDKCore.framework"
 if [[ -f "$CORE_DYLIB" ]]; then
