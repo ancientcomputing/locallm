@@ -917,12 +917,16 @@ relaunch.
 
 > **Use a provider when** you're deciding *what models your app can offer at all.* A provider is
 > "a source of language models" — you register the ones you want, and the registry resolves a
-> `ModelID` to whichever provider owns its `scheme`.
+> `ModelID` to whichever provider owns its `scheme`. Online models aren't a separate mechanism —
+> `RemoteModelProvider` is a `ModelProvider` like any other; it just gets its `scheme` from data
+> you supply instead of owning one fixed name (below, and [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)).
 >
 > **Examples that use it:** [`os-matrix`](../examples/os-matrix/) registers `System`, `PCC`, and
 > `MLX` behind one `#available(macOS 27, *)` check (the pattern for supporting both OS floors);
 > [`code-buddy`](../examples/code-buddy/) registers `MLXModelProvider` + `SystemModelProvider` as
-> a fallback.
+> a fallback; [`model-switch`](../examples/model-switch/) starts with just
+> `SystemModelProvider` and registers a `RemoteModelProvider` per configured service at runtime
+> via `lab.models.replace(_:)`, as the user adds each one in Settings.
 
 | Provider | Ships in | `scheme` | macOS | For |
 |---|---|---|---|---|
@@ -930,10 +934,14 @@ relaunch.
 | `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model (Apple's own models, not your weights). Needs the PCC entitlement + App Store Small Business Program — there is no paid tier. Since `1.0.0-beta.3` the provider maps availability, quota, and typed errors cleanly, and adds `probe(timeout:)` — an async liveness check (`availability(for:)` alone can say `.available` while turns still throw on a build without the entitlement). |
 | `ClaudeModelProvider(auth:)` | **`LocalLMLabSDKClaude`** | `claude` | 27 | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
 | `MLXModelProvider` | **Inference** | `mlx` | 27 | Locally-run open-weight models (Qwen, Llama, …) via MLX |
+| `RemoteModelProvider(_:)` | **Remote** | *host-chosen* — set in `RemoteProviderConfig.scheme`, one instance per provider you configure | 27 | Hosted APIs — OpenAI, Anthropic's Messages API, OpenRouter, any OpenAI-compatible server. The one provider here that's data-driven rather than a fixed named type; details in [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) |
 
 `LocalLMLabSDKClaude` is a third binaryTarget on the SDK release (`ClaudeForFoundationModels` is
-macOS-27-pinned, so it can't live in the macOS-26-floored Core). Register the 27-only providers
-inside `if #available(macOS 27, *)` — [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build).
+macOS-27-pinned, so it can't live in the macOS-26-floored Core); `LocalLMLabSDKRemote` is a
+fourth, with no such pin — its manifest floor stays macOS 26, so linking it never forces a 27
+deployment target, even though `RemoteModelProvider` itself only registers successfully on 27.
+Register every 27-only provider — `PCC`, `Claude`, `MLX`, `Remote` alike — inside
+`if #available(macOS 27, *)` — [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build).
 On macOS 26 `lab.models.availability(for:)` reports those schemes as
 `.unavailable(kind: .requiresOS("macOS 27"), …)` and `lab.models.schemesRequiringNewerOS` lists
 them.
