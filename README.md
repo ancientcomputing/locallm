@@ -52,7 +52,7 @@ reference apps is [further down](#building-on-the-sdk).
 ## About this repo
 
 `ancientcomputing/locallm` is the public home for everything shipped to LocalLM
-Lab users and SDK developers. The app and SDK *source* stay in private repos;
+Lab users and SDK developers. The app and SDK *source* stay closed-source;
 what's public here is:
 
 - **[SDK releases](CHANGELOG.md)** — the SwiftPM consumption manifests, binary

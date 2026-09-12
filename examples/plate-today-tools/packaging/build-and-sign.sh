@@ -152,7 +152,7 @@ BINARY="$BIN_DIR/PlateTodayTools"
 # not loaded" failure on first real launch of the packaged bundle.
 #
 # The on-disk shape differs depending on how this package.swift depends on Core, and both are real:
-# this private repo's `.package(path: "../../Core")` produces a flat `libLocalLMLabSDKCore.dylib`
+# the SDK-source checkout's sibling ../../Core path-dependency produces a flat `libLocalLMLabSDKCore.dylib`
 # next to the binary, but the public `locallm` copy's `.binaryTarget` (a prebuilt
 # Core.xcframework) produces a `LocalLMLabSDKCore.framework` bundle instead — PlateTodayTools's own
 # @rpath entry (`@rpath/LocalLMLabSDKCore.framework/LocalLMLabSDKCore` in that case) expects the

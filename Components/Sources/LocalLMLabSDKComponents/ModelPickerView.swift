@@ -1,7 +1,7 @@
 import LocalLMLabSDKCore
 import SwiftUI
 
-// Prebuilt model surface (docs/09-model-layer-requirements.md R16). Binds directly to
+// Prebuilt model surface (docs/sdk-guide.md §11). Binds directly to
 // `lab.models` — an `@Observable` `ModelRegistry` — so availability, install state, and live
 // download progress all come from observable properties, never by polling a provider.
 //

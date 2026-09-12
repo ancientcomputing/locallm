@@ -3,7 +3,7 @@ import Foundation
 import PackageDescription
 
 // Model Switch — reference app for the online / remote AI providers (SDK
-// docs/12-remote-model-providers.md). The user adds a provider + API key, ticks web search, and
+// docs/sdk-guide.md §6b). The user adds a provider + API key, ticks web search, and
 // switches between every configured model — Apple on-device, PCC, Claude-4-FM, GPT, Claude
 // online, any OpenRouter model — from one chat window, one `lab.makeSession` call site.
 //
