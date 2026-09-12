@@ -1281,6 +1281,15 @@ individually fine.
 
 ### Clock and Weather: no permission needed, just drop them in
 
+> **Reach for `ClockTool` specifically** whenever a session deals in relative dates ("tomorrow",
+> "next week") — no local model has a built-in notion of "now", and pairing it with the
+> Calendar/Reminders tools is the practical fix for their date-grounding caveat above.
+> `WeatherTool` is the smallest example of a tool needing a network call but no permission grant.
+>
+> **Examples that use them:** `ClockTool` is used by nearly every example;
+> [`code-buddy`](../examples/code-buddy/) and [`repo-qa`](../examples/repo-qa/) include it as a
+> cross-check that tool-calling works at all.
+
 Two more tools ship in Core that aren't part of the `Connectors` facade above, because they're not
 permission-gated at all — no entitlement, no Info.plist key, nothing to request:
 
@@ -1296,12 +1305,6 @@ let session = LanguageModelSession(tools: tools)
 Both accept an optional custom `description` in their initializer (`ClockTool(description:
 "...")`) if you want to override how the model sees the tool — otherwise each falls back to its own
 `defaultDescription`.
-
-**Reach for `ClockTool` specifically** whenever a session deals in relative dates ("tomorrow",
-"next week") — no local model has a built-in notion of "now", and pairing it with the
-Calendar/Reminders tools is the practical fix for their date-grounding caveat above.
-`ClockTool` is used by nearly every example; `code-buddy` and `repo-qa` include it as a
-cross-check that tool-calling works at all.
 
 ### 7a. Two paths to tool-calling: ready-made Tools, or write your own
 
@@ -1390,10 +1393,18 @@ tool whose schema doesn't build, rather than letting one malformed tool take dow
 
 ### 7c. Tool authorization: two levers — which tools, and whether they ask first
 
+> **Reach for this when** a session has any mutating tool and you want a real answer to "could
+> this call happen by mistake" — a model mistake, a prompt-injection string in a document it's
+> summarizing, or an MCP server whose tools you didn't write. Skip it if every tool in your
+> session is read-only, or your app has no untrusted input path into the model at all.
+>
+> **Examples that use it:** [`security-demo`](../examples/security-demo/) is the runnable
+> version of everything below — a "Security" panel wiring both levers against Calendar +
+> Todoist MCP.
+
 A model with a mutating tool will sometimes call it wrongly: a model mistake, a prompt-injection
 string in a document it's summarizing, or an MCP server whose tools you didn't write. Core gives
-you two independent levers over that. [`examples/security-demo`](../examples/security-demo) is
-the runnable version of everything below.
+you two independent levers over that.
 
 **Lever 1 — selection.** Which tools are in the session at all. Not just on/off: `ToolImpact`
 (`.read` < `.mutate` < `.destructive`) is a ceiling.
@@ -1550,6 +1561,13 @@ Required entitlements for this to work under App Sandbox:
 
 ### 8a. WorkspaceAccess/WorkspaceTools: what Core gives you once you have that URL
 
+> **Reach for this once you have a resolved root `URL`** from the bookmark pattern above — this
+> is the actual read/write API, the Core half of filesystem access.
+>
+> **Examples that use it:** [`workspace-buddy`](../examples/workspace-buddy/) and
+> [`code-buddy`](../examples/code-buddy/) both use these tools; `workspace-buddy`'s
+> `withFolderAccessAsync<T>(_:)` is the async-aware access wrapper the gotcha below points to.
+
 Once you have a resolved, access-bracketed root `URL` from the pattern above,
 `WorkspaceAccess` — an ordinary Core type, not a permission-gated connector — is what actually
 reads and writes inside it: `listFiles`/`readFile`/`writeFile`/`editFile`/`deleteFile`, each
@@ -1584,6 +1602,15 @@ call, not just a synchronous setup step. `examples/workspace-buddy` shows the as
 (`withFolderAccessAsync<T>(_:)`) this actually requires.
 
 ### 8b. `FileBackedTool` + the "AIQL" data verbs: a mechanical MCP-dataset → CSV pipeline
+
+> **Reach for this when** a data-source tool (an MCP dataset, an API, a big query) can return
+> more than fits in a small model's context, and you'd rather have the model describe one
+> transform than copy rows through itself. Skip it if your data tools already return small,
+> bounded results.
+>
+> **Examples that use it:** [`aiql`](../examples/aiql/) is the end-to-end pipeline — a
+> plain-English request over an MCP dataset → `FileBackedTool` → `loadTable`/`sqlQuery` → a CSV
+> in a folder you chose, with a local MLX model.
 
 The problem: a data-source tool (an MCP server tool for a dataset, an API, a big query) can
 return far more than fits in a small model's context — after the host truncates it the model
