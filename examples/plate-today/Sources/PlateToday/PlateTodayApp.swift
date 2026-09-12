@@ -177,7 +177,7 @@ struct TodoistTasksTool: Tool {
                 arguments: ["startDate": .string("today"), "overdueOption": .string("exclude-overdue")]
             )
             switch result {
-            case .success(let text): return text
+            case .success(let toolResult): return toolResult.renderedForModel
             case .failure(let error): return "Todoist tool call failed: \(error)"
             }
         }
