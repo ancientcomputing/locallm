@@ -611,8 +611,14 @@ Package as a real signed `.app` before relying on isolation.
 
 ## 5. Walking through a reference app's user experience, step by step
 
-See [`annotated-examples.md`](annotated-examples.md) for this file's full source with every SDK
-touchpoint marked, if you'd rather see it all at once than in prose.
+> **Reach for this when** you want the shape of a whole app's flow — launch → request access →
+> fetch/synthesize via the model → show the result → clean up — not just one API's signature.
+> Skip ahead to [§6](#6-general-api-reference) if you already know the shape and just want the
+> reference.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) is the app this walkthrough
+> traces line by line; see [`annotated-examples.md`](annotated-examples.md) for its full source
+> with every SDK touchpoint marked, if you'd rather see it all at once than in prose.
 
 This section traces `examples/plate-today`'s "what's on my plate today" flow end to end — launch →
 request Calendar/Reminders/MCP-server access → fetch and synthesize via an on-device model → show
@@ -857,33 +863,35 @@ both if you don't want to write your own.
 
 ## 6a. The model layer: local models, routing, sessions
 
+> **Reach for this when** "which model" becomes a real question in your app: you want to offer a
+> locally-run open-weight model *and* Apple's on-device model *and* Claude behind one API, let
+> the user (or your own logic) switch between them, keep one warm between turns, and show
+> download/memory state in your UI — without hand-rolling a provider abstraction. If your app
+> only ever uses Apple's on-device model, you don't need any of this — construct a
+> `LanguageModelSession` directly and pass it Core's tools; the rest of this section is for apps
+> that want more than one model.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) exercises all of it — a CLI
+> coding agent with a `.heavy` and a `.light` route to locally-run MLX models, Core's Workspace
+> tools, an MCP docs server, and streamed output; run it with a task for one shot, or without one
+> for a `>>` loop over one persistent `LocalLMLabSession` (where `contextBudget` and
+> `.contextCompacted` earn their place). Each subsection below names which example uses that
+> specific piece.
+
 New in 1.0. Everything above is the MCP client — usable on its own with Apple's
 `SystemLanguageModel` and nothing else. The model layer builds on a **macOS 26** floor; Private
 Cloud Compute and open-weight (MLX) models need macOS 27, and Claude needs a macOS-27 target
-(see [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build)). The **model layer** is what you
-reach for when
-"which model" becomes a real question in your app: you want to offer a locally-run open-weight
-model *and* Apple's on-device model *and* Claude behind one API, let the user (or your own
-logic) switch between them, keep one warm between turns, and show download / memory state in
-your UI — without your app hand-rolling a provider abstraction.
-
-If your app only ever uses Apple's on-device model, you don't need any of this — construct a
-`LanguageModelSession` directly and pass it Core's tools. The rest of this section is for apps
-that want more than one model.
-
-> **The one example that exercises all of it: [`code-buddy`](../examples/code-buddy/).** A CLI
-> coding agent with a `.heavy` and a `.light` route to locally-run MLX models, Core's Workspace
-> tools, an MCP docs server, and streamed output. Run it with a task for one shot, or without a
-> task for a `>>` loop over one persistent `LocalLMLabSession` (where `contextBudget` and
-> `.contextCompacted` actually earn their place). Every API below has a "→ code-buddy" pointer
-> to where it's used for real.
+(see [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build)).
 
 ### `LocalLMLab` — the front door (optional)
 
-**Use it when** you want one object that wires the model registry, the MCP manager, and the
-connector/workspace facades together, and hands you a ready session. It's entirely optional —
-every bare type (`MCPServerManager`, `Connectors`, `WorkspaceAccess`, the providers) stays
-public and usable without it.
+> **Use it when** you want one object that wires the model registry, the MCP manager, and the
+> connector/workspace facades together, and hands you a ready session. It's entirely optional —
+> every bare type (`MCPServerManager`, `Connectors`, `WorkspaceAccess`, the providers) stays
+> public and usable without it.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) builds `LocalLMLab` with two
+> providers and maps `.heavy`/`.light` before the first turn.
 
 ```swift
 let lab = LocalLMLab(configuration: .init(providers: [
@@ -902,15 +910,19 @@ lab.connectors  // Calendar / Reminders / Contacts / Location
 
 `lab.snapshot() -> LocalLMLabState` gives you a `Codable` snapshot of the route map + residency
 policy + installed-model records to persist wherever you like (the SDK writes nothing to disk);
-`lab.restore(from:)` re-applies one. **Use it when** you want the user's model choices to
-survive a relaunch. → *code-buddy builds `LocalLMLab` with two providers and maps `.heavy` /
-`.light` before the first turn.*
+`lab.restore(from:)` re-applies one. Use it when you want the user's model choices to survive a
+relaunch.
 
 ### `ModelProvider` and the built-in providers
 
-**Use a provider when** you're deciding *what models your app can offer at all.* A provider is
-"a source of language models" — you register the ones you want, and the registry resolves a
-`ModelID` to whichever provider owns its `scheme`:
+> **Use a provider when** you're deciding *what models your app can offer at all.* A provider is
+> "a source of language models" — you register the ones you want, and the registry resolves a
+> `ModelID` to whichever provider owns its `scheme`.
+>
+> **Examples that use it:** [`os-matrix`](../examples/os-matrix/) registers `System`, `PCC`, and
+> `MLX` behind one `#available(macOS 27, *)` check (the pattern for supporting both OS floors);
+> [`code-buddy`](../examples/code-buddy/) registers `MLXModelProvider` + `SystemModelProvider` as
+> a fallback.
 
 | Provider | Ships in | `scheme` | macOS | For |
 |---|---|---|---|---|
@@ -935,10 +947,13 @@ protocol.
 
 ### `RouteName` + routing — pick a model without hardcoding one
 
-**Use routes when** you don't want `"mlx:mlx-community/Qwen3-8B-4bit"` sprinkled through your
-code. A `RouteName` (`.heavy`, `.light`, `.draft`, or any string you like) is a name your app
-maps to a `ModelID`; you pick a route per session. **The SDK owns model residency, never
-routing policy** — your app decides which route a given task uses.
+> **Use routes when** you don't want `"mlx:mlx-community/Qwen3-8B-4bit"` sprinkled through your
+> code. A `RouteName` (`.heavy`, `.light`, `.draft`, or any string you like) is a name your app
+> maps to a `ModelID`; you pick a route per session. **The SDK owns model residency, never
+> routing policy** — your app decides which route a given task uses.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/)'s `--route heavy|light` flag
+> flips exactly this; `--heavy`/`--light` override the model each route points at.
 
 ```swift
 lab.models.route(.heavy, to: ModelID("mlx:mlx-community/Qwen3-8B-4bit")!)
@@ -947,14 +962,17 @@ lab.models.route(.light, to: .system)
 let session = try lab.makeSession(route: heavyTask ? .heavy : .light, tools: myTools, instructions: sys)
 ```
 
-→ *code-buddy's `--route heavy|light` flag flips exactly this; `--heavy` / `--light` override
-the model each route points at.*
-
 ### `MLXModelProvider` — run open-weight models locally (`LocalLMLabSDKInference`)
 
-**Use it when** you want the model to run entirely on the user's Mac with no API key and no
-network at inference time. It's a `DownloadableModelProvider`, so on top of the provider basics
-it adds the runtime lifecycle:
+> **Use it when** you want the model to run entirely on the user's Mac with no API key and no
+> network at inference time. It's a `DownloadableModelProvider`, so on top of the provider basics
+> it adds the runtime lifecycle (validate → download → capability-probe → remove) shown below.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) calls `validate` before its
+> first run, streams `download` progress, and prints `residencyEventStream` transitions to
+> stderr (its README has the small-RAM-Mac walkthrough);
+> [`workspace-buddy-local`](../examples/workspace-buddy-local/) runs the whole model layer
+> inside App Sandbox.
 
 ```swift
 let mlx = MLXModelProvider(residentModelLimit: 1)   // 1 model resident at a time
@@ -1007,14 +1025,15 @@ whole model layer inside App Sandbox and is the worked example.
 - `unloadResident(_:)` / `unloadAllResident()` — drop weights explicitly (e.g. before a
   memory-heavy operation elsewhere in your app).
 
-→ *code-buddy calls `validate` before its first run, streams `download` progress, and prints
-`residencyEventStream` transitions to stderr. Its README has the small-RAM-Mac walkthrough.*
-
 ### `makeSession` + `LocalLMLabSession` — a session with your tools + MCP tools merged
 
-**Use it instead of constructing `LanguageModelSession` yourself when** you want the SDK to:
-resolve the route → model, build the model, and assemble the tool list (your `tools` **plus**
-the enabled MCP session tools from `lab.mcp`, unless `includeMCPTools: false`).
+> **Use it instead of constructing `LanguageModelSession` yourself when** you want the SDK to
+> resolve the route → model, build the model, and assemble the tool list (your `tools` **plus**
+> the enabled MCP session tools from `lab.mcp`, unless `includeMCPTools: false`).
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/)'s whole
+> `makeSession(route:tools:instructions:)` call, tools = Workspace tools + its host-owned
+> `GitTool`/`RunTestsTool`.
 
 ```swift
 let session = try lab.makeSession(
@@ -1028,9 +1047,7 @@ let answer = try await session.respond(to: task)
 for try await snapshot in session.languageModelSession.streamResponse(to: task) { … }
 ```
 
-`session.route` / `session.modelID` tell you what actually backs it. → *code-buddy's whole
-`makeSession(route:tools:instructions:)` call, tools = Workspace tools + its host-owned
-`GitTool` / `RunTestsTool`.*
+`session.route` / `session.modelID` tell you what actually backs it.
 
 **`options: SessionOptions`** carries per-call knobs — provider-native web search, sampling
 (`temperature` / `topP` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
@@ -1042,9 +1059,12 @@ one (the Qwen3 family — a model that always reasons, e.g. DeepSeek-R1, raises
 
 ### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
 
-**Use it when** your UI needs to show what's happening *around* generation — a spinner per
-tool call, a "compacting context…" notice. Token streaming stays on
-`languageModelSession.streamResponse`; `events` carries only the rest:
+> **Use it when** your UI needs to show what's happening *around* generation — a spinner per
+> tool call, a "compacting context…" notice. Token streaming stays on
+> `languageModelSession.streamResponse`; `events` carries only the rest.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/)'s `→ tool` / `✓ tool` stderr
+> trace is this stream.
 
 ```swift
 for await event in session.events {
@@ -1058,12 +1078,13 @@ for await event in session.events {
 }
 ```
 
-→ *code-buddy's `→ tool` / `✓ tool` stderr trace is this stream.*
-
 ### `ContextBudget` + `RetryPolicy` — surviving a long session
 
-**Use these when** your app has long-running sessions (a coding agent, a chat that goes for
-hours) that will eventually fill the model's context window.
+> **Use these when** your app has long-running sessions (a coding agent, a chat that goes for
+> hours) that will eventually fill the model's context window.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) prints `contextBudget` after
+> each run.
 
 - `session.contextBudget` — `windowTokens`, `lastInputTokens`, `fractionUsed` (best-effort).
   Show a "context 78% full" gauge; decide when to start a fresh session.
@@ -1071,11 +1092,15 @@ hours) that will eventually fill the model's context window.
   myTrim(transcript) })` — when a turn throws `contextSizeExceeded`, the SDK calls your
   `compact` hook, rebuilds the session with the smaller transcript, emits `.contextCompacted`,
   and retries. Only applies to the SDK's `respond` wrappers; with no `compact` hook it just
-  rethrows. → *code-buddy prints `contextBudget` after each run.*
+  rethrows.
 
 ### `ModelAvailability` — gray out a model and say why
 
-**Use it when** you're building a model picker and need to disable an entry with a reason.
+> **Use it when** you're building a model picker and need to disable an entry with a reason.
+>
+> **Examples that use it:** [`os-matrix`](../examples/os-matrix/)'s `describe(_:)` switches over
+> every `ModelAvailability` case to print a status line per model family.
+
 `lab.models.availability(for: id)` (or `provider.availability(for:)`) returns:
 `.available` · `.notDownloaded` (offer a download button) · `.needsCredential` (prompt for the
 API key) · `.unavailable(kind:detail:)` where `kind` is machine-readable
@@ -1086,18 +1111,25 @@ API key) · `.unavailable(kind:detail:)` where `kind` is machine-readable
 
 ### `WorkspaceAccess` + the Workspace tools — let the model touch files
 
-**Use it when** the model needs to read or edit files in a folder the user picked. `WorkspaceAccess`
-owns the security-scoped-bookmark bracket; the ready-made tools (`SearchWorkspaceTool`,
-`WorkspaceTreeTool`, `ReadWorkspaceFileTool`, `ReadFileRangeTool`, `ListWorkspaceFilesTool`,
-`ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`, `DeleteWorkspaceFileTool`)
-are FoundationModels `Tool`s you drop straight into `makeSession`. → *`code-buddy` and
-[`workspace-buddy`](../examples/workspace-buddy/) (the Core-only, no-MLX version) both use these.*
+> **Use it when** the model needs to read or edit files in a folder the user picked.
+> `WorkspaceAccess` owns the security-scoped-bookmark bracket; the ready-made tools
+> (`SearchWorkspaceTool`, `WorkspaceTreeTool`, `ReadWorkspaceFileTool`, `ReadFileRangeTool`,
+> `ListWorkspaceFilesTool`, `ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`,
+> `DeleteWorkspaceFileTool`) are FoundationModels `Tool`s you drop straight into `makeSession`.
+>
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) and
+> [`workspace-buddy`](../examples/workspace-buddy/) (the Core-only, no-MLX version) both use
+> these.
 
 ## 6b. Online providers — GPT, Claude online, OpenRouter (`LocalLMLabSDKRemote`)
 
-**Reach for this when** you want a hosted model API — OpenAI, Anthropic's Messages API,
-OpenRouter, or any OpenAI-compatible server — behind the *same* `lab.makeSession(route:)` call
-site as the on-device and local models, ideally with the provider running web search for you.
+> **Reach for this when** you want a hosted model API — OpenAI, Anthropic's Messages API,
+> OpenRouter, or any OpenAI-compatible server — behind the *same* `lab.makeSession(route:)` call
+> site as the on-device and local models, ideally with the provider running web search for you.
+>
+> **Examples that use it:** [`model-switch`](../examples/model-switch/) is the reference app —
+> add a provider, tick web search, switch models mid-conversation, streamed search activity +
+> citation links, all through `Components`' `AIModelsSettingsView`.
 
 `LocalLMLabSDKRemote.xcframework` is a **4th binary** on the release, added the same way as
 `Inference` / `Claude` — a `binaryTarget` keyed off `LOCALLM_SDK_VERSION`. It has **no
