@@ -1705,6 +1705,14 @@ pass — the pipeline is mechanical enough that the reasoning trace only adds la
 
 ## 10. App Sandbox — building for the Mac App Store
 
+> **Reach for this when** you're distributing (or considering distributing) via the Mac App
+> Store, or you just want App Sandbox for its own sake. Skip this whole section if you're only
+> shipping Developer ID + notarization — that path needs none of this.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/)'s `packaging/` folder has
+> the working scripts for both signing paths — see the closing paragraph of
+> [§10d](#10d-one-time-apple-developer-portal-setup-for-mas-signing) below for which is which.
+
 Core has been tested under App Sandbox — confirmed via a real sandboxed, Developer-ID-signed,
 notarized build (not just code review), not through the actual MAS submission pipeline itself yet.
 Here's exactly what's needed and what was actually verified.
