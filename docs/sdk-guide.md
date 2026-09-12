@@ -3,21 +3,45 @@
 Audience: a Swift developer linking `LocalLMLabSDKCore` into their own macOS app to add local-AI
 tool-calling — system connectors (Calendar, Reminders, Contacts, Location), an MCP client, and
 (via `Components`) prebuilt SwiftUI for MCP servers and for the model layer (model picker,
-open-weight downloads, online-provider settings). Everything here has been
-exercised against real signed apps and real live MCP servers, not just written from the API
-surface — see [`examples/plate-today`](../examples/plate-today) (and its Path A twin,
-[`examples/plate-today-tools`](../examples/plate-today-tools) — same app, built on Core's
-ready-made Tools instead of hand-written ones, see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)), [`examples/repo-qa`](../examples/repo-qa)
-(a minimal command-line `MCPTool` example against a no-auth server),
-[`examples/workspace-buddy`](../examples/workspace-buddy) (a local AI-assisted coding example —
-pick a folder, the model reads/creates/edits files in it via `WorkspaceTools`, [§8a](#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) — WorkspaceAccess/WorkspaceTools), and
-[`examples/components-demo`](../examples/components-demo) for the working reference apps this
-guide is drawn from.
+open-weight downloads, online-provider settings). Everything here has been exercised against real
+signed apps and real live MCP servers, not just written from the API surface — see the table
+below for the working reference apps this guide is drawn from.
 
 Requires macOS 26+ on Apple Silicon, Swift 6 tools.
 
 **Status note**: this SDK is early — this guide describes the API as it exists today, and it will
 change. `Components` in particular is newer and smaller than `Core`.
+
+## Start here: run a real example before reading further
+
+This guide's actual on-ramp is the working code under [`examples/`](../examples/), not the prose
+below — each one is a real, signed, runnable app you can clone and read end to end, not a
+snippet. Pick the one closest to what you're building, then come back to the guide for the parts
+you want to understand more deeply. Ordered smallest → largest:
+
+| If you want to... | Start with | Lines of code |
+|---|---|--:|
+| The SDK's smallest possible footprint — MCP client only, on-device model | [`repo-qa`](../examples/repo-qa) | 66 |
+| One binary that runs unchanged on both macOS 26 and 27 | [`os-matrix`](../examples/os-matrix) | 74 |
+| The model layer added to the smallest example — an open-weight MLX model instead of on-device | [`repo-qa-local`](../examples/repo-qa-local) | 92 |
+| Prebuilt `Components` UI instead of writing your own MCP server picker | [`components-demo`](../examples/components-demo) | 141 |
+| Core's ready-made connector `Tool`s (Path A) — Calendar/Reminders/Todoist | [`plate-today-tools`](../examples/plate-today-tools) | 149 |
+| The model editing files in a user-picked folder, sandboxed | [`workspace-buddy`](../examples/workspace-buddy) | 172 |
+| Hand-rolled `Tool` adapters instead (Path B) — the twin of `plate-today-tools` | [`plate-today`](../examples/plate-today) | 216 |
+
+**Advanced — skip these on a first pass:**
+
+| If you want to... | Start with | Lines of code |
+|---|---|--:|
+| The two-lever tool-authorization model (`limited(toMaxImpact:)` + `ConfirmingToolAuthorizer`) end to end | [`security-demo`](../examples/security-demo) | ~250 |
+| The model layer running *inside* App Sandbox, streaming its answer | [`workspace-buddy-local`](../examples/workspace-buddy-local) | 252 |
+| Online providers (GPT / Claude online / OpenRouter) with web search + citations | [`model-switch`](../examples/model-switch) | 283 |
+| A CLI coding agent — two models with routing, workspace + host `Process` tools, MCP | [`code-buddy`](../examples/code-buddy) | 298 |
+| An MCP dataset pulled through a mechanical SQL pipeline instead of the model copying rows | [`aiql`](../examples/aiql) | 381 |
+
+Line counts are from
+[`annotated-examples.md`](annotated-examples.md#how-much-code-is-this-really), which also has the
+full annotated source for every one of these — every line that touches the SDK marked inline.
 
 ## Which integration path should I use — this SDK, or the toolkit?
 
