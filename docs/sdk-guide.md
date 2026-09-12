@@ -184,19 +184,19 @@ let answer = try await session.respond(to: prompt)
   way the LocalLM Lab app does (its `--serve` helper is split into a 27 binary and a 26 binary,
   chosen at launch). `Core`'s public API is identical on both sides of that boundary.
 
-## 2. Required setup before you can use Calendar/Reminders or MCP OAuth
+## 2. Required setup before you can use Calendar/Reminders
 
-> **Reach for this when** your app will touch Calendar/Reminders, or connect to any MCP server
-> that needs OAuth. Skip this whole section if you're doing neither yet — e.g. an on-device-model
-> app with no connectors, or an MCP integration against no-auth/PAT-only servers only (Contacts
-> and Location have their own, separate setup — see [§7](#7-connectors-calendar-reminders-contacts-location)).
+> **Reach for this when** your app will touch Calendar or Reminders. Skip this whole section if
+> you're not using either connector — Contacts and Location have their own, separate setup (see
+> [§7](#7-connectors-calendar-reminders-contacts-location)), and MCP OAuth's setup moved to
+> [§3](#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them), where it
+> belongs alongside the rest of MCP auth.
 >
 > **Examples that use it:** [`plate-today`](../examples/plate-today/) and
-> [`plate-today-tools`](../examples/plate-today-tools/) need all four subsections below (Calendar
-> + Reminders + Todoist OAuth); [`components-demo`](../examples/components-demo/) needs only the
-> OAuth ones (2c/2d).
+> [`plate-today-tools`](../examples/plate-today-tools/) need both subsections below (Calendar +
+> Reminders).
 
-Three things are **required**, not optional extras — skipping any one of them produces a confusing
+Two things are **required**, not optional extras — skipping either one produces a confusing
 failure (a silent TCC denial, or a crash on a missing entitlement) rather than a clear error.
 
 ### 2a. Info.plist usage-description strings (if using Calendar/Reminders)
@@ -250,7 +250,32 @@ ways.** The specific failure sequence (confirmed live, more than once):
    sign. Sign the binary, then sign the whole bundle **with `--entitlements` again** — that second
    pass is the one that actually matters.
 
-### 2c. OAuth redirect URI — MUST set this yourself (if using MCP OAuth)
+## 3. Connecting to an MCP server: three auth options, and how to pick between them
+
+> **Reach for this when** your app's pitch is "connect your own tools" — Todoist, GitHub,
+> Linear, an internal MCP server — rather than you hardcoding every integration one by one.
+> `MCPServerManager.addServer` discovers a server's tools at connect time and hands you back
+> plain descriptors; *you* decide which become model tools ([§6](#6-general-api-reference), [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)). The auth handling below
+> is the entire reason connecting isn't a one-liner: a server needs no auth, a static token,
+> or a browser OAuth round-trip, and you usually can't tell which up front.
+>
+> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
+> [`plate-today-tools`](../examples/plate-today-tools/) (Todoist over OAuth),
+> [`repo-qa`](../examples/repo-qa/) (DeepWiki, `.none`),
+> [`components-demo`](../examples/components-demo/) (all three auth types, via
+> `Components`' `MCPServerPickerView`).
+
+Adding an MCP server involves one of three auth types, exposed as `MCPAuthType`. `Components`'
+`MCPServerPickerView` (see [§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer), the Components package) already builds a UI over all three if you'd rather not build
+your own — this section explains what each requires, either way.
+
+| `MCPAuthType` | Real-world example | What your UI must collect |
+|---|---|---|
+| `.none` | Notion, Todoist, Linear-shaped servers | Nothing — just the server URL |
+| `.pat` | Static-bearer-token servers (e.g. GitHub-shaped) | A text field for the user's token |
+| `.oauthManual` | Servers with no Dynamic Client Registration (e.g. Slack-shaped) | A text field for a pre-registered OAuth client ID |
+
+### OAuth redirect URI — MUST set this yourself (if your server uses OAuth)
 
 > **Reach for this when** any MCP server you'll connect to might use OAuth — set this before your
 > first `connect`/`addServer` call, not after one fails.
@@ -288,11 +313,11 @@ simply won't route back to your app at all.
 Set `MCPOAuthFlow.clientMetadataURL` in the same spot if you're using CIMD instead of Dynamic
 Client Registration — see [§3d](#3d-cimd-skipping-dynamic-client-registration).
 
-### 2d. Wire the OAuth callback through your AppDelegate, not SwiftUI's `.onOpenURL` (if using MCP OAuth)
+### Wire the OAuth callback through your AppDelegate, not SwiftUI's `.onOpenURL` (if your server uses OAuth)
 
 > **Reach for this when** you're wiring the URL-scheme handling for the redirect from
-> [2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth) — needed the moment you
-> register a custom `CFBundleURLSchemes` entry.
+> [the section above](#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth) —
+> needed the moment you register a custom `CFBundleURLSchemes` entry.
 >
 > **Examples that use it:** [`plate-today`](../examples/plate-today/) /
 > [`plate-today-tools`](../examples/plate-today-tools/) and
@@ -324,31 +349,6 @@ struct YourApp: App {
 If you use SwiftUI's `.onOpenURL` instead, you will get a second window/scene spawned every time a
 user completes an OAuth sign-in — `WindowGroup` treats any open-URL event as a request for a new
 scene instance unless told otherwise.
-
-## 3. Connecting to an MCP server: three auth options, and how to pick between them
-
-> **Reach for this when** your app's pitch is "connect your own tools" — Todoist, GitHub,
-> Linear, an internal MCP server — rather than you hardcoding every integration one by one.
-> `MCPServerManager.addServer` discovers a server's tools at connect time and hands you back
-> plain descriptors; *you* decide which become model tools ([§6](#6-general-api-reference), [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)). The auth handling below
-> is the entire reason connecting isn't a one-liner: a server needs no auth, a static token,
-> or a browser OAuth round-trip, and you usually can't tell which up front.
->
-> **Examples that use it:** [`plate-today`](../examples/plate-today/) /
-> [`plate-today-tools`](../examples/plate-today-tools/) (Todoist over OAuth),
-> [`repo-qa`](../examples/repo-qa/) (DeepWiki, `.none`),
-> [`components-demo`](../examples/components-demo/) (all three auth types, via
-> `Components`' `MCPServerPickerView`).
-
-Adding an MCP server involves one of three auth types, exposed as `MCPAuthType`. `Components`'
-`MCPServerPickerView` (see [§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer), the Components package) already builds a UI over all three if you'd rather not build
-your own — this section explains what each requires, either way.
-
-| `MCPAuthType` | Real-world example | What your UI must collect |
-|---|---|---|
-| `.none` | Notion, Todoist, Linear-shaped servers | Nothing — just the server URL |
-| `.pat` | Static-bearer-token servers (e.g. GitHub-shaped) | A text field for the user's token |
-| `.oauthManual` | Servers with no Dynamic Client Registration (e.g. Slack-shaped) | A text field for a pre-registered OAuth client ID |
 
 ### It's not "figure out which of the three your target server needs and hardcode it"
 
@@ -397,7 +397,7 @@ your own UI; it's already the most specific information available.
 
 If you write user-facing setup instructions for a Slack-shaped (`.oauthManual`) server — registering
 an app and setting a redirect URL on the *server's* side — that redirect URL must be **your app's
-own scheme** (`yourapp://oauth/callback`, from [§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth) — the OAuth redirect URI). Copying another app's setup
+own scheme** (`yourapp://oauth/callback`, from [the OAuth redirect URI section above](#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth)). Copying another app's setup
 instructions verbatim into your own documentation would silently misconfigure every user who
 follows it — their server-side app would try to redirect back into the wrong app (or nowhere)
 instead of yours.
@@ -655,8 +655,8 @@ init() {
 ```
 
 This is the single most important line to copy correctly into your own app — the OAuth scheme
-override from [§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth) (the OAuth redirect URI), set before any `connect`/`addServer` call could possibly need it. Your
-`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler ([§2d](#2d-wire-the-oauth-callback-through-your-appdelegate-not-swiftuis-onopenurl-if-using-mcp-oauth) — wiring the OAuth callback) at this
+override from [§3's OAuth redirect URI section](#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth), set before any `connect`/`addServer` call could possibly need it. Your
+`@NSApplicationDelegateAdaptor` also installs the OAuth-callback handler ([the section right after it](#wire-the-oauth-callback-through-your-appdelegate-not-swiftuis-onopenurl-if-your-server-uses-oauth)) at this
 point, and `.handlesExternalEvents(matching: [])` is declared as part of the `Scene` body that
 follows — both need to be in place *before* the window is shown, not bolted on reactively later.
 
@@ -705,7 +705,7 @@ let access = await Connectors.requestAccess(.calendar)
 Core's `Connectors.requestAccess` (see [§7](#7-connectors-calendar-reminders-contacts-location)) handles the no-Info.plist-key and
 previously-denied cases with clearer errors than calling EventKit directly yourself. The system
 prompt macOS shows here is only possible because of the entitlement + Info.plist usage string from
-[§2a](#2a-infoplist-usage-description-strings-if-using-calendarreminders)/2b; without those, this call fails silently rather than prompting (see [§2](#2-required-setup-before-you-can-use-calendarreminders-or-mcp-oauth)'s
+[§2a](#2a-infoplist-usage-description-strings-if-using-calendarreminders)/2b; without those, this call fails silently rather than prompting (see [§2](#2-required-setup-before-you-can-use-calendarreminders)'s
 failure-sequence writeup). If the user denies, a well-behaved tool returns a plain string like
 `"Calendar access not granted."` — not an error/throw — so the model receives that as the tool's
 result and can reason about it in its final summary, rather than the whole request failing. A
@@ -1807,7 +1807,7 @@ specific connector).
   see the caution below).
 - **The MCP client, end-to-end**, including OAuth: connect, sign in via the system browser,
   redirect back into the app, tool calls. No entitlement needed beyond `network.client` — the
-  OAuth redirect is a URL-scheme handoff ([§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth)–2d, the OAuth redirect/callback), not a local HTTP listener, so
+  OAuth redirect is a URL-scheme handoff ([§3's OAuth redirect/callback setup](#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth)), not a local HTTP listener, so
   `com.apple.security.network.server` is not needed for this.
 - **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, [§4](#4-keychain-storage--automatic-isolation-native-api-sandbox-safe)) — round-tripped
   correctly under the sandboxed per-app-container Keychain access group.
@@ -2918,7 +2918,7 @@ enum MCPDiagnostics {
 enum MCPLogLevel: Int, Sendable, Comparable, Codable { case debug, info, notice, error, off }
 ```
 
-**OAuth setup** ([§2c](#2c-oauth-redirect-uri--must-set-this-yourself-if-using-mcp-oauth)–2d):
+**OAuth setup** ([§3's OAuth redirect URI + AppDelegate wiring sections](#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth)):
 
 ```swift
 enum MCPOAuthFlow {
