@@ -107,7 +107,7 @@ What that does, and doesn't do:
 
 ```bash
 # in locallm/examples/code-buddy/
-swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// doc comment line above every public declaration (the struct, each stored property, the initializer, both computed properties, and both top-level functions). Each comment should briefly say what that declaration is. Keep every existing line's indentation exactly as it is. Change nothing else."
+swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// doc comment line above three declarations: the Rectangle struct, and the isSquare and scaled functions. Each comment should briefly say what that declaration is. Keep every existing line's indentation exactly as it is. Change nothing else."
 ```
 
 - `CodeBuddy` — the executable target (`swift run` builds it from `Package.swift`).
@@ -115,14 +115,21 @@ swift run CodeBuddy /tmp/cb-demo "In Sources/Geometry/Geometry.swift, add a /// 
 - the quoted string — the **task**. One shot: it reads `Geometry.swift` and edits it in place.
   (It won't touch the planted bug — this task is only about comments.)
 
-> **Spell the task out.** A vague ask like *"add doc comments to every public declaration"* sends
-> an 8B model into a spiral — *which files? how do I find them? can I bulk-edit?* — and it
-> sometimes concludes there's nothing to do. Naming the file, listing what counts, and pinning
-> down the mechanics (*"keep the indentation", "change nothing else"*) is the difference between
-> a reliable one-shot and a coin flip. Even then a local 8B may write terse comments or nudge a
-> line's whitespace — **step 4 is where you check and keep or discard**. This prompt discipline
-> is a property of small local models, not a code-buddy quirk; it pays off in `workspace-buddy-local`
-> and `aiql` too.
+> **Spell the task out, and keep the list short.** A vague ask like *"add doc comments to every
+> public declaration"* sends an 8B model into a spiral — *which files? how do I find them? can I
+> bulk-edit?* — and it sometimes concludes there's nothing to do. Naming the file, listing what
+> counts, and pinning down the mechanics (*"keep the indentation", "change nothing else"*) is the
+> difference between a reliable one-shot and a coin flip. The list length matters too: this
+> walkthrough originally asked for doc comments on all 8 public declarations in `Rectangle`
+> (struct, 2 stored properties, initializer, 2 computed properties, 2 functions) in one shot.
+> That's 8 separate edits worth of "think, then call a tool" for an 8B model, and — because each
+> edit shifts the line numbers a diff-based `applyPatch` hunk is anchored to — the more edits in
+> one request, the more likely a later hunk's context goes stale and the model has to stop,
+> re-read the file, and retry. Three declarations is enough to show the pattern without the
+> spiral. Even then a local 8B may write terse comments or nudge a line's whitespace —
+> **step 4 is where you check and keep or discard**. This prompt discipline is a property of
+> small local models, not a code-buddy quirk; it pays off in `workspace-buddy-local` and `aiql`
+> too.
 
 While it runs, its narration (including a lot of visible "thinking" — these small models are
 verbose) streams to **stdout**, and a tool-call trace (`→ readWorkspaceFile`, `✓ applyPatch`, …)
@@ -136,8 +143,8 @@ default `heavy` route).
 git -C /tmp/cb-demo diff
 ```
 
-You should see `///` lines added above `area`, `perimeter`, `isSquare(_:)`, `scaled(_:by:)`, etc.
-Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
+You should see three `///` lines added: above `struct Rectangle`, `isSquare(_:)`, and
+`scaled(_:by:)`. Keep it (`git -C /tmp/cb-demo commit -am kept`), tweak it, or throw it away
 (`git -C /tmp/cb-demo checkout .`). Re-run step 3 with a different task to keep experimenting.
 
 **5. Now watch it use `run_tests` and `git`.** First undo step 3's edits so the diff at the end

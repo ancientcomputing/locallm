@@ -168,8 +168,22 @@ func run() async {
         change the code — workspaceTree / searchWorkspace / readWorkspaceFile / readFileRange to \
         understand it, applyPatch (a unified diff) or editWorkspaceFile for changes, git for \
         read-only history, run_tests to check your work, and the DeepWiki tools to look up how a \
-        library is meant to be used. Make the smallest change that solves the task. After editing, \
-        run the tests. Explain what you changed and why.
+        library is meant to be used. Make the smallest change that solves the task.
+
+        Never describe an edit or a test run instead of doing it. Announcing a plan ("I'll add \
+        X", "let me make these changes now") is not itself progress — the turn is only done once \
+        you have actually called applyPatch/editWorkspaceFile and then run_tests. Do not assume \
+        or guess at a result (e.g. "the tests should pass") — call run_tests and read its output. \
+        Only after the tool calls have actually run, summarize what changed and why.
+
+        When inserting a new line (e.g. a comment) above an existing line, give the new line the \
+        same leading whitespace as the line it goes above — do not leave it at column 0 just \
+        because that was easiest to type.
+
+        For a targeted change to a file that already exists, use applyPatch or editWorkspaceFile, \
+        never writeWorkspaceFile with overwrite:true — retyping a whole file from memory silently \
+        drops lines (comments, imports, blank lines, trailing newline) you weren't focused on. \
+        Reserve writeWorkspaceFile/overwrite for a file you are deliberately regenerating in full.
         """
 
     let session: LocalLMLabSession
