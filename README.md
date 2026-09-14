@@ -49,6 +49,51 @@ it. Full developer guide:
 **[docs/sdk-guide.md](docs/sdk-guide.md)**. Deeper walkthrough of the SDK and its
 reference apps is [further down](#building-on-the-sdk).
 
+### What's new for 1.0.0-beta.4 ###
+
+**MCP client spec upgrade (target: 2025-11-25).** The client now negotiates
+protocol version at `initialize`, returns structured tool results
+(`MCPToolResult`) with `outputSchema`/`title`/`nextCursor` pagination, streams
+multi-event responses with elicitation handler seams, ships a default
+elicitation UI (URL-mode, suppressible), and adds full OAuth support — CIMD,
+OIDC discovery, scope step-up, and issuer binding. Diagnostics got a real
+home too: `os.Logger` throughout plus an opt-in `MCPDiagnostics` buffer with
+a single `logLevel` knob for prod vs. dev, tool-call args/`isError` logging,
+and the negotiated protocol version surfaced in `exportSummary`.
+
+**Tool authority model (security).** A new invocation gate
+(`ToolCallAuthorizer`) plus a confirmation sheet in Components replaces the
+old all-or-nothing "Full Access" model with two levers: graded selection
+(`limited(toMaxImpact:)`) and per-call authorization, including
+cross-process confirmation (Phase 1.1). MCP-originated tools can now be
+tagged (`OriginTaggedTool`) and MCP prompts share the same resource-trust
+class as untrusted content, so prompt expansions correctly set
+`untrustedContentInTurn`. Backed by a Tier 3 security pass (provider
+validation, MLX revision pinning) and a live on-device test verifying a
+denied tool call actually gets denied.
+
+**AIQL: natural-language-to-SQL over MCP data.** New `loadTable` +
+`sqlQuery` core APIs let a model turn arbitrary MCP data into queryable
+tables — `loadTable` auto-explodes nested arrays into child tables, and
+`sqlQuery` runs joins across them, dependency-free. Ships with an eval
+harness (9/9 online, 9/9 on-device with Qwen3-14B via MLX) and a
+`security-demo`-style example aimed at non-SQL users (CSV-to-dashboard,
+callback flows). Session options gained `effort: .off` to skip local-model
+thinking passes where they're not needed.
+
+**Config Profiles groundwork.** `MCPCredentialProbe` gives a presence-only
+view of stored MCP credentials (no Keychain consent prompt just to check),
+`MCPServerManager.removeAllKeepingCredentials()` clears servers without
+losing saved creds, and `restore()` now carries per-resource enabled state —
+the pieces needed for save/load config profiles and A/B-testing tool
+combinations.
+
+**Security fixes**
+- MCP response size limits and transport hardening
+- Keychain fixes for stored credentials
+- `applyPatch`: reject no-op hunks instead of silently reporting success
+
+
 ## About this repo
 
 `ancientcomputing/locallm` is the public home for everything shipped to LocalLM
