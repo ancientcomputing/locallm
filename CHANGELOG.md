@@ -11,6 +11,17 @@ macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
 
+**Compatibility policy from `1.0.0` GA onward:** 1.x releases are **source compatible** — code
+that builds against one 1.x version keeps building unmodified against any later 1.x minor version.
+New capability lands as additive surface only: new optional parameters with defaults, new protocol
+methods shipped with a default implementation, new cases on the non-frozen enums noted below (build
+with `@unknown default`, not an exhaustive `switch`). A change that would require editing working
+code just to keep building is a major-version bump, not a minor one. This is a promise about
+source, not about binary compatibility — you pin an exact version and rebuild against it; nothing
+guarantees an already-built app keeps working if a newer xcframework is dropped in without
+recompiling. (Through `1.0.0-beta.N`/`-rc.N`, none of this applies yet — see each entry's own "Beta
+caveats" below.)
+
 ## 1.0.0-beta.4 — 2026-09-10
 
 ### Added — MCP client: protocol revision `2025-11-25` (`docs/sdk-guide.md` §3a–§3e)

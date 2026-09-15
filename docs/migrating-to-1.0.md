@@ -166,7 +166,13 @@ needs no code changes beyond the `callTool` return type above.
 
 - The built app runs on **macOS 26 or 27**; building the SDK against `1.0` needs the **Xcode 27
   beta** until it GAs.
-- `1.0.0-beta.N` makes **no API-stability guarantee** — signatures can move between betas.
+- `1.0.0-beta.N` makes **no API-stability guarantee** — signatures can move between betas. **From
+  `1.0.0` GA onward**, 1.x releases are source compatible: code that builds against one 1.x
+  version keeps building unmodified against later 1.x minors. New capability lands as additive
+  surface only (new optional/defaulted parameters, new protocol methods with a default
+  implementation, new enum cases where `@unknown default` is already expected); anything that
+  would force a code change just to keep building is a major-version bump. This is a source, not
+  binary, guarantee — you rebuild against whatever version you pin.
 - All xcframeworks (`Core`, `Claude`, `Inference`, `Remote`) are Developer-ID-signed and
   notarized. SwiftPM still verifies them by checksum; a consumer embedding them in a notarized
   app re-signs as part of its own build.
