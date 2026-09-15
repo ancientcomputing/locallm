@@ -227,9 +227,9 @@ final class AIQLModel: ObservableObject {
         let stepTask = Task { @MainActor in
             for await event in session.events {
                 switch event {
-                case .toolCallStarted(_, let name):
+                case .toolCallStarted(_, let name, _):
                     self.step(Self.friendlyStep(for: name))
-                case .toolCallFinished(_, let name, let failed) where failed:
+                case .toolCallFinished(_, let name, let failed, _) where failed:
                     self.step("  · \(Self.friendlyStep(for: name)) hit a snag — retrying")
                 default:
                     break

@@ -135,10 +135,19 @@ public struct ModelPickerView: View {
                 }
             }
 
-            ForEach(registry.downloads.sorted(by: { $0.key.rawValue < $1.key.rawValue }), id: \.key.rawValue) { id, fraction in
+            ForEach(registry.downloads.sorted(by: { $0.key.rawValue < $1.key.rawValue }), id: \.key.rawValue) { id, progress in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Downloading \(id.rest)").font(.caption)
-                    ProgressView(value: fraction)
+                    HStack {
+                        Text("Downloading \(id.rest)").font(.caption)
+                        Spacer()
+                        Button("Cancel") { registry.cancelDownload(id.rest) }
+                            .font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: progress.fraction)
+                    if progress.totalBytes > 0 {
+                        Text("\(Self.byteCount(progress.bytesReceived)) of \(Self.byteCount(progress.totalBytes)) — \(Int(progress.fraction * 100))%")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -152,6 +161,10 @@ public struct ModelPickerView: View {
                 Text(addError).font(.caption).foregroundStyle(.red)
             }
         }
+    }
+
+    private static func byteCount(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
     private func startAdd() {

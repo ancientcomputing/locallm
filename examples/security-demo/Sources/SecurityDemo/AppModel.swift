@@ -207,9 +207,9 @@ final class AppModel {
                 for await ev in session.events {
                     guard let self else { return }
                     switch ev {
-                    case .toolCallStarted(_, let name):
+                    case .toolCallStarted(_, let name, _):
                         await MainActor.run { self.toolLog.append("→ \(name)") }
-                    case .toolCallFinished(_, let name, let failed):
+                    case .toolCallFinished(_, let name, let failed, _):
                         await MainActor.run { self.toolLog.append("   \(name) \(failed ? "✗ denied/failed" : "✓")") }
                     default:
                         break

@@ -195,8 +195,8 @@ func run() async {
     let events = Task { @MainActor in
         for await event in session.events {
             switch event {
-            case .toolCallStarted(_, let name): if opts.verbose { note("  → \(name)") }
-            case .toolCallFinished(_, let name, let failed): if opts.verbose { note("  \(failed ? "✗" : "✓") \(name)") }
+            case .toolCallStarted(_, let name, _): if opts.verbose { note("  → \(name)") }
+            case .toolCallFinished(_, let name, let failed, _): if opts.verbose { note("  \(failed ? "✗" : "✓") \(name)") }
             case .contextCompacted(let n): note("  (compacted \(n) transcript entries)")
             default: break
             }

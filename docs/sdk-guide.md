@@ -1013,6 +1013,11 @@ for try await event in mlx.download("mlx-community/Qwen3-8B-4bit") {
     if case .completed(let installed) = event { /* InstalledModel */ }
 }
 
+// A "Cancel" button: aborts the real transfer, not just this loop's iteration — the stream
+// finishes by throwing (typically CancellationError) instead of yielding .completed. Equivalent
+// to cancelling the Task driving the `for try await` above, for callers not structured that way.
+mlx.cancelDownload("mlx-community/Qwen3-8B-4bit")
+
 // Post-download smoke test — a real prompt + a trivial tool call. Authoritative for
 // that model's ModelCapabilities (some downloaded models can't reliably tool-call).
 let report = await mlx.capabilityProbe(installed.id)   // ModelCapabilityReport
@@ -1090,10 +1095,15 @@ for try await snapshot in session.languageModelSession.streamResponse(to: task) 
 **`options: SessionOptions`** carries per-call knobs — provider-native web search, sampling
 (`temperature` / `topP` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
 to think**: on the MLX tier it flips the chat template's thinking toggle for models that have
-one (the Qwen3 family — a model that always reasons, e.g. DeepSeek-R1, raises
-`unsupportedCapability` instead; a model with no toggle is a no-op). On the remote providers
-`.off` maps to the provider default — there is no true "reasoning off" on those APIs, so pass
-`.low` to minimise it. `aiql` uses `.off` ([§8b](#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)). `.low`…`.max` don't reach MLX.
+one (the Qwen3 family). It's a *preference*, not a requirement — **`.off` never throws**: a
+model whose reasoning can't be suppressed (e.g. DeepSeek-R1, which always reasons) just keeps
+reasoning instead of failing the turn, same as a model with no thinking toggle at all, which is
+a no-op either way. If you need to know ahead of time whether `.off` will actually take effect
+(to gray out a "hide thinking" toggle in your own UI, say), check
+`ModelCapabilities.reasoningToggle` from `capabilityProbe(_:)` rather than trying `.off` and
+inspecting the result — there's no error to inspect, by design. On the remote providers `.off`
+maps to the provider default — there is no true "reasoning off" on those APIs, so pass `.low` to
+minimise it. `aiql` uses `.off` ([§8b](#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)). `.low`…`.max` don't reach MLX.
 
 ### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
 
@@ -1107,8 +1117,10 @@ one (the Qwen3 family — a model that always reasons, e.g. DeepSeek-R1, raises
 ```swift
 for await event in session.events {
     switch event {
-    case .toolCallStarted(let id, let name):   showRunning(name)
-    case .toolCallFinished(let id, let name, let failed): clearRunning(name, failed: failed)
+    case .toolCallStarted(let id, let name, let arguments):
+        showRunning(name, arguments)   // what the model actually sent — can differ from the user's own wording
+    case .toolCallFinished(let id, let name, let failed, let resultSummary):
+        clearRunning(name, failed: failed, resultSummary: resultSummary)
     case .contextCompacted(let removed):       toast("Trimmed \(removed) old messages")
     case .modelLoadProgress(let fraction):     updateBar(fraction)   // with a local model
     case .routeSwitched(let modelID):          statusLine = "Now on \(modelID)"
@@ -1118,8 +1130,10 @@ for await event in session.events {
 }
 ```
 
-All six cases, in one place: `.toolCallStarted`/`.toolCallFinished` (client tool calls),
-`.contextCompacted` (the retry-and-trim above), `.modelLoadProgress` (a local model's first
+All six cases, in one place: `.toolCallStarted`/`.toolCallFinished` (client tool calls — carrying
+the tool's real `arguments` and a best-effort `resultSummary`/error text, not just id/name/failed,
+so you can show what the model actually sent a tool without hand-rolling your own wrapper around
+it), `.contextCompacted` (the retry-and-trim above), `.modelLoadProgress` (a local model's first
 load), `.routeSwitched` (the route this session was on just repointed to a different model —
 rare, but real if your app calls `lab.models.route(_:to:)` mid-session), and
 `.serverToolCall` (a provider running web search/fetch on its own infrastructure — §6b).
@@ -1785,9 +1799,17 @@ pass — the pipeline is mechanical enough that the reasoning trace only adds la
 - **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need
   an `@unknown default` — new cases can land in a minor version. (Same for `ResidencyEvent` /
   `SessionEvent` / `DownloadEvent` / `MCPConnectionStatus` / `MCPServerError`.)
-- **No public API stability guarantee.** `1.0.0-beta.N` makes none. Access levels have been fixed
-  reactively as real usage surfaced gaps — if you hit "X is inaccessible due to internal
-  protection level" on something that looks like it should be public, it probably should. File it.
+- **No public API stability guarantee through the beta/RC series.** `1.0.0-beta.N`/`-rc.N` make
+  none — access levels have been fixed reactively as real usage surfaced gaps; if you hit "X is
+  inaccessible due to internal protection level" on something that looks like it should be public,
+  it probably should. File it. **From `1.0.0` GA onward this changes**: 1.x releases commit to
+  source compatibility — existing code keeps compiling unmodified against a later 1.x minor
+  version. New capability shows up as additive surface (new optional/defaulted parameters, new
+  protocol methods with a default implementation, new enum cases per the `@unknown default` point
+  above); anything that would force you to edit working code just to keep building is a
+  major-version bump, not a minor one. This covers source compatibility, not binary — you rebuild
+  against whatever version you pin, there's no supported "drop in a newer xcframework without
+  recompiling" path.
 - **No logging of prompts, responses, or tool calls.** The MCP client has `MCPDiagnostics`
   ([§3e](#3e-diagnostics-when-a-user-reports-an-mcp-problem)) for connection / auth / stream troubleshooting — `os.Logger` plus an opt-in event buffer
   — but it is strictly off-content (never prompt or response text; tokens redacted). Core writes
@@ -2078,8 +2100,14 @@ struct LocalLMLabState: Codable, Sendable, Equatable {
     var downloadableProviders: [any DownloadableModelProvider] { get }
     var installedModels: [InstalledModel] { get }
     var knownModels: [ModelID] { get }                  // union of providers' advertisedModels
-    var downloads: [ModelID: Double] { get }            // in-flight, fraction 0...1
+    var downloads: [ModelID: DownloadProgress] { get }  // in-flight — bytesReceived/totalBytes/fraction
     func startDownload(_ repoID: String) async throws -> InstalledModel
+    func cancelDownload(_ repoID: String)               // no-op if repoID has no in-flight download
+}
+struct DownloadProgress: Sendable, Equatable {
+    var bytesReceived: Int64
+    var totalBytes: Int64
+    var fraction: Double
 }
 enum ModelRegistryError: Error, Equatable, CustomStringConvertible { case schemeAlreadyRegistered(String); case noDownloadableProvider }
 
@@ -2096,6 +2124,7 @@ protocol ModelProvider: Sendable {
 protocol DownloadableModelProvider: ModelProvider {
     var installed: [InstalledModel] { get }
     func download(_ repoID: String) -> AsyncThrowingStream<DownloadEvent, any Error>   // 0+ .progress, then exactly one .completed, or throws
+    func cancelDownload(_ repoID: String)   // aborts the real transfer, not just local consumption of the stream
     func validate(_ repoID: String) async throws -> PreflightResult                    // no weights pulled
     func capabilityProbe(_ id: ModelID) async -> ModelCapabilityReport                 // authoritative for that model's ModelCapabilities
     func remove(_ id: ModelID) throws
@@ -2187,6 +2216,7 @@ struct MLXModelProvider: DownloadableModelProvider {
     func availability(for id: ModelID) -> ModelAvailability
     func prewarm(_ id: ModelID) async
     func download(_ repoID: String) -> AsyncThrowingStream<DownloadEvent, any Error>
+    func cancelDownload(_ repoID: String)
     func validate(_ repoID: String) async throws -> PreflightResult
     func capabilityProbe(_ id: ModelID) async -> ModelCapabilityReport
     func remove(_ id: ModelID) throws
@@ -2222,6 +2252,7 @@ enum ModelAvailability: Sendable, Equatable {
 struct ModelCapabilities: OptionSet, Sendable, Hashable, Codable {
     static let toolCalling: ModelCapabilities        // 1 << 0
     static let guidedGeneration: ModelCapabilities   // 1 << 1
+    static let reasoningToggle: ModelCapabilities    // 1 << 2 — effort: .off actually suppresses this model's thinking
 }
 struct ModelCapabilityReport: Sendable, Equatable {
     var id: ModelID
@@ -2280,8 +2311,8 @@ enum SessionEvent: Sendable {
     case modelLoadProgress(fraction: Double)
     case routeSwitched(ModelID)
     case contextCompacted(removedEntries: Int)
-    case toolCallStarted(id: String, name: String)
-    case toolCallFinished(id: String, name: String, failed: Bool)
+    case toolCallStarted(id: String, name: String, arguments: String)
+    case toolCallFinished(id: String, name: String, failed: Bool, resultSummary: String?)
     case serverToolCall(ServerToolActivity)         // provider-run web search/fetch — [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)
 }
 
@@ -2304,8 +2335,10 @@ struct SessionOptions: Sendable, Equatable {
 }
 /// Reasoning/thinking effort, ordered off → max. `.off` is a real guarantee only on the local MLX
 /// tier — it suppresses the `<think>` block for toggle-capable chat templates (Qwen3 and its
-/// siblings); a model that always reasons (DeepSeek-R1 and its distills) throws
-/// `LanguageModelError.unsupportedCapability(.reasoning)` instead of silently ignoring it. Remote
+/// siblings). `.off` never throws: a model that always reasons (DeepSeek-R1 and its distills)
+/// just keeps reasoning instead of failing the turn — it's a best-effort preference, not a
+/// requirement. Check `ModelCapabilities.reasoningToggle` (from `capabilityProbe(_:)`) ahead of
+/// time if you need to know whether `.off` will actually suppress a given model's output. Remote
 /// providers (OpenAI/Claude online/OpenRouter) and Apple on-device/PCC have no true "off" switch
 /// and treat `.off` as `nil` (provider default) — to minimize reasoning on those, pass `.low`.
 enum Effort: String, Sendable, Hashable, CaseIterable, Codable { case off, low, medium, high, xhigh, max }
@@ -3082,10 +3115,11 @@ struct ModelPickerView: View {
     init(registry: ModelRegistry, selection: Binding<ModelID?>, show27OnlyModels: Bool = true)
     // Lists registry.knownModels with an availability badge each (Ready / Not downloaded /
     // Needs credential / Requires macOS 27). When LocalLMLabSDKInference is linked, also a
-    // "Downloaded models" section: installed models + on-disk size, a live progress bar per
-    // registry.downloads entry, and an "Add from Hugging Face" field → registry.startDownload(_:).
-    // Binds to the @Observable registry directly — no polling. On macOS 26, show27OnlyModels:
-    // true adds disabled "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
+    // "Downloaded models" section: installed models + on-disk size, a byte-formatted progress
+    // bar + Cancel button per registry.downloads entry (bytesReceived/totalBytes, not just a
+    // fraction), and an "Add from Hugging Face" field → registry.startDownload(_:). Binds to
+    // the @Observable registry directly — no polling. On macOS 26, show27OnlyModels: true adds
+    // disabled "Requires macOS 27" rows for pcc/claude/mlx; false hides them.
 }
 struct ClaudeAuthField: View {
     init(apiKey: Binding<String>, onCommit: @escaping () -> Void = {})
