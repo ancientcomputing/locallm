@@ -940,7 +940,7 @@ relaunch.
 | `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model (Apple's own models, not your weights). Needs the PCC entitlement + App Store Small Business Program — there is no paid tier. Since `1.0.0-beta.3` the provider maps availability, quota, and typed errors cleanly, and adds `probe(timeout:)` — an async liveness check (`availability(for:)` alone can say `.available` while turns still throw on a build without the entitlement). |
 | `ClaudeModelProvider(auth:)` | **`LocalLMLabSDKClaude`** | `claude` | 27 | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
 | `MLXModelProvider` | **Inference** | `mlx` | 27 | Locally-run open-weight models (Qwen, Llama, …) via MLX |
-| `RemoteModelProvider(_:)` | **Remote** | *host-chosen* — set in `RemoteProviderConfig.scheme`, one instance per provider you configure | 27 | Hosted APIs — OpenAI, Anthropic's Messages API, OpenRouter, any OpenAI-compatible server. The one provider here that's data-driven rather than a fixed named type; details in [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) |
+| `try RemoteModelProvider(_:)` | **Remote** | *host-chosen* — set in `RemoteProviderConfig.scheme`, one instance per provider you configure | 27 | Hosted APIs — OpenAI, Anthropic's Messages API, OpenRouter, any OpenAI-compatible server. The one provider here that's data-driven rather than a fixed named type; details in [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) |
 
 `LocalLMLabSDKClaude` is a third binaryTarget on the SDK release (`ClaudeForFoundationModels` is
 macOS-27-pinned, so it can't live in the macOS-26-floored Core); `LocalLMLabSDKRemote` is a
@@ -1223,9 +1223,9 @@ import LocalLMLabSDKRemote
 // YOU supply the model ids — the SDK ships none (which id is current/good is your call).
 var openai = RemoteProviderConfig.openAI(apiKey: key, models: [RemoteModel(id: "gpt-…")])
 openai.capabilities.insert(.webSearch)
-openai.defaultOptions.webSearch = true          // provider runs the search; no MCP needed
+openai.defaultOptions.webSearch = true              // provider runs the search; no MCP needed
 
-lab.models.replace(RemoteModelProvider(openai)) // register / re-register at runtime
+lab.models.replace(try RemoteModelProvider(openai)) // validates, then registers / re-registers
 lab.models.route("chat", to: ModelID(scheme: "openai", rest: "gpt-…")!)
 let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
 ```
@@ -1244,6 +1244,13 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
   offering a provider — a hosted API has far more failure modes than a local model.
 - **`ModelRegistry.replace(_:)` / `.removeProvider(scheme:)`** — add, swap, or drop a provider
   between sessions without rebuilding `LocalLMLab`.
+- **Transport hardening + `RemoteProviderConfig.responseLimits`** (security review F11) — every
+  request runs over a hardened ephemeral session (explicit request *and* resource timeouts, no
+  cache, no cookies), and streamed/response bytes, a single SSE frame, emitted text, and
+  accumulated tool-call arguments are all capped — a misbehaving or hostile endpoint throws
+  `RemoteError.responseTooLarge(_:)` instead of growing memory/context/latency unbounded. The
+  defaults suit a normal provider; override `responseLimits` per-config for an endpoint you trust
+  less, or one you know returns unusually large payloads.
 - **Web search** — set `capabilities.insert(.webSearch)` + `defaultOptions.webSearch = true`
   (per-provider), or `SessionOptions(webSearch: true)` per turn. Works on OpenAI, Anthropic
   Messages, OpenRouter, and `ClaudeModelProvider` (Foundation Models). `session.events` yields
@@ -1255,19 +1262,20 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
   (`city`/`region`/`country`/`timezone`) localizes results when the provider supports it — set
   it if your search-heavy queries are location-sensitive ("restaurants near me").
 
-**If a user can paste a `baseURL` or import a provider profile, call `config.validated()`
-before registering it.** `baseURL` and `auth` are just data — if your UI lets someone type or
-import them (a custom `.openAICompatible` endpoint, an imported settings file), that string is
-an SSRF-shaped primitive inside your app's sandbox, and it decides where a real API key gets
-sent. `try config.validated()` throws `RemoteProviderConfig.ValidationIssue` for a non-HTTPS
-`baseURL` to a non-local host (the key would go over the wire in clear text), a non-`http(s)`
-scheme (`file:`, `ftp:`, …), a malformed custom header name, or a CR/LF in a credential (header
-injection) — catch it and reject the input rather than registering the provider anyway. This is
-a **syntax check, not a trust check**: it doesn't confirm the host is the one the user meant to
-talk to, so still warn before sending an existing key to a *changed* host, and tell users a
-remote request carries the full prompt, transcript, and tool definitions to that endpoint. Skip
-this for providers your own code constructs from a preset (`.openAI(apiKey:)`, etc.) — there's
-nothing user-supplied to validate.
+**`RemoteModelProvider.init(_:)` always validates `config` for you** (security review F13) —
+`baseURL` and `auth` are just data, and if your UI lets a user type or import them (a custom
+`.openAICompatible` endpoint, an imported settings file), that string is an SSRF-shaped primitive
+inside your app's sandbox that decides where a real API key gets sent. `init(_:)` runs
+`RemoteProviderConfig.validated()` internally and throws `RemoteProviderConfig.ValidationIssue`
+for a non-HTTPS `baseURL` to a non-local host (the key would go over the wire in clear text), a
+non-`http(s)` scheme (`file:`, `ftp:`, …), a malformed custom header name, or a CR/LF in a
+credential (header injection) — catch it and reject the input rather than registering the
+provider anyway. This is a **syntax check, not a trust check**: it doesn't confirm the host is
+the one the user meant to talk to, so still warn before sending an existing key to a *changed*
+host, and tell users a remote request carries the full prompt, transcript, and tool definitions
+to that endpoint. If you're certain a config needs to skip this (e.g. a hardcoded corporate-proxy
+profile where `validated()`'s rules are known to be wrong for it), use the non-throwing
+`RemoteModelProvider(unchecked:)` escape hatch instead — never for anything user-supplied.
 
 **Settings UI:** `Components`' `AIModelsSettingsView` renders the whole "AI Models" panel
 (add provider + key, per-model rows, web-search toggle, Test connection). `Components` does
@@ -2149,7 +2157,10 @@ struct ClaudeModelSpec: Sendable, Hashable { /* one Claude model — id, display
 // .requiresOS("macOS 27") at runtime on 26, same as pcc) — [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) ---
 @available(macOS 27, *)
 struct RemoteModelProvider: ModelProvider {
-    init(_ config: RemoteProviderConfig)
+    // Security review F13: always validates — the only initializer without "unchecked" in its
+    // name, so there's no shorter unvalidated spelling to reach for by mistake.
+    init(_ config: RemoteProviderConfig) throws                 // runs config.validated()
+    init(unchecked config: RemoteProviderConfig)                // explicit bypass — trusted configs only
     func probe(for id: ModelID, timeout: Duration = .seconds(8)) async -> ModelAvailability   // zero-token key/model/reachability check
     func turnArtifacts(in transcript: Transcript) -> TurnArtifacts   // server-tool activity + citations for the last turn
 }
@@ -2163,9 +2174,11 @@ struct RemoteProviderConfig: Sendable, Equatable {
     var capabilities: Set<Capability>            // .webSearch, …
     var defaultOptions: SessionOptions
     var allowArbitraryModelIDs: Bool = false     // true → any "scheme:<string>" routes (OpenRouter)
+    var responseLimits: RemoteResponseLimits = .default   // security review F11 — see below
     init(scheme: String, displayName: String, dialect: Dialect, baseURL: URL, auth: Auth,
          models: [RemoteModel] = [], capabilities: Set<Capability> = [],
-         defaultOptions: SessionOptions = .init(), allowArbitraryModelIDs: Bool = false)
+         defaultOptions: SessionOptions = .init(), allowArbitraryModelIDs: Bool = false,
+         responseLimits: RemoteResponseLimits = .default)
 }
 struct RemoteModel: Sendable, Hashable, Codable, Identifiable {
     var id: String; var displayName: String; var contextWindow: Int?
@@ -2199,6 +2212,20 @@ enum RemoteError: Error, LocalizedError {   // wrapped in LocalLMLabError.genera
     case http(status: Int, message: String)
     case transport(Error)
     case dialectNotImplemented(String)
+    case responseTooLarge(String)           // a RemoteResponseLimits bound was exceeded (F11)
+}
+
+// Security review F11: a custom OpenAI-compatible endpoint is exactly as untrusted as an MCP
+// server — this is the Remote-side equivalent of MCPResponseLimits. Applied per-provider via
+// RemoteProviderConfig.responseLimits; defaults suit a well-behaved provider.
+struct RemoteResponseLimits: Sendable, Hashable {
+    var maxResponseBytes: Int             // one non-streaming response body (OpenAI Responses)
+    var maxStreamedBytes: Int             // total bytes across an entire SSE stream
+    var maxSSELineBytes: Int              // one SSE line / `data:` frame
+    var maxEmittedTextBytes: Int          // total assistant text emitted for one turn
+    var maxToolCallArgumentBytes: Int     // one tool call's accumulated streamed arguments
+    var maxErrorBodyBytes: Int            // a non-2xx error body, before deriving a message
+    static let `default`: Self
 }
 
 // --- MLXModelProvider — LocalLMLabSDKInference (separate xcframework, macOS 27) ---
