@@ -1111,6 +1111,44 @@ data, the OS reclaimed space, anything external to your app — reconstruct your
 saved value in `pinnedRevisions` before redownloading, so you fetch the exact content the user
 originally got rather than whatever `main` currently points to.
 
+**Pairing a second model — speed helper and specialization patch** (docs/17-model-pairing-design.md,
+verified live in `examples/mlx-control-room`). Two ways to attach a smaller second model to a base
+model, both set on the provider (not `SessionOptions`) so they can be flipped on/off at runtime
+without rebuilding a session:
+
+```swift
+// Speed helper: base model verifies a small draft model's guesses in bulk instead of
+// generating token-by-token. No change in output quality when it helps.
+mlx.pairDraftModel(SpeculativeDecodingSpec(draftRepoID: "mlx-community/Qwen3-0.6B-4bit"),
+                    with: "mlx-community/Qwen3-8B-4bit")
+
+// Specialization patch: snaps a small LoRA/DoRA adapter onto the base model to specialize its
+// style/tone/skill, instead of shipping a whole separate multi-gigabyte model.
+mlx.pairAdapter(AdapterSpec(source: .huggingFace(repoID: "stbenjam/qwen3-0.6b-haiku-mlx-lora")),
+                 with: "mlx-community/Qwen3-0.6B-bf16")
+
+// Either call with `nil` clears the pairing. Both take effect on the *next* session built for
+// that base repo id — safe to call at any time, including mid-run, for live A/B testing.
+mlx.pairDraftModel(nil, with: "mlx-community/Qwen3-8B-4bit")
+```
+
+- **Speed helper** must share the base model's tokenizer — in practice, the same model family at
+  a much smaller size. The combined base+draft weight size is checked against the same
+  `preflightLimits.maxWeightFractionOfRAM` (70% by default) the single-model download warning
+  already uses. **Honest result, not a guarantee**: measured live against a real `Qwen3-8B`/
+  `Qwen3-0.6B` pair, this was *slower* than the base model alone (12.8 → 9.6 words/sec, narrowing
+  to 9.6 → 8.9 with reasoning suppressed) — Apple Silicon's memory bandwidth is often already the
+  bottleneck, which is the regime speculative decoding helps least. Measure on your own
+  model/task/Mac before turning it on for users; don't assume it's a win.
+- **Specialization patch** needs an adapter trained against the *same* base model (or a
+  close-enough sibling in the same family/size) to produce sane output. Applying it mutates the
+  model's layers in place, so a paired session gets its own dedicated loaded copy — a real memory
+  cost if an adapted and unadapted session to the same base run concurrently, traded for adapter
+  state never leaking into an unrelated session. Verified live against both an unquantized and a
+  4-bit-quantized base with a real published haiku-style adapter — both worked; quantization
+  doesn't block LoRA (`QuantizedLinear` is a `Linear` subclass in `mlx-swift`, not a separate
+  type).
+
 ### `makeSession` + `LocalLMLabSession` — a session with your tools + MCP tools merged
 
 > **Use it instead of constructing `LanguageModelSession` yourself when** you want the SDK to
@@ -2283,7 +2321,7 @@ struct MLXModelProvider: DownloadableModelProvider {
     var installed: [InstalledModel] { get }
     var storageUsed: Int64 { get }
     func makeSession(for id: ModelID, tools: [any Tool], instructions: String?,
-                     transcript: Transcript?) throws -> LanguageModelSession
+                     transcript: Transcript?, options: SessionOptions) throws -> LanguageModelSession
     func availability(for id: ModelID) -> ModelAvailability
     func prewarm(_ id: ModelID) async
     func download(_ repoID: String) -> AsyncThrowingStream<DownloadEvent, any Error>
@@ -2293,10 +2331,37 @@ struct MLXModelProvider: DownloadableModelProvider {
     func remove(_ id: ModelID) throws
     func unloadResident(_ id: ModelID, reason: String = "idleTimeout") async
     func unloadAllResident(reason: String = "idleTimeout") async
+    // model pairing (docs/17-model-pairing-design.md) — runtime-changeable, re-applied on
+    // every makeSession call for the paired base repo id
+    func pairDraftModel(_ spec: SpeculativeDecodingSpec?, with baseRepoID: String)   // speed helper; nil clears
+    func pairAdapter(_ spec: AdapterSpec?, with baseRepoID: String)                  // specialization patch; nil clears
 }
 struct MLXPreflightLimits: Sendable, Equatable {
-    var maxWeightFractionOfRAM: Double     // default 0.7
+    var maxWeightFractionOfRAM: Double     // default 0.7 — also the combined base+draft ceiling for a speed-helper pairing
     init(maxWeightFractionOfRAM: Double = 0.7)
+}
+
+// --- model pairing (LocalLMLabSDKInference, docs/17-model-pairing-design.md) ---------
+// "Speed helper": pairs a base model with a smaller, faster draft model that proposes several
+// tokens ahead per round for the base model to verify in bulk — no change in output quality
+// when it works. Real result measured on mlx-control-room: SLOWER, not faster, on this
+// project's test hardware/model — verify on your own setup before shipping it on.
+struct SpeculativeDecodingSpec: Sendable, Equatable {
+    var draftRepoID: String    // must share the base model's tokenizer/family, just much smaller
+    var numDraftTokens: Int    // tokens proposed per round; default 5
+    init(draftRepoID: String, numDraftTokens: Int = 5)
+}
+// "Specialization patch": pairs a base model with a LoRA/DoRA adapter that nudges its behavior
+// (tone, vocabulary, a skill) without a whole second model. Applying an adapter mutates the
+// model in place, so a paired session gets its own loaded copy of the base weights — separate
+// from, and not evicted by, a plain unadapted session to the same repo.
+enum AdapterSource: Sendable, Equatable {
+    case huggingFace(repoID: String)   // repo with adapter_config.json + adapters.safetensors
+    case directory(URL)                // same two files already on disk — no download
+}
+struct AdapterSpec: Sendable, Equatable {
+    var source: AdapterSource
+    init(source: AdapterSource)
 }
 
 // --- supply-chain hardening (LocalLMLabSDKInference) ----------------------
@@ -2437,9 +2502,17 @@ struct SessionOptions: Sendable, Equatable {
     var topP: Double? = nil
     var maxOutputTokens: Int? = nil
     var userLocation: UserLocation? = nil   // for web-search localisation
+    var seed: UInt64? = nil              // MLX only — sampler seed, for reproducible generation
+    var topK: Int? = nil                 // MLX only — top-k sampling
+    var minP: Double? = nil              // MLX only — min-p sampling threshold
+    var repetitionPenalty: Double? = nil // MLX only — nil = disabled; the loop/repeat fix
+    var repetitionContextSize: Int? = nil  // MLX only — how far back repetitionPenalty looks
+    var prefillStepSize: Int? = nil      // MLX only — prompt-prefill chunk size; affects time-to-first-token, not output text
     init(webSearch: Bool = false, webSearchMaxUses: Int? = nil, webSearchAllowedDomains: [String] = [],
          webSearchBlockedDomains: [String] = [], effort: Effort? = nil, temperature: Double? = nil,
-         topP: Double? = nil, maxOutputTokens: Int? = nil, userLocation: UserLocation? = nil)
+         topP: Double? = nil, maxOutputTokens: Int? = nil, userLocation: UserLocation? = nil,
+         seed: UInt64? = nil, topK: Int? = nil, minP: Double? = nil, repetitionPenalty: Double? = nil,
+         repetitionContextSize: Int? = nil, prefillStepSize: Int? = nil)
     var serverTools: Set<ServerTool> { get }        // derived from webSearch/webSearchMaxUses/etc.
     func merged(onto base: SessionOptions) -> SessionOptions   // per-call wins; nil falls through to base
 }
