@@ -1068,6 +1068,49 @@ app fetches on a user's next fresh download — the same file path, a different 
 listed in `pinnedRevisions` still tracks `main` as before; pin only the ones your app's behavior
 depends on being stable.
 
+**Supply-chain hardening for a free-text model picker** — if your app lets the *user* type any
+repo id (rather than shipping a fixed list you've already pinned), `pinnedRevisions` can't help on
+its own: there's nothing to pin ahead of time. Three more pieces cover that case, all grouped into
+one `MLXModelProvider.init` parameter:
+
+```swift
+struct MyTrustPolicy: MLXModelTrustPolicy {
+    func evaluate(repoID: String) async -> MLXModelTrustDecision {
+        repoID.hasPrefix("mlx-community/") ? .allow : .deny(reason: "not on the allow-list")
+    }
+}
+
+let mlx = MLXModelProvider(supplyChainPolicy: MLXSupplyChainPolicy(
+    verification: .enabled,                              // default — see below
+    trustPolicy: MyTrustPolicy(),                         // your allow/deny logic; nil = accept anything
+    cacheLimits: MLXCacheLimits(maxTotalCacheBytes: 20_000_000_000)))   // refuse past 20GB
+```
+
+- **`trustPolicy`** gates which repo ids can be validated/downloaded at all — checked before any
+  network call in `validate`, and re-checked in `download` (the policy might be dynamic, or
+  `download` might be called without a prior `validate`). The SDK ships no built-in allow-list;
+  that curation call is yours to make.
+- **`verification`** (`.enabled` by default) hashes every downloaded file against the ETag Hugging
+  Face reports for it before it's cached. A verification failure surfaces as
+  `LocalLMLabError.download(stage: "verify", underlying: MLXWeightVerificationError)`. Set
+  `.disabled` only for a non-standard HF-compatible mirror whose ETags don't follow a recognized
+  shape.
+- **`cacheLimits`** caps the MLX weight cache's total on-disk size — **this checks the whole cache
+  directory** (`MLXModelProvider(cacheDirectory:)`'s target, or the shared default), not just
+  weights your app itself downloaded. A generous-looking cap can trip immediately if the user's
+  Mac already has other MLX models cached from elsewhere. Give your app its own `cacheDirectory` if
+  you want the cap scoped to just its own footprint.
+
+**Self-pinning after a free-text download**: every `InstalledModel` (from `.completed` or
+`mlx.installed`) now carries `resolvedRevision` — the immutable commit hash the download actually
+resolved to, whether that came from a pin or from tracking `main`. Persist `(repoID,
+resolvedRevision)` yourself (e.g. `UserDefaults` — **not** anywhere under the Hugging Face cache
+directory, since `remove(_:)` deletes that whole directory, refs and all) the first time a
+user-chosen repo downloads successfully. If the weights are later gone — the user cleared app
+data, the OS reclaimed space, anything external to your app — reconstruct your provider with that
+saved value in `pinnedRevisions` before redownloading, so you fetch the exact content the user
+originally got rather than whatever `main` currently points to.
+
 ### `makeSession` + `LocalLMLabSession` — a session with your tools + MCP tools merged
 
 > **Use it instead of constructing `LanguageModelSession` yourself when** you want the SDK to
@@ -2233,7 +2276,8 @@ struct RemoteResponseLimits: Sendable, Hashable {
 struct MLXModelProvider: DownloadableModelProvider {
     static var scheme: String { "mlx" }
     init(cacheDirectory: URL? = nil, residentModelLimit: Int = 1, preflightLimits: MLXPreflightLimits = .init(),
-         pinnedRevisions: [String: String] = [:])   // repo id -> HF revision/commit, for reproducible downloads
+         pinnedRevisions: [String: String] = [:],   // repo id -> HF revision/commit, for reproducible downloads
+         supplyChainPolicy: MLXSupplyChainPolicy = .default)   // trust policy + hash verification + cache cap
     var residencyEventStream: AsyncStream<ResidencyEvent>?
     var advertisedModels: [ModelID] { get }
     var installed: [InstalledModel] { get }
@@ -2253,6 +2297,41 @@ struct MLXModelProvider: DownloadableModelProvider {
 struct MLXPreflightLimits: Sendable, Equatable {
     var maxWeightFractionOfRAM: Double     // default 0.7
     init(maxWeightFractionOfRAM: Double = 0.7)
+}
+
+// --- supply-chain hardening (LocalLMLabSDKInference) ----------------------
+struct MLXSupplyChainPolicy: Sendable {
+    var verification: MLXWeightVerification
+    var trustPolicy: (any MLXModelTrustPolicy)?
+    var cacheLimits: MLXCacheLimits
+    init(verification: MLXWeightVerification = .default, trustPolicy: (any MLXModelTrustPolicy)? = nil,
+         cacheLimits: MLXCacheLimits = .default)
+    static let `default`: MLXSupplyChainPolicy
+}
+protocol MLXModelTrustPolicy: Sendable {
+    func evaluate(repoID: String) async -> MLXModelTrustDecision
+}
+enum MLXModelTrustDecision: Sendable, Equatable {
+    case allow
+    case deny(reason: String)
+}
+enum MLXWeightVerification: Sendable, Equatable {
+    case enabled     // default — verify every file's hash before caching it
+    case disabled    // for a non-standard mirror whose ETags don't match a recognized shape
+    static let `default`: MLXWeightVerification
+}
+struct MLXWeightVerificationError: Error, LocalizedError, Sendable {
+    enum Reason: Sendable, Equatable {
+        case hashMismatch(expected: String, computed: String)
+        case unrecognizedETagShape(String)
+    }
+    var filename: String
+    var reason: Reason
+}
+struct MLXCacheLimits: Sendable, Equatable {
+    var maxTotalCacheBytes: Int64?   // nil (default) = unlimited; checks the WHOLE cache dir, not just this app's downloads
+    init(maxTotalCacheBytes: Int64? = nil)
+    static let `default`: MLXCacheLimits
 }
 
 // --- model identity + capability ------------------------------------------
@@ -2291,13 +2370,17 @@ struct ModelCapabilityReport: Sendable, Equatable {
 struct InstalledModel: Sendable, Hashable, Codable, Identifiable {
     var id: ModelID
     var repoID: String
+    var resolvedRevision: String   // the immutable commit this download actually resolved to — persist it
+                                    // yourself (not under the HF cache dir) to redownload the same content
+                                    // later, e.g. after remove(_:) or the OS reclaiming space
     var capabilities: ModelCapabilities       // empty until capabilityProbe
     var sizeBytes: Int64?
     var contextTokens: Int?
-    init(id: ModelID, repoID: String, capabilities: ModelCapabilities = [], sizeBytes: Int64? = nil, contextTokens: Int? = nil)
+    init(id: ModelID, repoID: String, resolvedRevision: String, capabilities: ModelCapabilities = [],
+         sizeBytes: Int64? = nil, contextTokens: Int? = nil)
 }
 struct PreflightResult: Sendable, Equatable {
-    enum Stage: String, Sendable, Codable { /* repoReachable / mlxFormat / architecture / size / … */ }
+    enum Stage: String, Sendable, Codable { /* repoReachable / mlxFormat / architecture / size / diskSpace / trustPolicy / cacheQuota */ }
     var failedStage: Stage?       // nil = passed
     var detail: String?
     var weightBytes: Int64?
