@@ -1102,14 +1102,91 @@ let mlx = MLXModelProvider(supplyChainPolicy: MLXSupplyChainPolicy(
   you want the cap scoped to just its own footprint.
 
 **Self-pinning after a free-text download**: every `InstalledModel` (from `.completed` or
-`mlx.installed`) now carries `resolvedRevision` — the immutable commit hash the download actually
-resolved to, whether that came from a pin or from tracking `main`. Persist `(repoID,
-resolvedRevision)` yourself (e.g. `UserDefaults` — **not** anywhere under the Hugging Face cache
-directory, since `remove(_:)` deletes that whole directory, refs and all) the first time a
-user-chosen repo downloads successfully. If the weights are later gone — the user cleared app
-data, the OS reclaimed space, anything external to your app — reconstruct your provider with that
-saved value in `pinnedRevisions` before redownloading, so you fetch the exact content the user
-originally got rather than whatever `main` currently points to.
+`mlx.installed`) carries `resolvedRevision`, the immutable commit hash the download actually
+resolved to, whether that came from a pin or from tracking `main`. Pass an `MLXFilePinStore` as
+`pinStore:` and the SDK persists it for you, outside the Hugging Face cache; see
+[Pinning, updating and cleaning up model versions](#pinning-updating-and-cleaning-up-model-versions).
+If you would rather store it yourself, persist `(repoID, resolvedRevision)` anywhere that is **not**
+under the Hugging Face cache directory (`remove(_:)` deletes that whole directory, refs and all), and
+pass it back in `pinnedRevisions` before redownloading.
+
+### Pinning, updating and cleaning up model versions
+
+**Why this matters.** A Hugging Face repo is not a fixed, vetted artifact. Its owner can change the
+files behind the same name at any time, anyone can publish a repo with a look-alike name, and a
+download can be corrupted, oversized, or not runnable on the user's Mac. An app that pulls models at
+runtime inherits all of that. The pieces above (trust policy, preflight, hash verification, the cache
+cap) decide *whether* to fetch a model. Pinning decides *which version* you keep using, so that the
+content you validated is the content that runs. `examples/mlx-control-room` walks through each of
+these end to end.
+
+A **pin** is one exact Hugging Face commit hash for a repo. There are two kinds, and they differ in who
+vouches for the version:
+
+| | Where it comes from | Who approved it | May move to |
+|---|---|---|---|
+| **Shipped pin** | `pinnedRevisions` in your code (build time) | You, the developer | Only a full commit hash you name |
+| **Captured pin** | `MLXPinStore`, written after a user's first successful download | The user's own choice (trust on first use) | `main` or a commit hash |
+
+A shipped pin always beats a captured one. A shipped pin that can't be fetched (a mismatch, or the
+commit is gone) **fails hard and never falls back to `main`**.
+
+**Persist captured pins with `MLXFilePinStore`.** Pass a pin store to the provider and the SDK records
+`(repoID, commit)` after each successful download, then uses it on later downloads:
+
+```swift
+let pins = MLXFilePinStore()   // default: default directory>/mlx-pins.json, outside the HF cache
+let mlx = MLXModelProvider(
+    pinnedRevisions: ["mlx-community/gemma-3-270m-it-4bit": "abc1234…"],   // shipped pins
+    pinStore: pins)                                                        // captured pins
+```
+
+Keep the pin file outside the Hugging Face cache. `remove(_:)` deletes the whole repo directory in
+the cache, so a pin stored there would vanish along with the weights it exists to protect. Pins are
+resolved per download, so one captured after `init` is honored by the same provider instance.
+`effectivePin(for:)` reports the pin in force and its source; `buildTimePin(for:)` reports the shipped
+one.
+
+**Update a pin atomically.** Checking costs nothing; updating fetches first and switches last:
+
+```swift
+// What would change? Downloads nothing.
+let check = try await mlx.checkPinUpdate("owner/model", to: nil)   // nil = main (captured pins only)
+
+// Fetch and verify the new commit, then run beforeSwitch, then move the pin, then evict.
+for try await event in mlx.updatePin("owner/model", to: newCommit, beforeSwitch: {
+    await inference.pauseAndDrain()        // your code: stop new runs, let the current one finish
+}) { /* DownloadEvent progress */ }
+
+// Roll back: the old version is still cached, so this is instant.
+for try await _ in mlx.updatePin("owner/model", to: oldCommit) {}
+```
+
+The order is preflight at the new commit, fetch and verify, `beforeSwitch`, move the pin, evict the
+resident model. If any step fails, the pin does not move and nothing changes. `beforeSwitch` is where
+the host pauses inference, because the SDK cannot know what else your app has running against the
+model. `updatePins(_:beforeSwitch:)` moves several repos together (a base model and its draft, say)
+and is all-or-nothing.
+
+**Ship a shipped-pin update without a new app release.** Only a commit the developer names may move a
+shipped pin. The SDK never fetches a feed or decides what is "newest"; where your app learns the new
+commit, and how it authenticates it, is yours. Give the provider `managedPinStore: MLXFileManagedPinStore()`, then call
+`updatePin(_:to:)` with the commit your feed names. The saved override records the shipped pin it was
+based on, and applies only while that still equals this build's shipped pin. A newer app release
+therefore always wins over an older runtime update, and the stale override is discarded.
+
+**Clean up old versions.** An update leaves the previous version on disk, which is what makes rollback
+instant. The SDK never prunes on its own. It gives the host the inventory:
+
+```swift
+for snap in mlx.snapshots(for: "owner/model") {
+    // snap.revision, snap.isCurrent, exclusive bytes vs bytes shared with other versions
+}
+let freed = try mlx.removeSnapshot("owner/model", revision: oldCommit)   // refuses the current version
+```
+
+The cache stores each file once and shares it between versions, so `removeSnapshot` deletes only the
+files no other version uses. Exclusive bytes is what removing a version would actually free.
 
 **Pairing a second model — speed helper and specialization patch** (verified live in
 `examples/mlx-control-room`, which has a Speed pair and an Adapter pair with a live on/off switch). Two ways to attach a smaller second model to a base
