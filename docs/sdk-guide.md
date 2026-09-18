@@ -1112,6 +1112,8 @@ pass it back in `pinnedRevisions` before redownloading.
 
 ### Pinning, updating and cleaning up model versions
 
+*Part of [supply-chain hardening](#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference) for model downloads: the trust policy and verification above decide whether to fetch; pins decide which version you keep.*
+
 **Why this matters.** A Hugging Face repo is not a fixed, vetted artifact. Its owner can change the
 files behind the same name at any time, anyone can publish a repo with a look-alike name, and a
 download can be corrupted, oversized, or not runnable on the user's Mac. An app that pulls models at
@@ -1999,6 +2001,12 @@ pass — the pipeline is mechanical enough that the reasoning trace only adds la
 Core has been tested under App Sandbox — confirmed via a real sandboxed, Developer-ID-signed,
 notarized build (not just code review), not through the actual MAS submission pipeline itself yet.
 Here's exactly what's needed and what was actually verified.
+
+> **Related, for model downloads:** the sandbox is one half of the security story for an app that
+> fetches models at runtime. The other half is what it fetches: the trust policy, preflight, hash
+> verification and cache cap under [supply-chain hardening](#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference),
+> and [pinning, updating and cleaning up model versions](#pinning-updating-and-cleaning-up-model-versions).
+> A sandboxed app also relocates the Hugging Face cache into its container; the SDK follows it.
 
 ### 10a. Entitlements
 
