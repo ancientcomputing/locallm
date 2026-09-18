@@ -105,10 +105,11 @@ extension ModelVersionsModel {
 }
 ```
 
-**Requires the SDK release that has these APIs.** `ModelOnboardingView`'s Pin step reads
+**Requires an SDK build that has these APIs.** `ModelOnboardingView`'s Pin step reads
 `InstalledModel.resolvedRevision`, and the adapter above uses `MLXModelProvider`'s pin-update and snapshot
-APIs — all added after the first `1.0.0-RC.1` build. Build Components against a Core release that includes
-them (`defaultSDKVersion` / `knownSDKReleases` in `Package.swift`).
+APIs. The `1.0.0-RC.1` release **as re-published on 2026-09-18** includes them; an earlier copy of RC.1 does
+not. If a build fails with a checksum mismatch or reads like old SDK code, the release assets were replaced in
+place — run `scripts/flush-sdk-cache.sh` (SwiftPM caches binary artifacts by URL, not by content).
 
 None of these views persist anything themselves. MCP state goes through the
 `MCPServerManagerObservable` you own (`manager.core.restore(from:)` at launch); model-layer state
