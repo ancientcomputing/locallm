@@ -1025,26 +1025,29 @@ struct ControlRoomView: View {
                                 if model.simulateStaleShippedPin {
                                     Text(model.launchMode == .pairing
                                         ? "← now click \"Use this pair\" (the companion's pin goes stale)"
-                                        : "← now click \"Use this model\"")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(.orange)
+                                        : "← now click \"Use this model\" or \"Test a developer update\"")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.primary)
                                 }
                             }
                         }
                         if model.launchMode == .card {
                             toggleRow("Simulate a newer app build", isOn: $model.simulateNewerAppBuild)
                             if model.simulateNewerAppBuild {
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 6) {
                                     Text("Pretends the developer released a new version of this app whose built-in Gemma is the newer one.")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.system(size: 14, weight: .semibold))
                                     if let saved = model.savedFeedUpdate {
                                         Text("Next: click “Test a developer update”. The update you applied earlier (to \(saved.revision.prefix(8))…) was made under the older build, so it is discarded — a new release always wins over an older runtime update. Gemma opens as “shipped with this app” at the newer version, with nothing left to update.")
                                     } else {
                                         Text("There is no earlier update to discard yet, so nothing would visibly change. To see the effect: (1) untick this, click “Test a developer update”, then Check for updates → Update in the control room; (2) click Change model; (3) come back here, tick this, and click “Test a developer update” again.")
                                     }
                                 }
-                                .font(.system(size: 12))
-                                .foregroundStyle(.orange)
+                                .font(.system(size: 14))
+                                // Primary text on a light tint: orange text on the grey card was hard to read.
+                                .foregroundStyle(.primary)
+                                .padding(10)
+                                .background(Color.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 8))
                                 .fixedSize(horizontal: false, vertical: true)
                             }
                         }
