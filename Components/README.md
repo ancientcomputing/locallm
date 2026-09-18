@@ -25,9 +25,90 @@ state, and live download progress are observable properties, never polled.
 | `ProviderSettingsSection.swift` | One online-provider block — API-key field, **Configured ✓** badge, per-model row editor, **Enable web search** toggle + **Max searches** stepper, **Test connection** button (one result per model). Usable standalone. |
 | `RemoteProviderDraft.swift` | `RemoteProviderDraft` + `RemoteProviderKind` — the UI-facing shape the host maps to `RemoteProviderConfig` (~20 lines; see `examples/model-switch`'s `ProviderGlue.swift`). `.new(_:)` deliberately ships **no default model ids** — the host prefills them. |
 | `ProviderTestOutcome.swift` | The result type for **Test connection**: one `ModelResult` (`modelId` / `ok` / `detail`) per configured model, or a `message` when the check couldn't run. |
+| `ModelOnboarding.swift` | **`ModelOnboardingView`** + `ModelOnboardingModel` — a *Validate → Download → Pin* stepper, one block per repo. A failed preflight names its stage and reason (`failed at .trustPolicy — …`) and nothing after it runs; the download shows progress and can be cancelled; the Pin step shows the resolved commit and, when the host passes the pin it ships (`ModelOnboardingRequest.expectedRevision`), **verifies** it matches. Works from `ModelOnboardingSource(provider:)` or `(registry:)` — Core's `DownloadableModelProvider` only. `ModelPickerView`'s "Add from Hugging Face" row now uses it. |
+| `ModelUpdates.swift` | **`ModelUpdateView`** (check → what changes → update → roll back, with a *switching* state and a `pauseInference` hook) and **`ModelVersionsView`** (versions on disk, what removing each would *actually* free, a guarded **Remove**). Provider-agnostic: they take plain value types (`ModelUpdateOffer`, `ModelVersionRow`) and closures (`ModelUpdateActions`), so the host adapts its provider in a few lines — see "Adapting `MLXModelProvider`" below. The wording follows who decides: `.userChosen` (you decide), `.developerOffered` (the developer vouches for a version), `.fixed(reason:)`. |
 
 `ModelPickerView` (local models + MLX download) and `AIModelsSettingsView` (online providers) are
 separate surfaces today — a full "AI Models" panel composes both. Unifying them is on the list.
+
+### Onboarding, updating and cleaning up a model
+
+`ModelOnboardingView` needs nothing but Core. Give it what to onboard and where the work happens:
+
+```swift
+let onboarding = ModelOnboardingModel(
+    requests: [ModelOnboardingRequest(repoID: "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+                                      expectedRevision: shippedPin)],     // optional: verify the commit
+    source: ModelOnboardingSource(registry: lab.models))                  // or (provider: mlxProvider)
+ModelOnboardingView(model: onboarding, onFinished: { installed in … })
+```
+
+`ModelUpdateView` and `ModelVersionsView` are **provider-agnostic on purpose**. The SDK's update and cleanup
+APIs live on `MLXModelProvider` in Inference (macOS 27), which Components doesn't link, so these views own
+presentation and state and call closures you supply. The pause point matters: downloading the new version
+doesn't disturb a running conversation, but *switching* can, so `ModelUpdateModel.pauseInference` is awaited
+after the download and before the switch, and `state == .switching` tells your UI to refuse new requests.
+
+`examples/components-updates-demo` drives every state of all three views from simulated sources.
+
+#### Adapting `MLXModelProvider`
+
+About forty lines. (Compiled and run against the real Inference module.) `vouchedCommit` is for a **built-in**
+model: ask *your own* channel which commit you vouch for — the SDK moves a shipped pin only to a commit hash
+you name, never to `main`, and cannot tell whether your channel is authentic. Leave it `nil` for a model the
+user chose.
+
+```swift
+import LocalLMLabSDKComponents
+import LocalLMLabSDKInference
+
+@available(macOS 27.0, *)
+extension ModelUpdateActions {
+    static func mlx(_ provider: MLXModelProvider, repoID: String,
+                    vouchedCommit: (@Sendable () async throws -> String)? = nil) -> ModelUpdateActions {
+        ModelUpdateActions(
+            check: {
+                let check = try await provider.checkPinUpdate(repoID, to: try await vouchedCommit?())
+                return ModelUpdateOffer(
+                    current: check.pinnedRevision, available: check.latestRevision,
+                    changes: check.changes.map { change in
+                        let kind: ModelFileChange.Kind
+                        switch change.kind {
+                        case .added: kind = .added
+                        case .removed: kind = .removed
+                        case .modified: kind = .modified
+                        @unknown default: kind = .modified
+                        }
+                        return ModelFileChange(path: change.path, kind: kind, oldSize: change.oldSize, newSize: change.newSize)
+                    })
+            },
+            apply: { revision, progress, beforeSwitch in
+                for try await event in provider.updatePin(repoID, to: revision, beforeSwitch: beforeSwitch) {
+                    if case .progress(_, _, let fraction) = event { progress(fraction) }
+                }
+            })
+    }
+}
+
+@available(macOS 27.0, *)
+extension ModelVersionsModel {
+    convenience init(provider: MLXModelProvider, repoID: String) {
+        self.init(
+            list: {
+                provider.snapshots(for: repoID).map {
+                    ModelVersionRow(revision: $0.revision, isCurrent: $0.isCurrent, isComplete: $0.isComplete,
+                                    freesBytes: $0.exclusiveBytes, sharedBytes: $0.sharedBytes)
+                }
+            },
+            remove: { try provider.removeSnapshot(repoID, revision: $0.revision) })
+    }
+}
+```
+
+**Requires the SDK release that has these APIs.** `ModelOnboardingView`'s Pin step reads
+`InstalledModel.resolvedRevision`, and the adapter above uses `MLXModelProvider`'s pin-update and snapshot
+APIs — all added after the first `1.0.0-RC.1` build. Build Components against a Core release that includes
+them (`defaultSDKVersion` / `knownSDKReleases` in `Package.swift`).
 
 None of these views persist anything themselves. MCP state goes through the
 `MCPServerManagerObservable` you own (`manager.core.restore(from:)` at launch); model-layer state

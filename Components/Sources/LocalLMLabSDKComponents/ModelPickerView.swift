@@ -16,8 +16,8 @@ public struct ModelPickerView: View {
     private let show27OnlyModels: Bool
 
     @State private var addRepoID = ""
-    @State private var addError: String?
-    @State private var addTask: Task<Void, Never>?
+    /// The Validate -> Download -> Pin flow for the repo being added; `nil` when nothing is being added.
+    @State private var onboarding: ModelOnboardingModel?
 
     /// - Parameters:
     ///   - registry: `lab.models`.
@@ -154,11 +154,21 @@ public struct ModelPickerView: View {
             HStack {
                 TextField("namespace/model-id from Hugging Face", text: $addRepoID)
                     .textFieldStyle(.roundedBorder)
+                    .disabled(onboarding != nil)
                 Button("Add") { startAdd() }
-                    .disabled(addRepoID.trimmingCharacters(in: .whitespaces).isEmpty || addTask != nil)
+                    .disabled(addRepoID.trimmingCharacters(in: .whitespaces).isEmpty || onboarding != nil)
             }
-            if let addError {
-                Text(addError).font(.caption).foregroundStyle(.red)
+            // A failed preflight (trust policy, architecture, size, quota) now says which stage and why,
+            // instead of a bare error line. The download row above already shows progress, so the
+            // stepper doesn't draw a second bar.
+            if let onboarding {
+                ModelOnboardingView(
+                    model: onboarding, showsDownloadProgress: false,
+                    onFinished: { _ in
+                        addRepoID = ""
+                        self.onboarding = nil
+                    },
+                    onDismiss: { self.onboarding = nil })
             }
         }
     }
@@ -169,16 +179,11 @@ public struct ModelPickerView: View {
 
     private func startAdd() {
         let repoID = addRepoID.trimmingCharacters(in: .whitespaces)
-        addError = nil
-        addTask = Task {
-            do {
-                _ = try await registry.startDownload(repoID)
-                addRepoID = ""
-            } catch {
-                addError = (error as? LocalLMLabError)?.errorDescription ?? "\(error)"
-            }
-            addTask = nil
-        }
+        guard !repoID.isEmpty else { return }
+        let model = ModelOnboardingModel(
+            requests: [ModelOnboardingRequest(repoID: repoID)], source: ModelOnboardingSource(registry: registry))
+        onboarding = model
+        model.start()
     }
 }
 

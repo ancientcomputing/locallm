@@ -67,6 +67,8 @@ let package = Package(
             url: sdkRelease.url,
             checksum: sdkRelease.checksum
         ),
-        .target(name: "LocalLMLabSDKComponents", dependencies: ["LocalLMLabSDKCore"])
+        .target(name: "LocalLMLabSDKComponents", dependencies: ["LocalLMLabSDKCore"]),
+        // View-model logic (onboarding, update, versions) — closure-driven, no provider/network/GPU needed.
+        .testTarget(name: "LocalLMLabSDKComponentsTests", dependencies: ["LocalLMLabSDKComponents"]),
     ]
 )
