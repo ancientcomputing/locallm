@@ -1111,8 +1111,8 @@ data, the OS reclaimed space, anything external to your app — reconstruct your
 saved value in `pinnedRevisions` before redownloading, so you fetch the exact content the user
 originally got rather than whatever `main` currently points to.
 
-**Pairing a second model — speed helper and specialization patch** (docs/17-model-pairing-design.md,
-verified live in `examples/mlx-control-room`). Two ways to attach a smaller second model to a base
+**Pairing a second model — speed helper and specialization patch** (verified live in
+`examples/mlx-control-room`, which has a Speed pair and an Adapter pair with a live on/off switch). Two ways to attach a smaller second model to a base
 model, both set on the provider (not `SessionOptions`) so they can be flipped on/off at runtime
 without rebuilding a session:
 
@@ -1135,11 +1135,15 @@ mlx.pairDraftModel(nil, with: "mlx-community/Qwen3-8B-4bit")
 - **Speed helper** must share the base model's tokenizer — in practice, the same model family at
   a much smaller size. The combined base+draft weight size is checked against the same
   `preflightLimits.maxWeightFractionOfRAM` (70% by default) the single-model download warning
-  already uses. **Honest result, not a guarantee**: measured live against a real `Qwen3-8B`/
-  `Qwen3-0.6B` pair, this was *slower* than the base model alone (12.8 → 9.6 words/sec, narrowing
-  to 9.6 → 8.9 with reasoning suppressed) — Apple Silicon's memory bandwidth is often already the
-  bottleneck, which is the regime speculative decoding helps least. Measure on your own
-  model/task/Mac before turning it on for users; don't assume it's a win.
+  already uses. **`numDraftTokens` matters more than you'd expect, so measure.** It is how many
+  words the draft model proposes per round (default **2**). A small draft only agrees with the big
+  model for a token or two at a time, so a long draft mostly wastes work. Measured on one Mac with
+  a `Qwen3-0.6B` draft (release build, warmed up, greedy, thinking off, one prompt — treat as
+  directional): 1–2 draft tokens were **27–39% faster** than the base model alone on `Qwen3-8B` and
+  `Qwen3-4B` bases, 3 was about break-even, and **5 was 17–29% *slower***. With greedy decoding the
+  output is byte-identical with the helper on or off. The first run with it on is slower (it loads
+  the draft model), so compare the second. Your model, task and Mac will differ — measure before
+  turning it on for users.
 - **Specialization patch** needs an adapter trained against the *same* base model (or a
   close-enough sibling in the same family/size) to produce sane output. Applying it mutates the
   model's layers in place, so a paired session gets its own dedicated loaded copy — a real memory
@@ -2331,7 +2335,7 @@ struct MLXModelProvider: DownloadableModelProvider {
     func remove(_ id: ModelID) throws
     func unloadResident(_ id: ModelID, reason: String = "idleTimeout") async
     func unloadAllResident(reason: String = "idleTimeout") async
-    // model pairing (docs/17-model-pairing-design.md) — runtime-changeable, re-applied on
+    // model pairing — runtime-changeable, re-applied on
     // every makeSession call for the paired base repo id
     func pairDraftModel(_ spec: SpeculativeDecodingSpec?, with baseRepoID: String)   // speed helper; nil clears
     func pairAdapter(_ spec: AdapterSpec?, with baseRepoID: String)                  // specialization patch; nil clears
@@ -2341,15 +2345,15 @@ struct MLXPreflightLimits: Sendable, Equatable {
     init(maxWeightFractionOfRAM: Double = 0.7)
 }
 
-// --- model pairing (LocalLMLabSDKInference, docs/17-model-pairing-design.md) ---------
+// --- model pairing (LocalLMLabSDKInference) ---------
 // "Speed helper": pairs a base model with a smaller, faster draft model that proposes several
 // tokens ahead per round for the base model to verify in bulk — no change in output quality
-// when it works. Real result measured on mlx-control-room: SLOWER, not faster, on this
-// project's test hardware/model — verify on your own setup before shipping it on.
+// when it works. Measured on mlx-control-room: faster with a short draft (the default, 2), slower
+// with a long one (5) — see the pairing notes above, and verify on your own setup.
 struct SpeculativeDecodingSpec: Sendable, Equatable {
     var draftRepoID: String    // must share the base model's tokenizer/family, just much smaller
-    var numDraftTokens: Int    // tokens proposed per round; default 5
-    init(draftRepoID: String, numDraftTokens: Int = 5)
+    var numDraftTokens: Int    // tokens proposed per round; default 2
+    init(draftRepoID: String, numDraftTokens: Int = 2)
 }
 // "Specialization patch": pairs a base model with a LoRA/DoRA adapter that nudges its behavior
 // (tone, vocabulary, a skill) without a whole second model. Applying an adapter mutates the
