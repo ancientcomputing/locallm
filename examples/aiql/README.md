@@ -284,7 +284,16 @@ the reasoning trace adds latency without changing the query. A model that always
 (DeepSeek-R1) would surface `unsupportedCapability` instead; on non-toggle models `.off` is a
 no-op.
 
-Any MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
+**Supply-chain safeguards.** The field is free text, so the app can't vet every model ahead of
+time. Instead: a **trust policy** (`MlxCommunityOnly` in `AIQLApp.swift`) refuses any repo outside
+`mlx-community/` before any network call; downloads are **hash-verified**; the default model is
+**pinned** to a commit the app shipped with; and any other model is pinned to the version you
+first download (stored outside the model cache), so re-downloading later gets the same bytes, not
+whatever the repo's `main` has become. The progress panel shows which version you got. To allow
+other publishers, edit the policy — each one is a party whose uploads your users will run.
+Background: [Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+
+Any `mlx-community/` MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
 and its `qat` sibling — their shipped `model.safetensors.index.json` disagrees with the actual
 weight files, so the load fails (and the bad size in it trips the preflight).
 

@@ -22,6 +22,11 @@ import SwiftUI
 
 // The model this app routes to. Any MLX-format Hugging Face repo — see docs/tested-models.md.
 let workspaceModelRepo = "mlx-community/Qwen3-8B-4bit"
+// The exact commit of that repo this app was built and tried against. A Hugging Face repo's owner can
+// change what `main` points to at any time; pinning means a fresh download (first run, or after the
+// user clears the cache) always gets these bytes, never whatever `main` is today. To change the
+// model, review the new version, then update both lines.
+let workspaceModelRevision = "545dc4251c05440727734bcd94334791f6ab0192"
 
 // MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8) — verbatim from workspace-buddy
 
@@ -94,7 +99,9 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
 
     // The model layer: an MLX provider (one model resident at a time), Apple's on-device model
     // kept as a fallback, and one named route pointing at the MLX model.
-    private let mlx = MLXModelProvider(residentModelLimit: 1)
+    private let mlx = MLXModelProvider(
+        residentModelLimit: 1,
+        pinnedRevisions: [workspaceModelRepo: workspaceModelRevision])
     private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))
     private lazy var modelID = ModelID(scheme: "mlx", rest: workspaceModelRepo)!
 

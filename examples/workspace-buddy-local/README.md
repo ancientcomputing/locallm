@@ -196,8 +196,14 @@ the `LocalLMLabSession.events` subsection.
 
 ## Changing the model
 
-Edit `workspaceModelRepo` at the top of
+Edit `workspaceModelRepo` **and `workspaceModelRevision`** at the top of
 `Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — any MLX-format Hugging Face repo.
+The revision is the exact commit the app downloads (the repo's *Files ▸ history* page shows it, or
+`https://huggingface.co/api/models/<repo>` returns it as `sha`). This app pins the model it ships:
+a Hugging Face repo's owner can change what `main` points to at any time, and without a pin a
+fresh download would silently fetch different weights. A pin means the version you tried is the
+version users get; moving to a new one is a deliberate edit after you've reviewed it. See
+[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
 See [`docs/tested-models.md`](../../docs/tested-models.md) for which open-weight models tool-call
 reliably. `MLXModelProvider.validate` refuses a model whose weights exceed ~70% of this Mac's RAM.
 

@@ -60,6 +60,17 @@ enum FolderAccess {
     }
 }
 
+// MARK: - Trust policy
+
+/// Which repos this app will fetch. The SDK ships no allow-list (that's the host's call); this app
+/// allows one namespace. Widen it here if you want other publishers — each one is a party whose
+/// uploads your users will run.
+struct MlxCommunityOnly: MLXModelTrustPolicy {
+    func evaluate(repoID: String) async -> MLXModelTrustDecision {
+        repoID.hasPrefix("mlx-community/") ? .allow : .deny(reason: "only mlx-community models are allowed in this app")
+    }
+}
+
 // MARK: - View model
 
 @available(macOS 27.0, *)
@@ -74,7 +85,10 @@ final class AIQLModel: ObservableObject {
         case failed(String)
     }
 
-    @Published var modelRepo = "mlx-community/Qwen3-14B-4bit"
+    static let defaultModelRepo = "mlx-community/Qwen3-14B-4bit"
+    // Commit of the default model this app was tried against. Update after reviewing a new version.
+    static let defaultModelRevision = "a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4"
+    @Published var modelRepo = AIQLModel.defaultModelRepo
     @Published var serverURLString = "https://econ-index.mcp.claude.com/mcp"
     @Published var request = ""
     @Published private(set) var folderURL: URL?
@@ -82,7 +96,16 @@ final class AIQLModel: ObservableObject {
     @Published private(set) var steps: [String] = []   // friendly progress lines
 
     private let manager = MCPServerManager()
-    private let mlx = MLXModelProvider(residentModelLimit: 1)
+    // The field is free text, so this app can't pin everything ahead of time. Two layers instead:
+    //  - the default model is pinned to a commit this app shipped with (developer-vouched);
+    //  - any other model is pinned on first download (`MLXFilePinStore`, kept outside the model
+    //    cache), so re-downloading later fetches the same version the user first got.
+    // A trust policy limits which repos can be fetched at all; downloads are hash-verified by default.
+    private let mlx = MLXModelProvider(
+        residentModelLimit: 1,
+        pinnedRevisions: [AIQLModel.defaultModelRepo: AIQLModel.defaultModelRevision],
+        supplyChainPolicy: MLXSupplyChainPolicy(trustPolicy: MlxCommunityOnly()),
+        pinStore: MLXFilePinStore())
     private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))
 
     init() {
@@ -153,6 +176,9 @@ final class AIQLModel: ObservableObject {
             do {
                 for try await event in mlx.download(modelRepo.trimmingCharacters(in: .whitespaces)) {
                     if case .progress(_, _, let fraction) = event { stage = .downloadingModel(fraction) }
+                }
+                if let pin = mlx.effectivePin(for: modelRepo.trimmingCharacters(in: .whitespaces)) {
+                    step("Pinned to version \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this app" : "the version you just downloaded")).")
                 }
             } catch {
                 stage = .failed("The model download failed: \(error.localizedDescription)"); return
