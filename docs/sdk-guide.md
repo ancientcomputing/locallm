@@ -1135,7 +1135,7 @@ commit is gone) **fails hard and never falls back to `main`**.
 `(repoID, commit)` after each successful download, then uses it on later downloads:
 
 ```swift
-let pins = MLXFilePinStore()   // default: default directory>/mlx-pins.json, outside the HF cache
+let pins = MLXFilePinStore()   // default file: mlx-pins.json, outside the HF cache
 let mlx = MLXModelProvider(
     pinnedRevisions: ["mlx-community/gemma-3-270m-it-4bit": "abc1234…"],   // shipped pins
     pinStore: pins)                                                        // captured pins
@@ -2396,7 +2396,9 @@ struct MLXModelProvider: DownloadableModelProvider {
     static var scheme: String { "mlx" }
     init(cacheDirectory: URL? = nil, residentModelLimit: Int = 1, preflightLimits: MLXPreflightLimits = .init(),
          pinnedRevisions: [String: String] = [:],   // repo id -> HF revision/commit, for reproducible downloads
-         supplyChainPolicy: MLXSupplyChainPolicy = .default)   // trust policy + hash verification + cache cap
+         supplyChainPolicy: MLXSupplyChainPolicy = .default,   // trust policy + hash verification + cache cap
+         pinStore: (any MLXPinStore)? = nil,                   // captured pins (trust on first use); MLXFilePinStore()
+         managedPinStore: (any MLXManagedPinStore)? = nil)     // developer-named updates to shipped pins
     var residencyEventStream: AsyncStream<ResidencyEvent>?
     var advertisedModels: [ModelID] { get }
     var installed: [InstalledModel] { get }
@@ -2416,6 +2418,16 @@ struct MLXModelProvider: DownloadableModelProvider {
     // every makeSession call for the paired base repo id
     func pairDraftModel(_ spec: SpeculativeDecodingSpec?, with baseRepoID: String)   // speed helper; nil clears
     func pairAdapter(_ spec: AdapterSpec?, with baseRepoID: String)                  // specialization patch; nil clears
+    // pins, updates, cleanup
+    func effectivePin(for repoID: String) -> MLXPin?          // pin in force + its source
+    func buildTimePin(for repoID: String) -> String?          // the pin this build shipped, if any
+    func checkPinUpdate(_ repoID: String, to revision: String? = nil) async throws -> MLXPinUpdateCheck   // downloads nothing
+    func updatePin(_ repoID: String, to revision: String? = nil,
+                   beforeSwitch: (@Sendable () async throws -> Void)? = nil) -> AsyncThrowingStream<DownloadEvent, any Error>
+    func updatePins(_ updates: [String: String],
+                    beforeSwitch: (@Sendable () async throws -> Void)? = nil) -> AsyncThrowingStream<DownloadEvent, any Error>   // all-or-nothing
+    func snapshots(for repoID: String) -> [MLXCachedSnapshot]                     // cached versions, exclusive vs shared bytes
+    func removeSnapshot(_ repoID: String, revision: String) throws -> Int64       // refuses the current version; returns bytes freed
 }
 struct MLXPreflightLimits: Sendable, Equatable {
     var maxWeightFractionOfRAM: Double     // default 0.7 — also the combined base+draft ceiling for a speed-helper pairing
