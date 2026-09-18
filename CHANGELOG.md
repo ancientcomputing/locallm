@@ -22,6 +22,68 @@ guarantees an already-built app keeps working if a newer xcframework is dropped 
 recompiling. (Through `1.0.0-beta.N`/`-rc.N`, none of this applies yet — see each entry's own "Beta
 caveats" below.)
 
+## 1.0.0-RC.1 — 2026-09-15 (binaries re-published 2026-09-18)
+
+Everything below is in `LocalLMLabSDKInference` unless noted; all of it is additive. The narrative is
+[`docs/sdk-guide.md` §6a](docs/sdk-guide.md#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference)
+and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+`docs/api-surface.md` is regenerated for this release; the diff against beta.4 has no breaking lines.
+
+### Added — supply-chain hardening for models downloaded at runtime
+
+- **`MLXSupplyChainPolicy`** (`MLXModelProvider(supplyChainPolicy:)`): a host-supplied
+  **`MLXModelTrustPolicy`** checked before any network call, **content-hash verification** of every
+  downloaded file (on by default), and an **`MLXCacheLimits`** cap over the whole cache directory.
+- **Preflight** stages: `trustPolicy`, `repoReachable`, `mlxFormat`, `architectureSupported` (backed by the
+  real architecture registry), `sizeVsMemory`, `diskSpace`, `cacheQuota`.
+- **`InstalledModel.resolvedRevision`** (Core): the immutable commit a download actually resolved to.
+- **Adapter, draft model and base-model fetches are governed** by the same trust policy, pins, cache cap and
+  verification as `download(_:)`. If one is denied or fails, the run fails instead of quietly using the plain model.
+
+### Added — model pinning, updates and cleanup
+
+- **Pins:** `MLXPin`, `MLXPinSource` (`.shipped` / `.captured`), `MLXPinStore`, `MLXFilePinStore`
+  (`MLXModelProvider(pinStore:)`), `effectivePin(for:)`, `buildTimePin(for:)`. A shipped pin
+  (`pinnedRevisions`) beats a captured one and never falls back to `main` on failure.
+- **Updates:** `checkPinUpdate(_:to:)` (downloads nothing), `updatePin(_:to:beforeSwitch:)` and
+  `updatePins(_:beforeSwitch:)` (all-or-nothing). Atomic: preflight, fetch and verify, `beforeSwitch`, move
+  the pin, evict. Rollback is `updatePin(to: oldCommit)`.
+- **Developer-moved shipped pins:** `MLXManagedPinStore`, `MLXFileManagedPinStore`, `MLXPinOverride`
+  (`MLXModelProvider(managedPinStore:)`). A saved override applies only while it matches this build's
+  shipped pin, so a newer app release always wins.
+- **Cleanup:** `snapshots(for:)` and `removeSnapshot(_:revision:)` with `MLXCachedSnapshot` (exclusive vs
+  shared bytes). The SDK never prunes on its own.
+- **`Components`:** `ModelOnboardingView` and `ModelUpdateView` / `ModelVersionsView` (provider-agnostic,
+  closure-driven), with `examples/components-updates-demo`.
+
+### Changed
+
+- **`SpeculativeDecodingSpec.numDraftTokens` default is now 2** (was 5). Measured on a Mac with a Qwen3-0.6B
+  draft, 1–2 draft tokens were 27–39% faster and 5 was 17–29% slower. Source-compatible; pass a value to keep 5.
+
+### Fixed
+
+- **Sandboxed apps could not download an MLX model** (`LocalLMLabError.download(stage: "verify")`). The SDK
+  looked for downloaded files under `~/.cache/huggingface/hub` while a sandboxed app's downloader writes to
+  `Library/Caches/huggingface/hub`. The SDK now asks the downloader where its cache is. Affected the first
+  RC.1 binaries; fixed in the re-publish.
+
+### Added — examples
+
+- **`examples/mlx-control-room`**: the MLX sampling, prefill, reasoning and pairing knobs with a gauge for
+  each, plus the validate, download, pin, update, roll back and clean up flow made visible. Sandboxed `.app`.
+- `workspace-buddy-local`, `aiql`, `code-buddy` and `repo-qa-local` now pin the models they use (`aiql` adds a
+  trust policy). `workspace-buddy-local` and `repo-qa-local` build against RC.1 by default.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip       fced6cfa03f5528fa39b0aa07a99391bda4ae17a09473ac29df6ede594f57639
+LocalLMLabSDKClaude-1.0.0-RC.1.xcframework.zip     a72ddcffc5865b7250669364ae185c57fd7e324978a1eb47868f2ba40aa17e49
+LocalLMLabSDKInference-1.0.0-RC.1.xcframework.zip  9adf820edbb3060b1cf6b87c76a3fb26566b0ad1dc5e829ebcbb775f2e1bb900
+LocalLMLabSDKRemote-1.0.0-RC.1.xcframework.zip     1d1ab0d2b78cdde08ca797d64b728bcb880a182bd7ed24e8384bd3028c4c2e97
+```
+
 ## 1.0.0-beta.4 — 2026-09-10
 
 ### Added — MCP client: protocol revision `2025-11-25` (`docs/sdk-guide.md` §3a–§3e)
