@@ -7,7 +7,7 @@
 //     a second built-in model the developer can move to a newer version without a new app release, your own
 //     free-text repo id, or a curated *pair* (a speed-helper pair or an adapter pair). Every choice runs
 //     validate -> download -> pin, per model, before the knobs unlock.
-//   - LIVE knobs actually change what the next turn does: `effort`, `temperature`/`topP`/`maxOutputTokens`/
+//   - KNOBS actually change what the next turn does: `effort`, `temperature`/`topP`/`maxOutputTokens`/
 //     `seed`, `topK`/`minP`/`repetitionPenalty`/`repetitionContextSize`, and `prefillStepSize` all ride
 //     `SessionOptions` into a real `GenerateParameters`. Drag temperature to the floor and the output should
 //     stop varying between runs; crank repetitionPenalty up on a prompt that loops and the repeat-rate gauge
@@ -18,7 +18,7 @@
 //   - PINS: a model you choose is pinned to the version you first downloaded; a built-in one is pinned by the
 //     app. The Model & pin panel checks for and applies updates, rolls back, and lists old versions on disk
 //     with what removing each would free.
-//   - RESERVED knobs (KV cache) don't exist on `SessionOptions` yet and are shown disabled.
+//   - ROADMAP: the KV-cache knobs don't exist on `SessionOptions` yet and are shown disabled.
 //
 // The gauges are the actual point: a knob only counts as "exposed" once something here reacts to it.
 // tokens/sec and the repeat-rate meter are real signals off the live stream; the determinism light is a real
@@ -384,6 +384,9 @@ final class ControlRoomModel: ObservableObject {
     /// Advanced: pretend this is a *newer build* of the app, which ships the newer Gemma version as its
     /// build-time pin — to watch a runtime update be superseded by the release.
     @Published var simulateNewerAppBuild = false
+    /// The update from the developer's feed that is saved for the built-in small model, if any — what
+    /// "simulate a newer app build" would discard. Read from the saved file each time.
+    var savedFeedUpdate: MLXPinOverride? { managedPinStore.override(for: smallModel.repoID) }
     @Published private(set) var capturedPins: [ActivePin] = []
     var pinFilePath: String { pinStore.fileURL.path }
 
@@ -1029,12 +1032,20 @@ struct ControlRoomView: View {
                             }
                         }
                         if model.launchMode == .card {
-                            toggleRow("simulate a newer app build (ships the newer Gemma)", isOn: $model.simulateNewerAppBuild)
+                            toggleRow("Simulate a newer app build", isOn: $model.simulateNewerAppBuild)
                             if model.simulateNewerAppBuild {
-                                Text("As if the developer released a new app version whose build-time pin for the small model is the newer one. Any earlier runtime update of it is then superseded (discarded), because the release's own choice wins.")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.orange)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Pretends the developer released a new version of this app whose built-in Gemma is the newer one.")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    if let saved = model.savedFeedUpdate {
+                                        Text("Next: click “Test a developer update”. The update you applied earlier (to \(saved.revision.prefix(8))…) was made under the older build, so it is discarded — a new release always wins over an older runtime update. Gemma opens as “shipped with this app” at the newer version, with nothing left to update.")
+                                    } else {
+                                        Text("There is no earlier update to discard yet, so nothing would visibly change. To see the effect: (1) untick this, click “Test a developer update”, then Check for updates → Update in the control room; (2) click Change model; (3) come back here, tick this, and click “Test a developer update” again.")
+                                    }
+                                }
+                                .font(.system(size: 12))
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         Text("Verification and the cap only matter on a fresh transfer — a repo already on disk is skipped file-by-file." + (model.launchMode == .ownModel ? "" : " \"Stale shipped pin\" swaps a shipped SHA for a bogus one: it should fail hard, never fall back to main."))
@@ -1456,7 +1467,7 @@ struct ControlRoomView: View {
     @ViewBuilder
     private var pairingPanel: some View {
         if let preset = model.activePreset {
-            groupBox("\(preset.title) — live") {
+            groupBox(preset.title) {
                 VStack(alignment: .leading, spacing: 10) {
                     switch preset.kind {
                     case .speedHelper(let numDraftTokens):
@@ -1523,7 +1534,7 @@ struct ControlRoomView: View {
                 // demonstrated, so it shouldn't be buried below the sampling knobs.
                 pairingPanel
 
-                groupBox("Sampling — live") {
+                groupBox("Sampling") {
                     VStack(alignment: .leading, spacing: 10) {
                         labeledSlider("temperature", value: $model.temperature, range: 0...2)
                         labeledSlider("topP", value: $model.topP, range: 0...1)
@@ -1540,7 +1551,7 @@ struct ControlRoomView: View {
                     }
                 }
 
-                groupBox("Sampling extras — live") {
+                groupBox("Sampling extras") {
                     VStack(alignment: .leading, spacing: 10) {
                         labeledSlider("topK (0 = off)", value: $model.topK, range: 0...100, format: "%.0f")
                         labeledSlider("minP (0 = off)", value: $model.minP, range: 0...1)
@@ -1556,7 +1567,7 @@ struct ControlRoomView: View {
                     }
                 }
 
-                groupBox("Prefill — live") {
+                groupBox("Prefill") {
                     VStack(alignment: .leading, spacing: 10) {
                         toggleRow("prefillStepSize", isOn: $model.usePrefillStepSize)
                         if model.usePrefillStepSize {
@@ -1570,7 +1581,7 @@ struct ControlRoomView: View {
 
                 modelPanel
 
-                groupBox("KV cache — not yet exposed") {
+                groupBox("KV cache — roadmap") {
                     VStack(alignment: .leading, spacing: 8) {
                         reservedRow("maxKVSize")
                         reservedRow("compressionAlgorithm")
@@ -1671,7 +1682,7 @@ struct ControlRoomView: View {
         HStack {
             Text(name).font(.system(size: 15, design: .monospaced)).foregroundStyle(.tertiary)
             Spacer()
-            Text("not yet exposed").font(.system(size: 13)).foregroundStyle(.tertiary)
+            Text("roadmap").font(.system(size: 13)).foregroundStyle(.tertiary)
         }
     }
 

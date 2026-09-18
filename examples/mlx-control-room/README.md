@@ -1,6 +1,6 @@
 # MLX Control Room
 
-**MLX Control Room** is a live panel over an MLX-backed model session. It puts the knobs
+**MLX Control Room** is a control panel over an MLX-backed model session. It puts the knobs
 `SessionOptions` and `MLXModelProvider` expose — sampling, prefill, model pairing, pinning and updating
 — in front of you, next to **gauges that prove each knob actually reaches `mlx-swift-lm`** rather than
 being silently accepted and ignored. A knob only counts as "exposed" once something here reacts to it.
@@ -15,7 +15,7 @@ being silently accepted and ignored. A knob only counts as "exposed" once someth
   developer, who decides — including moving it to a newer version **without a new app release**.
 - **Updating safely**: check what would change before downloading anything, fetch first and switch last so a
   failure changes nothing, pause inference for the switch, roll back instantly, and clean up old versions.
-- **Model pairing**: a speed-helper pair and an adapter pair, each with a live on/off switch.
+- **Model pairing**: a speed-helper pair and an adapter pair, each with an on/off switch.
 
 ## Getting the SDK & toolchain
 
@@ -173,8 +173,12 @@ authenticating it. Here `HostUpdateFeed` stands in for that server. Choose **Tes
 updates**, **Update**, and **Back to the version this app shipped**.
 
 - The update is saved with the version *this build* shipped, so it survives a relaunch — but **a newer app
-  build always wins**: with **Advanced ▸ Simulate a newer app build** on, the earlier update is discarded and
-  the release's own choice applies.
+  build always wins**. To see that: (1) choose **Test a developer update**, then **Check for updates → Update**;
+  (2) click **Change model**; (3) open **Advanced**, tick **Simulate a newer app build** (it pretends the
+  developer released a new app version whose built-in Gemma is the newer one), and click **Test a developer
+  update** again. The update from step 1 was made under the older build, so it is discarded; Gemma opens as
+  "shipped with this app" at the newer version, with nothing left to update. (The Advanced note spells out the
+  next step, and adapts if you haven't applied an update yet.)
 - **Pausing for the switch.** Downloading doesn't disturb a conversation; switching can. Once the new version
   is downloaded and verified, the app stops accepting new runs (the status reads "switching model
   version…"), lets a run in progress finish, and only then does the SDK switch — so no session can load part
