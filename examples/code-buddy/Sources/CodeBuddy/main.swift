@@ -21,6 +21,16 @@ import LocalLMLabSDKInference
 // First run downloads the chosen model. Tool-call trace goes to stderr; the model's
 // answer streams to stdout.
 
+// The default models are pinned to the exact commits this example was tried against, so a fresh
+// download never silently picks up whatever the repo's `main` has become. A model chosen with
+// --heavy / --light isn't listed here; it is pinned to the version you first download instead
+// (trust on first use), so re-downloading it later gets the same bytes. To change a default:
+// review the new version, then update the repo and its commit together.
+let shippedPins: [String: String] = [
+    "mlx-community/Qwen3-8B-4bit": "545dc4251c05440727734bcd94334791f6ab0192",
+    "mlx-community/Qwen2.5-3B-Instruct-4bit": "4f83f8f146fdf28b512a06562b671d7af4fab457",
+]
+
 struct Options {
     var route: RouteName = .heavy
     var heavy = "mlx-community/Qwen3-8B-4bit"
@@ -107,7 +117,7 @@ func run() async {
         note("workspace \(root.path) does not exist"); exit(1)
     }
 
-    let mlx = MLXModelProvider(residentModelLimit: 1)
+    let mlx = MLXModelProvider(residentModelLimit: 1, pinnedRevisions: shippedPins, pinStore: MLXFilePinStore())
     let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))
     lab.models.route(.heavy, to: ModelID(scheme: "mlx", rest: opts.heavy)!)
     lab.models.route(.light, to: ModelID(scheme: "mlx", rest: opts.light)!)
@@ -133,6 +143,9 @@ func run() async {
         } catch {
             note("download failed: \(error)"); exit(1)
         }
+    }
+    if let pin = mlx.effectivePin(for: modelID.rest) {
+        note("pinned to \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this example" : "first download"))")
     }
 
     // Tools: Core Workspace tools + host Process tools + (auto) MCP session tools.

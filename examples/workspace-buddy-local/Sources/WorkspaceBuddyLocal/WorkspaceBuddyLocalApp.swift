@@ -186,7 +186,7 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 let events = Task { @MainActor in
                     for await event in session.events {
                         switch event {
-                        case .toolCallStarted(_, let name):
+                        case .toolCallStarted(_, let name, _):
                             self.activity = Self.activityLabel(for: name)
                         case .toolCallFinished:
                             self.activity = nil

@@ -281,6 +281,18 @@ model. Weights land in `~/.cache/huggingface/hub/` — shared with
 | `session.languageModelSession.streamResponse` | streamed answer |
 | `session.contextBudget` | printed at the end |
 
+## Which version of the model you get
+
+The default models are pinned to the exact Hugging Face commit this example was tried against
+(`shippedPins` in the source), so a fresh download never silently fetches whatever the repo's `main` has
+become. A model you choose yourself with `--heavy` / `--light` isn't known ahead of time, so it is pinned to the
+version you first download, and a later re-download gets those same bytes. The run prints
+`pinned to <commit> (shipped with this example | first download)`. First-download pins are saved
+to `~/Library/Application Support/CodeBuddy/LocalLMLab/mlx-pins.json`, outside the model cache, so
+they survive `rm -rf` on the cache; delete that file to forget them. To change a default, review the
+new version, then update the repo and its commit together. See
+[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+
 ## Running local models on a memory-constrained Mac
 
 The whole point of `MLXModelProvider` is that a local model competes with everything else for

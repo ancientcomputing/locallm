@@ -44,7 +44,12 @@ func run() async {
     let effectiveQuestion = question.isEmpty ? "What does this repository do, in a couple sentences?" : question
 
     // --- the model layer: one MLX provider, Apple's on-device model as an alternative, one route ---
-    let mlx = MLXModelProvider(residentModelLimit: 1)
+    // Pin the default model to the commit this example was tried against, so a fresh download never
+    // silently picks up whatever `main` has become. A model chosen with --model is pinned to the
+    // version you first download instead (trust on first use). To change the default, review the
+    // new version, then update the repo and its commit together.
+    let shippedPins = ["mlx-community/Qwen3-8B-4bit": "545dc4251c05440727734bcd94334791f6ab0192"]
+    let mlx = MLXModelProvider(residentModelLimit: 1, pinnedRevisions: shippedPins, pinStore: MLXFilePinStore())
     let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))
     let modelID = useApple ? ModelID.system : ModelID(scheme: "mlx", rest: modelRepo)!
     lab.models.route(.local, to: modelID)
@@ -67,6 +72,9 @@ func run() async {
         } catch {
             note("download failed: \(error)"); exit(1)
         }
+    }
+    if !useApple, let pin = mlx.effectivePin(for: modelRepo) {
+        note("pinned to \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this example" : "first download"))")
     }
 
     // --- everything below is repo-qa, unchanged ---

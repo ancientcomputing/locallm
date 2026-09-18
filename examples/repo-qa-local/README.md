@@ -59,7 +59,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Leaves your system default alone; lasts only for the current terminal. `Package.swift` builds
-against SDK `1.0.0-beta.4` with no further setup — it links **two** binaries,
+against SDK `1.0.0-RC.1` with no further setup — it links **two** binaries,
 `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the MLX runtime), from
 that one GitHub Release. `export LOCALLM_SDK_VERSION=<version>` to pin a different published
 release. **No Metal Toolchain needed** — the prebuilt Inference xcframework bundles the compiled
@@ -138,6 +138,18 @@ This is a CLI (not sandboxed), so the weights go to the standard Hugging Face ca
 - `rm -rf` that directory to reclaim the space, or set `HF_HUB_CACHE` / pass
   `MLXModelProvider(cacheDirectory:)` to put it elsewhere.
 
+## Which version of the model you get
+
+The default model is pinned to the exact Hugging Face commit this example was tried against
+(`shippedPins` in the source), so a fresh download never silently fetches whatever the repo's `main` has
+become. A model you choose yourself with `--model` isn't known ahead of time, so it is pinned to the
+version you first download, and a later re-download gets those same bytes. The run prints
+`pinned to <commit> (shipped with this example | first download)`. First-download pins are saved
+to `~/Library/Application Support/RepoQALocal/LocalLMLab/mlx-pins.json`, outside the model cache, so
+they survive `rm -rf` on the cache; delete that file to forget them. To change a default, review the
+new version, then update the repo and its commit together. See
+[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+
 ## What the model layer adds (diff against `repo-qa`)
 
 The Deepwiki / `MCPTool` half of `main.swift` is a verbatim copy of `repo-qa` — connecting,
@@ -163,7 +175,7 @@ That's the point: the model layer is a swap-in, not a rewrite.
 ## Verified live
 
 ```
-model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-beta.4
+model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-RC.1
 Connecting to Deepwiki…
 Skipping read_wiki_contents: excluded by this example.
 Built 2 tool(s) from Deepwiki's live schema: ask_question, read_wiki_structure
