@@ -49,7 +49,10 @@ presentation and state and call closures you supply. The pause point matters: do
 doesn't disturb a running conversation, but *switching* can, so `ModelUpdateModel.pauseInference` is awaited
 after the download and before the switch, and `state == .switching` tells your UI to refuse new requests.
 
-`examples/components-updates-demo` drives every state of all three views from simulated sources.
+[`examples/components-updates-demo`](../examples/components-updates-demo/) drives every state of all three views from
+simulated sources. [`examples/mlx-control-room`](../examples/mlx-control-room/) shows the same flows against a real
+`MLXModelProvider`: pin capture, check / update / roll back, a developer-moved built-in model, and cleanup of old
+versions, with the download, pin and verification steps visible as they happen.
 
 #### Adapting `MLXModelProvider`
 
