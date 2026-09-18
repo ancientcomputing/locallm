@@ -76,8 +76,10 @@ The app opens on a model picker, not the control room:
 
 - **Recommended model** — `Qwen2.5-0.5B-Instruct-4bit`, shipped pinned at a fixed commit. The pin step
   *verifies* the download resolved to exactly that commit.
-- **Also built in: Gemma 3 270M** — shipped pinned at an *older* commit, with a stand-in for the developer's
-  update feed that vouches for a newer one. See [Updating a built-in model](#updating-a-built-in-model-without-a-new-app-release).
+- **Update test: Gemma 3 270M** — a second built-in model, shipped pinned at an *older* commit on purpose, so
+  there is something for the developer's update feed (here a stand-in) to offer. **Test a developer update**
+  opens the control room on it; use **Check for updates** there. See
+  [Updating a built-in model](#updating-a-built-in-model-without-a-new-app-release).
 - **Choose a different model…** — type any `mlx-community/...` repo id. The trust policy allow-lists
   `mlx-community/*`; try another namespace to see it refuse the repo *before any network call*. The first
   download **records the version you got**, so later downloads fetch exactly that version.
@@ -167,7 +169,7 @@ A model the app ships is different, because a different party vouches for the ve
 chose, your click is the approval; for a built-in one, **the developer** reviewed one specific version.
 So "update to whatever is newest" is never allowed — the SDK moves a shipped pin only to a **full commit hash
 the app names**, and where the app learns it (its server, a config push) is the app's business, as is
-authenticating it. Here `HostUpdateFeed` stands in for that server. Pick **Gemma 3 270M** and use **Check for
+authenticating it. Here `HostUpdateFeed` stands in for that server. Choose **Test a developer update** on the launch screen and use **Check for
 updates**, **Update**, and **Back to the version this app shipped**.
 
 - The update is saved with the version *this build* shipped, so it survives a relaunch — but **a newer app

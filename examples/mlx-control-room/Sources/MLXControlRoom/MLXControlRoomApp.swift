@@ -1095,34 +1095,40 @@ struct ControlRoomView: View {
 
     private var recommendedCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
+            // Each card owns its own button, so there is one obvious action per card.
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Recommended model").font(.system(size: 13)).foregroundStyle(.secondary)
                 Text(shippedModel.repoID).font(.system(size: 16, design: .monospaced))
                 Text("pinned by this app at \(shippedModel.revision)")
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Also built in — small, and updatable by the app's developer").font(.system(size: 13)).foregroundStyle(.secondary)
-                Text(smallModel.repoID).font(.system(size: 14, design: .monospaced))
-                Text("this build ships it at \(smallModel.revision.prefix(12))…; the app's update feed can offer a newer version")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                Button("Use this model") { model.useBuiltIn(smallModel) }
-                    .font(.system(size: 13))
-                    .disabled(model.isPreparing)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            HStack {
                 Button("Use this model") { model.useShippedModel() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.isPreparing)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+
+            // Why this card exists: it is the way in to the developer-update flow. The model is a real
+            // small model you can also just use, but it ships at an *older* version on purpose so there
+            // is something for the developer's update feed to offer.
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Update test — a built-in model its developer can update").font(.system(size: 13)).foregroundStyle(.secondary)
+                Text(smallModel.repoID).font(.system(size: 14, design: .monospaced))
+                Text("This build ships it at \(smallModel.revision.prefix(12))…, an older version. In the control room you can check the developer's feed for a newer one and move to it — no new app release needed.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Test a developer update") { model.useBuiltIn(smallModel) }
+                    .disabled(model.isPreparing)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+
+            HStack {
                 Button("Choose a different model…") {
                     // Hidden in the free-text view, so don't leave it silently armed.
                     model.simulateStaleShippedPin = false
