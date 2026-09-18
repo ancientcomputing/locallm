@@ -14,6 +14,7 @@ Code samples for LocalLM Lab, split by which feature they use.
 | [workspace-buddy/](workspace-buddy/) | LocalLM Lab SDK (Core), Path A | A local AI-assisted coding example: pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`. Sandboxed — the security-scoped bookmark demo. |
 | [workspace-buddy-local/](workspace-buddy-local/) | LocalLM Lab SDK (Core **+ Inference**) | The same sandboxed `.app` as `workspace-buddy/`, but with a downloadable **open-weight MLX model** routed through the model layer. The one example running the model layer inside **App Sandbox** (adds the `network.client` entitlement for the model download). |
 | [code-buddy/](code-buddy/) | LocalLM Lab SDK (Core **+ Inference**) | The full model layer: a CLI coding agent running **locally-run MLX models** through `LocalLMLab` + `MLXModelProvider` (heavy/light routes, one resident at a time), Core's Workspace tools, a no-auth MCP server, and two **host-owned** `Process` tools (git, run-tests) the SDK deliberately doesn't ship. |
+| [mlx-control-room/](mlx-control-room/) | LocalLM Lab SDK (Core **+ Inference**) | A live control panel for an MLX model session: the sampling / prefill / pairing knobs with **gauges that prove each reaches `mlx-swift-lm`**, plus the model-pinning flow made visible — validate → download → pin, a per-model version you can **check, update, roll back** and clean up, a built-in model its developer can move to a newer version **without an app release**, and two curated model pairs (speed helper, adapter). Sandboxed `.app` with the network entitlement. |
 | [os-matrix/](os-matrix/) | LocalLM Lab SDK (Core **+ Inference**) | One `.macOS("26.0")` CLI that runs on both macOS 26 and 27 with no source `#if` — shows `ModelAvailability.requiresOS` gating the 27-only providers. |
 | [components-demo/](components-demo/) | LocalLM Lab SDK (`Components`) | The same SDK, via the prebuilt `LocalLMLabSDKComponents` MCP server picker UI instead of building your own. |
 | [model-switch/](model-switch/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | The online / remote providers: add a provider + API key, tick web search, switch between every configured model (on-device, PCC, Claude-4-FM, GPT, Claude online, OpenRouter) from one chat window. |
@@ -63,6 +64,8 @@ build against the latest stable release. No environment variable is needed for e
 | `repo-qa`, `code-buddy`, `os-matrix` | CLI | ✅ the whole example | — (no `packaging/`) |
 | `components-demo`, `model-switch` | SwiftUI, no system permissions | ✅ — real `.app` via the committed `.xcodeproj` (ad-hoc, no account needed); bundle-less via `Package.swift` / `swift run` | **any** identity, or **none** — see the table below |
 | `plate-today`, `plate-today-tools`, `security-demo` | SwiftUI + Calendar / Reminders / Contacts | ✅ via the committed `.xcodeproj` — **Automatic** signing: Xcode uses your Apple ID's Apple Development identity (a **free** one works), needed for reliable prompts. No Apple ID → add one or pick *Sign to Run Locally*. Bare `swift run` is denied the prompts. (`security-demo` also needs one or more provider API keys — set them in the scheme's env vars.) | **a signing identity is required** — a **free** "Apple Development" one works |
+| `mlx-control-room` | SwiftUI + App Sandbox (network only) | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); it keeps no security-scoped bookmark, so **Sign to Run Locally** works too | **any** identity — `packaging/build-and-sign.sh` |
+| `components-updates-demo` | SwiftUI, no system permissions, simulated data | ✅ via `Package.swift` / `swift run` (no `.xcodeproj`) | — (no `packaging/`) |
 | `workspace-buddy`, `workspace-buddy-local`, `aiql` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
@@ -79,8 +82,8 @@ build against the latest stable release. No environment variable is needed for e
    **Open With ▸ Xcode**, or launch Xcode first and use **File ▸ Open**. (The
    *Xcode ▸ Settings ▸ Locations ▸ Command Line Tools* selection does **not** change this — it
    only affects the terminal `swift` / `xcodebuild`.) Then:
-   - **The eight SwiftUI examples** (`components-demo`, `model-switch`, `security-demo`,
-     `plate-today`, `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`, `aiql`) ship
+   - **The nine SwiftUI examples with a project** (`components-demo`, `model-switch`, `security-demo`,
+     `plate-today`, `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`, `aiql`, `mlx-control-room`) ship
      a committed `.xcodeproj` — open `examples/<name>/<Name>.xcodeproj`. Run gives a *real* `.app` (Dock icon,
      menu bar, `⌘,`, URL scheme, entitlements). The project is generated from `project.yml` with
      [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml` and `xcodegen
@@ -93,7 +96,7 @@ build against the latest stable release. No environment variable is needed for e
    **Signing of the `.xcodeproj` Run build:**
    - `components-demo`, `model-switch` — **ad-hoc**, no account needed. They only make outbound
      HTTPS calls, so ad-hoc is fine.
-   - `plate-today`, `plate-today-tools`, `security-demo`, `workspace-buddy`, `workspace-buddy-local`, `aiql` —
+   - `plate-today`, `plate-today-tools`, `security-demo`, `workspace-buddy`, `workspace-buddy-local`, `aiql`, `mlx-control-room` —
      **Automatic**, no hard-coded team. Xcode signs with your **Apple Development** identity: add
      any Apple ID under **Xcode ▸ Settings ▸ Accounts** (a **free** one is enough) and Xcode
      picks it up. With no Apple ID, Run stops with *"requires a development team"* — add one, or

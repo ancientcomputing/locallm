@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Always sandboxed, like the other examples that run a downloaded model. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- MLXModelProvider.download fetches the model over HTTPS from Hugging Face. Without this the
+	     download is silently blocked by the sandbox. This app needs no file-access entitlement: models
+	     and pin files live in the app's own container. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>
