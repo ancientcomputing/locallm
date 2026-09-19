@@ -22,9 +22,10 @@ guarantees an already-built app keeps working if a newer xcframework is dropped 
 recompiling. (Through `1.0.0-beta.N`/`-rc.N`, none of this applies yet — see each entry's own "Beta
 caveats" below.)
 
-## 1.0.0-RC.1 — 2026-09-15 (binaries re-published 2026-09-18)
+## 1.0.0-RC.1 — 2026-09-15 (binaries re-published 2026-09-18 and 2026-09-19)
 
-Everything below is in `LocalLMLabSDKInference` unless noted; all of it is additive. The narrative is
+Everything below is in `LocalLMLabSDKInference` unless noted (the 2026-09-19 re-publish also adds the
+`LocalLMLabSDKCore` items under *Added — sampling options on Apple's on-device model*); all of it is additive. The narrative is
 [`docs/sdk-guide.md` §6a](docs/sdk-guide.md#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference)
 and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
 `docs/api-surface.md` is regenerated for this release; the diff against beta.4 has no breaking lines.
@@ -39,6 +40,19 @@ and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning
 - **`InstalledModel.resolvedRevision`** (Core): the immutable commit a download actually resolved to.
 - **Adapter, draft model and base-model fetches are governed** by the same trust policy, pins, cache cap and
   verification as `download(_:)`. If one is denied or fails, the run fails instead of quietly using the plain model.
+
+### Added — sampling options on Apple's on-device model (`LocalLMLabSDKCore`, 2026-09-19 re-publish)
+
+- `SessionOptions` `temperature`, `maxOutputTokens`, `topK` / `topP` and `seed` now take effect on the
+  `system` model (they were ignored). `temperature: 0` selects greedy decoding.
+- **`SessionOptionsError`** (`topKAndTopPBothSet`, `seedRequiresTopKOrTopP`, `invalidValue`,
+  `perCallOptionsUnsupported`) reports combinations Apple's sampler can't honour, from `makeSession`.
+  **Behaviour change:** on the on-device model, `topK` together with `topP`, or a `seed` with neither,
+  now throws where it was previously ignored.
+- `SessionOptions.appleGenerationOptions()` (the mapping, for hosts calling `languageModelSession`
+  directly) and `LocalLMLabSession.respond(to:options:)` (per-call override).
+- A seed is best-effort on this model: reproducible within a process, but the first request after launch
+  can differ. See [`docs/sdk-guide.md` §6a](docs/sdk-guide.md).
 
 ### Added — model pinning, updates and cleanup
 

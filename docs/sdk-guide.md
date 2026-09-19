@@ -1257,7 +1257,7 @@ for try await snapshot in session.languageModelSession.streamResponse(to: task) 
 `session.route` / `session.modelID` tell you what actually backs it.
 
 **`options: SessionOptions`** carries per-call knobs — provider-native web search, sampling
-(`temperature` / `topP` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
+(`temperature` / `topP` / `topK` / `seed` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
 to think**: on the MLX tier it flips the chat template's thinking toggle for models that have
 one (the Qwen3 family). It's a *preference*, not a requirement — **`.off` never throws**: a
 model whose reasoning can't be suppressed (e.g. DeepSeek-R1, which always reasons) just keeps
@@ -1268,6 +1268,38 @@ a no-op either way. If you need to know ahead of time whether `.off` will actual
 inspecting the result — there's no error to inspect, by design. On the remote providers `.off`
 maps to the provider default — there is no true "reasoning off" on those APIs, so pass `.low` to
 minimise it. `aiql` uses `.off` ([§8b](#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)). `.low`…`.max` don't reach MLX.
+
+**Sampling on Apple's on-device model (`system`).** The SDK maps `temperature`, `maxOutputTokens`,
+`topK` / `topP` and `seed` onto Apple's `GenerationOptions` and applies them on every
+`session.respond(...)`. A few rules come from how Apple's API is shaped, and the SDK reports a
+combination it can't honour with a `SessionOptionsError` — thrown from `makeSession`, not
+discovered on the first turn — instead of quietly dropping a knob:
+
+- **`temperature: 0` means greedy decoding.** `topK`, `topP` and `seed` are then irrelevant (not
+  an error), as on MLX.
+- **`topK` or `topP`, not both.** Apple's sampler takes one or the other; setting both throws
+  `.topKAndTopPBothSet`. MLX still accepts both.
+- **A `seed` needs `topK` or `topP`** (unless `temperature` is 0), because Apple only takes a seed
+  inside a random sampling mode; otherwise `.seedRequiresTopKOrTopP`.
+- **Values are range-checked** (`temperature` ≥ 0, `topK` ≥ 1, `topP` in (0, 1], `maxOutputTokens`
+  ≥ 1) → `.invalidValue`.
+- `minP`, the repetition knobs and `prefillStepSize` don't exist on Apple's model and are ignored,
+  like `effort` and web search. Private Cloud Compute ignores all of these.
+
+You can override per turn with `session.respond(to: task, options: SessionOptions(temperature: 0))`.
+Per-call values win field by field, and setting `topK` or `topP` on the call replaces the
+session's choice of either. `respond(to:options:)` is for the on-device model only — every other
+provider fixes its options at `makeSession`, so passing non-default options to one throws
+`.perCallOptionsUnsupported` rather than being silently ignored.
+
+**A seed is best-effort on Apple's model, not a guarantee.** In testing, the same seed (and greedy
+decoding) gave the same text on every call within a running process, but the first request after a
+process launch occasionally differed, and the model itself can change with an OS update. Treat "same
+seed → usually the same text" as the contract; don't build tests or caching on exact matches.
+(On MLX, where the weights are pinned, a seed is a stronger tool for replay and golden-output tests.)
+
+If you call `session.languageModelSession.respond(...)` directly to opt out of the SDK's wrapper,
+these options are **not** applied — pass `try options.appleGenerationOptions()` yourself.
 
 ### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
 
@@ -2582,6 +2614,7 @@ struct LocalLMLabSession: Sendable {
     var contextBudget: ContextBudget { get }
     func cancel()
     // + respond(...) / streamResponse(...) wrappers (LocalLMLabSession+respond) that apply retryOnContextOverflow
+    func respond(to prompt: String, options: SessionOptions) async throws -> String   // per-call options, on-device model only
 }
 enum SessionEvent: Sendable {
     case modelLoadProgress(fraction: Double)
@@ -2599,12 +2632,12 @@ struct SessionOptions: Sendable, Equatable {
     var webSearchAllowedDomains: [String] = []
     var webSearchBlockedDomains: [String] = []
     var effort: Effort? = nil            // reasoning level; nil = provider default ([§6a](#6a-the-model-layer-local-models-routing-sessions) "options: SessionOptions")
-    var temperature: Double? = nil
-    var topP: Double? = nil
+    var temperature: Double? = nil       // MLX, Apple on-device (0 = greedy), remote; not PCC
+    var topP: Double? = nil              // MLX, Apple on-device (exclusive with topK there), remote
     var maxOutputTokens: Int? = nil
     var userLocation: UserLocation? = nil   // for web-search localisation
-    var seed: UInt64? = nil              // MLX only — sampler seed, for reproducible generation
-    var topK: Int? = nil                 // MLX only — top-k sampling
+    var seed: UInt64? = nil              // MLX + Apple on-device (needs topK/topP there) — sampler seed; best-effort on Apple
+    var topK: Int? = nil                 // MLX + Apple on-device (exclusive with topP there) — top-k sampling
     var minP: Double? = nil              // MLX only — min-p sampling threshold
     var repetitionPenalty: Double? = nil // MLX only — nil = disabled; the loop/repeat fix
     var repetitionContextSize: Int? = nil  // MLX only — how far back repetitionPenalty looks
@@ -2616,6 +2649,15 @@ struct SessionOptions: Sendable, Equatable {
          repetitionContextSize: Int? = nil, prefillStepSize: Int? = nil)
     var serverTools: Set<ServerTool> { get }        // derived from webSearch/webSearchMaxUses/etc.
     func merged(onto base: SessionOptions) -> SessionOptions   // per-call wins; nil falls through to base
+    func appleGenerationOptions() throws -> GenerationOptions  // the Apple on-device mapping; throws SessionOptionsError
+}
+/// Thrown by `makeSession` / `respond` / `appleGenerationOptions()` for an option combination Apple's
+/// on-device model can't honour, instead of dropping a knob silently.
+enum SessionOptionsError: Error, LocalizedError, Equatable {
+    case topKAndTopPBothSet                         // Apple's sampler takes top-K or top-P, not both
+    case seedRequiresTopKOrTopP                     // a seed only exists inside a random sampling mode
+    case invalidValue(field: String, detail: String)
+    case perCallOptionsUnsupported(model: String)   // respond(to:options:) on a non-`system` session
 }
 /// Reasoning/thinking effort, ordered off → max. `.off` is a real guarantee only on the local MLX
 /// tier — it suppresses the `<think>` block for toggle-capable chat templates (Qwen3 and its
