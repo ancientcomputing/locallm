@@ -1,0 +1,394 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		114508EFDF37F2776BEAD4C9 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A63894EF84DDCA99807D875 /* ChatView.swift */; };
+		4DC4266434187DC2AE892139 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB88CF08995D123244AD1815 /* Theme.swift */; };
+		57D1D611D17D705663439545 /* LocalLMLabSDKInference in Frameworks */ = {isa = PBXBuildFile; productRef = 6AF8741043BD4182C1A7C902 /* LocalLMLabSDKInference */; };
+		6957ECC17D28556E09B46A44 /* TavilySearchTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80617A19EA95A5A043AA8C03 /* TavilySearchTool.swift */; };
+		93E8D44D7A49DE5E511FCEFE /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E3B5E30D4E793AF9A76B145 /* AppModel.swift */; };
+		BDB36485D9CD36D1219D2949 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4960BC7A7FF8173F7A09663B /* Persistence.swift */; };
+		C8FD63C31692CE8E47E93177 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F421966122D6FF100A5E3873 /* Assets.xcassets */; };
+		D03F714381D86C8F67EBCCFF /* TavilySetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF68ABDA92F0849C28754B2D /* TavilySetupView.swift */; };
+		DD894A9FA2476245A669F2DF /* VistaNovaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC6D8330A0B18EA11513E58 /* VistaNovaApp.swift */; };
+		FD5A59774CDDC417C4D0A8F1 /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3038A800DFF58658574303B6 /* LocalLMLabSDKCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		038449EBD9805A323AB4F496 /* vistanova */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vistanova; path = .; sourceTree = SOURCE_ROOT; };
+		4155A116DD7A456AF3B955DE /* VistaNova.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VistaNova.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4960BC7A7FF8173F7A09663B /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		4E3B5E30D4E793AF9A76B145 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		7AC6D8330A0B18EA11513E58 /* VistaNovaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VistaNovaApp.swift; sourceTree = "<group>"; };
+		80617A19EA95A5A043AA8C03 /* TavilySearchTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TavilySearchTool.swift; sourceTree = "<group>"; };
+		9A63894EF84DDCA99807D875 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		BB88CF08995D123244AD1815 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		CF68ABDA92F0849C28754B2D /* TavilySetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TavilySetupView.swift; sourceTree = "<group>"; };
+		F421966122D6FF100A5E3873 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BFDE13B24AD3EF55333C026A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD5A59774CDDC417C4D0A8F1 /* LocalLMLabSDKCore in Frameworks */,
+				57D1D611D17D705663439545 /* LocalLMLabSDKInference in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		11C49E537FCEB0DB4AA0A206 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				AA13DDD8C27A5A5AFCAEC1E0 /* VistaNova */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		3C0FE9558CA9D74BFF414FCD /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				038449EBD9805A323AB4F496 /* vistanova */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		96051C361BB45C0F4BA4E388 = {
+			isa = PBXGroup;
+			children = (
+				3C0FE9558CA9D74BFF414FCD /* Packages */,
+				11C49E537FCEB0DB4AA0A206 /* Sources */,
+				D9F800875575FBEC7D5BE13C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9C371365C0AA4350724DB070 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F421966122D6FF100A5E3873 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		AA13DDD8C27A5A5AFCAEC1E0 /* VistaNova */ = {
+			isa = PBXGroup;
+			children = (
+				9C371365C0AA4350724DB070 /* Resources */,
+				4E3B5E30D4E793AF9A76B145 /* AppModel.swift */,
+				9A63894EF84DDCA99807D875 /* ChatView.swift */,
+				4960BC7A7FF8173F7A09663B /* Persistence.swift */,
+				80617A19EA95A5A043AA8C03 /* TavilySearchTool.swift */,
+				CF68ABDA92F0849C28754B2D /* TavilySetupView.swift */,
+				BB88CF08995D123244AD1815 /* Theme.swift */,
+				7AC6D8330A0B18EA11513E58 /* VistaNovaApp.swift */,
+			);
+			path = VistaNova;
+			sourceTree = "<group>";
+		};
+		D9F800875575FBEC7D5BE13C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4155A116DD7A456AF3B955DE /* VistaNova.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9C2145A7789F573D73BC2B6A /* VistaNova */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F9466FD8B714A132C8D50BFE /* Build configuration list for PBXNativeTarget "VistaNova" */;
+			buildPhases = (
+				EC9D12674301412B4711461C /* Sources */,
+				241343C7D8C3F73D3ADBD18E /* Resources */,
+				BFDE13B24AD3EF55333C026A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VistaNova;
+			packageProductDependencies = (
+				3038A800DFF58658574303B6 /* LocalLMLabSDKCore */,
+				6AF8741043BD4182C1A7C902 /* LocalLMLabSDKInference */,
+			);
+			productName = VistaNova;
+			productReference = 4155A116DD7A456AF3B955DE /* VistaNova.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		08CA9BA7F362A90EC36D499E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					9C2145A7789F573D73BC2B6A = {
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 4C4CF69DF359D5569A778F37 /* Build configuration list for PBXProject "VistaNova" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 96051C361BB45C0F4BA4E388;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B293E4C94CD40E4054DD1899 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D9F800875575FBEC7D5BE13C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9C2145A7789F573D73BC2B6A /* VistaNova */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		241343C7D8C3F73D3ADBD18E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C8FD63C31692CE8E47E93177 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		EC9D12674301412B4711461C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				93E8D44D7A49DE5E511FCEFE /* AppModel.swift in Sources */,
+				114508EFDF37F2776BEAD4C9 /* ChatView.swift in Sources */,
+				BDB36485D9CD36D1219D2949 /* Persistence.swift in Sources */,
+				6957ECC17D28556E09B46A44 /* TavilySearchTool.swift in Sources */,
+				D03F714381D86C8F67EBCCFF /* TavilySetupView.swift in Sources */,
+				4DC4266434187DC2AE892139 /* Theme.swift in Sources */,
+				DD894A9FA2476245A669F2DF /* VistaNovaApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		498D2B852B62728C0B8557FB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/VistaNova-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.vistanova.app;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		5ED918C38D0EB7ABE34BDBC6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		631AB450B256504044440969 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AB3480C2BB6CA95D4CF68C16 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/VistaNova-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.vistanova.app;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4C4CF69DF359D5569A778F37 /* Build configuration list for PBXProject "VistaNova" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5ED918C38D0EB7ABE34BDBC6 /* Debug */,
+				631AB450B256504044440969 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F9466FD8B714A132C8D50BFE /* Build configuration list for PBXNativeTarget "VistaNova" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				498D2B852B62728C0B8557FB /* Debug */,
+				AB3480C2BB6CA95D4CF68C16 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B293E4C94CD40E4054DD1899 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3038A800DFF58658574303B6 /* LocalLMLabSDKCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKCore;
+		};
+		6AF8741043BD4182C1A7C902 /* LocalLMLabSDKInference */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKInference;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 08CA9BA7F362A90EC36D499E /* Project object */;
+}

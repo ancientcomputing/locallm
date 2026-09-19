@@ -145,6 +145,9 @@ Roughly simplest to fullest — every one runnable, with full annotated source i
 - **[examples/aiql/](examples/aiql/)** — a plain-English request → one read-only SQL `SELECT`
   over an MCP dataset → the CSV you asked for. Sandboxed SwiftUI, a downloaded local model,
   zero fabricated values (the model writes the query, the host runs it read-only).
+- **[examples/vistanova/](examples/vistanova/)** — a tiny local search engine: web search through a
+  Tavily MCP server, summaries from an MLX model **shipped pinned to an exact commit**, and
+  defenses against a small model that skips the tool call. A SwiftUI app.
 
 Plus **[examples/api-lab/](examples/api-lab/)** (scripts + a chat app for the OpenAI-compatible
 endpoint) and **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cli-swift/](examples/localai-cli-swift/)**

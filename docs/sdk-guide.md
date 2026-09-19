@@ -41,6 +41,7 @@ deeply. Ordered smallest → largest:
 | Online providers (GPT / Claude online / OpenRouter) with web search + citations | [`model-switch`](../examples/model-switch) | 283 |
 | A CLI coding agent — two models with routing, workspace + host `Process` tools, MCP | [`code-buddy`](../examples/code-buddy) | 298 |
 | An MCP dataset pulled through a mechanical SQL pipeline instead of the model copying rows | [`aiql`](../examples/aiql) | 381 |
+| An MLX model shipped pinned to an exact commit, plus checking a small model really called its tool | [`vistanova`](../examples/vistanova) | 931 (whole app) |
 
 Line counts are from
 [`annotated-examples.md`](annotated-examples.md#how-much-code-is-this-really), which also has the

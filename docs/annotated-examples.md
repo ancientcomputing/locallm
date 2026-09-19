@@ -2,7 +2,7 @@
 
 The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
-`workspace-buddy-local`, `os-matrix`, and `aiql`), `// ← SDK (Remote)` (online providers —
+`workspace-buddy-local`, `os-matrix`, `aiql`, and `vistanova`), `// ← SDK (Remote)` (online providers —
 `model-switch` and `security-demo`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
@@ -20,7 +20,7 @@ companion "show me the whole thing at once" reference.
 
 ## How much code is this, really?
 
-Every reference app in full — the whole Swift source, not a snippet. "Code" is non-blank,
+Every reference app in full — the whole Swift source, not a snippet (except `vistanova`, whose section excerpts just its SDK-facing files and whose count below is the whole app). "Code" is non-blank,
 non-comment lines; these examples are commented far more heavily than production code, so the
 "with comments" column roughly doubles it.
 
@@ -38,6 +38,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
 | [`code-buddy`](#examplescode-buddy) | 298 | 387 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
 | [`aiql`](#examplesaiql) | 381 | 468 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values |
+| [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
 
 The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most,
 and each section's **Tally** breaks that down. The rest is ordinary SwiftUI, Foundation, and
@@ -2553,3 +2554,282 @@ discovery and verification — the row data itself never passes through the mode
 it drives is the four data-verb `Tool`s plus up to four `FileBackedTool.mcp`-wrapped MCP tools
 (`ranked.prefix(4)`, marked above), eight one-line `Tool` instantiations at most, plus
 `WorkspaceAccess` to read the result back.
+
+## `examples/vistanova`
+
+*`Sources/VistaNova/AppModel.swift`, `TavilySearchTool.swift`, and `ModelStateStore` from
+`Persistence.swift` — the app's SDK-facing code, 931 lines of code in the whole app (1,294 with
+comments), of which `AppModel` is 361. The SwiftUI views, theme, settings screen
+are plain SwiftUI/Foundation and omitted; elisions are marked
+`// …`.*
+
+A search engine whose two jobs use **two different local models**, because they carry different
+risk: *search* needs a model that reliably calls a tool (Apple's on-device model by default);
+*summarize* is pure text synthesis with no tool call, so it defaults to a downloaded MLX model,
+`mlx-community/Qwen3-4B-4bit`, **shipped pinned to an exact commit** (`sdk-guide.md`
+[Pinning, updating and cleaning up model versions](sdk-guide.md#pinning-updating-and-cleaning-up-model-versions)).
+The search runs through Tavily's hosted MCP server with a static API key (`authType: .pat`), via a
+hand-written Path B `Tool`. Most of the interesting code is defensive: it never trusts a small
+model to have actually called the tool, or to have produced a usable shape. Links both
+`LocalLMLabSDKCore` and `LocalLMLabSDKInference`. Sandbox-free, ad-hoc signed (no entitlements).
+
+```swift
+// TavilySearchTool.swift — Path B: a hand-written Tool over one MCP tool, instead of Core's
+// auto-assembled MCPTool. Two things Path A can't give: max_results/search_depth pinned in
+// Swift (the model only ever chooses `query`), and the query the model actually sent.
+
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+
+/// Records the query argument each `tavily_search` call actually used, so the UI can show what was
+/// really searched rather than re-printing the user's input. (Since 1.0.0-RC.1 `session.events`'
+/// `.toolCallStarted` also carries the call's `arguments`; this app predates that and still records it here.)
+actor SearchQueryCapture {
+    private(set) var query: String?
+    func record(_ query: String) { self.query = query }
+}
+
+struct TavilySearchTool: Tool {                                       // FoundationModels' Tool protocol
+    let name = "tavily_search"
+    let description = "Search the web for a query and return ranked results with source URLs."
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The web search query")
+        let query: String
+    }
+
+    let manager: MCPServerManager                                     // ← SDK
+    let serverID: MCPServerID                                         // ← SDK
+    let capture: SearchQueryCapture
+
+    func call(arguments: Arguments) async throws -> String {
+        await capture.record(arguments.query)
+        let result = await manager.callTool(                          // ← SDK
+            server: serverID, tool: "tavily_search",
+            arguments: [
+                "query": .string(arguments.query),
+                "max_results": .number(5),                            // pinned here, not in a prompt
+                "search_depth": .string("basic"),
+            ])
+        switch result {
+        case .success(let toolResult): return toolResult.renderedForModel   // ← SDK
+        case .failure(let error): return "tavily_search failed: \(error)"
+        }
+    }
+}
+```
+
+```swift
+// Persistence.swift — the SDK's own snapshot type is Codable: routes, residency and installed
+// records round-trip through one JSON file. The app keeps no model-choice setting of its own.
+
+enum ModelStateStore {
+    static func load() -> LocalLMLabState? {                          // ← SDK
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(LocalLMLabState.self, from: data)   // ← SDK
+    }
+
+    static func save(_ state: LocalLMLabState) {                      // ← SDK
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+    // …
+}
+```
+
+```swift
+// AppModel.swift
+import FoundationModels
+import LocalLMLabSDKCore                                              // ← SDK
+import LocalLMLabSDKInference                                         // ← SDK (Inference)
+
+@Generable
+struct SearchResults {                                                // structured output, when the model can
+    @Guide(description: "Exactly 5 distinct web pages that cover the topic")
+    let pages: [WebPage]
+}
+
+@available(macOS 27, *)
+@MainActor
+@Observable
+final class AppModel {
+    let lab: LocalLMLab                                               // ← SDK
+
+    // THE PIN. Without `pinnedRevisions` a fresh download tracks the repo's `main`, so its owner can
+    // change the weights behind the same name and change what Summarize does with no app release.
+    // A shipped pin beats any captured one and, if it can't be fetched, fails the download — it never
+    // falls back to `main`. Only a commit this app names can move it: review a newer one, then change
+    // the hash and ship.
+    private let mlxProvider = MLXModelProvider(pinnedRevisions: [    // ← SDK (Inference)
+        AppModel.summaryModelRepo: AppModel.summaryModelRevision,
+    ])
+
+    static let summaryModelRepo = "mlx-community/Qwen3-4B-4bit"
+    static let summaryModelRevision = "4dcb3d101c2a062e5c1d4bb173588c54ea6c4d25"   // full commit hash, not a branch
+    static let defaultSummaryModel = ModelID(scheme: "mlx", rest: summaryModelRepo)!   // ← SDK
+
+    // Two independent model choices — two routes, not one model: search needs reliable
+    // tool-calling, summarize doesn't.
+    var searchModel: ModelID = .system                                // ← SDK
+    var summaryModel: ModelID = AppModel.defaultSummaryModel
+
+    init() {
+        // …
+        lab = LocalLMLab(configuration: .init(                        // ← SDK
+            providers: [SystemModelProvider(), mlxProvider]))         // ← SDK / ← SDK (Inference)
+        if let modelState = ModelStateStore.load() {
+            lab.restore(from: modelState)                             // ← SDK — routes + installed records back
+        }
+        searchModel = lab.models.modelID(for: "search") ?? .system    // ← SDK
+        summaryModel = lab.models.modelID(for: "summary") ?? Self.defaultSummaryModel   // ← SDK
+        // …
+    }
+
+    /// Only models actually ready to use — Apple's plus whatever MLX weights are already on disk.
+    var availableModels: [ModelID] {
+        lab.models.knownModels.filter { lab.models.availability(for: $0).isAvailable }   // ← SDK
+    }
+
+    func selectSummaryModel(_ id: ModelID) {
+        // …
+        lab.models.route("summary", to: id)                           // ← SDK
+        ModelStateStore.save(lab.snapshot())                          // ← SDK
+    }
+
+    // MARK: - Tavily (MCP)
+
+    func connectTavily(apiKey: String) async -> String? {
+        let result = await lab.mcp.addServer(                         // ← SDK
+            url: tavilyURL, displayName: "Tavily", authType: .pat, patToken: apiKey)   // static key → Keychain
+        // …persist only the server's non-secret shape; the key itself is in MCPPATStore
+    }
+
+    private func reconnectTavily(shape: PersistedTavilyServer) async {
+        lab.mcp.restore(from: [(                                      // ← SDK — no network, no key prompt
+            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName,
+            tools: [], estimatedTokens: shape.estimatedTokens, enabled: true,
+            authType: .pat, manualClientID: nil, resources: []
+        )])
+        let result = await lab.mcp.reconnect(tavilyServerID)          // ← SDK — pulls the key from the Keychain
+        // …
+    }
+
+    // MARK: - Search
+
+    // Whether an MLX model reliably calls a tool, and whether it supports @Generable structured
+    // output, both vary by model (confirmed live: Qwen3-8B, Gemma and Granite answered "who founded
+    // Yahoo" from training data instead of calling the tool). One real probe, cached per model.
+    private func searchCapability(_ id: ModelID) async -> ModelSearchCapability {
+        guard id.scheme == "mlx" else { return ModelSearchCapability(toolCalling: true, guidedGeneration: true) }
+        if let cached = capabilityCache[id] { return cached }
+        let report = await mlxProvider.capabilityProbe(id)            // ← SDK (Inference)
+        let capability = ModelSearchCapability(
+            toolCalling: report.capabilities.contains(.toolCalling),          // ← SDK
+            guidedGeneration: report.capabilities.contains(.guidedGeneration))   // ← SDK
+        capabilityCache[id] = capability
+        return capability
+    }
+
+    // A fresh, stateless session per search — refinement happens in the composer, not the model.
+    private func makeSearchSession(supportsGuidedGeneration: Bool) throws -> (LocalLMLabSession, SearchQueryCapture) {
+        lab.models.route("search", to: searchModel)                   // ← SDK
+        let capture = SearchQueryCapture()
+        let tool = TavilySearchTool(manager: lab.mcp, serverID: tavilyServerID, capture: capture)   // ← SDK — lab.mcp IS an MCPServerManager
+        let session = try makeSessionSuppressingThinking(
+            route: "search", tools: [tool], instructions: /* … */, includeMCPTools: false)
+        return (session, capture)
+    }
+
+    // `effort: .off` suppresses a Qwen3-family model's <think> block (a documented no-throw
+    // preference: a model that always reasons just keeps reasoning instead of failing the turn).
+    private func makeSessionSuppressingThinking(route: RouteName, tools: [any Tool] = [], instructions: String, includeMCPTools: Bool) throws -> LocalLMLabSession {
+        try lab.makeSession(route: route, tools: tools, instructions: instructions,   // ← SDK
+                            includeMCPTools: includeMCPTools, options: .init(effort: .off))   // ← SDK
+    }
+
+    private func attemptSearch(query: String, using session: LocalLMLabSession, supportsGuidedGeneration: Bool) async throws -> [SearchResultLink] {
+        // A plausible-looking answer proves nothing: a model can answer from its own training data
+        // and never call the tool. Watch the session's event stream for the tool actually starting.
+        var toolWasCalled = false
+        let watcher = Task {
+            for await event in session.events {                       // ← SDK
+                if case .toolCallStarted(_, let name, _) = event, name == "tavily_search" {   // ← SDK
+                    toolWasCalled = true
+                }
+            }
+        }
+        defer { watcher.cancel() }
+
+        if supportsGuidedGeneration {
+            do {
+                let response = try await session.languageModelSession.respond(   // ← SDK — a plain FoundationModels session
+                    to: query, generating: SearchResults.self)
+                guard toolWasCalled else { throw SearchParseError.toolNotCalled }
+                return response.content.pages.map { /* … */ }
+            } catch {
+                // Apple's on-device guardrail can decline a turn about a public figure AFTER the model
+                // produced a valid payload; the JSON survives in the error's own description.
+                if let recovered = await Self.recoverPages(from: error) { return recovered }
+                throw error
+            }
+        } else {
+            // No guided generation on this model: plain text, parsed leniently for (title, url).
+            let response = try await session.languageModelSession.respond(to: query)   // ← SDK
+            // …
+        }
+    }
+
+    private static func recoverPages(from error: Error) async -> [SearchResultLink]? {
+        let description = await GenerationErrorDescription.describe(error)   // ← SDK — unwraps the underlying error
+        // …strict JSON decode, then a lenient regex when the decline path drops quote characters
+    }
+
+    // MARK: - Summarize
+
+    func summarize(turnID: UUID) async {
+        // …
+        // `mlxProvider.installed` alone isn't trustworthy right after a cancelled download (a few MB
+        // of metadata is on disk and `installed` already lists the repo), so the app also keeps its
+        // own record of "the last attempt didn't finish" and always re-runs the tracked download.
+        if summaryModel.scheme == "mlx",
+           !mlxProvider.installed.contains(where: { $0.id == summaryModel })   // ← SDK (Inference)
+            || incompleteDownloadRepoIDs.contains(summaryModel.rest) {
+            guard await downloadSummaryModel() else { return }
+        }
+        // …
+    }
+
+    private func downloadSummaryModel() async -> Bool {
+        // …
+        for try await event in mlxProvider.download(repoID) {         // ← SDK (Inference) — downloads the PINNED commit
+            if case .progress(_, _, let fraction) = event {           // ← SDK
+                pendingDownload?.fraction = fraction
+            } else if case .completed = event {                       // ← SDK
+                incompleteDownloadRepoIDs.remove(repoID)
+                return true
+            }
+        }
+        // …
+    }
+
+    func cancelPendingDownload() {
+        isUserCancelledDownload = true
+        mlxProvider.cancelDownload(summaryModel.rest)                 // ← SDK (Inference) — aborts the real transfer
+    }
+}
+```
+
+**Tally**: of `AppModel`'s 361 lines of code, 34 touch the SDK directly (marked above; another 8 in
+`TavilySearchTool` and `ModelStateStore`) — the rest is search-result parsing, thread bookkeeping
+and state. **The pin is one parameter**
+(`pinnedRevisions:` on `MLXModelProvider`) **plus two constants** — everything downstream
+(`download`, `installed`, availability) then resolves the pinned commit without further code. What
+the app *doesn't* need is as instructive: no `MLXFilePinStore` (captured pins record the commit of a
+user's own first download, and this app only ever downloads the one model it pins), and no
+`managedPinStore` (updating that model means shipping a new build). Compare `mlx-control-room`,
+which shows both. The parts with no SDK line but the most hard-won behavior are the defensive
+ones: the `session.events` watcher that rejects a turn where the tool was never called, the
+capability probe that decides between `@Generable` output and a text parser, and the guardrail-
+decline recovery. Path B (`TavilySearchTool`) costs 33 lines against `MCPTool`'s zero, and buys a
+pinned `max_results` and the captured query.
