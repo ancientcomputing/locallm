@@ -15,7 +15,8 @@ which OS it's actually on.
 ## Requirements
 
 - **Apple Silicon**, macOS **26 or 27**.
-- **Xcode 27 to build** — `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- **Xcode 27 to build** — select it with `xcode-select`, or per command with
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (adjust the path if yours lives elsewhere).
   The binary *runs* on macOS 26, but it's compiled with the macOS 27 SDK (the macOS-27-only
   symbols are weak-linked). An older Xcode fails with `'v27' is unavailable`.
 - **Apple Intelligence enabled** (System Settings → *Apple Intelligence & Siri*). Without it,

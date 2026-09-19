@@ -38,7 +38,7 @@ every new terminal).
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
-`Package.swift` builds against SDK `1.0.0-RC.1` with no further setup — it links **two** binaries,
+Skip it if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere); it lasts only for the current terminal. `Package.swift` builds against SDK `1.0.0-RC.1` with no further setup — it links **two** binaries,
 `LocalLMLabSDKCore.xcframework` and `LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one
 GitHub Release. `export LOCALLM_SDK_VERSION=<version>` pins a different published release. **No Metal
 Toolchain needed** — the prebuilt Inference xcframework bundles the compiled `default.metallib`.

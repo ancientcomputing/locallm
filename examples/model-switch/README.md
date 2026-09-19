@@ -118,7 +118,7 @@ To sign it for wider use, set `APP_IDENTITY` — see the
 | `NOTARIZE_APP` | No | `1` | `0` skips Apple notarization for fast local sign-and-test. The output isn't Gatekeeper-approved without it (`spctl` rejects it) — fine for direct-launch testing, not distribution. |
 | `KEYCHAIN_PROFILE` | Only if `NOTARIZE_APP=1` | — | Created once via `xcrun notarytool store-credentials <profile-name>`. `NOTARY_PROFILE` also works. |
 | `TEAM_ID` | No | — | Passed to `notarytool submit` if set. |
-| `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at Xcode 27; not auto-detected. |
+| `DEVELOPER_DIR` | If your selected Xcode isn't 27 | `xcode-select -p` | Must resolve to Xcode 27; adjust the example path to your install. |
 
 Same script shape and env-var names as [`plate-today`](../plate-today/) and
 [`components-demo`](../components-demo/) — see `plate-today`'s script for the full codesign /

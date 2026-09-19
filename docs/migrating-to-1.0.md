@@ -17,7 +17,7 @@ enum-resilience change, one MCP return-type change, and — if you wrote a custo
   platforms: [.macOS("26.0")],
 ```
 
-No platform bump — `1.0.0-beta.2` keeps the `0.8.x` floor. You still need the **Xcode 27 beta**
+No platform bump — `1.0.0-beta.2` keeps the `0.8.x` floor. You still need **Xcode 27**
 to build: the xcframeworks are compiled with the macOS 27 SDK (27-only symbols weak-linked), and
 an older Xcode fails with `'v27' is unavailable`. Register the macOS-27-only providers behind
 `if #available(macOS 27, *)` — see [`sdk-guide.md` §1a](sdk-guide.md).
@@ -164,8 +164,7 @@ needs no code changes beyond the `callTool` return type above.
 
 ## Beta caveats
 
-- The built app runs on **macOS 26 or 27**; building the SDK against `1.0` needs the **Xcode 27
-  beta** until it GAs.
+- The built app runs on **macOS 26 or 27**; building the SDK against `1.0` needs **Xcode 27**.
 - `1.0.0-beta.N` makes **no API-stability guarantee** — signatures can move between betas. **From
   `1.0.0` GA onward**, 1.x releases are source compatible: code that builds against one 1.x
   version keeps building unmodified against later 1.x minors. New capability lands as additive

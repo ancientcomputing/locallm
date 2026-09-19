@@ -101,8 +101,8 @@ Copy-paste each step. Step 1 is one-time machine setup; step 2 sets up your term
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
-Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
-or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-beta.4` with no further
+Skip it if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere). Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-RC.1` with no further
 setup — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
 `LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
 `export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain

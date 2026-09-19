@@ -30,4 +30,4 @@ Use this checklist for native `.app` work involving LocalLM Lab SDK permissions,
 - The final outer `.app` bundle signing pass must include the required entitlements. Signing only the inner executable is not enough.
 - Use the example packaging scripts as the baseline for Developer ID, Apple Development, ad-hoc local builds, and Mac App Store variants.
 - Xcode project runs for permission-gated examples generally need a signing identity; a free Apple Development identity is enough for local testing.
-- Use Xcode 27 beta / the expected `DEVELOPER_DIR` while the SDK depends on beta macOS SDK symbols.
+- Use Xcode 27 (via `xcode-select` or the expected `DEVELOPER_DIR`) — the SDK is built against macOS 27 SDK symbols.
