@@ -11,24 +11,29 @@ macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
 [`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
 
-**Compatibility policy from `1.0.0` GA onward:** 1.x releases are **source compatible** — code
-that builds against one 1.x version keeps building unmodified against any later 1.x minor version.
+**Compatibility policy from `1.0.0-RC.1` onward:** every release after RC.1 — later release candidates,
+`1.0.0` GA, and all 1.x minors — is **source compatible**: code that builds against RC.1 keeps building
+unmodified against any of them.
 New capability lands as additive surface only: new optional parameters with defaults, new protocol
 methods shipped with a default implementation, new cases on the non-frozen enums noted below (build
 with `@unknown default`, not an exhaustive `switch`). A change that would require editing working
 code just to keep building is a major-version bump, not a minor one. This is a promise about
 source, not about binary compatibility — you pin an exact version and rebuild against it; nothing
 guarantees an already-built app keeps working if a newer xcframework is dropped in without
-recompiling. (Through `1.0.0-beta.N`/`-rc.N`, none of this applies yet — see each entry's own "Beta
-caveats" below.)
+recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and earlier, none of this applies; the
+beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
+RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
 ## 1.0.0-RC.1 — 2026-09-15 (binaries re-published 2026-09-18 and 2026-09-19)
 
 Everything below is in `LocalLMLabSDKInference` unless noted (the 2026-09-19 re-publish also adds the
-`LocalLMLabSDKCore` items under *Added — sampling options on Apple's on-device model*); all of it is additive. The narrative is
+`LocalLMLabSDKCore` items under *Added — sampling options on Apple's on-device model*); apart from
+*Changed — breaking (pre-GA)*, all of it is additive. **RC.1 is the source-compatibility baseline:** from
+here to GA, changes are additive or fixes only. The narrative is
 [`docs/sdk-guide.md` §6a](docs/sdk-guide.md#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference)
 and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
-`docs/api-surface.md` is regenerated for this release; the diff against beta.4 has no breaking lines.
+`docs/api-surface.md` is regenerated for this release; the lines in its diff against beta.4 that can
+break a build are the ones under *Changed — breaking (pre-GA)*.
 
 ### Added — supply-chain hardening for models downloaded at runtime
 
@@ -69,6 +74,36 @@ and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning
   shared bytes). The SDK never prunes on its own.
 - **`Components`:** `ModelOnboardingView` and `ModelUpdateView` / `ModelVersionsView` (provider-agnostic,
   closure-driven), with `examples/components-updates-demo`.
+
+### Changed — breaking (pre-GA)
+
+These can stop existing code compiling. They landed before the compatibility baseline above, so they do not
+count against it. Most apps are unaffected; each item says who is.
+
+- **`SessionEvent.toolCallStarted` and `.toolCallFinished` carry more.** They are now
+  `toolCallStarted(id:name:arguments:)` and `toolCallFinished(id:name:failed:resultSummary:)`: the call's real
+  arguments, and a short result summary. A `switch` that matches them with the old element count needs a
+  placeholder, `case .toolCallStarted(_, let name, _):`. A `default:` or a bare `case .toolCallFinished:` is
+  unaffected. *Affects:* code that reads `session.events`.
+- **`InstalledModel.init` requires `resolvedRevision`**, the commit a download actually resolved to.
+  *Affects:* custom `DownloadableModelProvider`s and tests that construct one by hand.
+- **`DownloadableModelProvider` gains a required `cancelDownload(_:)`**. *Affects:* custom conformers only;
+  `MLXModelProvider` and `ModelRegistry` already have it.
+- **`RemoteModelProvider.init(_:)` now `throws`** (it validates the config). Add `try`, or use the new
+  `RemoteModelProvider(unchecked:)` to skip validation. *Affects:* callers of `RemoteModelProvider(config)`.
+- **New cases on non-frozen enums:** `PreflightResult.Stage` (`.trustPolicy`, `.cacheQuota`) and
+  `RemoteError.responseTooLarge`. Source-compatible if you write `@unknown default`; an exhaustive `switch`
+  needs the new cases.
+
+### Added — tool calls, reasoning, downloads
+
+- **`effort: .off` is best-effort**: it no longer throws for a model that always reasons (DeepSeek-R1), and
+  `ModelCapabilities.reasoningToggle` lets a host check ahead of time whether suppression will take effect.
+- **Downloads can be cancelled**: `cancelDownload(_:)` on `MLXModelProvider` and `ModelRegistry`. This also fixes
+  a cancelled download's `URLSession` task carrying on in the background. `Components`' download UI now shows
+  byte-formatted progress and a Cancel button.
+- **`LocalLMLabSDKRemote` hardened**: `RemoteProviderConfig.responseLimits` (`RemoteResponseLimits`, defaulted)
+  bounds response sizes, and provider construction validates its configuration (the `throws` above).
 
 ### Changed
 

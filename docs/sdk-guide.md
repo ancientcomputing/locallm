@@ -2004,15 +2004,15 @@ pass — the pipeline is mechanical enough that the reasoning trace only adds la
 - **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need
   an `@unknown default` — new cases can land in a minor version. (Same for `ResidencyEvent` /
   `SessionEvent` / `DownloadEvent` / `MCPConnectionStatus` / `MCPServerError`.)
-- **No public API stability guarantee through the beta/RC series.** `1.0.0-beta.N`/`-rc.N` make
-  none — access levels have been fixed reactively as real usage surfaced gaps; if you hit "X is
-  inaccessible due to internal protection level" on something that looks like it should be public,
-  it probably should. File it. **From `1.0.0` GA onward this changes**: 1.x releases commit to
-  source compatibility — existing code keeps compiling unmodified against a later 1.x minor
-  version. New capability shows up as additive surface (new optional/defaulted parameters, new
+- **No public API stability guarantee before RC.1.** `1.0.0-beta.N` made none — access levels
+  were fixed reactively as real usage surfaced gaps, and a few signatures changed between beta.4
+  and RC.1 (see the CHANGELOG). If you hit "X is inaccessible due to internal protection level" on
+  something that looks like it should be public, it probably should. File it. **From `1.0.0-RC.1`
+  onward this changes**: later release candidates, `1.0.0` GA and every 1.x release commit to
+  source compatibility — existing code keeps compiling unmodified against a later one.
+  New capability shows up as additive surface (new optional/defaulted parameters, new
   protocol methods with a default implementation, new enum cases per the `@unknown default` point
-  above); anything that would force you to edit working code just to keep building is a
-  major-version bump, not a minor one. This covers source compatibility, not binary — you rebuild
+  above); anything that would force you to edit working code just to keep building waits for 2.0. This covers source compatibility, not binary — you rebuild
   against whatever version you pin, there's no supported "drop in a newer xcframework without
   recompiling" path.
 - **No logging of prompts, responses, or tool calls.** The MCP client has `MCPDiagnostics`
@@ -2171,7 +2171,9 @@ App Store.
 >
 > **Examples that use it:** [`components-demo`](../examples/components-demo/) — essentially
 > the whole app is the MCP views; [`model-switch`](../examples/model-switch/) — the online-provider
-> panel (`AIModelsSettingsView`).
+> panel (`AIModelsSettingsView`); [`components-updates-demo`](../examples/components-updates-demo/) —
+> the model onboarding, update and cleanup views, driven from simulated data (and
+> [`mlx-control-room`](../examples/mlx-control-room/) runs the same flows against a real `MLXModelProvider`).
 
 See [`annotated-examples.md`](annotated-examples.md) for both apps' full source with every
 `Components`/`Core` touchpoint marked.
@@ -2233,6 +2235,19 @@ polling):
 - **`ClaudeAuthField`** — a ready-made secure field for the Anthropic API key that
   `ClaudeModelProvider(auth: .apiKey(_:))` needs for prototyping (a shipped app uses App Attest).
   The value is handed to the host via the binding; `Components` never persists it.
+- **`ModelOnboardingView`** + `ModelOnboardingModel` — a *Validate → Download → Pin* stepper, one block
+  per repo. A failed preflight names its stage and reason and nothing after it runs; the download shows
+  progress and can be cancelled; the Pin step shows the resolved commit (and can check it against the
+  commit you ship, `ModelOnboardingRequest.expectedRevision`). Needs only Core: `ModelOnboardingSource`
+  adapts `lab.models` (`init(registry:)`) or an `MLXModelProvider` (`init(provider:)`). See
+  [Pinning, updating and cleaning up model versions](#pinning-updating-and-cleaning-up-model-versions).
+- **`ModelUpdateView`** + `ModelUpdateModel` — check → what changes → update → roll back, with a
+  *switching* state and a `pauseInference` hook the host awaits after the download and before the pin
+  moves. **`ModelVersionsView`** + `ModelVersionsModel` — the versions on disk, what removing each would
+  actually free, and a guarded **Remove**. Both are **provider-agnostic**: `MLXModelProvider`'s update and
+  cleanup APIs live in Inference (macOS 27), which Components doesn't link, so the views take plain value
+  types (`ModelUpdateOffer`, `ModelVersionRow`) and closures (`ModelUpdateActions`, `list` / `remove`) that
+  you adapt from your provider — about forty lines; `Components/README.md` has the adapter.
 
 `ModelPickerView` (local models + MLX download) and `AIModelsSettingsView` (online providers) are
 currently **separate surfaces** — a full "AI Models" panel composes both. Unifying them is on the
@@ -2579,7 +2594,7 @@ struct InstalledModel: Sendable, Hashable, Codable, Identifiable {
          sizeBytes: Int64? = nil, contextTokens: Int? = nil)
 }
 struct PreflightResult: Sendable, Equatable {
-    enum Stage: String, Sendable, Codable { /* repoReachable / mlxFormat / architecture / size / diskSpace / trustPolicy / cacheQuota */ }
+    enum Stage: String, Sendable, Codable { /* trustPolicy / repoReachable / mlxFormat / architectureSupported / sizeVsMemory / diskSpace / cacheQuota */ }
     var failedStage: Stage?       // nil = passed
     var detail: String?
     var weightBytes: Int64?
@@ -3452,6 +3467,41 @@ struct ClaudeAuthField: View {
     init(apiKey: Binding<String>, onCommit: @escaping () -> Void = {})
     // A ready-made secure field for the Claude API key that ClaudeModelProvider(auth: .apiKey(_:)) needs.
 }
+
+// Model onboarding, updates and cleanup (1.0.0-RC.1) — Components/README.md has the adapter for MLXModelProvider.
+struct ModelOnboardingRequest: Sendable, Equatable, Identifiable {
+    init(role: String = "Model", repoID: String, expectedRevision: String? = nil, validates: Bool = true)
+}
+struct ModelOnboardingSource: Sendable {
+    init(provider: any DownloadableModelProvider)     // or init(registry: ModelRegistry)
+}
+@MainActor @Observable final class ModelOnboardingModel {
+    init(requests: [ModelOnboardingRequest], source: ModelOnboardingSource)
+    func start(); func cancel(); func reset()
+    var items: [ModelOnboardingItem] { get }; var isFinished: Bool { get }; var hasFailed: Bool { get }
+}
+struct ModelOnboardingView: View {
+    init(model: ModelOnboardingModel, showsDownloadProgress: Bool = true,
+         onFinished: (([InstalledModel]) -> Void)? = nil, onDismiss: (() -> Void)? = nil)
+}
+struct ModelUpdateActions: Sendable {
+    init(check: @escaping @Sendable () async throws -> ModelUpdateOffer,
+         apply: @escaping @Sendable (_ revision: String, _ progress: @escaping @Sendable (Double) -> Void,
+                                     _ beforeSwitch: @escaping @Sendable () async throws -> Void) async throws -> Void)
+    // apply has exactly the shape of MLXModelProvider.updatePin(_:to:beforeSwitch:)
+}
+@MainActor @Observable final class ModelUpdateModel {
+    init(actions: ModelUpdateActions, ownership: ModelUpdateOwnership, currentRevision: String? = nil,
+         pauseInference: (@Sendable () async throws -> Void)? = nil)
+    func checkForUpdate() async; func update() async; func rollBack() async; func revertToShippedVersion() async
+}
+struct ModelUpdateView: View { init(model: ModelUpdateModel) }
+@MainActor @Observable final class ModelVersionsModel {
+    init(list: @escaping @Sendable () async -> [ModelVersionRow],
+         remove: @escaping @Sendable (ModelVersionRow) async throws -> Int64)   // returns bytes freed; must refuse the current version
+    func refresh() async; func remove(_ row: ModelVersionRow) async
+}
+struct ModelVersionsView: View { init(model: ModelVersionsModel) }
 
 // Online providers (1.0.0-beta.3) — the "AI Models" settings panel. Host owns [RemoteProviderDraft]
 // (keys → Keychain) and maps a draft → RemoteProviderConfig in the closures. Components does not
