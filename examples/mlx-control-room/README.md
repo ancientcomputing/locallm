@@ -214,7 +214,7 @@ Pairing attaches a second, small model to the main one. It is set on the model p
 switch takes effect on the next run with no restart. Two kinds (the [two curated pairs](#model-pairing) are described below):
 
 - **Speed helper** — a much smaller sibling model proposes a couple of tokens ahead and the big model checks them in
-  one cheap pass instead of generating them one at a time. The output is unchanged; it can arrive faster.
+  one cheap pass instead of generating them one at a time. The text is usually the same; it can arrive faster.
 - **Specialization adapter** — a small file of adjustments (a "LoRA") applied to the base model to change its style
   or skill — here, to write haiku-style verse — without downloading a whole second model.
 
@@ -239,10 +239,10 @@ same Validate → Download → Pin flow. A pair is curated, not free text, becau
 same-family sibling of its base, and an adapter must match the architecture it was trained against.
 
 - **Speed pair** — `Qwen3-4B-4bit` with `Qwen3-0.6B-4bit` as a *speed helper*: the small model proposes a
-  couple of words ahead and the large one checks them in one cheap pass. The output is the same; it arrives
+  couple of words ahead and the large one checks them in one cheap pass. The text is usually the same; it can arrive
   sooner. *What to expect*: run a prompt with the helper off, then on, then on again — the first run with it
   on loads the helper, so it's slower; the second shows the steady state. Measured (release build, warmed up,
-  greedy): about **30–40% faster**, and the output is byte-identical. It drafts **2** words ahead. Using a larger number may end up being *slower*, because a small draft model only agrees with the big one for a
+  greedy): about **30–40% faster** on the machine it was measured on, with byte-identical output on a short prompt. (On an Apple M3 with 24 GB a longer answer gave about **17–25% faster**, and the text matched only for its first ~180 characters — near-ties can flip, so don't count on byte-identical output. Judge speed on a **release** build: a debug build can show no gain.) It drafts **2** words ahead. Using a larger number may end up being *slower*, because a small draft model only agrees with the big one for a
   token or two at a time.
 - **Adapter pair** — `Qwen3-0.6B-bf16` with a small LoRA adapter that makes it write haiku-style verse.
   *What to expect*: run a prompt with the adapter off (a factual overview), then on (a short verse).

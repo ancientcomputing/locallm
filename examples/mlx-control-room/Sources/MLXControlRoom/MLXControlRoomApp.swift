@@ -661,12 +661,10 @@ final class ControlRoomModel: ObservableObject {
     }
 
     /// A fresh provider every call, seeded from the persisted pin store exactly as it would be
-    /// after an app relaunch. A speed pair keeps base and draft resident together.
+    /// after an app relaunch. A speed pair's base and draft are one resident unit in the SDK, so the
+    /// default `residentModelLimit` is enough — this used to pass 2 for a speed pair as a workaround.
     private func makeProvider(for launch: Launch) -> MLXModelProvider {
-        var residentLimit = 1
-        if case .pairing(let preset) = launch, case .speedHelper = preset.kind { residentLimit = 2 }
         return MLXModelProvider(
-            residentModelLimit: residentLimit,
             pinnedRevisions: shippedPins(for: launch),
             supplyChainPolicy: MLXSupplyChainPolicy(
                 verification: verificationEnabled ? .enabled : .disabled,
