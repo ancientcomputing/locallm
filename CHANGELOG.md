@@ -92,10 +92,10 @@ and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip       fced6cfa03f5528fa39b0aa07a99391bda4ae17a09473ac29df6ede594f57639
-LocalLMLabSDKClaude-1.0.0-RC.1.xcframework.zip     a72ddcffc5865b7250669364ae185c57fd7e324978a1eb47868f2ba40aa17e49
-LocalLMLabSDKInference-1.0.0-RC.1.xcframework.zip  9adf820edbb3060b1cf6b87c76a3fb26566b0ad1dc5e829ebcbb775f2e1bb900
-LocalLMLabSDKRemote-1.0.0-RC.1.xcframework.zip     1d1ab0d2b78cdde08ca797d64b728bcb880a182bd7ed24e8384bd3028c4c2e97
+LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip       397e7b5f7efd1076293a3d5d06c41d75043bffa23cffdb821d71d21ee41e68de
+LocalLMLabSDKClaude-1.0.0-RC.1.xcframework.zip     9678077c47f257ed8165e653d0e322501e7d79459e1bf76ca1bfcf1850f6f55e
+LocalLMLabSDKInference-1.0.0-RC.1.xcframework.zip  e24cb0581807d37a7b595f0b198b9a9eeecc1c5c36fb59f61429b8a7b42dc169
+LocalLMLabSDKRemote-1.0.0-RC.1.xcframework.zip     3e763c2fb542f7cc8493cf8e4ba2effcc98adae9c7d9991b60e6a92be8ee88c6
 ```
 
 ## 1.0.0-beta.4 — 2026-09-10

@@ -55,7 +55,7 @@ advanced model-layer features (Private Cloud Compute, open-weight/MLX, Claude, o
 need it — but it isn't universal: [`os-matrix/`](os-matrix/) is built and tested to run unchanged
 on **macOS 26** too (see its README).
 
-The examples on this `1.0.0-beta` branch build against SDK **`1.0.0-beta.4`**; the ones on `main`
+The examples on this `1.0.0-RC.1` branch build against SDK **`1.0.0-RC.1`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
 
 ### What each example needs
@@ -151,7 +151,7 @@ resolution doesn't inherit shell environment variables.
 
 ```bash
 cd examples/repo-qa
-LOCALLM_SDK_VERSION=1.0.0-beta.2 \
+LOCALLM_SDK_VERSION=1.0.0-RC.1 \
   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift run RepoQA facebook/react
 ```
@@ -164,13 +164,13 @@ previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these �
 dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
 
 ```swift
-let defaultSDKVersion = "1.0.0-beta.4"
+let defaultSDKVersion = "1.0.0-RC.1"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-beta.3": SDKRelease(url: "…/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
-                               checksum: "a49b8b…"),
     "1.0.0-beta.4": SDKRelease(url: "…/v1.0.0-beta.4/LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip",
-                               checksum: "60439d6b…"),
+                               checksum: "3ed0e79b…"),
+    "1.0.0-RC.1": SDKRelease(url: "…/v1.0.0-RC.1/LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip",
+                             checksum: "397e7b5f…"),
 ]
 ```
 

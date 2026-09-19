@@ -137,7 +137,7 @@ already built). Same split as LocalLM Lab's `SecurityPolicy`.
 
 Requires **macOS 27** on Apple Silicon and **Xcode 27** — `RemoteModelProvider` is
 `@available(macOS 27)`. It resolves the SDK as a **binary** dependency from this repo's
-`1.0.0-beta.4` GitHub Release; nothing to download by hand.
+`1.0.0-RC.1` GitHub Release; nothing to download by hand.
 
 You need an **Anthropic or OpenAI API key**. Two ways to provide one:
 

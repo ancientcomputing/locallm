@@ -126,7 +126,7 @@ MCP views in a full app, and [`examples/model-switch/`](../examples/model-switch
 ## Building
 
 This is a library, not an app — there's nothing to sign or package, just `swift build`/`swift
-test`. `Package.swift` builds against SDK `1.0.0-beta.3` by default, same as the example apps:
+test`. `Package.swift` builds against SDK `1.0.0-RC.1` by default, same as the example apps:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build

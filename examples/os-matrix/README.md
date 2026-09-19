@@ -26,7 +26,7 @@ which OS it's actually on.
 
 ## Run
 
-`Package.swift` resolves the SDK as a binary dependency, building against `1.0.0-beta.4` by
+`Package.swift` resolves the SDK as a binary dependency, building against `1.0.0-RC.1` by
 default (set `LOCALLM_SDK_VERSION` in a shell to pin another release — see
 [`../README.md`](../README.md#building--running-an-sdk-example)):
 
