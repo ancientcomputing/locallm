@@ -32,7 +32,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`components-demo`](#examplescomponents-demo) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-tools) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
 | [`workspace-buddy`](#examplesworkspace-buddy) | 172 | 226 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
-| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 255 | 331 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 255 | 332 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-today) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
 | [`model-switch`](#examplesmodel-switch) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
@@ -1359,7 +1359,7 @@ struct GitTool: Tool {
     }
     let name = "git"
     var description: String {
-        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands are refused — make edits with applyPatch instead."
+        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands are refused — make edits with editWorkspaceFile instead."
     }
     func call(arguments: Arguments) async throws -> String {
         try Task.checkCancellation()   // a tool call queued after a Ctrl-C never launches
@@ -1572,7 +1572,7 @@ three more: the `shippedPins` dictionary and `pinStore:` argument on `MLXModelPr
 
 ## `examples/workspace-buddy-local`
 
-*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 255 lines of code (331 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 255 lines of code (332 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddy) above —

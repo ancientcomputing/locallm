@@ -126,7 +126,8 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
     }
 
     // "Reading a file…" reads better mid-run than the raw tool name "readWorkspaceFile".
-    // (`SessionEvent` carries the tool name, not its arguments, so we can't name the file.)
+    // (`.toolCallStarted` also carries the call's arguments, as a raw string; a label keyed on the
+    // tool name is all this line needs.)
     private static func activityLabel(for toolName: String) -> String {
         switch toolName {
         case "listWorkspaceFiles": return "Listing the folder…"

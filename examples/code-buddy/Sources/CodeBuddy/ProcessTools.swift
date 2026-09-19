@@ -69,7 +69,7 @@ struct GitTool: Tool {
 
     let name = "git"
     var description: String {
-        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands (commit, push, reset, checkout, clean, rebase) are refused — make edits with applyPatch instead."
+        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands (commit, push, reset, checkout, clean, rebase) are refused — make edits with editWorkspaceFile instead."
     }
 
     func call(arguments: Arguments) async throws -> String {
