@@ -28,16 +28,16 @@ non-comment lines; these examples are commented far more heavily than production
 |---|--:|--:|---|
 | [`repo-qa`](#examplesrepo-qa) | 66 | 115 | Apple's on-device model calling a real MCP server's tools, built from its live schema — no `Arguments` structs |
 | [`os-matrix`](#examplesos-matrix) | 74 | 97 | one binary that runs on macOS 26 **and** 27, model families gated by OS at registration |
-| [`repo-qa-local`](#examplesrepo-qa-local) | 92 | 126 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model (the model layer) |
+| [`repo-qa-local`](#examplesrepo-qa-local) | 96 | 134 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
 | [`components-demo`](#examplescomponents-demo) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-tools) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
 | [`workspace-buddy`](#examplesworkspace-buddy) | 172 | 226 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
-| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 252 | 323 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 255 | 331 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-today) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
 | [`model-switch`](#examplesmodel-switch) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
-| [`code-buddy`](#examplescode-buddy) | 298 | 387 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
-| [`aiql`](#examplesaiql) | 381 | 468 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values |
+| [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
+| [`aiql`](#examplesaiql) | 395 | 494 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
 
 The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most,
@@ -193,7 +193,7 @@ struct TodoistTasksTool: Tool {
                 arguments: ["startDate": .string("today"), "overdueOption": .string("exclude-overdue")]  // ← SDK (MCPValue)
             )
             switch result {
-            case .success(let text): return text
+            case .success(let toolResult): return toolResult.renderedForModel   // ← SDK (MCPToolResult, since beta.4)
             case .failure(let error): return "Todoist tool call failed: \(error)"
             }
         }
@@ -1027,7 +1027,7 @@ of whether it uses `Components` or not.
 
 ## `examples/code-buddy`
 
-*298 lines of code across the app's two files, `main.swift` + `ProcessTools.swift` (below).*
+*315 lines of code across the app's two files, `main.swift` + `ProcessTools.swift` (below).*
 
 The fullest **model-layer** example (see also
 [`repo-qa-local`](#examplesrepo-qa-local) for the minimal one, and
@@ -1036,14 +1036,15 @@ for the sandboxed one, both annotated below), and one of several linking a secon
 (the MLX runtime). Lines that touch it are marked `// ← SDK (Inference)`; `// ← SDK` is Core as
 elsewhere. A CLI coding agent: point it at a repo, give it a task (one-shot) or omit the task to
 get a `>>` loop over one persistent session, and it downloads an open-weight MLX model on first
-run, then drives Core's Workspace tools + host `Process` tools + (auto) MCP tools through a routed
+run (pinned to the exact commit the example was tried against, so a fresh download never silently
+picks up whatever `main` has become), then drives Core's Workspace tools + host `Process` tools + (auto) MCP tools through a routed
 `LocalLMLabSession`. Ctrl-C cancels the running turn — reaching the `Process` tools so a child
 `swift test` is terminated, not orphaned — and quits from an idle prompt. See
 [`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) for the prose.
 
 ### `Sources/CodeBuddy/main.swift`
 
-*203 lines of code (264 with comments).*
+*220 lines of code (290 with comments).*
 
 ```swift
 import Foundation
@@ -1055,6 +1056,16 @@ import LocalLMLabSDKInference                                         // ← SDK
 //   code-buddy [--route heavy|light] [--heavy <repo>] [--light <repo>]
 //              [--test-cmd "<cmd>"] [--no-mcp] [--no-verbose] <workspace-dir> [task...]
 // With a task: run it and stop. Without: a >> loop over one session until `quit` / Ctrl-D.
+
+// The default models are pinned to the exact commits this example was tried against, so a fresh
+// download never silently picks up whatever the repo's `main` has become. A model chosen with
+// --heavy / --light isn't listed here; it is pinned to the version you first download instead
+// (trust on first use), so re-downloading it later gets the same bytes. To change a default:
+// review the new version, then update the repo and its commit together.
+let shippedPins: [String: String] = [
+    "mlx-community/Qwen3-8B-4bit": "545dc4251c05440727734bcd94334791f6ab0192",
+    "mlx-community/Qwen2.5-3B-Instruct-4bit": "4f83f8f146fdf28b512a06562b671d7af4fab457",
+]
 
 struct Options {
     var route: RouteName = .heavy                                     // ← SDK
@@ -1118,9 +1129,9 @@ func run() async {
     }
 
     // The whole model layer, wired in four lines: an MLX provider capped at one resident model
-    // (the memory story for a constrained Mac), a LocalLMLab bundling it with Apple's on-device
-    // provider as fallback, and two named routes.
-    let mlx = MLXModelProvider(residentModelLimit: 1)                 // ← SDK (Inference)
+    // (the memory story for a constrained Mac) and pinned to the reviewed commits above, a
+    // LocalLMLab bundling it with Apple's on-device provider as fallback, and two named routes.
+    let mlx = MLXModelProvider(residentModelLimit: 1, pinnedRevisions: shippedPins, pinStore: MLXFilePinStore())   // ← SDK (Inference)
     let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
     lab.models.route(.heavy, to: ModelID(scheme: "mlx", rest: opts.heavy)!)   // ← SDK
     lab.models.route(.light, to: ModelID(scheme: "mlx", rest: opts.light)!)   // ← SDK
@@ -1147,14 +1158,16 @@ func run() async {
             note("download failed: \(error)"); exit(1)
         }
     }
+    if let pin = mlx.effectivePin(for: modelID.rest) {               // ← SDK (Inference)
+        note("pinned to \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this example" : "first download"))")
+    }
 
     // Tools: Core's ready-made Workspace tools (Path A) …
-    var tools: [any Tool] = [
+    let tools: [any Tool] = [
         WorkspaceTreeTool(root: root),                               // ← SDK
         SearchWorkspaceTool(root: root),                             // ← SDK
         ReadWorkspaceFileTool(root: root),                           // ← SDK
         ReadFileRangeTool(root: root),                               // ← SDK
-        ApplyPatchTool(root: root),                                  // ← SDK
         EditWorkspaceFileTool(root: root),                           // ← SDK
         WriteWorkspaceFileTool(root: root),                          // ← SDK
         ListWorkspaceFilesTool(root: root),                          // ← SDK
@@ -1178,8 +1191,14 @@ func run() async {
 
     let instructions = """
         You are a coding agent working in the user's repository. Use the tools to explore and \
-        change the code … Make the smallest change that solves the task. After editing, run the \
-        tests. Explain what you changed and why.
+        change the code — workspaceTree / searchWorkspace / readWorkspaceFile / readFileRange to \
+        understand it, editWorkspaceFile for changes, git for read-only history, run_tests to \
+        check your work, and the DeepWiki tools … Make the smallest change that solves the task.
+
+        Never describe an edit or a test run instead of doing it … the turn is only done once you \
+        have actually called editWorkspaceFile and then run_tests … (full prompt in the source —
+        the rules about announcing a plan, indentation, and editWorkspaceFile vs. overwrite exist
+        because a small model got each of them wrong in real runs)
         """
 
     // One call: a session on the chosen route, with these tools AND the enabled MCP tools merged.
@@ -1194,8 +1213,8 @@ func run() async {
     let events = Task { @MainActor in
         for await event in session.events {                          // ← SDK
             switch event {
-            case .toolCallStarted(_, let name): if opts.verbose { note("  → \(name)") }
-            case .toolCallFinished(_, let name, let failed): if opts.verbose { note("  \(failed ? "✗" : "✓") \(name)") }
+            case .toolCallStarted(_, let name, _): if opts.verbose { note("  → \(name)") }
+            case .toolCallFinished(_, let name, let failed, _): if opts.verbose { note("  \(failed ? "✗" : "✓") \(name)") }
             case .contextCompacted(let n): note("  (compacted \(n) transcript entries)")
             @unknown default: break                                  // non-frozen — see sdk-guide §9
             }
@@ -1265,11 +1284,11 @@ func run() async {
 await run()
 ```
 
-**Tally**: of the file's 203 non-comment/non-blank lines, 31 touch the SDK directly (marked
+**Tally**: of the file's 220 non-comment/non-blank lines, 31 touch the SDK directly (marked
 above) — and that 31 is the *entire* model layer: pick providers, name routes, preflight/download,
-make a session, stream it, watch `.events`, plus the eight ready-made Workspace `Tool`s and the
-MCP add-server/tool-disable calls. Everything MLX-specific is four lines (`MLXModelProvider`,
-`validate`, `download`, and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude`
+make a session, stream it, watch `.events`, plus the seven ready-made Workspace `Tool`s and the
+MCP add-server/tool-disable calls. Everything MLX-specific is a handful of lines (`MLXModelProvider` with its `pinnedRevisions:` /
+`pinStore:` pin, `validate`, `download`, `effectivePin(for:)`, and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude`
 instead (a macOS-27 target — see `sdk-guide.md` §1a) and the rest of the file is unchanged.
 `RouteName` is the only new type the caller names by hand. The REPL loop and Ctrl-C handling add
 no SDK surface — one persistent `LocalLMLabSession` spans every turn, and `session.cancel()` /
@@ -1394,11 +1413,14 @@ make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it
 
 ## `examples/repo-qa-local`
 
-*`Sources/RepoQALocal/main.swift` — 92 lines of code (126 with comments) — ~20 more than `repo-qa`, all of it the model layer.*
+*`Sources/RepoQALocal/main.swift` — 96 lines of code (134 with comments) — ~30 more than `repo-qa`, all of it the model layer.*
 
 The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qa) above,
-with the ~20 lines that swap Apple's on-device model for an open-weight MLX model you download and
-run locally. The Deepwiki / `MCPTool` half is a verbatim copy of `repo-qa`'s — diff the two to see
+with the ~30 lines that swap Apple's on-device model for an open-weight MLX model you download and
+run locally — including the **pin**: the default model is tied to the exact Hugging Face commit the example
+was tried against (`pinnedRevisions`), and a model you pick with `--model` is pinned on first download
+(`MLXFilePinStore`, trust on first use), so a later fresh download never silently fetches whatever `main`
+has become. The Deepwiki / `MCPTool` half is a verbatim copy of `repo-qa`'s — diff the two to see
 exactly what adopting the model layer costs. One of several examples linking
 `LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as elsewhere.
 
@@ -1409,8 +1431,12 @@ exactly what adopting the model layer costs. One of several examples linking
 // layer and swap `LanguageModelSession(tools:)` for `lab.makeSession(route:tools:)`.
 //
 //   swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
+//   swift run RepoQALocal facebook/react                        # default question
 //   swift run RepoQALocal --model mlx-community/Qwen2.5-3B-Instruct-4bit apple/swift-nio "..."
 //   swift run RepoQALocal --apple anthropics/claude-code "..."  # route to Apple's on-device model instead
+//
+// First run downloads the model (progress on stderr). Default: mlx-community/Qwen3-8B-4bit —
+// see docs/tested-models.md for which open-weight models tool-call reliably.
 
 import Foundation
 import FoundationModels
@@ -1435,14 +1461,22 @@ func run() async {
         }
     }
     guard let repoName = rest.first, !repoName.isEmpty else {
-        note("usage: swift run RepoQALocal [--model <hf-repo>] [--apple] <owner/repo> [question]")
+        note("""
+        usage: swift run RepoQALocal [--model <hf-repo>] [--apple] <owner/repo> [question]
+        example: swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
+        """)
         exit(1)
     }
     let question = rest.dropFirst().joined(separator: " ")
     let effectiveQuestion = question.isEmpty ? "What does this repository do, in a couple sentences?" : question
 
     // --- the model layer: one MLX provider, Apple's on-device model as an alternative, one route ---
-    let mlx = MLXModelProvider(residentModelLimit: 1)                 // ← SDK (Inference)
+    // Pin the default model to the commit this example was tried against, so a fresh download never
+    // silently picks up whatever `main` has become. A model chosen with --model is pinned to the
+    // version you first download instead (trust on first use). To change the default, review the
+    // new version, then update the repo and its commit together.
+    let shippedPins = ["mlx-community/Qwen3-8B-4bit": "545dc4251c05440727734bcd94334791f6ab0192"]
+    let mlx = MLXModelProvider(residentModelLimit: 1, pinnedRevisions: shippedPins, pinStore: MLXFilePinStore())  // ← SDK (Inference)
     let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
     let modelID = useApple ? ModelID.system : ModelID(scheme: "mlx", rest: modelRepo)!    // ← SDK
     lab.models.route(.local, to: modelID)                            // ← SDK
@@ -1466,6 +1500,9 @@ func run() async {
             note("download failed: \(error)"); exit(1)
         }
     }
+    if !useApple, let pin = mlx.effectivePin(for: modelRepo) {    // ← SDK (Inference)
+        note("pinned to \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this example" : "first download"))")
+    }
 
     // --- everything below is repo-qa, unchanged ---
 
@@ -1481,7 +1518,7 @@ func run() async {
 
     // Build a Tool for each of Deepwiki's tools from its own live schema. `read_wiki_contents` is
     // skipped by name: it dumps a repo's entire wiki unscoped (~165K tokens for anthropics/
-    // claude-code in one call), which MCPTool can't know from the schema — that curation is the
+    // claude-code in one call), which `MCPTool` can't know from the schema — that curation is the
     // app's job (see docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal.
     var tools: [any Tool] = []
     for descriptor in state.tools {
@@ -1493,11 +1530,11 @@ func run() async {
         catch { note("Skipping \(descriptor.name): \(error)") }
     }
     guard !tools.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
+    note("Built \(tools.count) tool(s) from Deepwiki's live schema: \(tools.map(\.name).joined(separator: ", "))")
 
     // The one line that changes from repo-qa: lab.makeSession(route:tools:) instead of
     // LanguageModelSession(tools:) — same FoundationModels session underneath, just backed by
-    // whichever model the route points at. includeMCPTools: false because this app passes its
-    // MCPTools in by hand above rather than going through lab.mcp.
+    // whichever model the route points at.
     let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     let session: LocalLMLabSession                                   // ← SDK
     do {
@@ -1507,8 +1544,8 @@ func run() async {
     }
 
     let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
+    note("\nAsking: \(prompt)\n")
     do {
-        // Plain FoundationModels LanguageModelSession underneath — respond/streamResponse as usual.
         let response = try await session.languageModelSession.respond(to: prompt)   // ← SDK
         print(response.content)
     } catch {
@@ -1524,16 +1561,18 @@ if #available(macOS 26.0, *) {
 }
 ```
 
-**Tally**: of the file's 92 non-comment/non-blank lines, 18 touch the SDK directly (marked above)
+**Tally**: of the file's 96 non-comment/non-blank lines, 19 touch the SDK directly (marked above)
 — and everything below the `--- everything below is repo-qa, unchanged ---` marker is
-character-for-character `repo-qa` except the one `lab.makeSession` line. The model layer itself is
+`repo-qa`'s code (its long comments condensed) except the one `lab.makeSession` line. The model layer itself is
 ~8 lines (`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` / `availability` / `validate` /
-`download`, plus the diagnostic `note(...)` line that reads `LocalLMLabSDKVersion.current`);
+`download`, plus the diagnostic `note(...)` line that reads `LocalLMLabSDKVersion.current`), and pinning adds
+three more: the `shippedPins` dictionary and `pinStore:` argument on `MLXModelProvider`, and an
+`effectivePin(for:)` call that reports which version is in use and where the pin came from (`.shipped` vs `.captured`);
 `--apple` proves the same route can point at Apple's on-device model with no other change.
 
 ## `examples/workspace-buddy-local`
 
-*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 252 lines of code (323 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 255 lines of code (331 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddy) above —
@@ -1541,7 +1580,9 @@ same folder-picker, same security-scoped bookmark, same `WorkspaceTools` — but
 open-weight MLX model routed through the 1.0 model layer. It is the one example that runs the
 model layer **inside App Sandbox**, so it also needs `com.apple.security.network.client` (to fetch
 the weights on first run) on top of `workspace-buddy`'s `files.user-selected.read-write`; the
-model downloads into this app's own sandbox container. One of several examples linking
+model downloads into this app's own sandbox container. The model is **pinned** to the exact Hugging Face
+commit the app was tried against (`pinnedRevisions:`), so a fresh download always gets those bytes rather
+than whatever `main` has become. One of several examples linking
 `LocalLMLabSDKInference`. The `FolderAccess` enum is verbatim from `workspace-buddy` and is
 elided here — see that section above.
 
@@ -1559,6 +1600,11 @@ import SwiftUI
 
 // The model this app routes to. Any MLX-format Hugging Face repo — see docs/tested-models.md.
 let workspaceModelRepo = "mlx-community/Qwen3-8B-4bit"
+// The exact commit of that repo this app was built and tried against. A Hugging Face repo's owner can
+// change what `main` points to at any time; pinning means a fresh download (first run, or after the
+// user clears the cache) always gets these bytes, never whatever `main` is today. To change the
+// model, review the new version, then update both lines.
+let workspaceModelRevision = "545dc4251c05440727734bcd94334791f6ab0192"
 
 // MARK: - FolderAccess { pickFolder / resolveBookmarkedFolder / withFolderAccessAsync }
 //   — verbatim from workspace-buddy (docs/sdk-guide.md §8); see that section above. Elided here.
@@ -1582,7 +1628,9 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
 
     // The model layer: an MLX provider (one model resident at a time), Apple's on-device model
     // kept as a fallback, and one named route pointing at the MLX model.
-    private let mlx = MLXModelProvider(residentModelLimit: 1)         // ← SDK (Inference)
+    private let mlx = MLXModelProvider(                               // ← SDK (Inference)
+        residentModelLimit: 1,
+        pinnedRevisions: [workspaceModelRepo: workspaceModelRevision])
     private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
     private lazy var modelID = ModelID(scheme: "mlx", rest: workspaceModelRepo)!   // ← SDK
 
@@ -1665,7 +1713,7 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 let events = Task { @MainActor in
                     for await event in session.events {             // ← SDK
                         switch event {
-                        case .toolCallStarted(_, let name): self.activity = Self.activityLabel(for: name)
+                        case .toolCallStarted(_, let name, _): self.activity = Self.activityLabel(for: name)
                         case .toolCallFinished:                self.activity = nil
                         default: break
                         }
@@ -1716,8 +1764,8 @@ struct WorkspaceBuddyLocalApp: App {
 
 **Tally**: of ~110 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI section both elided), 17 touch the SDK (marked above). Against `workspace-buddy`'s five (four
-Tool instantiations + one error formatter), the delta is the model layer (provider/lab/route setup,
-the first-run `availability` check, the `validate` + `download` progress loop) plus the streaming
+Tool instantiations + one error formatter), the delta is the model layer (provider/lab/route setup
+and the `pinnedRevisions:` pin, the first-run `availability` check, the `validate` + `download` progress loop) plus the streaming
 turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond`.
 The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
 sandbox changes nothing in the code, only the entitlements.
@@ -2321,7 +2369,7 @@ the entire confirmation UI. Nothing in the three panel views touches the SDK —
 
 ## `examples/aiql`
 
-*`Sources/AIQL/AIQLApp.swift` — 381 lines of code (468 with comments) — one file: view model + pipeline + SwiftUI UI. The
+*`Sources/AIQL/AIQLApp.swift` — 395 lines of code (494 with comments) — one file: view model + pipeline + SwiftUI UI. The
 `FolderAccess` enum and the `ContentView` UI are elided below.*
 
 The **`FileBackedTool` + `loadTable` + `sqlQuery`** showcase (`sdk-guide.md`
@@ -2331,7 +2379,11 @@ into a file (so the raw payload never enters the model's context), `loadTable`s 
 ephemeral SQLite table, and has the model write **one read-only `SELECT`** to a CSV. The model
 names a table and describes one query — it never handles a row, and can't drop a step, because
 there's only ever one query call. `WHERE` / `BETWEEN` / `ORDER BY … LIMIT` / `JOIN` run inside
-SQLite. Links `LocalLMLabSDKInference` for the MLX model; `FolderAccess` is verbatim from
+SQLite. Links `LocalLMLabSDKInference` for the MLX model. Because the model field is free text, the app can't pin
+everything ahead of time, so it layers three supply-chain controls: the default model is **pinned** to a
+reviewed commit (`pinnedRevisions:`), any other model is pinned on first download (`MLXFilePinStore`), and a
+**trust policy** (`MlxCommunityOnly`) limits which repos can be fetched at all; downloads are hash-verified by
+default. `FolderAccess` is verbatim from
 `workspace-buddy-local` (`sdk-guide.md` §8) and elided.
 
 ```swift
@@ -2345,6 +2397,17 @@ import SwiftUI
 // MARK: - FolderAccess { pickFolder / resolveBookmarkedFolder / withFolderAccessAsync }
 //   — verbatim from workspace-buddy-local (docs/sdk-guide.md §8); elided here.
 
+// MARK: - Trust policy
+
+/// Which repos this app will fetch. The SDK ships no allow-list (that's the host's call); this app
+/// allows one namespace. Widen it here if you want other publishers — each one is a party whose
+/// uploads your users will run.
+struct MlxCommunityOnly: MLXModelTrustPolicy {                       // ← SDK (Inference)
+    func evaluate(repoID: String) async -> MLXModelTrustDecision {   // ← SDK (Inference)
+        repoID.hasPrefix("mlx-community/") ? .allow : .deny(reason: "only mlx-community models are allowed in this app")
+    }
+}
+
 @available(macOS 27.0, *)
 @MainActor
 final class AIQLModel: ObservableObject {
@@ -2356,7 +2419,10 @@ final class AIQLModel: ObservableObject {
         case failed(String)
     }
 
-    @Published var modelRepo = "mlx-community/Qwen3-14B-4bit"
+    static let defaultModelRepo = "mlx-community/Qwen3-14B-4bit"
+    // Commit of the default model this app was tried against. Update after reviewing a new version.
+    static let defaultModelRevision = "a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4"
+    @Published var modelRepo = AIQLModel.defaultModelRepo
     @Published var serverURLString = "https://econ-index.mcp.claude.com/mcp"
     @Published var request = ""
     @Published private(set) var folderURL: URL?
@@ -2364,7 +2430,16 @@ final class AIQLModel: ObservableObject {
     @Published private(set) var steps: [String] = []
 
     private let manager = MCPServerManager()                          // ← SDK
-    private let mlx = MLXModelProvider(residentModelLimit: 1)         // ← SDK (Inference)
+    // The field is free text, so this app can't pin everything ahead of time. Two layers instead:
+    //  - the default model is pinned to a commit this app shipped with (developer-vouched);
+    //  - any other model is pinned on first download (`MLXFilePinStore`, kept outside the model
+    //    cache), so re-downloading later fetches the same version the user first got.
+    // A trust policy limits which repos can be fetched at all; downloads are hash-verified by default.
+    private let mlx = MLXModelProvider(                               // ← SDK (Inference)
+        residentModelLimit: 1,
+        pinnedRevisions: [AIQLModel.defaultModelRepo: AIQLModel.defaultModelRevision],   // ← SDK (Inference)
+        supplyChainPolicy: MLXSupplyChainPolicy(trustPolicy: MlxCommunityOnly()),        // ← SDK (Inference)
+        pinStore: MLXFilePinStore())                                 // ← SDK (Inference)
     private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
 
     init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
@@ -2407,6 +2482,9 @@ final class AIQLModel: ObservableObject {
             do {
                 for try await event in mlx.download(modelRepo.trimmingCharacters(in: .whitespaces)) {   // ← SDK (Inference)
                     if case .progress(_, _, let fraction) = event { stage = .downloadingModel(fraction) }
+                }
+                if let pin = mlx.effectivePin(for: modelRepo.trimmingCharacters(in: .whitespaces)) {   // ← SDK (Inference)
+                    step("Pinned to version \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this app" : "the version you just downloaded")).")
                 }
             } catch {
                 stage = .failed("The model download failed: \(error.localizedDescription)"); return
@@ -2474,9 +2552,9 @@ final class AIQLModel: ObservableObject {
         let stepTask = Task { @MainActor in
             for await event in session.events {                      // ← SDK
                 switch event {
-                case .toolCallStarted(_, let name):
+                case .toolCallStarted(_, let name, _):
                     self.step(Self.friendlyStep(for: name))
-                case .toolCallFinished(_, let name, let failed) where failed:
+                case .toolCallFinished(_, let name, let failed, _) where failed:
                     self.step("  · \(Self.friendlyStep(for: name)) hit a snag — retrying")
                 default: break
                 }
@@ -2543,7 +2621,9 @@ struct AIQLApp: App {
 ```
 
 **Tally**: the model layer is the same ~7 lines as `repo-qa-local` (`MLXModelProvider` / `LocalLMLab`
-/ `route` / `availability` / `validate` / `download` / `makeSession`). Everything new here is the
+/ `route` / `availability` / `validate` / `download` / `makeSession`), plus the supply-chain controls above:
+an `MLXModelTrustPolicy` conformance (~5 lines), and the `pinnedRevisions:` / `supplyChainPolicy:` / `pinStore:`
+arguments on `MLXModelProvider`, and an `effectivePin(for:)` call that tells the user which version they got. Everything new here is the
 pipeline: `FileBackedTool.mcp(descriptor:manager:root:)` wraps each MCP data tool so its payload
 lands in a file instead of the model's context, and four data-verb `Tool`s
 (`LoadTableTool` / `SQLQueryTool` / `DescribeJSONTool` / `CSVInfoTool`, marked above) do the
