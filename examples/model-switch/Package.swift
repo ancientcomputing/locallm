@@ -28,16 +28,16 @@ struct SDKRelease {
 // `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
 // release not listed, add its entry (URL + the `.sha256` next to the zip on the
 // GitHub release) or just replace the strings in place.
-let defaultSDKVersion = "1.0.0-beta.4"
+let defaultSDKVersion = "1.0.0-RC.1"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-beta.3": SDKRelease(
-        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKRemote-1.0.0-beta.3.xcframework.zip",
-        remoteChecksum: "2b1e401a606c2c34d3e086cf9a2edad9d2c9ca730a3c3840b964f88d9e2e446b"
-    ),
     "1.0.0-beta.4": SDKRelease(
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.4/LocalLMLabSDKRemote-1.0.0-beta.4.xcframework.zip",
         remoteChecksum: "a73a06bf04a2dd3b1a15b40770f12c0565f8cbf1a97eaa604317b09e3a860454"
+    ),
+    "1.0.0-RC.1": SDKRelease(
+        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-RC.1/LocalLMLabSDKRemote-1.0.0-RC.1.xcframework.zip",
+        remoteChecksum: "3e763c2fb542f7cc8493cf8e4ba2effcc98adae9c7d9991b60e6a92be8ee88c6"
     ),
 ]
 
