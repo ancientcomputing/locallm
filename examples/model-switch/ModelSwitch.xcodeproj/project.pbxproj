@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		1A857591E197763C585F5E82 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3C82FFAD7EC2BC797F1967 /* AppModel.swift */; };
 		5A0D73B41B8390B64603FBCD /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = F4B154FEF70BD06424523FD9 /* LocalLMLabSDKCore */; };
+		7C42167FA6A53CB767307452 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F21946188835A01E549BF09 /* Keychain.swift */; };
 		87EBB9B4048145652745717C /* ModelSwitchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB14159899588803E8E6F718 /* ModelSwitchApp.swift */; };
 		99C77F27F9654F0C8C0E29D5 /* LocalLMLabSDKRemote in Frameworks */ = {isa = PBXBuildFile; productRef = 5CFDC25BB5A7D4D3DFDC0110 /* LocalLMLabSDKRemote */; };
 		DE1153DD66CF8D0E04A5DB14 /* ProviderGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C393611EAE1342AB79C4640E /* ProviderGlue.swift */; };
@@ -16,6 +17,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0F21946188835A01E549BF09 /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
 		756DA25283FD61E759569B8C /* Components */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Components; path = ../../Components; sourceTree = SOURCE_ROOT; };
 		9AFE3E367BE5D7A7A8AEA285 /* ModelSwitch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ModelSwitch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF3C82FFAD7EC2BC797F1967 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -50,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				AF3C82FFAD7EC2BC797F1967 /* AppModel.swift */,
+				0F21946188835A01E549BF09 /* Keychain.swift */,
 				DB14159899588803E8E6F718 /* ModelSwitchApp.swift */,
 				C393611EAE1342AB79C4640E /* ProviderGlue.swift */,
 			);
@@ -149,6 +152,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A857591E197763C585F5E82 /* AppModel.swift in Sources */,
+				7C42167FA6A53CB767307452 /* Keychain.swift in Sources */,
 				87EBB9B4048145652745717C /* ModelSwitchApp.swift in Sources */,
 				DE1153DD66CF8D0E04A5DB14 /* ProviderGlue.swift in Sources */,
 			);

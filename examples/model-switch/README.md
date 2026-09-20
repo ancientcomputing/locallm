@@ -129,12 +129,13 @@ notarize failure-mode writeups this mirrors.
 | piece | file |
 |---|---|
 | `RemoteProviderDraft` → `RemoteProviderConfig` — the ~30 lines of host glue | [`ProviderGlue.swift`](Sources/ModelSwitch/ProviderGlue.swift) |
-| `lab.models.replace(RemoteModelProvider(config))` on every settings change | [`AppModel.applyDraft`](Sources/ModelSwitch/AppModel.swift) |
+| `lab.models.replace(try RemoteModelProvider(config))` on every settings change | [`AppModel.applyDraft`](Sources/ModelSwitch/AppModel.swift) |
 | one `makeSession(route:options:)` for every tier; `session.events` → search activity; `session.citations` | [`AppModel.send`](Sources/ModelSwitch/AppModel.swift) |
 | `RemoteModelProvider.probe(for:)` behind the settings panel's **Test connection** | [`AppModel.testDraft`](Sources/ModelSwitch/AppModel.swift) |
 | the assembled settings panel + per-provider section | `Components` |
 
 ## Not production
 
-API keys persist to `UserDefaults` here for brevity — **a real app stores them in the
-Keychain.** The SDK persists nothing; key storage is always the host's job.
+API keys are stored in the Keychain (`Keychain.swift`, one generic-password item per provider) and
+everything else about a provider in `UserDefaults`. The SDK persists nothing; key storage is always
+the host's job — this example keeps its own small Keychain wrapper because the SDK's is internal.

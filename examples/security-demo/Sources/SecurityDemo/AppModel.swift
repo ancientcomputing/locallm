@@ -105,7 +105,11 @@ final class AppModel {
             ? RemoteProviderConfig.anthropic(apiKey: key)
             : RemoteProviderConfig.openAI(apiKey: key)
         cfg.allowArbitraryModelIDs = true
-        lab.models.replace(RemoteModelProvider(cfg))   // register-or-swap by scheme
+        do {
+            lab.models.replace(try RemoteModelProvider(cfg))   // register-or-swap by scheme
+        } catch {
+            providerNote = "Couldn't use that key: \(error.localizedDescription)"
+        }
     }
 
     private func bootstrap() async {

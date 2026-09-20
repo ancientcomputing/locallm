@@ -136,7 +136,7 @@ locally-run open-weight (MLX) models behind one API, with routing and residency 
 Since `1.0.0-beta.3`, also **online providers** (`sdk-guide.md` §6b) — GPT, Claude's online
 Messages API, OpenRouter, or any OpenAI-compatible server, with provider-native web search,
 behind the same `lab.makeSession(route:)`. Add the `LocalLMLabSDKRemote` binaryTarget,
-`import LocalLMLabSDKRemote`, register `RemoteModelProvider(config)`. Nothing about the
+`import LocalLMLabSDKRemote`, register `try RemoteModelProvider(config)`. Nothing about the
 existing model layer changes.
 
 Also since `1.0.0-beta.3`, **`FileBackedTool` + the "AIQL" data verbs** in Core (`sdk-guide.md`

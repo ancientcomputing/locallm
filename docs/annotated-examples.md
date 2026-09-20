@@ -34,7 +34,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`workspace-buddy`](#examplesworkspace-buddy) | 172 | 226 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
 | [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 255 | 332 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-today) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
-| [`model-switch`](#examplesmodel-switch) | 283 | 347 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
+| [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
 | [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
 | [`aiql`](#examplesaiql) | 395 | 494 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
@@ -1897,8 +1897,8 @@ independently re-verified in this pass.
 
 ## `examples/model-switch`
 
-*283 lines of code across the app's three files — `AppModel.swift`, `ProviderGlue.swift`, and
-`ModelSwitchApp.swift` (all below).*
+*328 lines of code across the app's four files — `AppModel.swift`, `ProviderGlue.swift`,
+`ModelSwitchApp.swift` (all below) and `Keychain.swift` (a 33-line generic-password wrapper, not shown).*
 
 The **online / remote providers** example (`sdk-guide.md`
 [§6b](sdk-guide.md#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)): a chat
@@ -1913,7 +1913,7 @@ types and the `onSave` / `onRemove` / `onTest` closures — see `ModelSwitchApp.
 
 ### `Sources/ModelSwitch/AppModel.swift`
 
-*146 lines of code (180 with comments).*
+*158 lines of code (199 with comments).*
 
 ```swift
 import Foundation
@@ -1968,9 +1968,17 @@ final class AppModel {
         guard let idx = providers.firstIndex(where: { $0.scheme == draft.scheme }) else { return }
         var updated = draft
         if let config = draft.makeConfig() {                          // makeConfig() → RemoteProviderConfig, see ProviderGlue.swift
-            lab.models.replace(RemoteModelProvider(config))           // ← SDK (Remote)  — add/replace at runtime
-            updated.configured = true
-            updated.statusText = "\(config.models.count) model(s) available."
+            // `RemoteModelProvider.init(_:)` always validates — this config's
+            // baseURL/apiKey came straight from the settings panel.
+            do {
+                lab.models.replace(try RemoteModelProvider(config))   // ← SDK (Remote)  — add/replace at runtime
+                updated.configured = true
+                updated.statusText = "\(config.models.count) model(s) available."
+            } catch {
+                lab.models.removeProvider(scheme: draft.scheme)       // ← SDK
+                updated.configured = false
+                updated.statusText = error.localizedDescription
+            }
         } else {
             lab.models.removeProvider(scheme: draft.scheme)           // ← SDK
             updated.configured = false
@@ -1992,7 +2000,12 @@ final class AppModel {
         guard let config = draft.makeConfig(), !config.models.isEmpty else {
             return .unableToRun("Add a model id and an API key first.")
         }
-        let provider = RemoteModelProvider(config)                    // ← SDK (Remote)
+        let provider: RemoteModelProvider                             // ← SDK (Remote)
+        do {
+            provider = try RemoteModelProvider(config)                // ← SDK (Remote)
+        } catch {
+            return .unableToRun(error.localizedDescription)
+        }
         var results: [ProviderTestOutcome.ModelResult] = []
         for model in config.models {
             guard let modelID = ModelID(scheme: config.scheme, rest: model.id) else {   // ← SDK
@@ -2058,18 +2071,23 @@ final class AppModel {
         mutate(&transcript[idx])
     }
 
-    // MARK: persistence (demo only — real apps use the Keychain for keys)
+    // MARK: persistence
+    //
+    // API keys go in the Keychain (`Keychain.swift`), keyed by the provider's `scheme` — never in
+    // `UserDefaults`, which is a plaintext plist. Everything else about a provider draft (base URL,
+    // model list, web-search settings) isn't a secret and stays in `UserDefaults`.
 
     private static let key = "modelswitch.providers.v1"
 
     private func persist() {
-        let plain = providers.map {
-            ["scheme": $0.scheme, "displayName": $0.displayName, "kind": $0.kind.rawValue,
-             "baseURL": $0.baseURL, "apiKey": $0.apiKey,
-             "models": $0.models.joined(separator: "\n"),
-             "webSearchSupported": String($0.webSearchSupported),
-             "webSearchEnabled": String($0.webSearchEnabled),
-             "maxSearches": String($0.maxSearches)]
+        let plain = providers.map { d -> [String: String] in
+            Keychain.set(d.apiKey.isEmpty ? nil : d.apiKey, for: d.scheme)
+            return ["scheme": d.scheme, "displayName": d.displayName, "kind": d.kind.rawValue,
+                    "baseURL": d.baseURL,
+                    "models": d.models.joined(separator: "\n"),
+                    "webSearchSupported": String(d.webSearchSupported),
+                    "webSearchEnabled": String(d.webSearchEnabled),
+                    "maxSearches": String(d.maxSearches)]
         }
         UserDefaults.standard.set(plain, forKey: Self.key)
     }
@@ -2081,13 +2099,13 @@ final class AppModel {
                   let kind = RemoteProviderKind(rawValue: kindRaw) else { return nil }   // ← Components (type)
             var d = RemoteProviderDraft(
                 scheme: scheme, displayName: r["displayName"] ?? scheme, kind: kind,
-                baseURL: r["baseURL"] ?? "", apiKey: r["apiKey"] ?? "",
+                baseURL: r["baseURL"] ?? "", apiKey: Keychain.string(for: scheme) ?? "",
                 models: (r["models"] ?? "").split(whereSeparator: \.isNewline).map(String.init),
                 webSearchSupported: r["webSearchSupported"] == "true",
                 webSearchEnabled: r["webSearchEnabled"] == "true",
                 maxSearches: Int(r["maxSearches"] ?? "5") ?? 5)
-            if let config = d.makeConfig() {
-                lab.models.replace(RemoteModelProvider(config))       // ← SDK (Remote)
+            if let config = d.makeConfig(), let provider = try? RemoteModelProvider(config) {   // ← SDK (Remote)
+                lab.models.replace(provider)                          // ← SDK (Remote)
                 d.configured = true
             }
             return d
@@ -2315,7 +2333,11 @@ final class AppModel {
             ? RemoteProviderConfig.anthropic(apiKey: key)             // ← SDK (Remote) (preset)
             : RemoteProviderConfig.openAI(apiKey: key)                // ← SDK (Remote) (preset)
         cfg.allowArbitraryModelIDs = true                            // ← SDK (Remote)
-        lab.models.replace(RemoteModelProvider(cfg))                  // ← SDK  — register-or-swap by scheme
+        do {
+            lab.models.replace(try RemoteModelProvider(cfg))          // ← SDK  — register-or-swap by scheme
+        } catch {
+            providerNote = "Couldn't use that key: \(error.localizedDescription)"
+        }
     }
 
     // MARK: run — DemoPolicy → SDK

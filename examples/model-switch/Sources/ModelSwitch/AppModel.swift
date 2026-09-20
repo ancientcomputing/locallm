@@ -10,8 +10,8 @@ import LocalLMLabSDKRemote
 final class AppModel {
     let lab: LocalLMLab
 
-    /// Online-provider drafts, persisted by the app. **Demo persistence only** — a real app
-    /// stores the API keys in the Keychain, not `UserDefaults`.
+    /// Online-provider drafts, persisted by the app: API keys in the Keychain
+    /// (`Keychain.swift`), everything else in `UserDefaults` (`persist()`/`restore()`).
     var providers: [RemoteProviderDraft] = [] {
         didSet { persist() }
     }
@@ -50,9 +50,17 @@ final class AppModel {
         guard let idx = providers.firstIndex(where: { $0.scheme == draft.scheme }) else { return }
         var updated = draft
         if let config = draft.makeConfig() {
-            lab.models.replace(RemoteModelProvider(config))
-            updated.configured = true
-            updated.statusText = "\(config.models.count) model(s) available."
+            // `RemoteModelProvider.init(_:)` always validates — this config's
+            // baseURL/apiKey came straight from the settings panel.
+            do {
+                lab.models.replace(try RemoteModelProvider(config))
+                updated.configured = true
+                updated.statusText = "\(config.models.count) model(s) available."
+            } catch {
+                lab.models.removeProvider(scheme: draft.scheme)
+                updated.configured = false
+                updated.statusText = error.localizedDescription
+            }
         } else {
             lab.models.removeProvider(scheme: draft.scheme)
             updated.configured = false
@@ -76,7 +84,12 @@ final class AppModel {
         guard let config = draft.makeConfig(), !config.models.isEmpty else {
             return .unableToRun("Add a model id and an API key first.")
         }
-        let provider = RemoteModelProvider(config)
+        let provider: RemoteModelProvider
+        do {
+            provider = try RemoteModelProvider(config)
+        } catch {
+            return .unableToRun(error.localizedDescription)
+        }
         var results: [ProviderTestOutcome.ModelResult] = []
         for model in config.models {
             guard let modelID = ModelID(scheme: config.scheme, rest: model.id) else {
@@ -142,18 +155,24 @@ final class AppModel {
         mutate(&transcript[idx])
     }
 
-    // MARK: persistence (demo only — real apps use the Keychain for keys)
+    // MARK: persistence
+    //
+    // API keys go in the Keychain (`Keychain.swift`), keyed by the
+    // provider's `scheme` — never in `UserDefaults`, which is a plaintext plist. Everything
+    // else about a provider draft (base URL, model list, web-search settings) isn't a secret
+    // and stays in `UserDefaults` as before.
 
     private static let key = "modelswitch.providers.v1"
 
     private func persist() {
-        let plain = providers.map {
-            ["scheme": $0.scheme, "displayName": $0.displayName, "kind": $0.kind.rawValue,
-             "baseURL": $0.baseURL, "apiKey": $0.apiKey,
-             "models": $0.models.joined(separator: "\n"),
-             "webSearchSupported": String($0.webSearchSupported),
-             "webSearchEnabled": String($0.webSearchEnabled),
-             "maxSearches": String($0.maxSearches)]
+        let plain = providers.map { d -> [String: String] in
+            Keychain.set(d.apiKey.isEmpty ? nil : d.apiKey, for: d.scheme)
+            return ["scheme": d.scheme, "displayName": d.displayName, "kind": d.kind.rawValue,
+                    "baseURL": d.baseURL,
+                    "models": d.models.joined(separator: "\n"),
+                    "webSearchSupported": String(d.webSearchSupported),
+                    "webSearchEnabled": String(d.webSearchEnabled),
+                    "maxSearches": String(d.maxSearches)]
         }
         UserDefaults.standard.set(plain, forKey: Self.key)
     }
@@ -165,13 +184,13 @@ final class AppModel {
                   let kind = RemoteProviderKind(rawValue: kindRaw) else { return nil }
             var d = RemoteProviderDraft(
                 scheme: scheme, displayName: r["displayName"] ?? scheme, kind: kind,
-                baseURL: r["baseURL"] ?? "", apiKey: r["apiKey"] ?? "",
+                baseURL: r["baseURL"] ?? "", apiKey: Keychain.string(for: scheme) ?? "",
                 models: (r["models"] ?? "").split(whereSeparator: \.isNewline).map(String.init),
                 webSearchSupported: r["webSearchSupported"] == "true",
                 webSearchEnabled: r["webSearchEnabled"] == "true",
                 maxSearches: Int(r["maxSearches"] ?? "5") ?? 5)
-            if let config = d.makeConfig() {
-                lab.models.replace(RemoteModelProvider(config))
+            if let config = d.makeConfig(), let provider = try? RemoteModelProvider(config) {
+                lab.models.replace(provider)
                 d.configured = true
             }
             return d

@@ -19,7 +19,7 @@ public struct AIModelsSettingsView: View {
     /// - Parameters:
     ///   - registry: `lab.models`.
     ///   - providers: the online-provider drafts, owned + persisted by the host.
-    ///   - onSave: called when a draft changes — rebuild `RemoteModelProvider(config)` from it,
+    ///   - onSave: called when a draft changes — rebuild `try RemoteModelProvider(config)` from it,
     ///     `lab.models.replace(_:)`, and persist (key → Keychain).
     ///   - onRemove: called when the user deletes a provider — `lab.models.removeProvider(scheme:)`
     ///     and forget its key.
