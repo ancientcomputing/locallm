@@ -2,8 +2,8 @@
 
 The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
-`workspace-buddy-local`, `os-matrix`, `aiql`, and `vistanova`), `// ← SDK (Remote)` (online providers —
-`model-switch` and `security-demo`), or `// ← Components`. Everything else is ordinary SwiftUI/Foundation — the point
+`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, and `mlx-control-room`), `// ← SDK (Remote)` (online providers —
+`model-switch` and `security-demo`), or `// ← Components` (`components-demo` and `components-updates-demo`). Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
@@ -39,6 +39,8 @@ non-comment lines; these examples are commented far more heavily than production
 | [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
 | [`aiql`](#examplesaiql) | 395 | 494 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
+| [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
+| [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
 The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most,
 and each section's **Tally** breaks that down. The rest is ordinary SwiftUI, Foundation, and
@@ -2913,3 +2915,694 @@ ones: the `session.events` watcher that rejects a turn where the tool was never 
 capability probe that decides between `@Generable` output and a text parser, and the guardrail-
 decline recovery. Path B (`TavilySearchTool`) costs 33 lines against `MCPTool`'s zero, and buys a
 pinned `max_results` and the captured query.
+
+## `examples/components-updates-demo`
+
+*`Sources/UpdatesDemo/UpdatesDemoApp.swift` — 151 lines of code (170 with comments) — the whole file is shown below.*
+
+The `LocalLMLabSDKComponents` views for **onboarding, updating and cleaning up** a downloaded model
+([`sdk-guide.md` §11](sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)), driven by
+**simulated** sources: short sleeps stand in for the network and for MLX, so every state of every view can be
+reached on demand — a denied preflight, a download that fails part-way, a download that resolves to a different
+commit than the app ships, an update with the host's pause point, a failed update, a fixed model that can't be
+updated, and a versions list with a guarded Remove. It links only `Components` (and through it `Core`); it never
+touches `MLXModelProvider`, which lives in `LocalLMLabSDKInference` and needs no import here.
+
+That is the point of the design: these views are **provider-agnostic**. They own presentation and state and take plain
+value types (`PreflightResult`, `InstalledModel`, `ModelUpdateOffer`, `ModelVersionRow`) and closures
+(`ModelOnboardingSource`, `ModelUpdateActions`, the `list` / `remove` pair) that *you* supply. Here the closures fake
+the work; in a real host they call `MLXModelProvider` — `validate`, `download`, `checkPinUpdate`,
+`updatePin(_:to:beforeSwitch:)`, `snapshots(for:)`, `removeSnapshot(_:revision:)` — and
+[`mlx-control-room`](#examplesmlx-control-room) is the companion that does exactly that.
+`Components/README.md` has the ~40-line adapter.
+
+```swift
+import LocalLMLabSDKComponents                                    // ← Components
+import LocalLMLabSDKCore                                          // ← SDK
+import SwiftUI
+
+// Every source here is simulated with short sleeps, so each state of each view can be reached on demand.
+
+private let shippedCommit = "9eba008f65cdc8aee60201be10dcd0e7858455ce"
+private let newerCommit = "ff1143e3a10547c9f2129e94ca37059b096b23f4"
+
+@main
+@available(macOS 27, *)
+struct UpdatesDemoApp: App {
+    var body: some Scene {
+        WindowGroup("Components: onboarding, updates, versions") {
+            DemoView().frame(minWidth: 640, minHeight: 720)
+        }
+    }
+}
+
+// MARK: - Simulated sources
+
+/// Onboarding source with switches for each way a flow can go wrong.
+private struct Faults: Sendable {
+    var denyPreflight = false
+    var resolveDifferentCommit = false
+    var failDownload = false
+}
+
+private func simulatedOnboardingSource(_ faults: Faults) -> ModelOnboardingSource {  // ← Components
+    ModelOnboardingSource(                                        // ← Components
+        validate: { repo in
+            try await Task.sleep(for: .milliseconds(500))
+            if faults.denyPreflight {
+                return PreflightResult(failedStage: .trustPolicy, detail: "\(repo) isn't on this app's allow-list")  // ← SDK
+            }
+            return PreflightResult(detail: "qwen2 · ≈ 278 MB")    // ← SDK
+        },
+        download: { repo, report in
+            for step in 0...10 {
+                try await Task.sleep(for: .milliseconds(180))
+                report(DownloadProgress(bytesReceived: Int64(step) * 27_800_000, totalBytes: 278_000_000, fraction: Double(step) / 10))  // ← SDK
+                if faults.failDownload && step == 6 { throw LocalLMLabError.download(stage: "verify", underlying: nil) }  // ← SDK
+            }
+            return InstalledModel(                                // ← SDK
+                id: ModelID(scheme: "mlx", rest: repo)!, repoID: repo,  // ← SDK
+                resolvedRevision: faults.resolveDifferentCommit ? newerCommit : shippedCommit)
+        })
+}
+
+/// A model that is on `shippedCommit`, with `newerCommit` on offer; failures switchable.
+private final class SimulatedModel: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _current = shippedCommit
+    var failNextUpdate = false
+    var current: String { lock.lock(); defer { lock.unlock() }; return _current }
+    func set(_ commit: String) { lock.lock(); _current = commit; lock.unlock() }
+}
+
+private func simulatedActions(_ sim: SimulatedModel) -> ModelUpdateActions {  // ← Components
+    ModelUpdateActions(                                           // ← Components
+        check: {
+            try await Task.sleep(for: .milliseconds(600))
+            let current = sim.current
+            return ModelUpdateOffer(                              // ← Components
+                current: current, available: newerCommit,
+                changes: current == newerCommit ? [] : [
+                    ModelFileChange(path: "config.json", kind: .modified, oldSize: 1648, newSize: 1653),  // ← Components
+                ])
+        },
+        apply: { revision, progress, beforeSwitch in
+            for step in 0...10 {
+                try await Task.sleep(for: .milliseconds(150))
+                progress(Double(step) / 10)
+            }
+            if sim.failNextUpdate { sim.failNextUpdate = false; throw LocalLMLabError.download(stage: "cacheQuota", underlying: nil) }  // ← SDK
+            try await beforeSwitch()          // the host's pause point, before anything changes
+            try await Task.sleep(for: .milliseconds(300))
+            sim.set(revision)
+        })
+}
+
+// MARK: - Demo
+
+@available(macOS 27, *)
+private struct DemoView: View {
+    @State private var faults = Faults()
+    @State private var onboarding: ModelOnboardingModel?          // ← Components
+
+    @State private var sim = SimulatedModel()
+    @State private var userChosen: ModelUpdateModel               // ← Components
+    @State private var builtIn: ModelUpdateModel                  // ← Components
+    @State private var versions: ModelVersionsModel               // ← Components
+    @State private var pauseNote = "idle"
+
+    init() {
+        let userSim = SimulatedModel()
+        let builtInSim = SimulatedModel()
+        _sim = State(initialValue: builtInSim)
+        _userChosen = State(initialValue: ModelUpdateModel(       // ← Components
+            actions: simulatedActions(userSim), ownership: .userChosen, currentRevision: shippedCommit))  // ← Components
+        let built = ModelUpdateModel(                             // ← Components
+            actions: simulatedActions(builtInSim), ownership: .developerOffered, currentRevision: shippedCommit)  // ← Components
+        built.shippedRevision = shippedCommit                     // ← Components
+        _builtIn = State(initialValue: built)
+        _versions = State(initialValue: ModelVersionsModel(       // ← Components
+            list: { [
+                ModelVersionRow(revision: shippedCommit, isCurrent: false, freesBytes: 1_648, sharedBytes: 190_208_261),  // ← Components
+                ModelVersionRow(revision: newerCommit, isCurrent: true, freesBytes: 1_653, sharedBytes: 190_208_261),  // ← Components
+            ] },
+            remove: { row in row.freesBytes }))
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                section("1 · Onboarding a model") {
+                    Text("Validate → Download → Pin. Try the switches, then Add.").font(.caption).foregroundStyle(.secondary)
+                    Toggle("preflight denies the repo (trust policy)", isOn: $faults.denyPreflight)
+                    Toggle("download resolves a different commit than the app ships", isOn: $faults.resolveDifferentCommit)
+                    Toggle("download fails part-way", isOn: $faults.failDownload)
+                    Button("Add mlx-community/gemma-3-270m-it-4bit") {
+                        onboarding = ModelOnboardingModel(        // ← Components
+                            requests: [ModelOnboardingRequest(    // ← Components
+                                repoID: "mlx-community/gemma-3-270m-it-4bit", expectedRevision: shippedCommit)],
+                            source: simulatedOnboardingSource(faults))
+                        onboarding?.start()                       // ← Components
+                    }
+                    .disabled(onboarding?.isRunning == true)      // ← Components
+                    if let onboarding {
+                        ModelOnboardingView(model: onboarding, onFinished: { _ in self.onboarding = nil }, onDismiss: { self.onboarding = nil })  // ← Components
+                    }
+                }
+                Divider()
+                section("2 · A model you chose — you decide when to update") {
+                    ModelUpdateView(model: userChosen)            // ← Components
+                }
+                Divider()
+                section("3 · A built-in model — the developer's offer") {
+                    Text("Pause point: \(pauseNote)").font(.caption).foregroundStyle(.secondary)
+                    ModelUpdateView(model: builtIn)               // ← Components
+                        .task {
+                            builtIn.pauseInference = {            // ← Components
+                                await MainActor.run { pauseNote = "waiting for in-flight requests to finish…" }
+                                try await Task.sleep(for: .milliseconds(900))
+                                await MainActor.run { pauseNote = "quiet — switching" }
+                            }
+                        }
+                }
+                Divider()
+                section("4 · Something that can't be updated here") {
+                    ModelUpdateView(model: ModelUpdateModel(      // ← Components
+                        actions: simulatedActions(SimulatedModel()),
+                        ownership: .fixed(reason: "Shipped with this app. It changes only with a new app version.")))  // ← Components
+                }
+                Divider()
+                section("5 · Cleaning up old versions") {
+                    ModelVersionsView(model: versions)            // ← Components
+                }
+            }
+            .padding(24)
+        }
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.headline)
+            content()
+        }
+    }
+}
+```
+
+**Tally**: of the file's 151 non-comment/non-blank lines, 38 touch the SDK (marked above), and every one of them is a
+`Components` type or a Core value type handed to one. Almost all of the rest is the *simulation* — the sleeps, the
+fault switches, the state for each demo section. The seams to notice:
+
+- **`ModelOnboardingSource(validate:download:)`** is where a real host plugs in the provider: `validate` returns a
+  `PreflightResult` (a failure names its `.stage`, and nothing after it runs), `download` reports `DownloadProgress`
+  and returns the `InstalledModel` whose `resolvedRevision` the **Pin** step checks against
+  `ModelOnboardingRequest.expectedRevision`. Section 1's second switch makes the download resolve a different commit
+  to show that check refusing.
+- **`ModelUpdateActions(check:apply:)`**: `apply` has exactly the shape of `MLXModelProvider.updatePin(_:to:beforeSwitch:)`
+  — download and verify, call `beforeSwitch` **once, before anything changes**, then switch, and a throw must leave the
+  old version in place (section 2's failure switch).
+- **`pauseInference`** is the host's half of that contract. The SDK moves the pin only after `beforeSwitch` returns, so
+  the host uses the pause to stop new requests and wait for the in-flight one (`builtIn.pauseInference` above);
+  `state == .switching` tells the UI to refuse new work.
+- **`ModelUpdateOwnership`** (`.userChosen`, `.developerOffered`, `.fixed(reason:)`) changes what the view offers: a
+  user's own model updates when they say so; a built-in one only to a commit the developer vouches for (and can be
+  reverted to the shipped version); a fixed one shows the reason instead of a button.
+- **`ModelVersionsModel(list:remove:)`** takes the versions on disk and a `remove` that returns the bytes freed. Note
+  `freesBytes` versus `sharedBytes`: removing a version frees only the files no other version uses, which is what the
+  SDK's `MLXCachedSnapshot` reports.
+
+## `examples/mlx-control-room`
+
+*`Sources/MLXControlRoom/MLXControlRoomApp.swift` — the view-model half (`ControlRoomModel` and the constants above
+it), excerpted: 1,434 lines of code in the whole file (1,812 with comments), of which the SwiftUI views (`// MARK: - UI`,
+about 863 lines) are plain SwiftUI and omitted. Elisions are marked `// …`.*
+
+The example that shows how a host app can **deploy models from Hugging Face without a "just download anything"
+approach**, and exposes the MLX knobs with a gauge beside each. Read it as one tour of `MLXModelProvider`'s
+supply-chain and lifecycle surface ([`sdk-guide.md` §6a](sdk-guide.md#pinning-updating-and-cleaning-up-model-versions)):
+
+1. **Check before you fetch.** `validate(_:)` runs the preflight (`trustPolicy`, `repoReachable`, `mlxFormat`,
+   `architectureSupported`, `sizeVsMemory`, `diskSpace`, `cacheQuota`) and names the stage that failed.
+   `MLXSupplyChainPolicy` carries the host's `MLXModelTrustPolicy` (here a toy allow-list), the hash-verification
+   switch, and an `MLXCacheLimits` cap.
+2. **Pin every model to one exact version.** Three kinds of pin meet in `makeProvider`: `pinnedRevisions:` is the
+   developer's **shipped** pin (code, never stored, always wins); `pinStore: MLXFilePinStore()` **captures** the commit
+   of a user's own first download; `managedPinStore:` records a developer-vouched **runtime move** of a shipped pin.
+   `effectivePin(for:)` says which is in force.
+3. **Update deliberately.** `checkPinUpdate(_:to:)` previews what would change and downloads nothing;
+   `updatePin(_:to:beforeSwitch:)` downloads and verifies the new commit, awaits the host's `beforeSwitch` (the pause
+   point), moves the pin, and evicts — all or nothing. Rolling back is `updatePin(to: oldCommit)`. For a shipped model
+   the target is a commit the developer's feed names (`HostUpdateFeed`), **never `main`**; the SDK has no feed and
+   authenticating the answer is the host's job.
+4. **Clean up.** `snapshots(for:)` lists every cached version with what removing it would actually free;
+   `removeSnapshot(_:revision:)` refuses the current one. The SDK never prunes on its own.
+5. **Tune and pair.** `SessionOptions` carries every knob into a real `GenerateParameters`;
+   `pairDraftModel(_:with:)` / `pairAdapter(_:with:)` add a speed helper or a LoRA adapter, re-applied on each Run.
+6. **Observe.** `residencyEventStream` is the residency log; the tokens/sec, repeat-rate and time-to-first-token
+   gauges are measured off the live stream.
+
+Links `LocalLMLabSDKCore` and `LocalLMLabSDKInference`. The README has a section per risk: what it is, what the
+SDK does about it, and where to watch it happen.
+
+```swift
+import Foundation
+import FoundationModels
+import LocalLMLabSDKCore                                          // ← SDK
+import LocalLMLabSDKInference                                     // ← SDK (Inference)
+import SwiftUI
+
+let controlRoomModelRepo = "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
+
+/// A model the "host developer" ships pinned at build time. In a real app this is a
+/// compile-time constant chosen at curation time (does the fork support the architecture; does
+/// it pass our own trust check); here it's the default model at the commit `main` resolved to
+/// on 2026-09-18. Shipped pins live in code, never in the pin store, and always beat a captured
+/// (captured) pin for the same repo.
+struct ShippedModel {
+    let repoID: String
+    let revision: String
+}
+
+let shippedModel = ShippedModel(
+    repoID: controlRoomModelRepo, revision: "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3")
+
+/// A second built-in model, shipped pinned at the version **this build** of the app was released with
+/// — deliberately *not* the newest: its developer has since reviewed a newer commit and offers it
+/// through an update feed (below), so the app can move to it **without a new app release**
+/// (host-managed pin updates). `gemma-3-270m-it-4bit`'s last two
+/// commits differ only in `config.json` (1648 -> 1653 bytes).
+let smallModel = ShippedModel(
+    repoID: "mlx-community/gemma-3-270m-it-4bit", revision: "9eba008f65cdc8aee60201be10dcd0e7858455ce")
+
+/// What a *later* build of the app would ship for `smallModel` — used by "Simulate a newer app build".
+let smallModelNextBuildRevision = "ff1143e3a10547c9f2129e94ca37059b096b23f4"
+
+/// Stand-in for the **developer's update feed**: which commit of each built-in model the developer has
+/// reviewed and vouches for. In a real app this is an authenticated request to the developer's server
+/// (or an MDM push); the SDK has no feed and takes no view on where the commit comes from — the host
+/// names an explicit commit hash, and *authenticating that answer is the host's job*. It is never
+/// "latest main": an unreviewed version must not replace the vetted one.
+enum HostUpdateFeed {
+    static let vouchedCommits: [String: String] = [
+        smallModel.repoID: "ff1143e3a10547c9f2129e94ca37059b096b23f4",
+    ]
+
+    static func latest() async throws -> [String: String] {
+        try await Task.sleep(for: .milliseconds(400))   // "the network"
+        return vouchedCommits
+    }
+}
+
+@available(macOS 27.0, *)
+@MainActor
+final class ControlRoomModel: ObservableObject {
+    // …knob state (@Published temperature, topP, seed, topK, minP, repetition…), gauges…
+
+    private var mlx: MLXModelProvider?                            // ← SDK (Inference)
+    private var lab: LocalLMLab?                                  // ← SDK
+    private var residencyTask: Task<Void, Never>?
+
+    private func log(_ event: ResidencyEvent) {                   // ← SDK (Inference)
+        let stamp = Date().formatted(date: .omitted, time: .standard)
+        switch event {
+        case .warmed(let id):
+            residencyLog.append("\(stamp)  ⬤ warmed  \(id)")
+        case .evicted(let id, let reason):
+            residencyLog.append("\(stamp)  ○ evicted \(id) (\(reason))")
+        case .loadProgress(let id, let fraction):
+            residencyLog.append("\(stamp)  ↻ load \(id) \(Int(fraction * 100))%")
+        @unknown default:
+            residencyLog.append("\(stamp)  ? unrecognized residency event")
+        }
+    }
+
+    var options: SessionOptions {                                 // ← SDK
+        SessionOptions(                                           // ← SDK
+            effort: suppressThinking ? .off : nil,
+            temperature: temperature,
+            topP: topP,
+            maxOutputTokens: maxOutputTokens,
+            seed: useFixedSeed ? UInt64(seed) : nil,
+            topK: topK > 0 ? Int(topK) : nil,
+            minP: minP > 0 ? minP : nil,
+            repetitionPenalty: useRepetitionPenalty ? repetitionPenalty : nil,
+            repetitionContextSize: useRepetitionPenalty ? Int(repetitionContextSize) : nil,
+            prefillStepSize: usePrefillStepSize ? Int(prefillStepSize) : nil)
+    }
+
+    private func run(_ prompt: String) async {
+        guard let lab else { return }
+        applyPairing()
+        let pairedThisRun = pairingEnabled
+        state = .working
+        do {
+            let currentOptions = options
+            let session = try lab.makeSession(route: .local, options: currentOptions)  // ← SDK
+            let start = Date()
+            var firstChunkAt: Date?
+            var wordCount = 0
+            for try await partial in session.languageModelSession.streamResponse(to: prompt) {  // ← SDK
+                if firstChunkAt == nil, !partial.content.isEmpty { firstChunkAt = Date() }
+                lastOutput = partial.content
+                wordCount = partial.content.split(separator: " ").count
+            }
+            let elapsed = Date().timeIntervalSince(start)
+            tokensPerSecond = elapsed > 0 ? Double(wordCount) / elapsed : nil
+            if activePreset != nil, let rate = tokensPerSecond {
+                if pairedThisRun { lastRateWithPairing = rate } else { lastRateWithoutPairing = rate }
+            }
+            repeatRate = Self.trigramRepeatRate(lastOutput)
+            timeToFirstTokenMS = firstChunkAt.map { $0.timeIntervalSince(start) * 1000 }
+
+            if let fixedSeed = currentOptions.seed {
+                if let previous = previousRun, previous.prompt == prompt, previous.seed == fixedSeed {
+                    deterministic = previous.output == lastOutput
+                } else {
+                    deterministic = nil
+                }
+                previousRun = (prompt: prompt, seed: fixedSeed, output: lastOutput)
+            } else {
+                previousRun = nil
+                deterministic = nil
+            }
+            state = .ready
+        } catch {
+            state = .failed("Generation failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Model selection & onboarding (excerpt)
+
+    /// Captured pins live in the SDK's `MLXFilePinStore` — a JSON file in Application
+    /// Support, outside the Hugging Face cache (whose `remove(_:)` wipes a repo's whole directory,
+    /// `refs/` included). The provider reads it at download time and captures into it on first
+    /// sight; this app does none of that by hand.
+    private let pinStore = MLXFilePinStore()                      // ← SDK (Inference)
+    /// Runtime advances of *shipped* pins (an update from the developer's feed) live here, each saved with
+    /// the build-time pin it was made against — so an update survives a relaunch, but a newer app build
+    /// (a different build-time pin) discards it and the developer's newer choice wins.
+    private let managedPinStore = MLXFileManagedPinStore()        // ← SDK (Inference)
+
+    // …
+    /// Which kind of pin the active single model is on, if it can be updated here at all:
+    /// - `.captured` — the user's own choice; the user decides, and the target is whatever `main` is now;
+    /// - `.shipped` — a built-in model **the developer's feed vouches for**: the target is the commit
+    ///   the feed names, never `main`. A shipped model the feed doesn't mention can't be updated here
+    ///   (the recommended model and both pairs: a new app version moves them).
+    var updatablePinSource: MLXPinSource? {                       // ← SDK (Inference)
+        guard case .single(let repo) = activeLaunch, let pin = mlx?.effectivePin(for: repo) else { return nil }  // ← SDK (Inference)
+        switch pin.source {
+        case .captured: return .captured
+        case .shipped: return HostUpdateFeed.vouchedCommits[repo] != nil ? .shipped : nil
+        @unknown default: return nil
+        }
+    }
+
+    /// A built-in model the developer's feed has already moved past what this build shipped.
+    var activeIsRuntimeOverride: Bool {
+        guard case .single(let repo) = activeLaunch else { return false }
+        return mlx?.effectivePin(for: repo)?.isRuntimeOverride ?? false  // ← SDK (Inference)
+    }
+
+    /// What this app build shipped for the active model — the "back to the version this app shipped" target.
+    var activeBuildTimeRevision: String? {
+        guard case .single(let repo) = activeLaunch else { return nil }
+        return mlx?.buildTimePin(for: repo)                       // ← SDK (Inference)
+    }
+
+    /// The `beforeSwitch` hook: the SDK has downloaded and verified the new version and is about to
+    /// move the pin. Stop new runs, let the one in flight finish, then return.
+    private func pauseInferenceForSwitch() async throws {
+        inferencePaused = true
+        onboardingLogLine("update downloaded and verified — pausing inference to switch")
+        while state == .working { try await Task.sleep(for: .milliseconds(100)) }
+    }
+
+    func checkForPinUpdate() {
+        guard pinUpdatable, !isPinUpdateBusy, let mlx, case .single(let repo) = activeLaunch else { return }
+        pinUpdate = .checking
+        let source = updatablePinSource
+        Task {
+            do {
+                // A shipped model is only ever checked against a commit the developer's feed names —
+                // the user's click triggers the check, the developer vouches for the version.
+                let target: String? = source == .shipped ? try await HostUpdateFeed.latest()[repo] : nil
+                let check = try await mlx.checkPinUpdate(repo, to: target)  // ← SDK (Inference)
+                pinUpdate = check.isUpToDate ? .upToDate : .available(check)
+                onboardingLogLine("update check \(repo): " + (check.isUpToDate ? "up to date" : "\(check.changes.count) file(s) differ"))
+            } catch {
+                pinUpdate = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Moves the pin to `revision` (the checked-for latest, or the rollback target).
+    private func movePin(to revision: String?, previous: String) {
+        guard pinUpdatable, !isPinUpdateBusy, let mlx, case .single(let repo) = activeLaunch else { return }
+        pinUpdate = .updating(0)
+        Task {
+            defer { inferencePaused = false }
+            do {
+                for try await event in mlx.updatePin(repo, to: revision, beforeSwitch: {  // ← SDK (Inference)
+                    // Strong on purpose: this runs inside the update's own Task, which already holds the
+                    // model, and the update is short-lived.
+                    try await self.pauseInferenceForSwitch()
+                }) {
+                    switch event {
+                    case .progress(_, _, let fraction): pinUpdate = .updating(fraction)
+                    case .completed(let model):
+                        activePins = [ActivePin(repo: repo, revision: model.resolvedRevision)]  // ← SDK
+                        rollbackRevision = model.resolvedRevision == previous ? nil : previous  // ← SDK
+                        onboardingLogLine("pin for \(repo): \(previous.prefix(12))… → \(model.resolvedRevision.prefix(12))…")  // ← SDK
+                    @unknown default: break
+                    }
+                }
+                refreshCapturedPins()
+                refreshSnapshots()
+                pinUpdate = .upToDate
+            } catch {
+                // Atomic: a failed update left the old pin and the old files exactly as they were.
+                pinUpdate = .failed("\(error.localizedDescription) — still pinned to \(previous.prefix(12))…")
+            }
+        }
+    }
+
+    func refreshSnapshots() {
+        guard let mlx else { snapshots = []; return }
+        snapshots = activeRepos.flatMap { mlx.snapshots(for: $0) }  // ← SDK (Inference)
+    }
+
+    func removeSnapshot(_ snapshot: MLXCachedSnapshot) {          // ← SDK (Inference)
+        guard let mlx else { return }
+        do {
+            let freed = try mlx.removeSnapshot(snapshot.repoID, revision: snapshot.revision)  // ← SDK (Inference)
+            onboardingLogLine("removed \(snapshot.repoID)@\(snapshot.revision.prefix(12))… — freed \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file))")
+        } catch {
+            onboardingLogLine("could not remove that version: \(error.localizedDescription)")
+        }
+        refreshSnapshots()
+    }
+
+    /// Toy `MLXModelTrustPolicy`: the free-text picker is limited to
+    /// mlx-community/*, plus the exact artifacts this app itself ships (a curated adapter lives
+    /// in another namespace — a real host's allow-list would name it too).
+    private struct AllowMLXCommunityOrShipped: MLXModelTrustPolicy {  // ← SDK (Inference)
+        let shippedRepoIDs: Set<String>
+        func evaluate(repoID: String) async -> MLXModelTrustDecision {
+            repoID.hasPrefix("mlx-community/") || shippedRepoIDs.contains(repoID)
+                ? .allow
+                : .deny(reason: "this demo only allow-lists mlx-community/* and this app's shipped artifacts — try a different namespace to see it denied")
+        }
+    }
+
+    /// A fresh provider every call, seeded from the persisted pin store exactly as it would be
+    /// after an app relaunch. A speed pair's base and draft are one resident unit in the SDK, so the
+    /// default `residentModelLimit` is enough — this used to pass 2 for a speed pair as a workaround.
+    private func makeProvider(for launch: Launch) -> MLXModelProvider {  // ← SDK (Inference)
+        return MLXModelProvider(                                  // ← SDK (Inference)
+            pinnedRevisions: shippedPins(for: launch),            // ← SDK (Inference)
+            supplyChainPolicy: MLXSupplyChainPolicy(              // ← SDK (Inference)
+                verification: verificationEnabled ? .enabled : .disabled,
+                trustPolicy: AllowMLXCommunityOrShipped(shippedRepoIDs: Set(allShipped.map(\.repoID))),
+                cacheLimits: cacheCapEnabled
+                    ? MLXCacheLimits(maxTotalCacheBytes: Int64(cacheCapMB * 1_000_000))  // ← SDK (Inference)
+                    : .default),
+            pinStore: pinStore,                                   // ← SDK (Inference)
+            managedPinStore: managedPinStore)                     // ← SDK (Inference)
+    }
+
+    private func prepare(_ launch: Launch) async {
+        let holdForAcknowledgement = isRedownloadFlow
+        preps = launch.artifacts
+        let provider = makeProvider(for: launch)
+        var pins: [ActivePin] = []
+        var source: PinSource = .shipped
+
+        for index in preps.indices {
+            let repo = preps[index].repoID
+            guard ModelID(scheme: "mlx", rest: repo) != nil else {  // ← SDK
+                preps[index].validate = .failed("\"\(repo)\" isn't a valid repo id — expected namespace/name")
+                return
+            }
+
+            // 1. validate — an adapter repo has no model config.json, so the architecture check
+            // doesn't apply; the trust policy still runs, at download.
+            if preps[index].isAdapter {
+                preps[index].validate = .done("adapter repo — no architecture check; trust policy applies at download")
+            } else {
+                preps[index].validate = .running
+                do {
+                    let result = try await provider.validate(repo)  // ← SDK (Inference)
+                    if let stage = result.failedStage {           // ← SDK
+                        preps[index].validate = .failed("failed at .\(stage.rawValue) — \(result.detail ?? "")")
+                        onboardingLogLine("validate \(repo): failed at .\(stage.rawValue)")
+                        return
+                    }
+                    preps[index].validate = .done(result.detail ?? "passed")
+                    onboardingLogLine("validate \(repo): passed")
+                } catch {
+                    preps[index].validate = .failed(error.localizedDescription)
+                    return
+                }
+            }
+
+            // 2. download (a cache hit completes immediately)
+            // Where a pin stands *before* this download: a captured pin means this is a reuse, none
+            // means the download itself is about to capture one.
+            let priorPin = provider.effectivePin(for: repo)       // ← SDK (Inference)
+            preps[index].download = .running
+            preps[index].progress = 0
+            var revision: String?
+            do {
+                for try await event in provider.download(repo) {  // ← SDK (Inference)
+                    switch event {
+                    case .progress(_, _, let fraction):
+                        preps[index].progress = fraction
+                    case .completed(let model):
+                        revision = model.resolvedRevision         // ← SDK
+                    @unknown default:
+                        break
+                    }
+                }
+            } catch {
+                preps[index].progress = nil
+                preps[index].download = .failed(error.localizedDescription)
+                onboardingLogLine("download \(repo) failed: \(error.localizedDescription)")
+                return
+            }
+            preps[index].progress = nil
+            guard let revision else {
+                preps[index].download = .failed("download finished without a resolved revision")
+                return
+            }
+            preps[index].download = .done("verified" + (verificationEnabled ? "" : " (hash check off)"))
+
+            // 3. pin — the provider applied and (for an unpinned repo) captured it during the
+            // download; here we just confirm what landed matches, and say where it came from.
+            preps[index].pin = .running
+            guard let pin = provider.effectivePin(for: repo) else {  // ← SDK (Inference)
+                preps[index].pin = .failed("no pin was recorded for \(repo) — refusing to continue")
+                onboardingLogLine("no pin for \(repo) after download")
+                return
+            }
+            guard revision == pin.revision else {
+                preps[index].pin = .failed(
+                    "resolved \(revision.prefix(12))… but pinned \(pin.revision.prefix(12))…")
+                onboardingLogLine("pin mismatch for \(repo) — refusing to continue")
+                return
+            }
+            switch pin.source {
+            case .shipped:
+                preps[index].pin = .done("verified against shipped pin \(revision.prefix(12))…")
+                onboardingLogLine("pinned \(repo)@\(revision.prefix(12))… (shipped pin verified)")
+            case .captured:
+                let isNew = priorPin == nil
+                source = isNew ? .captured : .reused
+                preps[index].pin = .done(
+                    isNew ? "captured \(revision.prefix(12))… → pin store" : "reused pin \(revision.prefix(12))…")
+                onboardingLogLine(
+                    "pinned \(repo)@\(revision.prefix(12))… (\(isNew ? "new pin captured" : "existing pin honored"))")
+            @unknown default:
+                preps[index].pin = .done("pinned at \(revision.prefix(12))…")
+            }
+            pins.append(ActivePin(repo: repo, revision: revision))
+        }
+
+        refreshCapturedPins()
+        if holdForAcknowledgement {
+            pendingActivation = PendingActivation(provider: provider, launch: launch, pins: pins, source: source)
+        } else {
+            activate(provider: provider, launch: launch, pins: pins, source: source)
+        }
+    }
+
+    private func activate(provider: MLXModelProvider, launch: Launch, pins: [ActivePin], source: PinSource) {  // ← SDK (Inference)
+        guard let id = ModelID(scheme: "mlx", rest: launch.baseRepo) else { return }  // ← SDK
+        residencyTask?.cancel()
+        residencyLog.removeAll()
+        resetGauges()
+        mlx = provider
+        let newLab = LocalLMLab(configuration: .init(providers: [provider]))  // ← SDK
+        newLab.models.route(.local, to: id)                       // ← SDK
+        lab = newLab
+        activeLaunch = launch
+        activeRepo = launch.baseRepo
+        activePins = pins
+        pinSource = source
+        let stream = provider.residencyEventStream                // ← SDK (Inference)
+        residencyTask = Task { [weak self] in
+            guard let stream else { return }
+            for await event in stream {
+                self?.log(event)
+            }
+        }
+        switch launch {
+        case .single:
+            activePreset = nil
+            suggestedPrompt = nil
+        case .pairing(let preset):
+            activePreset = preset
+            applyPresetDefaults(preset)
+        }
+        pinUpdate = .idle
+        rollbackRevision = nil
+        refreshSnapshots()
+        pairingEnabled = false
+        lastRateWithoutPairing = nil
+        lastRateWithPairing = nil
+        applyPairing()
+        state = .idle
+        phase = .ready
+    }
+
+    /// Re-applied on every Run — the live on/off switch.
+    private func applyPairing() {
+        guard let mlx, let preset = activePreset else { return }
+        switch preset.kind {
+        case .speedHelper(let numDraftTokens):
+            mlx.pairDraftModel(                                   // ← SDK (Inference)
+                pairingEnabled
+                    ? SpeculativeDecodingSpec(draftRepoID: preset.companion.repoID, numDraftTokens: numDraftTokens)  // ← SDK (Inference)
+                    : nil,
+                with: preset.base.repoID)
+        case .adapter:
+            mlx.pairAdapter(                                      // ← SDK (Inference)
+                pairingEnabled ? AdapterSpec(source: .huggingFace(repoID: preset.companion.repoID)) : nil,  // ← SDK (Inference)
+                with: preset.base.repoID)
+        }
+    }
+    // …
+}
+```
+
+**Tally**: of the excerpt's SDK-facing lines, 47 carry a marker — and the *shape* is more useful than the count. The
+supply-chain policy is **one argument** to `MLXModelProvider` (`supplyChainPolicy:`) plus a small protocol
+conformance; pinning is **three** (`pinnedRevisions:`, `pinStore:`, `managedPinStore:`); an update is **one** call
+(`updatePin`) whose `beforeSwitch` closure is the only thing the host writes to keep it safe; cleanup is **two**
+(`snapshots`, `removeSnapshot`); a pairing is **one** call per kind. Everything else is the host's own: the update feed
+and how it is authenticated, the pause loop (`pauseInferenceForSwitch` refuses new runs and waits for the running one),
+the allow-list, the knob state, and the gauges. Compare [`components-updates-demo`](#examplescomponents-updates-demo),
+which puts a ready-made `Components` UI on the same flows, and [`vistanova`](#examplesvistanova), which shows the
+minimal end (one `pinnedRevisions:` and nothing else). The one thing worth copying verbatim is
+`AllowMLXCommunityOrShipped`: an allow-list keyed on `mlx-community/` plus the exact artifacts the app itself ships,
+because a curated adapter lives in a different namespace.
