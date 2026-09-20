@@ -31,8 +31,8 @@ non-comment lines; these examples are commented far more heavily than production
 | [`repo-qa-local`](#examplesrepo-qa-local) | 96 | 134 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
 | [`components-demo`](#examplescomponents-demo) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-tools) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
-| [`workspace-buddy`](#examplesworkspace-buddy) | 172 | 226 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
-| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 255 | 332 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
+| [`workspace-buddy`](#examplesworkspace-buddy) | 173 | 227 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 256 | 333 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-today) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
 | [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
@@ -670,7 +670,7 @@ generally.
 
 ## `examples/workspace-buddy`
 
-*`Sources/WorkspaceBuddy/WorkspaceBuddyApp.swift` — 172 lines of code (226 with comments) — the plain-SwiftUI UI section is elided below.*
+*`Sources/WorkspaceBuddy/WorkspaceBuddyApp.swift` — 173 lines of code (227 with comments) — the plain-SwiftUI UI section is elided below.*
 
 A fourth shape again: the first reference app that writes to disk, and the first sandboxed by
 default. Pick a folder, describe a change, the on-device model reads/creates/edits files in it via
@@ -792,8 +792,9 @@ final class WorkspaceBuddyModel: ObservableObject {
                 listWorkspaceFiles to see what's there and readWorkspaceFile before editing \
                 anything — never guess a file's contents. Prefer editWorkspaceFile (a targeted \
                 find-and-replace) over writeWorkspaceFile for changes to files that already \
-                exist; writeWorkspaceFile only creates brand-new files and fails if the file is \
-                already there. Explain what you changed and why, briefly.
+                exist; writeWorkspaceFile fails on an existing file unless you pass overwrite:true, \
+                which you should only do to regenerate a file wholesale, never for a partial edit. \
+                Explain what you changed and why, briefly.
                 """
             }
             do {
@@ -1574,7 +1575,7 @@ three more: the `shippedPins` dictionary and `pinStore:` argument on `MLXModelPr
 
 ## `examples/workspace-buddy-local`
 
-*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 255 lines of code (332 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 256 lines of code (333 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddy) above —
@@ -1702,8 +1703,9 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 listWorkspaceFiles to see what's there and readWorkspaceFile before editing \
                 anything — never guess a file's contents. Prefer editWorkspaceFile (a targeted \
                 find-and-replace) over writeWorkspaceFile for changes to files that already \
-                exist; writeWorkspaceFile only creates brand-new files and fails if the file is \
-                already there. Explain what you changed and why, briefly.
+                exist; writeWorkspaceFile fails on an existing file unless you pass overwrite:true, \
+                which you should only do to regenerate a file wholesale, never for a partial edit. \
+                Explain what you changed and why, briefly.
                 """
             do {
                 let session = try self.lab.makeSession(              // ← SDK
