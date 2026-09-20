@@ -1,11 +1,10 @@
 import Testing
 import Foundation
 import LocalLMLabSDKCore
-@testable import LocalLMLabSDKComponents
+import LocalLMLabSDKComponents
 
-// The SwiftUI presenter as an
-// MCPElicitationHandler: queues a request, resolves when the sheet decides,
-// auto-cancels on timeout.
+// The SwiftUI presenter as an MCPElicitationHandler: queues a request, resolves when the sheet
+// decides, auto-cancels on timeout.
 
 @available(macOS 26.0, *)
 private func request(_ message: String = "hi", url: URL? = nil) -> MCPElicitationRequest {

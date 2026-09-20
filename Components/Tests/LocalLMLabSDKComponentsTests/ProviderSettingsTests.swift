@@ -1,7 +1,7 @@
 import Testing
 import SwiftUI
 import LocalLMLabSDKCore
-@testable import LocalLMLabSDKComponents
+import LocalLMLabSDKComponents
 
 @Test func draftFactoryPrefillsSchemeAndWebSearchSupport() {
     #expect(RemoteProviderDraft.new(.anthropic).scheme == "anthropic")

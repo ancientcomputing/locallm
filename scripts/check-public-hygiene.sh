@@ -65,6 +65,15 @@ report 'private-process aside or internal component name' \
   -e 'maintained privately|public copy|copied here|private source|copy process|the SDK repo\b' \
   -e 'MCPServerManagerHost|LOCALLM_SDK_VERIFICATION|serve op\b' -e '\b[Cc]hooser\b'
 
+# 8. Components' tests use the PUBLIC API only (no @testable), so they double as a check that
+#    everything a consumer needs is public, and never depend on internals.
+if hits="$(git grep -nI '@testable import' -- 'Components/Tests' 2>/dev/null)"; then
+  echo "✗ @testable import in Components/Tests (use the public API only)"
+  echo "$hits" | sed 's/^/    /'
+  echo
+  fail=1
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "FAIL: private-repo references found in the public tree (see above)."
   echo "Fix them in locallmlab-sdk first, then re-copy — do not patch only the public side."

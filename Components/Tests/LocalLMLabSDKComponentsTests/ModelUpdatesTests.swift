@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import LocalLMLabSDKCore
-@testable import LocalLMLabSDKComponents
+import LocalLMLabSDKComponents
 
 // ModelUpdateModel and ModelVersionsModel. The host's provider is a set of closures, so the state machine,
 // the pause point and the guards are tested without any provider.

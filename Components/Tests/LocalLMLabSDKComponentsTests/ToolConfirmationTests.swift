@@ -2,7 +2,7 @@ import Testing
 import Foundation
 import FoundationModels
 import LocalLMLabSDKCore
-@testable import LocalLMLabSDKComponents
+import LocalLMLabSDKComponents
 
 // The SwiftUI presenter as a ToolConfirmationChannel.
 

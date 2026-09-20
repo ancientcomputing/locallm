@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import LocalLMLabSDKCore
-@testable import LocalLMLabSDKComponents
+import LocalLMLabSDKComponents
 
 // ModelOnboardingModel: Validate -> Download -> Pin, per repo, in order. Every dependency is a closure, so
 // none of this needs a provider, a network or a GPU.
