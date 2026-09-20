@@ -223,3 +223,14 @@ A sandboxed example keeps its models in its own container; a `swift run` example
 only removed with `--shared`. Pin records live separately from the weights (`--pins`).
 `--example <name>` limits it to one example, and `--check` tells you if the script's model list has
 drifted from the examples' sources.
+
+To keep the shared models while you test, back them up first and restore afterwards:
+
+```bash
+./scripts/scrub-example-models.sh --shared-backup --shared --pins --yes   # back up, then remove
+./scripts/scrub-example-models.sh --shared-restore --yes                  # put them back
+```
+
+The backup goes to a sibling folder of the cache (`~/.cache/huggingface/hub-example-backup`; set
+`SCRUB_BACKUP_DIR` to move it). On APFS the copy is a clone, so it takes almost no extra space, and the
+removal only happens once the backup is verified. Restore skips any model already in the cache.
