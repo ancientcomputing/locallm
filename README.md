@@ -28,9 +28,9 @@ On macOS 26 only Apple's on-device model runs; open-weight (MLX) models and the
 hosted providers need macOS 27. **Private Cloud Compute** is wired up but needs
 an Apple entitlement that is still pending, so it is inert in this beta.
 
-**Download:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm), or the
-DMG + `.sha256` on
-[`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases).
+**Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
+get the app directly:
+[LocalLM Lab 1.0.0-RC.1 (arm64 DMG)](https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-RC.1/LocalLM.Lab-1.0.0-RC.1-arm64.dmg).
 
 ## LocalLM Lab SDK
 
