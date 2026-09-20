@@ -1,7 +1,7 @@
 import LocalLMLabSDKCore
 import SwiftUI
 
-/// The assembled "AI Models" settings panel (docs/12 §5): the built-in model families with
+/// The assembled "AI Models" settings panel: the built-in model families with
 /// live availability, then one `ProviderSettingsSection` per configured online provider, then
 /// an **Add provider** menu.
 ///
@@ -23,7 +23,7 @@ public struct AIModelsSettingsView: View {
     ///     `lab.models.replace(_:)`, and persist (key → Keychain).
     ///   - onRemove: called when the user deletes a provider — `lab.models.removeProvider(scheme:)`
     ///     and forget its key.
-    ///   - onTest: runs a zero-token connectivity/key/model check (docs/12 §11) and shows a
+    ///   - onTest: runs a zero-token connectivity/key/model check and shows a
     ///     "Test connection" button when non-`nil`. Omit if the host doesn't link
     ///     `LocalLMLabSDKRemote` or hasn't wired `RemoteModelProvider.probe(for:)` yet.
     public init(

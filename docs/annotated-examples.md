@@ -328,7 +328,7 @@ struct ContentView: View {
 // WindowGroup treats an open-URL event as a request for a new scene instance and spins up a
 // second window for it (confirmed live: signing in to Todoist brought back a second "Plate
 // Today" window instead of returning to the original one). NSApplicationDelegate gets the same
-// Apple Event without SwiftUI creating anything — same fix LocalLM Lab's own chooser window
+// Apple Event without SwiftUI creating anything — same fix LocalLM Lab's own main window
 // already uses for this exact problem.
 @available(macOS 26.0, *)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -360,12 +360,12 @@ struct PlateTodayApp: App {
         // content's *ideal* size on every re-layout, which fights a user's manual resize — every
         // drag would just get snapped back. .contentMinSize only imposes a floor (from
         // ContentView's own minHeight above), leaving the user's own resize as the real source of
-        // truth for how tall the window can grow. Same reasoning as LocalLM Lab's own chooser
+        // truth for how tall the window can grow. Same reasoning as LocalLM Lab's own main
         // windows.
         .windowResizability(.contentMinSize)
         // Without this, WindowGroup matches every external event by default and ALSO opens a new
         // scene for the same platetoday:// callback AppDelegate already handles above — matching
-        // nothing here makes AppDelegate the only handler, same as LocalLM Lab's own chooser app.
+        // nothing here makes AppDelegate the only handler, same as LocalLM Lab's own app.
         .handlesExternalEvents(matching: [])
     }
 }
@@ -1985,7 +1985,7 @@ final class AppModel {
     }
 
     // "Test connection" — in-process here since this example links Remote directly. A host split
-    // across a macOS-26 chooser + a 27-only helper round-trips this through a serve op instead.
+    // across a macOS 26 app plus a macOS 27 helper would round-trip this call through the helper instead.
     // Every configured model, not just the first — a valid key doesn't mean a second model id the
     // user just typed is real.
     func testDraft(_ draft: RemoteProviderDraft) async -> ProviderTestOutcome {   // ← Components (type)

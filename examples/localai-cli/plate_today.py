@@ -36,7 +36,7 @@ WHAT THIS SCRIPT DOES
 REQUIREMENTS
     - Everything run_localai_mcp.py requires: localai-cli +
       localai-playground-run next to this script (or LOCALAI_CLI_PATH set),
-      LocalLM Lab running (connector/MCP calls relay through its chooser
+      LocalLM Lab running (connector/MCP calls relay through its background
       process over a local socket).
     - In LocalLM Lab's Connectors screen: "System Clock", "Calendar", and
       "Reminders" connectors enabled (Calendar/Reminders each prompt for

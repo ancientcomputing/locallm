@@ -1,7 +1,7 @@
 import LocalLMLabSDKCore
 import SwiftUI
 
-/// One online-provider block in an "AI Models" settings panel (docs/12 §5): an API-key field,
+/// One online-provider block in an "AI Models" settings panel: an API-key field,
 /// a **Configured ✓ / Not configured** badge, a model-id list editor, and — once configured
 /// and if the wire supports it — an **Enable web search** toggle with a **Max searches**
 /// stepper.
@@ -23,7 +23,7 @@ public struct ProviderSettingsSection: View {
 
     /// - Parameters:
     ///   - onTest: runs a zero-token connectivity/key/model check against the provider
-    ///     (docs/12 §11) and returns the outcome. `nil` (the default) hides the "Test
+    ///     and returns the outcome. `nil` (the default) hides the "Test
     ///     connection" button — pass it once the host links `LocalLMLabSDKRemote` and can call
     ///     `RemoteModelProvider.probe(for:)`.
     public init(

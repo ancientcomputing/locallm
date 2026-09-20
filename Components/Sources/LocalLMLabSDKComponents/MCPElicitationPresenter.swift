@@ -3,7 +3,7 @@ import LocalLMLabSDKCore
 import SwiftUI
 
 // The single-process SwiftUI implementation of `MCPElicitationHandler`
-// (docs/mcp-client-spec-upgrade.md §7.2). Mirrors `ToolConfirmationPresenter`:
+// Mirrors `ToolConfirmationPresenter`:
 // a `@MainActor` `ObservableObject` the host installs once and renders with
 // `.mcpElicitationSheet(_:)`, then hands to Core:
 //

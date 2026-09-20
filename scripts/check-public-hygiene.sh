@@ -53,6 +53,18 @@ report 'path-dependency on a closed package (Core/Inference/Remote)' \
   -e '\.package\(path: *"\.\./\.\./(Core|Inference|Remote)"' \
   -e 'package\(path: *"\.\./\.\./\.\./(Core|Inference|Remote)'
 
+# 6. Numbered references to private docs ("docs/12 §5"), internal review/requirement IDs
+#    ("(R16)", "security review F11"), and names of docs that only exist in the private repo.
+report 'reference to a private doc, review ID or requirement ID' \
+  -e 'docs/[0-9]{1,2}([^0-9a-zA-Z]|$)' \
+  -e '\((F|R)[0-9]{1,2}\)' -e '[Ss]ecurity review F[0-9]' \
+  -e 'mlx-security|sdk-authority-model|aiql-sql-design|mcp-client-spec-upgrade|mcp-tavily|sdk-security'
+
+# 7. Sync-process asides and internal component names that mean nothing to a public reader.
+report 'private-process aside or internal component name' \
+  -e 'maintained privately|public copy|copied here|private source|copy process|the SDK repo\b' \
+  -e 'MCPServerManagerHost|LOCALLM_SDK_VERIFICATION|serve op\b' -e '\b[Cc]hooser\b'
+
 if [ "$fail" -ne 0 ]; then
   echo "FAIL: private-repo references found in the public tree (see above)."
   echo "Fix them in locallmlab-sdk first, then re-copy — do not patch only the public side."

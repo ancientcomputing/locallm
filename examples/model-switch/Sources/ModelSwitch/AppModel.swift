@@ -66,9 +66,9 @@ final class AppModel {
         if selectedModel.scheme == draft.scheme { selectedModel = .system }
     }
 
-    /// "Test connection" (docs/12 §11) — in-process here since this example links Remote
-    /// directly. A host split across two binaries (the 26/27 Chooser/helper split — see
-    /// `locallmlab`) round-trips this through a serve op instead.
+    /// "Test connection" — in-process here since this example links Remote
+    /// directly. A host split across two binaries (a macOS 26 app plus a macOS 27 helper)
+    /// would round-trip this call through the helper instead.
     ///
     /// Every configured model, not just the first — a valid key doesn't mean a second or
     /// third model id the user just typed in is real.

@@ -2,11 +2,9 @@
 import Foundation
 import PackageDescription
 
-// "What's on my plate today" — the public copy of the SDK's reference app (this source is
-// maintained privately and copied here). Depends on Core as a BINARY (LocalLMLabSDKCore.xcframework
-// via a GitHub Release asset), unlike the source original, which depends on Core directly — this
-// is the one real difference the copy process has to account for, since Core itself never
-// ships as source.
+// "What's on my plate today" — the SDK's reference app. Depends on Core as a BINARY
+// (LocalLMLabSDKCore.xcframework via a GitHub Release asset), since Core itself never ships as
+// source.
 
 // MARK: - Which SDK version to build against
 

@@ -1,6 +1,5 @@
 // Persistence — everything the app remembers across launches. Nothing here is a secret: the
-// Tavily MCP server's own PAT is persisted automatically by MCPServerManager/MCPPATStore (see
-// locallm/docs/mcp-tavily.md) — we only persist its non-secret shape (URL, tool list) so
+// Tavily MCP server's own PAT is persisted automatically by MCPServerManager/MCPPATStore — we only persist its non-secret shape (URL, tool list) so
 // `lab.mcp.restore(from:)` + `reconnect(id)` can bring the live connection back without the user
 // re-entering the key. Every model is local (Apple on-device or a downloaded MLX model), so
 // there's no other credential to store. Search history (topic threads) is plain JSON.

@@ -189,7 +189,7 @@ public struct ModelPickerView: View {
 
 // MARK: - Claude auth
 
-/// API-key entry for `ClaudeModelProvider` (R16). The value is handed to the host via the
+/// API-key entry for `ClaudeModelProvider`. The value is handed to the host via the
 /// binding — Components does **not** persist it. Production on a real device uses App Attest
 /// (`ClaudeModelProvider.Auth.appAttest`) instead of a key.
 @available(macOS 26.0, *)

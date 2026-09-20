@@ -4,8 +4,8 @@ import SwiftUI
 // Host-app-side ObservableObject wrapper Core's own MCPServerManager doc comment anticipates —
 // Core deliberately isn't an ObservableObject itself (a plain-Swift engine, not SwiftUI-coupled),
 // so any host app wanting reactive UI needs exactly this: subscribe to serverChanges, republish as
-// @Published. LocalLM Lab hand-wrote its own private copy of this (MCPServerManagerHost.swift)
-// before Components existed; this is that same pattern, generalized and made public so no
+// @Published. LocalLM Lab itself hand-wrote this same pattern
+// before Components existed; this is that pattern, generalized and made public so no
 // consuming app has to write it again.
 @available(macOS 26.0, *)
 @MainActor

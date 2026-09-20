@@ -182,7 +182,7 @@ let answer = try await session.respond(to: prompt)
   release — see [§6a](#6a-the-model-layer-local-models-routing-sessions)) depends on `ClaudeForFoundationModels`, which is hard-pinned to macOS 27,
   so linking it forces a **macOS 27 deployment target** on whatever links it. To ship a macOS 26
   app *and* offer Claude, put the Claude path in a separate macOS-27-only executable/helper the
-  way the LocalLM Lab app does (its `--serve` helper is split into a 27 binary and a 26 binary,
+  way the LocalLM Lab app does (its background helper is split into a 27 binary and a 26 binary,
   chosen at launch). `Core`'s public API is identical on both sides of that boundary.
 
 ## 2. Required setup before you can use Calendar/Reminders
@@ -1441,7 +1441,7 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
   offering a provider — a hosted API has far more failure modes than a local model.
 - **`ModelRegistry.replace(_:)` / `.removeProvider(scheme:)`** — add, swap, or drop a provider
   between sessions without rebuilding `LocalLMLab`.
-- **Transport hardening + `RemoteProviderConfig.responseLimits`** (security review F11) — every
+- **Transport hardening + `RemoteProviderConfig.responseLimits`** — every
   request runs over a hardened ephemeral session (explicit request *and* resource timeouts, no
   cache, no cookies), and streamed/response bytes, a single SSE frame, emitted text, and
   accumulated tool-call arguments are all capped — a misbehaving or hostile endpoint throws
@@ -1459,7 +1459,7 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
   (`city`/`region`/`country`/`timezone`) localizes results when the provider supports it — set
   it if your search-heavy queries are location-sensitive ("restaurants near me").
 
-**`RemoteModelProvider.init(_:)` always validates `config` for you** (security review F13) —
+**`RemoteModelProvider.init(_:)` always validates `config` for you** —
 `baseURL` and `auth` are just data, and if your UI lets a user type or import them (a custom
 `.openAICompatible` endpoint, an imported settings file), that string is an SSRF-shaped primitive
 inside your app's sandbox that decides where a real API key gets sent. `init(_:)` runs
@@ -1477,7 +1477,7 @@ profile where `validated()`'s rules are known to be wrong for it), use the non-t
 **Settings UI:** `Components`' `AIModelsSettingsView` renders the whole "AI Models" panel
 (add provider + key, per-model rows, web-search toggle, Test connection). `Components` does
 **not** link `Remote` — it calls back through `onSave` / `onRemove` / `onTest` closures with
-plain `RemoteProviderDraft` / `ProviderTestOutcome` values, so a macOS-26 chooser can host the
+plain `RemoteProviderDraft` / `ProviderTestOutcome` values, so a macOS-26 host app can host the
 panel and hand the actual `RemoteModelProvider` work to a 27-only helper. → *the full pattern
 is [`examples/model-switch`](../examples/model-switch/).*
 
@@ -1961,8 +1961,7 @@ out.csv`. The building blocks under them — `CSVCodec` (RFC 4180 encode/decode 
 with the same `saveAs` path plus `saveAsAppend: true`, and `jsonToCsv` / `describeJson` read the
 resulting file of concatenated JSON values (`{…}{…}{…}`) as one dataset.
 
-**`loadTable` + `sqlQuery` — real SQL over the pulled data (`1.0.0-beta.4`; see
-`aiql-sql-design.md` in the SDK repo).** Chaining the verbs asks the model to emit a correct
+**`loadTable` + `sqlQuery` — real SQL over the pulled data (`1.0.0-beta.4`).** Chaining the verbs asks the model to emit a correct
 multi-call sequence, and small models drift — most often dropping the filter when it is the
 third refinement. The answer is not another verb: it is to stop the model *orchestrating* and
 have it *describe one query*. `loadTable(jsonPath, tableName)` stages a JSON records file into an
@@ -2224,7 +2223,7 @@ polling):
   `[RemoteProviderDraft]` (persist keys to the Keychain) and the `onSave` / `onRemove` / `onTest`
   closures that turn a draft into a `RemoteModelProvider` and call `lab.models.replace(_:)`.
   `Components` has **no dependency on `LocalLMLabSDKRemote`** — the closures are the seam, so a
-  macOS-26 chooser can present the panel and hand the 27-only work to a helper. See [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote).
+  macOS-26 host app can present the panel and hand the 27-only work to a helper. See [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote).
 - **`ProviderSettingsSection`** — one provider block: API-key field, a **Configured ✓** badge, a
   per-model row editor (add / trash), an **Enable web search** toggle + **Max searches** stepper
   once configured, and a **Test connection** button (one result per model, via the host's
@@ -2375,7 +2374,7 @@ struct ClaudeModelSpec: Sendable, Hashable { /* one Claude model — id, display
 // .requiresOS("macOS 27") at runtime on 26, same as pcc) — [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) ---
 @available(macOS 27, *)
 struct RemoteModelProvider: ModelProvider {
-    // Security review F13: always validates — the only initializer without "unchecked" in its
+    // Always validates — the only initializer without "unchecked" in its
     // name, so there's no shorter unvalidated spelling to reach for by mistake.
     init(_ config: RemoteProviderConfig) throws                 // runs config.validated()
     init(unchecked config: RemoteProviderConfig)                // explicit bypass — trusted configs only
@@ -2392,7 +2391,7 @@ struct RemoteProviderConfig: Sendable, Equatable {
     var capabilities: Set<Capability>            // .webSearch, …
     var defaultOptions: SessionOptions
     var allowArbitraryModelIDs: Bool = false     // true → any "scheme:<string>" routes (OpenRouter)
-    var responseLimits: RemoteResponseLimits = .default   // security review F11 — see below
+    var responseLimits: RemoteResponseLimits = .default   // see below
     init(scheme: String, displayName: String, dialect: Dialect, baseURL: URL, auth: Auth,
          models: [RemoteModel] = [], capabilities: Set<Capability> = [],
          defaultOptions: SessionOptions = .init(), allowArbitraryModelIDs: Bool = false,
@@ -2414,7 +2413,7 @@ extension RemoteProviderConfig {
     static func openRouter(apiKey: String, models: [RemoteModel] = []) -> Self   // allowArbitraryModelIDs = true
     static func openAICompatible(scheme: String, displayName: String, baseURL: URL, apiKey: String?) -> Self
 
-    // Security review F9: run this on any config whose baseURL/auth came from outside your own
+    // Run this on any config whose baseURL/auth came from outside your own
     // code (a pasted URL, an imported profile) — throws ValidationIssue rather than silently
     // sending a key to an untrusted or non-HTTPS host. Syntax check, not a trust check.
     func validated() throws -> RemoteProviderConfig
@@ -2430,10 +2429,10 @@ enum RemoteError: Error, LocalizedError {   // wrapped in LocalLMLabError.genera
     case http(status: Int, message: String)
     case transport(Error)
     case dialectNotImplemented(String)
-    case responseTooLarge(String)           // a RemoteResponseLimits bound was exceeded (F11)
+    case responseTooLarge(String)           // a RemoteResponseLimits bound was exceeded
 }
 
-// Security review F11: a custom OpenAI-compatible endpoint is exactly as untrusted as an MCP
+// A custom OpenAI-compatible endpoint is exactly as untrusted as an MCP
 // server — this is the Remote-side equivalent of MCPResponseLimits. Applied per-provider via
 // RemoteProviderConfig.responseLimits; defaults suit a well-behaved provider.
 struct RemoteResponseLimits: Sendable, Hashable {
@@ -3524,7 +3523,7 @@ struct ProviderSettingsSection: View {
 struct RemoteProviderDraft: Identifiable, Hashable, Sendable {
     var scheme, displayName, baseURL, apiKey: String
     var kind: RemoteProviderKind
-    var models: [String]                 // .new(_:) leaves this empty — host prefills (docs/12 [§10](#10-app-sandbox--building-for-the-mac-app-store))
+    var models: [String]                 // .new(_:) leaves this empty — host prefills
     var webSearchSupported, webSearchEnabled, configured: Bool
     var maxSearches: Int
     var statusText: String?

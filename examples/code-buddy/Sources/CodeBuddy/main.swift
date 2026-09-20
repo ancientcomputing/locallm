@@ -3,7 +3,7 @@ import FoundationModels
 import LocalLMLabSDKCore
 import LocalLMLabSDKInference
 
-// code-buddy — a minimal coding agent on the LocalLM Lab SDK (R17).
+// code-buddy — a minimal coding agent on the LocalLM Lab SDK.
 //
 //   code-buddy [options] <workspace-dir> [task...]
 //

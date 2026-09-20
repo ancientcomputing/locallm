@@ -1785,12 +1785,6 @@ struct MLXControlRoomApp: App {
     @StateObject private var model = ControlRoomModel()
 
     init() {
-        #if LOCALLM_SDK_VERIFICATION
-        // Maintainer builds only (see Verification.swift): `--verify-*` runs the SDK's real-network checks
-        // headless and exits before the window opens. Compiled out of the public copy of this example.
-        runVerificationModeIfRequested()
-        #endif
-
         // Launched with `swift run` there is no app bundle, so macOS starts this as a
         // background-style process: it can show a window and take clicks, but it is never made
         // the active application, so keystrokes go to whatever app was frontmost (the terminal

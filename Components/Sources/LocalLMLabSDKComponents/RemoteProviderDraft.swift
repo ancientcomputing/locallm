@@ -21,7 +21,7 @@ public struct RemoteProviderDraft: Identifiable, Hashable, Sendable {
     public var apiKey: String
     /// Model ids to expose, one per line in the editor (`"gpt-6-astra"`, `"anthropic/claude-…"`).
     /// `RemoteProviderDraft.new(_:)` leaves this empty — Components has no opinion on which
-    /// model id is current, cheap, or good for a given app; the host prefills it (docs/12 §10).
+    /// model id is current, cheap, or good for a given app; the host prefills it.
     public var models: [String]
     /// Whether this provider/wire can do provider-native web search (drives the checkbox).
     public var webSearchSupported: Bool
@@ -85,7 +85,7 @@ public enum RemoteProviderKind: String, Sendable, Hashable, CaseIterable {
 
 public extension RemoteProviderDraft {
     /// A blank draft for `kind`, prefilled with the usual scheme / name / capability hints —
-    /// but deliberately **no default `models`** (docs/12 §10). Components has no opinion on
+    /// but deliberately **no default `models`**. Components has no opinion on
     /// which model id is current, cheap, or good for a given app's users, and a hardcoded
     /// guess here goes stale the moment a provider retires that model (that's exactly how
     /// "anthropic/claude-3.7-sonnet" 404ed for everyone using it, 2026-09). The host — who has

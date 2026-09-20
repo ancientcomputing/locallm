@@ -1,6 +1,6 @@
 import Foundation
 
-/// The result of a "Test connection" check on one online provider (docs/12 §11) — one
+/// The result of a "Test connection" check on one online provider — one
 /// zero-token HTTP call **per configured model**, run by the host (Components doesn't
 /// depend on `LocalLMLabSDKRemote`, so it can't run the check itself; see
 /// `ProviderSettingsSection.onTest`).

@@ -2,8 +2,7 @@
 import Foundation
 import PackageDescription
 
-// os-matrix — the public copy of the SDK's 26/27 reference example (source maintained
-// privately, copied here). ONE .macOS("26.0") build that runs on both macOS 26 and 27 — the
+// os-matrix — the SDK's 26/27 reference example. ONE .macOS("26.0") build that runs on both macOS 26 and 27 — the
 // canonical "register fewer providers on 26, one #available block, identical code after"
 // pattern. See README.md for the four scenarios and the "Claude → separate 27-only target"
 // recipe.

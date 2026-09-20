@@ -5,7 +5,7 @@ set -euo pipefail
 # codesign/notarize sequence, same --entitlements-on-every-touching-sign discipline LocalLM Lab's
 # own release tooling uses, since that already worked out the real TCC/codesign failure modes the
 # hard way (see packaging/PlateTodayTools.entitlements' comment). This app is simpler (single
-# binary, no nested chooser bundle), so the script is shorter, but the sequence that matters —
+# binary, no nested helper bundle), so the script is shorter, but the sequence that matters —
 # sign binary, sign bundle WITH --entitlements again, verify, notarize, staple — is unchanged.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -157,7 +157,7 @@ BINARY="$BIN_DIR/PlateTodayTools"
 # Core.xcframework) produces a `LocalLMLabSDKCore.framework` bundle instead — PlateTodayTools's own
 # @rpath entry (`@rpath/LocalLMLabSDKCore.framework/LocalLMLabSDKCore` in that case) expects the
 # whole framework directory, not a renamed flat file. Confirmed the hard way running this same
-# script against the public copy's binaryTarget build, which produces the framework shape and
+# script against a binaryTarget build, which produces the framework shape and
 # failed to find a nonexistent flat dylib. Detect whichever shape this build actually produced.
 CORE_DYLIB="$BIN_DIR/libLocalLMLabSDKCore.dylib"
 CORE_FRAMEWORK="$BIN_DIR/LocalLMLabSDKCore.framework"

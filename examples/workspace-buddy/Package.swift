@@ -2,10 +2,8 @@
 import Foundation
 import PackageDescription
 
-// Workspace Buddy — the public copy of the SDK's fourth reference app (this source is maintained
-// privately and copied here, same as the other examples). Depends on Core as a BINARY
-// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift
-// for the fuller explanation of that one real difference the copy process accounts for.
+// Workspace Buddy — the SDK's fourth reference app. Depends on Core as a BINARY
+// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift.
 //
 // Same as plate-today-tools/repo-qa, same reason: this app's whole point is
 // WorkspaceAccess/WorkspaceTools (docs/sdk-guide.md §8a), which shipped starting with 0.8.0.

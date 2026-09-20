@@ -245,7 +245,7 @@ search) and a **rebuilt Private Cloud Compute provider**.
 - **`RemoteProviderDraft`** / **`ProviderTestOutcome`** — plain data types the host maps to
   `RemoteProviderConfig` in ~30 lines. `Components` has **no dependency on `Remote`** —
   coordination is via optional closures (`onSave` / `onRemove` / `onTest`), so a macOS-26
-  chooser can present the panel and hand the work to a 27-only helper.
+  host app can present the panel and hand the work to a 27-only helper.
 
 ### Added — Private Cloud Compute
 
@@ -350,7 +350,7 @@ the pickers are identical code on both OSes.
   `LocalLMLabSDKClaude` binaryTarget (keyed off the same `LOCALLM_SDK_VERSION`), `import
   LocalLMLabSDKClaude`, and accept a **macOS 27** deployment target on the target that links
   it. To ship a macOS 26 app *and* offer Claude, put the Claude path in a separate 27-only
-  target (the LocalLM Lab app splits its `--serve` helper this way).
+  target (the LocalLM Lab app splits its background helper this way).
 - **`ModelProvider` protocol**: `languageModel(for:) -> any LanguageModel` →
   `makeSession(for:tools:instructions:transcript:) -> LanguageModelSession`. Apple's
   `LanguageModel` protocol is macOS 27; having the provider build its own session is what

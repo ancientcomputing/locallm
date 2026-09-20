@@ -461,7 +461,7 @@ struct ContentView: View {
 
 // Handle aiql://oauth/callback through the AppDelegate, not SwiftUI's .onOpenURL — WindowGroup
 // treats an open-URL event as a request for a new window (confirmed in plate-today: signing in
-// brought back a second window). Same fix LocalLM Lab's own Chooser uses.
+// brought back a second window). Same fix LocalLM Lab's own app uses.
 @available(macOS 27.0, *)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {

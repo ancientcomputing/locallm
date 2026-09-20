@@ -4,8 +4,7 @@ import SwiftUI
 
 // The single-process SwiftUI implementation of `ToolConfirmationChannel`
 // (the protocol + `ConfirmingToolAuthorizer` itself now live in Core, so a
-// headless / multi-process host can reuse them — see
-// docs/sdk-authority-model.md §1.1).
+// headless / multi-process host can reuse them).
 //
 // Wiring in a single-process SwiftUI app:
 //

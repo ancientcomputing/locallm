@@ -119,7 +119,7 @@ by step, for `quickstart_clock.swift`:
    Install in the dialog, wait, then retry.
 3. **Go to this folder** (adjust the path to wherever you cloned the repo):
    ```bash
-   cd ~/Downloads/localai-playground/examples/localai-cli-swift
+   cd path/to/locallm/examples/localai-cli-swift
    ```
 4. **One-time app setup:** run LocalLM Lab, open **Connectors**, turn on
    **System Clock** (no permission prompt for this one).

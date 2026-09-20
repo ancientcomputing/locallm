@@ -9,7 +9,7 @@ import SwiftUI
 // Why a stepper and not just a progress bar: a host that lets people pick a model needs each step's
 // outcome to be *visible* — "failed at .trustPolicy" or "resolved a commit that isn't the one this app
 // ships" is the difference between a working flow and a mysterious spinner. The steps mirror the SDK's
-// supply-chain flow (docs/mlx-security.md): a preflight (architecture, trust policy, size, quota), a
+// supply-chain flow: a preflight (architecture, trust policy, size, quota), a
 // content-verified download, and the resolved commit checked against the pin the host ships.
 
 /// One repo to onboard.

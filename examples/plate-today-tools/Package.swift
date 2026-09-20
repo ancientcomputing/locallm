@@ -2,11 +2,9 @@
 import Foundation
 import PackageDescription
 
-// "What's on my plate today" — Tools edition. The public copy of the SDK's Path A reference app
-// (this source is maintained privately and copied here, same as plate-today). Depends on Core as
-// a BINARY (LocalLMLabSDKCore.xcframework via a GitHub Release asset), unlike the private source,
-// which depends on Core directly — see plate-today's Package.swift for the fuller explanation of
-// that one real difference the copy process accounts for.
+// "What's on my plate today" — Tools edition. The SDK's Path A reference app.
+// Depends on Core as a BINARY (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see
+// plate-today's Package.swift.
 //
 // Requires an SDK release that includes CalendarTools.swift/RemindersTools.swift/
 // ContactsTools.swift/LocationTools.swift/MCPToolAdapter.swift (the ready-made FoundationModels

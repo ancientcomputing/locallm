@@ -2,10 +2,8 @@
 import Foundation
 import PackageDescription
 
-// Repo Q&A — the public copy of the SDK's third reference app (this source is maintained
-// privately and copied here, same as plate-today/plate-today-tools). Depends on Core as a BINARY
-// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift
-// for the fuller explanation of that one real difference the copy process accounts for.
+// Repo Q&A — the SDK's third reference app. Depends on Core as a BINARY
+// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift.
 //
 // This app's whole point is MCPTool (MCPToolAdapter.swift), which — like the ready-made
 // connector Tools — shipped starting with 0.8.0. Building against 0.7.0/0.7.1 fails to compile
