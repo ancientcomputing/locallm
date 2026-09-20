@@ -204,3 +204,22 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/<Name>-*      # Xcode (or: File ▸
 
 Then build / Run again. This only happens across a re-cut of one version tag — a normal version
 bump changes the tag, so there's nothing stale to collide with.
+
+### Starting over: removing the downloaded models
+
+The open-weight examples download their models on first run (`aiql`, `code-buddy`, `mlx-control-room`,
+`os-matrix`, `repo-qa-local`, `vistanova`, `workspace-buddy-local`). To test that first-run path again,
+`scripts/scrub-example-models.sh` removes what the examples created. It is a **dry run** until you pass
+`--yes`:
+
+```bash
+./scripts/scrub-example-models.sh                        # show what would go, sandboxed apps' caches only
+./scripts/scrub-example-models.sh --shared --pins        # also the shared Hugging Face cache and the pin records
+./scripts/scrub-example-models.sh --shared --pins --yes  # actually delete
+```
+
+A sandboxed example keeps its models in its own container; a `swift run` example uses the shared
+`~/.cache/huggingface/hub`, which other apps (including LocalLM Lab) also use, so those folders are
+only removed with `--shared`. Pin records live separately from the weights (`--pins`).
+`--example <name>` limits it to one example, and `--check` tells you if the script's model list has
+drifted from the examples' sources.
