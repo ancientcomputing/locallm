@@ -12,7 +12,7 @@ Use these local files as the source of truth while working in this repository.
 
 ## Public Site
 
-The public site is `https://locallmlab.dev`. Prefer local repo docs while editing code. Use the website when the user asks for public-facing wording, external links, or developer-facing copy that should match the published site.
+The public site is `https://thisbrain.ai/locallm/`. Prefer local repo docs while editing code. Use the website when the user asks for public-facing wording, external links, or developer-facing copy that should match the published site.
 
 ## Common Local Search Terms
 
