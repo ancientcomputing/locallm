@@ -1554,9 +1554,9 @@ date into the field literally named `date` instead of a separate change field, s
 searched on the wrong date and failed.
 
 **There is no built-in gate on any of this beyond the TCC grant itself.** Unlike LocalLM Lab the
-product, which has its own app-specific "Full Access" toggle deciding whether a given session
-exposes update/delete as tools the model can call at all, Core has no equivalent concept — that's
-UI/IPC behavior specific to that app, not something this SDK provides or enforces. The moment a
+product, which has per-connector levels in its Security panel (Read-only, Changes, Full) deciding
+whether a given session exposes add/update/delete as tools the model can call at all, Core has no
+built-in level setting — that's UI/IPC behavior specific to that app, not something this SDK provides or enforces. The moment a
 user grants Calendar/Reminders/Contacts access, every method above (read and write) is callable
 unconditionally. Whether and how to expose update/delete to a model — as a `Tool` at all, behind
 your own confirmation UI, restricted by your own app-level setting — is entirely your design
@@ -1647,7 +1647,7 @@ let session = LanguageModelSession(tools: tools)
 
 The mutating ones — `UpdateCalendarEventTool`/`DeleteCalendarEventTool`,
 `UpdateReminderTool`/`DeleteReminderTool`, `AddContactTool`/`UpdateContactTool`/
-`DeleteContactTool` — take no permission gate of their own (no "Full Access" flag, matching this
+`DeleteContactTool` — take no permission gate of their own (no per-connector level, matching this
 section's already-stated SDK philosophy: that decision is entirely yours). Whether to expose them
 at all is a plain array-membership choice — include them in `tools` when your UI is ready to let
 the model delete something, don't when it isn't.
