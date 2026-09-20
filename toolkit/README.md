@@ -14,11 +14,11 @@ and [../examples/localai-cli-swift/](../examples/localai-cli-swift/) (Swift).
 
 From `1.0.0-beta.4` on, the toolkit zip and its checksum ship as release assets
 on **[github.com/ancientcomputing/locallm-releases](https://github.com/ancientcomputing/locallm-releases/releases)**,
-alongside the LocalLM Lab app DMG — one release per version:
+alongside the LocalLM Lab app DMG — one release per version. Latest (`1.0.0-RC.1`):
 
 ```bash
-curl -LO https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-beta.4/localai-toolkit-1.0.0-beta.4-arm64.zip
-curl -LO https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-beta.4/localai-toolkit-1.0.0-beta.4-arm64.zip.sha256
+curl -LO https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-RC.1/localai-toolkit-1.0.0-RC.1-arm64.zip
+curl -LO https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-RC.1/localai-toolkit-1.0.0-RC.1-arm64.zip.sha256
 ```
 
 Earlier releases (`0.6`–`1.0.0-beta.3`) stay checked into this folder — grab
@@ -32,13 +32,13 @@ curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/t
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-1.0.0-beta.4-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-1.0.0-RC.1-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-1.0.0-beta.4-arm64.zip
+unzip localai-toolkit-1.0.0-RC.1-arm64.zip
 ```
 
 This produces `localai-cli`, `localai-playground-run` (macOS 27),
