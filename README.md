@@ -60,4 +60,4 @@ for the full framing.
 
 ## Roadmap
 
-If you want to see a new feature in LocalLM Lab, please feel free to do a pull request on ROADMAP.md
+If you want to see a new feature in LocalLM Lab, please feel free to raise an issue.
