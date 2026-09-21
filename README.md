@@ -155,4 +155,4 @@ endpoint) and **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cl
 
 ## Roadmap
 
-If you want to see a new feature in LocalLM Lab, please feel free to do a pull request on ROADMAP.md
+If you want to see a new feature in LocalLM Lab, please feel free to raise an issue.
