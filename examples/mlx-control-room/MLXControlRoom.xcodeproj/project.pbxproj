@@ -1,0 +1,347 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		7465C512361BD1D414CB2D2E /* MLXControlRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA17C721C65E389F3E5BD6C8 /* MLXControlRoomApp.swift */; };
+		AE8ED9C680D4B48F15041131 /* LocalLMLabSDKInference in Frameworks */ = {isa = PBXBuildFile; productRef = C881F3597141304462D01CD7 /* LocalLMLabSDKInference */; };
+		F5DB40C38329AC64BAC4A7AA /* LocalLMLabSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = D632BC161CEBE4E8E805319A /* LocalLMLabSDKCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		032850984E9712840EEE19A4 /* MLXControlRoom.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MLXControlRoom.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		097ECC20E14944DAC9BCA37D /* mlx-control-room */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "mlx-control-room"; path = .; sourceTree = SOURCE_ROOT; };
+		CA17C721C65E389F3E5BD6C8 /* MLXControlRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXControlRoomApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4391E36D489B0D147AA10F16 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5DB40C38329AC64BAC4A7AA /* LocalLMLabSDKCore in Frameworks */,
+				AE8ED9C680D4B48F15041131 /* LocalLMLabSDKInference in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		212FDA233FC7497B8956E43F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				032850984E9712840EEE19A4 /* MLXControlRoom.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		361CD979224F8E1BE6858C47 /* MLXControlRoom */ = {
+			isa = PBXGroup;
+			children = (
+				CA17C721C65E389F3E5BD6C8 /* MLXControlRoomApp.swift */,
+			);
+			path = MLXControlRoom;
+			sourceTree = "<group>";
+		};
+		9487105ABF804DC4B6496F04 = {
+			isa = PBXGroup;
+			children = (
+				D5B46D648A692EE1F9F83C0A /* Packages */,
+				CB426DEB8ACCB28E01796903 /* Sources */,
+				212FDA233FC7497B8956E43F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CB426DEB8ACCB28E01796903 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				361CD979224F8E1BE6858C47 /* MLXControlRoom */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		D5B46D648A692EE1F9F83C0A /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				097ECC20E14944DAC9BCA37D /* mlx-control-room */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E064A486D93000A3C82BB789 /* MLXControlRoom */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 74509D7FC7CAD068E7E67893 /* Build configuration list for PBXNativeTarget "MLXControlRoom" */;
+			buildPhases = (
+				F60201D3C170BD16CE38F9ED /* Sources */,
+				4391E36D489B0D147AA10F16 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MLXControlRoom;
+			packageProductDependencies = (
+				D632BC161CEBE4E8E805319A /* LocalLMLabSDKCore */,
+				C881F3597141304462D01CD7 /* LocalLMLabSDKInference */,
+			);
+			productName = MLXControlRoom;
+			productReference = 032850984E9712840EEE19A4 /* MLXControlRoom.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		216D108E39F9FBB6AC514752 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					E064A486D93000A3C82BB789 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 3037DC7CF2D0DFF554396BEE /* Build configuration list for PBXProject "MLXControlRoom" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 9487105ABF804DC4B6496F04;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B781ADD455CAE86CBEF95B83 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 212FDA233FC7497B8956E43F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E064A486D93000A3C82BB789 /* MLXControlRoom */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F60201D3C170BD16CE38F9ED /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7465C512361BD1D414CB2D2E /* MLXControlRoomApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		5111565692C76C4F55023458 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		58B27467EDAA31AC3E25EA59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = xcodeproj/MLXControlRoom.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/MLXControlRoom-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.mlxcontrolroom;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		61172B7282FF605D351A7D6F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = xcodeproj/MLXControlRoom.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = "xcodeproj/MLXControlRoom-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lab.locallm.sdk.reference.mlxcontrolroom;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		8F8A9FDACA281A04A496E50E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3037DC7CF2D0DFF554396BEE /* Build configuration list for PBXProject "MLXControlRoom" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F8A9FDACA281A04A496E50E /* Debug */,
+				5111565692C76C4F55023458 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		74509D7FC7CAD068E7E67893 /* Build configuration list for PBXNativeTarget "MLXControlRoom" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				61172B7282FF605D351A7D6F /* Debug */,
+				58B27467EDAA31AC3E25EA59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B781ADD455CAE86CBEF95B83 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C881F3597141304462D01CD7 /* LocalLMLabSDKInference */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKInference;
+		};
+		D632BC161CEBE4E8E805319A /* LocalLMLabSDKCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalLMLabSDKCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 216D108E39F9FBB6AC514752 /* Project object */;
+}

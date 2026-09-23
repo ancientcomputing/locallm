@@ -6,8 +6,7 @@ run `actool` afterward to compile this into Assets.car (and derive AppIcon.icns 
 required in the shipped app: CFBundleIconName (already set in Info.plist) resolves through
 Assets.car, which is what App Store Connect's asset-catalog validation and System Settings'
 Privacy & Security pane actually read; a bare .icns via CFBundleIconFile alone renders fine in
-Finder/Dock but isn't sufficient for either of those — same finding locallmlab-main's own
-packaging/generate_app_icon.py already documents for the main app's icon.
+Finder/Dock but isn't sufficient for either of those.
 """
 import sys
 from pathlib import Path

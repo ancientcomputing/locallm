@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Calendar access, via EventKit (Core's CalendarAccess). Keep any comments in this file
+	     plain ASCII: AMFIUnserializeXML rejects an em-dash in an XML comment with an opaque
+	     "syntax error" (found the hard way in the other examples' packaging scripts). -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+</dict>
+</plist>

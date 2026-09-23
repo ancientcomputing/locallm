@@ -1,21 +1,23 @@
 #!/usr/bin/env swift
 //
-// run_localai.swift — call localai-cli from Swift, no LocalLM Lab server running
+// run_localai.swift — call localai-cli from Swift, no HTTP server
 //
 // WHAT THIS SCRIPT DOES
 //     Same pattern as examples/localai-cli/run_localai.py: spawn `localai-cli`
 //     as a subprocess, write a JSON request to its stdin, read its JSON
-//     response from stdout. This does NOT talk to LocalLM Lab's Go server or
-//     its HTTP API at all — localai-cli and localai-playground-run are
-//     self-contained binaries.
+//     response from stdout. No HTTP server is involved — this does NOT use
+//     LocalLM Lab's API Lab endpoint. localai-cli and localai-playground-run
+//     are self-contained binaries; LocalLM Lab only needs to be running so
+//     connector/MCP calls can execute inside it.
 //
-//     localai-cli reads a config file (localai-config.json, authored by
-//     LocalLM Lab's Local AI Settings screen) that lists which connectors
+//     localai-cli reads a config file (app-config.json, authored by
+//     LocalLM Lab's Connectors / MCP Servers / AI Models screens) that lists
+//     which connectors
 //     and MCP server tools the user has granted/enabled. Every request to
 //     localai-cli explicitly lists which of those it wants active for that
 //     one call, via "connectors" and "mcp_tools" fields:
 //         - Anything requested must already be enabled in
-//           localai-config.json, or localai-cli rejects the request with a
+//           app-config.json, or localai-cli rejects the request with a
 //           JSON {"error": "..."} before ever invoking the model.
 //         - Enabled-but-not-requested connectors/tools simply aren't given
 //           to that call — no error, just a narrower toolset.
@@ -29,9 +31,9 @@
 //       somewhere. Both must sit in the same directory (localai-cli's
 //       default --helper-path assumes "next to me"), or pass a
 //       LOCALAI_CLI_PATH pointing elsewhere.
-//     - A localai-config.json produced by running LocalLM Lab at least once
+//     - An app-config.json produced by running LocalLM Lab at least once
 //       and enabling whichever connectors/MCP tools you plan to request
-//       below — see Local AI Settings / MCP Servers in the app. localai-cli
+//       below — see the Connectors and MCP Servers screens in the app. localai-cli
 //       only reads this file, it never creates or edits it.
 //
 // RUN
@@ -48,7 +50,7 @@
 //       the binary where this script expects it.
 //     - {"error": "config file not found: ..."} - fix LOCALAI_CONFIG_PATH.
 //     - {"error": "connector '...' is not enabled in the config"} - the
-//       connector requested below isn't turned on in Local AI Settings.
+//       connector requested below isn't turned on in the Connectors screen.
 //     - {"error": "MCP server \"...\" is not configured"} /
 //       "... is not enabled" / "MCP tool \"...\" is not known on server ..."
 //       / "... is not enabled" - the --mcp request's server/tool doesn't
@@ -67,16 +69,16 @@ let localaiCLIPath = env["LOCALAI_CLI_PATH"]
     ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("localai-cli").path
 
 let localaiConfigPath = env["LOCALAI_CONFIG_PATH"]
-    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/localai-config.json"
+    ?? NSHomeDirectory() + "/Library/Application Support/LocalLM Lab/app-config.json"
 
 // Which connectors this particular call wants active - must already be
-// enabled in localai-config.json, or localai-cli rejects the request before
+// enabled in app-config.json, or localai-cli rejects the request before
 // ever invoking the model. Empty means no connectors are made available.
 let connectors = ["clock"]
 
 // Used only when this script is run with `--mcp` - must match a server's
 // "url" and one of its tools' "name" exactly, as they appear in
-// localai-config.json's "mcp_servers" array (see MCP Servers in LocalLM
+// app-config.json's "mcp_servers" array (see MCP Servers in LocalLM
 // Lab). Both server and tool must already be enabled there.
 let mcpServer = env["LOCALAI_MCP_SERVER"] ?? "https://example-mcp-server.com/mcp"
 let mcpTool = env["LOCALAI_MCP_TOOL"] ?? "example_tool"

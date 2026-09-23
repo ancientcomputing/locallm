@@ -1,0 +1,18 @@
+name: public-hygiene
+
+# Fails the build if a private-repo reference (private repo names, "this private repo" asides,
+# Xcode-beta paths, links to the private numbered design docs, or a path-dependency on a closed
+# package) has leaked into the public tree during a hand-copy from locallmlab-sdk.
+# See scripts/check-public-hygiene.sh.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/check-public-hygiene.sh

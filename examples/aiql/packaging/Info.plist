@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key><string>AIQL</string>
+	<key>CFBundleExecutable</key><string>AIQL</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIconName</key><string>AppIcon</string>
+	<key>CFBundleIdentifier</key><string>lab.locallm.sdk.reference.aiql</string>
+	<key>CFBundleName</key><string>AIQL</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>0.1.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key><string>27.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<!-- Folder access (NSOpenPanel + files.user-selected.read-write) and network access (MCP +
+	     model download) need no NS*UsageDescription string. -->
+	<!-- Redirect target for an OAuth MCP server's sign-in flow — see Core's MCPOAuthFlow.swift
+	     and AIQLApp.init(), which sets MCPOAuthFlow.redirectURI to match this scheme. Distinct
+	     from LocalLM Lab's own "locallmlab" scheme and plate-today's "platetoday". -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key><string>lab.locallm.sdk.reference.aiql.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array><string>aiql</string></array>
+		</dict>
+	</array>
+</dict>
+</plist>

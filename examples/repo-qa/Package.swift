@@ -2,10 +2,8 @@
 import Foundation
 import PackageDescription
 
-// Repo Q&A — the public copy of the SDK's third reference app (this source is maintained
-// privately and copied here, same as plate-today/plate-today-tools). Depends on Core as a BINARY
-// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift
-// for the fuller explanation of that one real difference the copy process accounts for.
+// Repo Q&A — the SDK's third reference app. Depends on Core as a BINARY
+// (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift.
 //
 // This app's whole point is MCPTool (MCPToolAdapter.swift), which — like the ready-made
 // connector Tools — shipped starting with 0.8.0. Building against 0.7.0/0.7.1 fails to compile
@@ -19,19 +17,23 @@ struct SDKRelease {
     let checksum: String
 }
 
+// The SDK release these examples build against with no setup — what "clone, open in
+// Xcode, Run" uses. `knownSDKReleases` carries this plus the previous release. Build
+// against another published version: set LOCALLM_SDK_VERSION in your shell (works for
+// `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
+// release not listed, add its entry (URL + the `.sha256` next to the zip on the
+// GitHub release) or just replace the strings in place.
+let defaultSDKVersion = "1.0.0-RC.1"
+
 let knownSDKReleases: [String: SDKRelease] = [
-    "0.7.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.0/LocalLMLabSDKCore-0.7.0.xcframework.zip",
-        checksum: "8853f891f782cb052dd49850e6490558ba68b21b6970a0e1b83d393ab50f8289"
+    "1.0.0-beta.4": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.4/LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip",
+        checksum: "3ed0e79b6914e6b48b7ae27f3fdda139f71e3d60f603daf54901716c8c972cb3"
     ),
-    "0.7.1": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.7.1/LocalLMLabSDKCore-0.7.1.xcframework.zip",
-        checksum: "d165bc1fbed790ac2264502c0cfa16336b68d2d7d9d282964742bd8b73f08e21"
+    "1.0.0-RC.1": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-RC.1/LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip",
+        checksum: "397e7b5f7efd1076293a3d5d06c41d75043bffa23cffdb821d71d21ee41e68de"
     ),
-    "0.8.0": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v0.8.0/LocalLMLabSDKCore-0.8.0.xcframework.zip",
-        checksum: "3a7369e3fbd88de0bcf5cbe2e0a4202b2b919b67c20f364fb8bb2572fd1b9703"
-    )
 ]
 
 func failManifest(_ message: String) -> Never {
@@ -39,16 +41,7 @@ func failManifest(_ message: String) -> Never {
     exit(1)
 }
 
-guard let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] else {
-    failManifest("""
-    error: LOCALLM_SDK_VERSION is not set.
-    Set it to the LocalLM Lab SDK version to build against, e.g.:
-        LOCALLM_SDK_VERSION=0.8.0 swift build
-    Known versions: \(knownSDKReleases.keys.sorted().joined(separator: ", "))
-    NOTE: this example needs 0.8.0 or later — it depends on MCPToolAdapter's MCPTool
-    (docs/sdk-guide.md §7a), which 0.7.0/0.7.1 predate.
-    """)
-}
+let requestedSDKVersion = ProcessInfo.processInfo.environment["LOCALLM_SDK_VERSION"] ?? defaultSDKVersion
 
 guard let sdkRelease = knownSDKReleases[requestedSDKVersion] else {
     failManifest("""
@@ -68,7 +61,15 @@ let package = Package(
         ),
         .executableTarget(
             name: "RepoQA",
-            dependencies: ["LocalLMLabSDKCore"]
+            dependencies: ["LocalLMLabSDKCore"],
+            linkerSettings: [
+                // SwiftPM's Swift Build system (default in the Xcode 27 toolchain) gives a bare
+                // executable target no LC_RPATH, so `@rpath/LocalLMLabSDKCore.framework/...`
+                // resolves to nothing and the tool aborts at launch ("no LC_RPATH's found").
+                // SwiftPM extracts the framework next to the built binary, so point rpath at
+                // @executable_path. Same fix as code-buddy.
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])
+            ]
         )
     ]
 )

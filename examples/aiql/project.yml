@@ -1,0 +1,75 @@
+# XcodeGen spec for the "double-click, Run" variant of AIQL.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates AIQL.xcodeproj
+#
+# The generated AIQL.xcodeproj IS committed — a fresh clone opens it and Runs. Edit project.yml,
+# not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the way to make a
+# distributable .app.
+#
+# Like workspace-buddy-local this is ALWAYS App-Sandboxed and links the MLX runtime
+# (LocalLMLabSDKInference, macOS 27 / Metal) — it needs network.client (MLXModelProvider.download
+# fetches the model from Hugging Face) which also covers the MCP connection and an OAuth redirect
+# fetch. Like plate-today it registers a custom URL scheme (aiql://) for the OAuth callback.
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode. The security-scoped bookmark for the output folder is tied to the signing
+# identity and won't survive a rebuild under ad-hoc. One Apple ID → picked automatically; none →
+# Run says "requires a development team" until you add an Apple ID (Xcode ▸ Settings ▸ Accounts,
+# free is enough) or switch to "Sign to Run Locally". packaging/build-and-sign.sh is unaffected.
+name: AIQL
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  AIQL:
+    build:
+      targets:
+        AIQL: all
+    run:
+      config: Debug
+packages:
+  AIQLPackage:
+    path: .
+targets:
+  AIQL:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/AIQL
+    info:
+      path: xcodeproj/AIQL-Info.plist
+      properties:
+        CFBundleDisplayName: AIQL
+        CFBundleName: AIQL
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+        CFBundleURLTypes:
+          - CFBundleURLName: lab.locallm.sdk.reference.aiql.oauth
+            CFBundleURLSchemes: [aiql]
+    # XcodeGen owns (regenerates) this file from `properties` — keep it separate from
+    # packaging/AIQL.entitlements, which build-and-sign.sh owns.
+    entitlements:
+      path: xcodeproj/AIQL.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.aiql
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: AIQLPackage
+        product: LocalLMLabSDKCore
+      - package: AIQLPackage
+        product: LocalLMLabSDKInference

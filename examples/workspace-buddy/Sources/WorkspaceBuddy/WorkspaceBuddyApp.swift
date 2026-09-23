@@ -129,8 +129,9 @@ final class WorkspaceBuddyModel: ObservableObject {
                 listWorkspaceFiles to see what's there and readWorkspaceFile before editing \
                 anything — never guess a file's contents. Prefer editWorkspaceFile (a targeted \
                 find-and-replace) over writeWorkspaceFile for changes to files that already \
-                exist; writeWorkspaceFile only creates brand-new files and fails if the file is \
-                already there. Explain what you changed and why, briefly.
+                exist; writeWorkspaceFile fails on an existing file unless you pass overwrite:true, \
+                which you should only do to regenerate a file wholesale, never for a partial edit. \
+                Explain what you changed and why, briefly.
                 """
             }
             do {

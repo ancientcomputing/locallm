@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Same sandbox story as workspace-buddy: sandboxing is unconditional here, which is what
+	     makes the security-scoped bookmark pattern (docs/sdk-guide.md §8) necessary to
+	     demonstrate. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Read/write access to whatever folder the user picks via NSOpenPanel — makes
+	     WorkspaceAccess's write/edit calls work under sandbox. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- NEW vs workspace-buddy: MLXModelProvider.download fetches the model over HTTPS from
+	     Hugging Face on first run. Without this the download is silently blocked by the sandbox.
+	     (workspace-buddy needs no network entitlement — Apple's on-device model is already local.) -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

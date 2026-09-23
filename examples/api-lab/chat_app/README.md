@@ -7,7 +7,7 @@ getting started with API Lab.
 
 ## Setup
 
-1. In LocalLM Lab, open **API Settings** and turn the server **On**.
+1. In LocalLM Lab, open **API Lab** and turn the server **On**.
 2. Copy the **Base URL** and **Token** shown there.
 3. Install dependencies:
 
@@ -23,7 +23,7 @@ getting started with API Lab.
    ```
 
    (Port `8765` is a common default — always double-check the actual port
-   shown in API Settings, since LocalLM Lab may pick a different one if
+   shown in API Lab, since LocalLM Lab may pick a different one if
    your configured port was busy.)
 
 5. Run it:

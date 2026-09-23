@@ -1,0 +1,66 @@
+# XcodeGen spec for the "double-click, Run" variant of Model Switch.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates ModelSwitch.xcodeproj
+#
+# The generated ModelSwitch.xcodeproj IS committed, so a fresh clone can just open it and hit
+# Run — no xcodegen step, no packaging/build-and-sign.sh. That path (ad-hoc signed, this-Mac
+# only) is for trying the example; packaging/build-and-sign.sh is still the way to make a
+# distributable .app.
+#
+# Info.plist is written by XcodeGen to xcodeproj/ModelSwitch-Info.plist (also committed) from
+# the `properties` below — kept separate from packaging/Info.plist, which build-and-sign.sh owns.
+name: ModelSwitch
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  ModelSwitch:
+    build:
+      targets:
+        ModelSwitch: all
+    run:
+      config: Debug
+packages:
+  ModelSwitchPackage:
+    path: .
+  Components:
+    path: ../../Components
+targets:
+  ModelSwitch:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/ModelSwitch
+    info:
+      path: xcodeproj/ModelSwitch-Info.plist
+      properties:
+        CFBundleDisplayName: Model Switch
+        CFBundleName: Model Switch
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.modelswitch
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Ad-hoc, no sandbox, no hardened runtime — the same local-run tier as
+        # packaging/build-and-sign.sh with APP_IDENTITY unset. Hardened runtime would reject the
+        # Team-signed SDK frameworks under an ad-hoc outer signature.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        # SwiftPM embeds the xcframework slices in Contents/Frameworks for an app target.
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: Components
+        product: LocalLMLabSDKCore
+      - package: Components
+        product: LocalLMLabSDKComponents
+      - package: ModelSwitchPackage
+        product: LocalLMLabSDKRemote

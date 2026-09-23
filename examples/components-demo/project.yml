@@ -1,0 +1,61 @@
+# XcodeGen spec for the "double-click, Run" variant of Components Demo.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates ComponentsDemo.xcodeproj
+#
+# The generated ComponentsDemo.xcodeproj IS committed — a fresh clone can open it and hit Run
+# (ad-hoc signed, this-Mac only). packaging/build-and-sign.sh is still the way to make a
+# distributable .app. Edit project.yml, not the .xcodeproj, then regenerate.
+#
+# Info.plist is written by XcodeGen to xcodeproj/ComponentsDemo-Info.plist (committed) from the
+# `properties` below — separate from packaging/Info.plist, which build-and-sign.sh owns. The
+# `componentsdemo:` URL scheme (MCP OAuth redirect target) is carried here too.
+name: ComponentsDemo
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  ComponentsDemo:
+    build:
+      targets:
+        ComponentsDemo: all
+    run:
+      config: Debug
+packages:
+  Components:
+    path: ../../Components
+targets:
+  ComponentsDemo:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/ComponentsDemo
+    info:
+      path: xcodeproj/ComponentsDemo-Info.plist
+      properties:
+        CFBundleDisplayName: Components Demo
+        CFBundleName: Components Demo
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "26.0"
+        NSHighResolutionCapable: true
+        CFBundleURLTypes:
+          - CFBundleURLName: lab.locallm.sdk.reference.componentsdemo.oauth
+            CFBundleURLSchemes: [componentsdemo]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.componentsdemo
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Ad-hoc, no sandbox, no hardened runtime — same local-run tier as
+        # packaging/build-and-sign.sh with APP_IDENTITY unset.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: Components
+        product: LocalLMLabSDKComponents

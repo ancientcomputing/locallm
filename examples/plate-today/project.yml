@@ -1,0 +1,77 @@
+# XcodeGen spec for the "double-click, Run" variant of Plate Today.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates PlateToday.xcodeproj
+#
+# The generated PlateToday.xcodeproj IS committed — a fresh clone opens it and Runs. Edit
+# project.yml, not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the way
+# to make a distributable / MAS .app.
+#
+# Feature set baked into this variant: Todoist ON (the default), Contacts and Location/Weather
+# OFF — matches `swift build` with no env vars. Flip them by adding to
+# SWIFT_ACTIVE_COMPILATION_CONDITIONS below (and, for Contacts/Location, the matching
+# usage-description key + entitlement).
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team. In Xcode this resolves to your
+# Apple Development identity — Calendar/Reminders TCC prompts are only dependable under a real
+# (team) signature, and that's the whole point of this example. If Xcode has one Apple ID it is
+# picked automatically; with none, Run reports "requires a development team" until you add an
+# Apple ID (Xcode ▸ Settings ▸ Accounts — a free one is enough, no paid account) or switch the
+# target to "Sign to Run Locally". packaging/build-and-sign.sh is unaffected by this file: it
+# signs with whatever APP_IDENTITY you pass (ad-hoc if unset).
+name: PlateToday
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  PlateToday:
+    build:
+      targets:
+        PlateToday: all
+    run:
+      config: Debug
+packages:
+  PlateTodayPackage:
+    path: .
+targets:
+  PlateToday:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/PlateToday
+    info:
+      path: xcodeproj/PlateToday-Info.plist
+      properties:
+        CFBundleDisplayName: Plate Today
+        CFBundleName: Plate Today
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: "26.0"
+        NSHighResolutionCapable: true
+        NSCalendarsFullAccessUsageDescription: Plate Today reads your calendar events for today to summarize what's on your plate.
+        NSRemindersFullAccessUsageDescription: Plate Today reads your reminders due today to summarize what's on your plate.
+        CFBundleURLTypes:
+          - CFBundleURLName: lab.locallm.sdk.reference.platetoday.oauth
+            CFBundleURLSchemes: [platetoday]
+    # XcodeGen owns (regenerates) this file from `properties` — keep it separate from
+    # packaging/PlateToday.entitlements, which build-and-sign.sh owns. Calendars covers
+    # Reminders too (both go through EventKit); no separate reminders entitlement exists.
+    entitlements:
+      path: xcodeproj/PlateToday.entitlements
+      properties:
+        com.apple.security.personal-information.calendars: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.platetoday
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: PLATETODAY_INCLUDE_TODOIST
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: PlateTodayPackage
+        product: LocalLMLabSDKCore

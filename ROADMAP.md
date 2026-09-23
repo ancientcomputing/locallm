@@ -9,3 +9,8 @@ This document collects suggestions/proposals for features and improvements for L
 
 ### ThisBrainAI ideas ###
 - Concept of "comma-separate prompts" (CSP) file to feed prompts (system+user input) into the Prompt Playground. The dev.log will capture the behavior of the local AI for each set of prompts.
+
+### Model supply chain (post-1.0 candidates) ###
+- **Refuse an unpinned model.** A strict mode where the provider fails instead of downloading a repo that has neither a shipped nor a captured pin (for CI and locked-down CLIs). Today an unpinned repo is pinned on first download.
+- **Usage reporting.** Surface token counts and tokens/sec from mlx-swift-lm. The bridge currently drops `GenerateCompletionInfo`. Design notes exist; nothing is implemented.
+

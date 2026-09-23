@@ -2,7 +2,7 @@
 // UI, same prompt, same connectors), rebuilt on Core's ready-made FoundationModels Tools instead
 // of hand-writing a Tool struct per connector. Diff this file against plate-today's
 // PlateTodayApp.swift to see the "Path A vs Path B" difference described in
-// docs/02-sdk-developer-guide.md §7a in actual code, not just prose — every place the two files
+// docs/sdk-guide.md §7a in actual code, not just prose — every place the two files
 // diverge is called out below with a `DIFF FROM plate-today:` comment.
 //
 // SwiftUI app shape (not a bare CLI): launch -> request Calendar/Reminders/Todoist access on
@@ -71,7 +71,7 @@ final class PlateTodayToolsModel: ObservableObject {
     // DIFF FROM plate-today: request access up front, before any Tool exists — see this file's
     // top-of-file comment for why Path A's ready-made Tools need this instead of requesting
     // lazily inside call(). Connectors.requestAccess(_:) is the same unified facade
-    // docs/02-sdk-developer-guide.md §7's first example uses; CalendarAccess/RemindersAccess also
+    // docs/sdk-guide.md §7's first example uses; CalendarAccess/RemindersAccess also
     // expose their own .requestAccess() directly, used interchangeably here just to show both
     // spellings work.
     private func requestConnectorAccess() async -> String? {

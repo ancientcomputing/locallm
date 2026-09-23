@@ -1,0 +1,72 @@
+# XcodeGen spec for the "double-click, Run" variant of Workspace Buddy.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates WorkspaceBuddy.xcodeproj
+#
+# The generated WorkspaceBuddy.xcodeproj IS committed — a fresh clone opens it and Runs. Edit
+# project.yml, not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the way
+# to make a distributable / MAS .app.
+#
+# This app is ALWAYS App-Sandboxed (that's the point of the example — see the security-scoped
+# bookmark story in docs/sdk-guide.md §8). The NSOpenPanel folder pick + the
+# user-selected.read-write entitlement are all it needs — folder access has no TCC
+# usage-description requirement.
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode. A security-scoped bookmark is tied to the app's signing identity, so under
+# an ad-hoc signature (identity changes every rebuild) it won't survive a rebuild — a real team
+# signature is what makes the bookmark-persists-across-relaunch point of this example actually
+# hold. One Apple ID → picked automatically; none → Run says "requires a development team" until
+# you add an Apple ID (Xcode ▸ Settings ▸ Accounts, free is enough) or switch the target to
+# "Sign to Run Locally". packaging/build-and-sign.sh is unaffected — it signs with whatever
+# APP_IDENTITY you pass.
+name: WorkspaceBuddy
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  WorkspaceBuddy:
+    build:
+      targets:
+        WorkspaceBuddy: all
+    run:
+      config: Debug
+packages:
+  WorkspaceBuddyPackage:
+    path: .
+targets:
+  WorkspaceBuddy:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/WorkspaceBuddy
+    info:
+      path: xcodeproj/WorkspaceBuddy-Info.plist
+      properties:
+        CFBundleDisplayName: Workspace Buddy
+        CFBundleName: Workspace Buddy
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "26.0"
+        NSHighResolutionCapable: true
+    # XcodeGen owns (regenerates) this file — separate from packaging/WorkspaceBuddy.entitlements,
+    # which build-and-sign.sh owns.
+    entitlements:
+      path: xcodeproj/WorkspaceBuddy.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.workspacebuddy
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: WorkspaceBuddyPackage
+        product: LocalLMLabSDKCore

@@ -1,0 +1,68 @@
+# XcodeGen spec for the "double-click, Run" variant of MLX Control Room.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates MLXControlRoom.xcodeproj
+#
+# The generated MLXControlRoom.xcodeproj IS committed — a fresh clone opens it and Runs.
+# Edit project.yml, not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the
+# way to make a distributable .app.
+#
+# Always App-Sandboxed, and it links the MLX runtime (LocalLMLabSDKInference, macOS 27 / Metal), so it
+# needs the network.client entitlement — MLXModelProvider.download fetches models from Hugging Face.
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode. One Apple ID -> picked automatically; none -> Run says "requires a development
+# team" until you add an Apple ID (Xcode > Settings > Accounts, free is enough) or switch to "Sign to
+# Run Locally". packaging/build-and-sign.sh is unaffected — it signs with whatever APP_IDENTITY you pass.
+name: MLXControlRoom
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  MLXControlRoom:
+    build:
+      targets:
+        MLXControlRoom: all
+    run:
+      config: Debug
+packages:
+  MLXControlRoomPackage:
+    path: .
+targets:
+  MLXControlRoom:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MLXControlRoom
+    info:
+      path: xcodeproj/MLXControlRoom-Info.plist
+      properties:
+        CFBundleDisplayName: MLX Control Room
+        CFBundleName: MLX Control Room
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+    # XcodeGen owns (regenerates) this file — separate from
+    # packaging/MLXControlRoom.entitlements, which build-and-sign.sh owns.
+    entitlements:
+      path: xcodeproj/MLXControlRoom.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.mlxcontrolroom
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: MLXControlRoomPackage
+        product: LocalLMLabSDKCore
+      - package: MLXControlRoomPackage
+        product: LocalLMLabSDKInference

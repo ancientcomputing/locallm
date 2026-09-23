@@ -9,9 +9,19 @@ Code samples for LocalLM Lab, split by which feature they use.
 | [localai-cli-swift/](localai-cli-swift/) | `localai-cli` toolkit (Swift) | Same examples as localai-cli/, in Swift. |
 | [plate-today/](plate-today/) | LocalLM Lab SDK (Core), Path B | A native SwiftUI app linking `LocalLMLabSDKCore` directly — Calendar/Reminders connectors, a real Todoist MCP OAuth flow, and a signed path to both Developer ID distribution and the Mac App Store. Each connector gets its own hand-written `Tool` adapter. |
 | [plate-today-tools/](plate-today-tools/) | LocalLM Lab SDK (Core), Path A | The exact same app as `plate-today/`, rebuilt on Core's ready-made `Tool`s (`GetUpcomingEventsTool`, `MCPTool`, etc.) instead of hand-written adapters — diff the two to see precisely what changes. |
-| [repo-qa/](repo-qa/) | LocalLM Lab SDK (Core), Path A | A minimal command-line tool — no signing, no macOS permission needed. Builds a `Tool` for a real MCP server's (Deepwiki's) own tools straight from their live schema, no hand-written `Arguments` struct. |
-| [workspace-buddy/](workspace-buddy/) | LocalLM Lab SDK (Core), Path A | A local AI-assisted coding example: pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`. |
+| [repo-qa/](repo-qa/) | LocalLM Lab SDK (Core), Path A | A minimal command-line tool — no signing, no macOS permission needed. Builds a `Tool` for a real MCP server's (Deepwiki's) own tools straight from their live schema, no hand-written `Arguments` struct. Answered by Apple's on-device model. |
+| [repo-qa-local/](repo-qa-local/) | LocalLM Lab SDK (Core **+ Inference**) | The exact same tool as `repo-qa/`, but the answer comes from an **open-weight MLX model you download and run locally** (`mlx-community/Qwen3-8B-4bit` by default), routed through the 1.0 model layer. The smallest possible model-layer + MLX example — diff the two `main.swift`s to see what the model layer adds. |
+| [workspace-buddy/](workspace-buddy/) | LocalLM Lab SDK (Core), Path A | A local AI-assisted coding example: pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`. Sandboxed — the security-scoped bookmark demo. |
+| [workspace-buddy-local/](workspace-buddy-local/) | LocalLM Lab SDK (Core **+ Inference**) | The same sandboxed `.app` as `workspace-buddy/`, but with a downloadable **open-weight MLX model** routed through the model layer. The one example running the model layer inside **App Sandbox** (adds the `network.client` entitlement for the model download). |
+| [code-buddy/](code-buddy/) | LocalLM Lab SDK (Core **+ Inference**) | The full model layer: a CLI coding agent running **locally-run MLX models** through `LocalLMLab` + `MLXModelProvider` (heavy/light routes, one resident at a time), Core's Workspace tools, a no-auth MCP server, and two **host-owned** `Process` tools (git, run-tests) the SDK deliberately doesn't ship. |
+| [mlx-control-room/](mlx-control-room/) | LocalLM Lab SDK (Core **+ Inference**) | A live control panel for an MLX model session: the sampling / prefill / pairing knobs with **gauges that prove each reaches `mlx-swift-lm`**, plus the model-pinning flow made visible — validate → download → pin, a per-model version you can **check, update, roll back** and clean up, a built-in model its developer can move to a newer version **without an app release**, and two curated model pairs (speed helper, adapter). Sandboxed `.app` with the network entitlement. |
+| [os-matrix/](os-matrix/) | LocalLM Lab SDK (Core **+ Inference**) | One `.macOS("26.0")` CLI that runs on both macOS 26 and 27 with no source `#if` — shows `ModelAvailability.requiresOS` gating the 27-only providers. |
 | [components-demo/](components-demo/) | LocalLM Lab SDK (`Components`) | The same SDK, via the prebuilt `LocalLMLabSDKComponents` MCP server picker UI instead of building your own. |
+| [model-switch/](model-switch/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | The online / remote providers: add a provider + API key, tick web search, switch between every configured model (on-device, PCC, Claude-4-FM, GPT, Claude online, OpenRouter) from one chat window. |
+| [components-updates-demo/](components-updates-demo/) | LocalLM Lab SDK (`Components`) | The model **onboarding stepper**, **update** view and **versions-on-disk** view driven by simulated sources (no network, no MLX): a failed preflight, a hash mismatch, a download, an update with the pause point, a rollback, and cleaning up old versions. |
+| [security-demo/](security-demo/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | Tool authorization: a "Security" panel whose two controls are `Sequence.limited(toMaxImpact:)` (which tools the model sees) and `ConfirmingToolAuthorizer` + `Components.ToolConfirmationPresenter` (whether a call runs or asks first). A frontier model against a real Calendar and a real Todoist MCP server. |
+| [vistanova/](vistanova/) | LocalLM Lab SDK (Core **+ Inference**) | A tiny local search engine: a SwiftUI app that runs web search through a Tavily MCP server on one local model and summarizes on another — by default a downloaded MLX model **shipped pinned to an exact commit** (`MLXModelProvider(pinnedRevisions:)`), so a new upstream version is never picked up silently. Also shows a hand-written `Tool` over an MCP tool, and the defenses a small model needs: verify from `session.events` that it really called the tool, probe `capabilityProbe` before trusting structured output. |
+| [aiql/](aiql/) | LocalLM Lab SDK (Core **+ Inference**) | "Ask your data": a SwiftUI app that pulls an MCP-fronted dataset and writes the spreadsheet you asked for — `FileBackedTool` + the data verbs (`jsonToCsv` / `filterRows` / `sortRows` / …, guide §8b) do every row-level step so a local MLX model can't fabricate a value. Sandboxed; MCP OAuth via the `aiql://` URL scheme. |
 
 **Path A vs Path B**, for the four Core-based examples above: two ways to turn a connector or MCP
 server into something the on-device model can call as a tool. **Path A** drops in a ready-made
@@ -22,9 +32,205 @@ descriptions. Neither is the "real" one — both ship in Core, and an app can mi
 [`../docs/sdk-guide.md` §7a](../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
 for the full framing.
 
-The `localai-cli` examples require the CLI toolkit itself, shipped in
-[../toolkit/](../toolkit/). See that folder's README to download and
-install it, and [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
+The `localai-cli` examples require the CLI toolkit itself. From `1.0.0-beta.4`
+on it ships as a release asset on
+[`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
+alongside the app DMG (older versions are checked into [../toolkit/](../toolkit/)).
+See that folder's README to download and install it, and
+[thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
 for the full CLI reference.
 
 Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](https://thisbrain.ai/locallm)
+
+---
+
+## Building & running an SDK example
+
+Each SDK example (everything except the `api-lab/` and `localai-cli*/` folders) is a standalone
+SwiftPM package. It resolves `LocalLMLabSDKCore` (and, where used, `LocalLMLabSDKInference` /
+`LocalLMLabSDKRemote`) as a **binary** dependency from a GitHub Release on this repo — nothing to
+download or unzip by hand. Requires **Apple Silicon** and the **Xcode 27** toolchain to build (a
+stable Xcode fails with `'v27' is unavailable`). **macOS 27 is recommended** — most of the SDK's
+advanced model-layer features (Private Cloud Compute, open-weight/MLX, Claude, online providers)
+need it — but it isn't universal: [`os-matrix/`](os-matrix/) is built and tested to run unchanged
+on **macOS 26** too (see its README).
+
+The examples on this `1.0.0-RC.1` branch build against SDK **`1.0.0-RC.1`**; the ones on `main`
+build against the latest stable release. No environment variable is needed for either.
+
+### What each example needs
+
+| Example | Kind | `swift run` (or Xcode ▸ Run) | To get a real `.app` (`packaging/build-and-sign.sh`) |
+|---|---|---|---|
+| `repo-qa`, `code-buddy`, `os-matrix` | CLI | ✅ the whole example | — (no `packaging/`) |
+| `components-demo`, `model-switch` | SwiftUI, no system permissions | ✅ — real `.app` via the committed `.xcodeproj` (ad-hoc, no account needed); bundle-less via `Package.swift` / `swift run` | **any** identity, or **none** — see the table below |
+| `plate-today`, `plate-today-tools`, `security-demo` | SwiftUI + Calendar / Reminders / Contacts | ✅ via the committed `.xcodeproj` — **Automatic** signing: Xcode uses your Apple ID's Apple Development identity (a **free** one works), needed for reliable prompts. No Apple ID → add one or pick *Sign to Run Locally*. Bare `swift run` is denied the prompts. (`security-demo` also needs one or more provider API keys — set them in the scheme's env vars.) | **a signing identity is required** — a **free** "Apple Development" one works |
+| `vistanova` | SwiftUI, no system permissions, no sandbox; needs a free [Tavily](https://app.tavily.com) API key at runtime | ✅ via the committed `.xcodeproj` — ad-hoc signed, no account needed. | **any** identity, or **none** — `packaging/build-and-sign.sh` (drives `xcodebuild archive`) |
+| `mlx-control-room` | SwiftUI + App Sandbox (network only) | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); it keeps no security-scoped bookmark, so **Sign to Run Locally** works too | **any** identity — `packaging/build-and-sign.sh` |
+| `components-updates-demo` | SwiftUI, no system permissions, simulated data | ✅ via `Package.swift` / `swift run` (no `.xcodeproj`) | — (no `packaging/`) |
+| `workspace-buddy`, `workspace-buddy-local`, `aiql` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
+
+"Apple Development" = the free identity Xcode creates once you add any Apple ID under
+**Xcode ▸ Settings ▸ Accounts**. No paid Apple Developer account, no Developer ID certificate.
+
+### In Xcode
+
+1. Get the code — either `git clone https://github.com/ancientcomputing/locallm`, or open the
+   repo's page on **github.com**, click the green **`<> Code`** button, choose **Download ZIP**,
+   and unzip. (That button is on the GitHub website, not in Xcode.)
+2. **Open it in Xcode 27 or newer.** Every example targets
+   macOS 27; an older Xcode fails with `'v27' is unavailable`. Double-clicking a project opens it
+   in your *default* Xcode, which is usually the stable one — instead, right-click the file ▸
+   **Open With ▸ Xcode**, or launch Xcode first and use **File ▸ Open**. (The
+   *Xcode ▸ Settings ▸ Locations ▸ Command Line Tools* selection does **not** change this — it
+   only affects the terminal `swift` / `xcodebuild`.) Then:
+   - **The nine SwiftUI examples with a project** (`components-demo`, `model-switch`, `security-demo`,
+     `plate-today`, `plate-today-tools`, `workspace-buddy`, `workspace-buddy-local`, `aiql`, `mlx-control-room`) ship
+     a committed `.xcodeproj` — open `examples/<name>/<Name>.xcodeproj`. Run gives a *real* `.app` (Dock icon,
+     menu bar, `⌘,`, URL scheme, entitlements). The project is generated from `project.yml` with
+     [XcodeGen](https://github.com/yonaskolb/XcodeGen) — edit `project.yml` and `xcodegen
+     generate`, not the `.xcodeproj` directly.
+   - **Every example** also opens as a package: open `examples/<name>/Package.swift`. Run works,
+     but a SwiftUI app runs bundle-less (no Dock icon, `⌘,` may not register).
+   Either way Xcode resolves the SDK binary automatically — no `LOCALLM_SDK_VERSION`.
+3. Choose the scheme (named after the example) and press **Run**.
+
+   **Signing of the `.xcodeproj` Run build:**
+   - `components-demo`, `model-switch` — **ad-hoc**, no account needed. They only make outbound
+     HTTPS calls, so ad-hoc is fine.
+   - `plate-today`, `plate-today-tools`, `security-demo`, `workspace-buddy`, `workspace-buddy-local`, `aiql`, `mlx-control-room` —
+     **Automatic**, no hard-coded team. Xcode signs with your **Apple Development** identity: add
+     any Apple ID under **Xcode ▸ Settings ▸ Accounts** (a **free** one is enough) and Xcode
+     picks it up. With no Apple ID, Run stops with *"requires a development team"* — add one, or
+     open the target ▸ **Signing & Capabilities** and choose **Sign to Run Locally** (ad-hoc; the
+     app runs, but Calendar/Reminders prompts are unreliable and the workspace bookmark won't
+     survive a rebuild). None of this touches `packaging/build-and-sign.sh`, which signs with
+     `APP_IDENTITY` (below).
+
+   CLI examples take arguments — **Product ▸ Scheme ▸ Edit Scheme… ▸ Run ▸ Arguments**.
+
+### Signing a `.app` — `APP_IDENTITY`
+
+`packaging/build-and-sign.sh` reads `APP_IDENTITY`. What each value does:
+
+| `APP_IDENTITY` | Paid account? | Where the `.app` runs | Notarize? |
+|---|---|---|---|
+| unset (or `-`) | no | **this Mac only** — ad-hoc signature; Gatekeeper rejects it elsewhere, and Calendar / Reminders / Contacts / Sandbox grants are unreliable | no (`NOTARIZE_APP` forced to `0`) |
+| `Apple Development: NAME (TEAMID)` | no (free) | **this Mac only** — but with working system-permission prompts. `spctl` still flags it "not notarized"; harmless for your own machine | no |
+| `Developer ID Application: NAME (TEAMID)` | **yes** ($99/yr) | **anywhere**, once notarized — add `NOTARIZE_APP=1` and `KEYCHAIN_PROFILE` | yes |
+
+`security find-identity -v -p codesigning` lists the identities installed on your Mac — use one
+of those strings verbatim.
+
+```bash
+cd examples/model-switch
+# no account — local ad-hoc build:
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./packaging/build-and-sign.sh
+# free Apple ID:
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  APP_IDENTITY="Apple Development: Your Name (TEAMID)" NOTARIZE_APP=0 ./packaging/build-and-sign.sh
+```
+
+### From the command line
+
+```bash
+cd examples/repo-qa
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  swift run RepoQA facebook/react "how does the reconciler work?"
+```
+
+```bash
+cd examples/model-switch          # a SwiftUI app — opens a window, takes no arguments
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  swift run ModelSwitch
+```
+
+Set `LOCALLM_SDK_VERSION` to build against a specific published release instead of the package
+default. This works from a shell and in CI — **but not from inside Xcode**, whose package
+resolution doesn't inherit shell environment variables.
+
+```bash
+cd examples/repo-qa
+LOCALLM_SDK_VERSION=1.0.0-RC.1 \
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  swift run RepoQA facebook/react
+```
+
+### Building against a different SDK version
+
+Every SDK example's top-level `Package.swift` (and `Components/Package.swift`) has a
+`defaultSDKVersion` line and a small `knownSDKReleases` table — the current release plus the
+previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these — it's a
+dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
+
+```swift
+let defaultSDKVersion = "1.0.0-RC.1"
+
+let knownSDKReleases: [String: SDKRelease] = [
+    "1.0.0-beta.4": SDKRelease(url: "…/v1.0.0-beta.4/LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip",
+                               checksum: "3ed0e79b…"),
+    "1.0.0-RC.1": SDKRelease(url: "…/v1.0.0-RC.1/LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip",
+                             checksum: "397e7b5f…"),
+]
+```
+
+To use a release that isn't listed, add an entry. The URL always follows
+`https://github.com/ancientcomputing/locallm/releases/download/v<version>/LocalLMLabSDK<Module>-<version>.xcframework.zip`,
+and the checksum is the `.sha256` file published next to each `.xcframework.zip` on that release:
+
+```bash
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.1/LocalLMLabSDKCore-1.0.0-beta.1.xcframework.zip.sha256
+# → 0b4ab34e474d1acd725161cfb591cf3d862a7529fe7c9dbadf01eece3ad1590f
+```
+
+Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass
+`LOCALLM_SDK_VERSION=<version>` from a shell. Simplest of all for a one-off: just replace the URL
+and checksum strings in place.
+
+### Troubleshooting
+
+**`artifact of binary target 'LocalLMLabSDKCore' has changed checksum`**, or in Xcode
+**`Missing package product 'LocalLMLabSDKCore' / 'LocalLMLabSDKRemote' / 'LocalLMLabSDKComponents'`**
+— same cause: you built this example once against an *earlier* cut of the same version tag (during
+a pre-release beta, a `vX.Y.Z` release asset can be re-uploaded with new bytes), and SwiftPM /
+Xcode won't silently swap the cached artifact for one with a different checksum — so the download
+is refused and the products it would have provided go "missing". The manifest is correct; the
+stale copy is local.
+
+```bash
+rm -rf examples/<name>/.build                              # swift build
+rm -rf ~/Library/Developer/Xcode/DerivedData/<Name>-*      # Xcode (or: File ▸ Packages ▸ Reset Package Caches)
+```
+
+Then build / Run again. This only happens across a re-cut of one version tag — a normal version
+bump changes the tag, so there's nothing stale to collide with.
+
+### Starting over: removing the downloaded models
+
+The open-weight examples download their models on first run (`aiql`, `code-buddy`, `mlx-control-room`,
+`os-matrix`, `repo-qa-local`, `vistanova`, `workspace-buddy-local`). To test that first-run path again,
+`scripts/scrub-example-models.sh` removes what the examples created. It is a **dry run** until you pass
+`--yes`:
+
+```bash
+./scripts/scrub-example-models.sh                        # show what would go, sandboxed apps' caches only
+./scripts/scrub-example-models.sh --shared --pins        # also the shared Hugging Face cache and the pin records
+./scripts/scrub-example-models.sh --shared --pins --yes  # actually delete
+```
+
+A sandboxed example keeps its models in its own container; a `swift run` example uses the shared
+`~/.cache/huggingface/hub`, which other apps (including LocalLM Lab) also use, so those folders are
+only removed with `--shared`. Pin records live separately from the weights (`--pins`).
+`--example <name>` limits it to one example, and `--check` tells you if the script's model list has
+drifted from the examples' sources.
+
+To keep the shared models while you test, back them up first and restore afterwards:
+
+```bash
+./scripts/scrub-example-models.sh --shared-backup --shared --pins --yes   # back up, then remove
+./scripts/scrub-example-models.sh --shared-restore --yes                  # put them back
+```
+
+The backup goes to a sibling folder of the cache (`~/.cache/huggingface/hub-example-backup`; set
+`SCRUB_BACKUP_DIR` to move it). On APFS the copy is a clone, so it takes almost no extra space, and the
+removal only happens once the backup is verified. Restore skips any model already in the cache.
