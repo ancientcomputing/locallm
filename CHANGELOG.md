@@ -24,6 +24,20 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 1.0.0 — GA (unreleased)
+
+Fixes only; no API change.
+
+### Fixed
+
+- **Preflight rejected models that fit in memory** (`MLXModelProvider.validate(_:)`, stages
+  `sizeVsMemory` and `diskSpace`). The download size came from the Hub's repo-level `usedStorage`, which
+  counts blobs from every revision, so a re-uploaded repo reported about twice its real size —
+  `mlx-community/Qwen3.8-27B-8bit` read as 58.1 GB against 29.5 GB of actual files and failed on a 64 GB
+  Mac. The SDK now sums the current revision's file sizes and uses `usedStorage` only when no file reports
+  a size. `PreflightResult.weightBytes` reports the corrected figure, and the free-disk requirement drops
+  with it.
+
 ## 1.0.0-RC.1 — 2026-09-15 (binaries re-published 2026-09-18 and 2026-09-19)
 
 Everything below is in `LocalLMLabSDKInference` unless noted (the 2026-09-19 re-publish also adds the
