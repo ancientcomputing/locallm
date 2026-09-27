@@ -30,7 +30,7 @@ built-in `ClockTool` cross-check.
 | **DeepSeek** (R1-Distill-Qwen 7B/14B, R1-Distill-Llama 8B, V2-Lite-Chat) | ❌ | 4/4 zero tool calls, across 3 lineages + 2 base architectures. Root cause: chat templates with no working tool-definition/tool-call mechanism the app can drive. Also fabricates confidently. **Check the chat template before downloading any DeepSeek model for tool use.** |
 | **Phi-4** (14B, `mlx-community/phi-4-4bit`) | ❌ | Same root cause as DeepSeek despite an "instruction/tool-tuned" reputation. Phi-4-mini untested — different checkpoint, don't assume it carries over. |
 | **Phi-4-mini**, **SmolLM3-3B** | ❌ | Fail on the *input* side: templates try to list tools via a convention `swift-transformers` doesn't supply. Structurally unreachable regardless of the model. SmolLM3 then fabricates badly. |
-| **gpt-oss-20B** | ⚠️ app-side gap | The model correctly formats a real call — in OpenAI's "Harmony" format, which `mlx-swift-lm` has no parser for, so the call is never recognized. Not a model gap; tracked as a roadmap item. |
+| **gpt-oss-20B** | ⚠️ app-side gap | The model correctly formats a real call — in OpenAI's "Harmony" format, which `mlx-swift-lm` has no parser for, so the call is never recognized. Not a model gap; a known limitation of `mlx-swift-lm`'s parser. |
 
 ## Capacity notes (this Mac, this workload)
 
@@ -58,8 +58,7 @@ built-in `ClockTool` cross-check.
 ## Chain-of-thought in output
 
 Several of these models (Qwen3's `<think>…</think>`, Gemma's `<|channel|>` markers) emit
-raw reasoning inline in the response text. The 1.0.0-beta MLX bridge streams that through
-verbatim — it does **not** separate a reasoning channel (Apple's `streamResponse` doesn't
-surface incremental reasoning; a real reasoning channel is a post-beta item). If you want a
-clean answer, carve the delimiters out consumer-side, as LocalLM Lab's own Prompt Playground
-does.
+raw reasoning inline in the response text. The MLX bridge streams that through verbatim — it
+does **not** separate a reasoning channel (Apple's `streamResponse` doesn't surface incremental
+reasoning). If you want a clean answer, carve the delimiters out consumer-side, as LocalLM Lab's
+own Prompt Playground does.
