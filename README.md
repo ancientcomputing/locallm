@@ -30,7 +30,7 @@ an Apple entitlement that is still pending, so it is inert in this beta.
 
 **Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
 get the app directly:
-[LocalLM Lab 1.0.0-RC.1 (arm64 DMG)](https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-RC.1/LocalLM.Lab-1.0.0-RC.1-arm64.dmg).
+[LocalLM Lab 1.0.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLM.Lab-1.0.0-GA-arm64.dmg).
 
 ## LocalLM Lab SDK
 
@@ -63,11 +63,12 @@ what's public here is:
   OpenAI-compatible API Lab endpoint. Full list with descriptions in the
   [Building on the SDK](#building-on-the-sdk) section below.
 - **[toolkit/](toolkit/)** — the `localai-cli` toolkit (zip + `.sha256`).
-  `0.6`–`1.0.0-beta.3` are checked in here; from `1.0.0-beta.4` on it ships as a
-  release asset on
-  [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
-  alongside the app DMG. See that folder's README to download and verify; full
-  CLI reference at
+  `0.6`–`1.0.0-beta.3` are checked in here; `1.0.0-beta.4` through `1.0.0-RC.1`
+  shipped as a release asset on
+  [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases);
+  from **`1.0.0-GA`** on it ships as a release asset on this repo instead,
+  alongside the app DMG and the SDK xcframeworks. See that folder's README to
+  download and verify; full CLI reference at
   [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html).
 - **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
   managing MCP servers and models, built on the SDK's public API.
