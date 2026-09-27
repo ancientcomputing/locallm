@@ -5,7 +5,9 @@
 > `1.0.0-beta`, requires macOS 27). Model conversions, chat templates, and the MLX stack all
 > move. **Validate your own model with `MLXModelProvider.capabilityProbe` — that result is
 > authoritative, this table is a starting point.** Distilled from
-> 15+ rounds of real traces.
+> 15+ rounds of real traces. (The Qwen3.8-27B row was confirmed separately on
+> **2026-09-27** against SDK `1.0.0-GA`, on a Mac Studio M5 Max / 64 GB — not part of the
+> original 15-round rig below.)
 
 Applies to the **model layer** only (`LocalLMLabSDKInference` + `MLXModelProvider` — see
 [`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions)). The
@@ -21,6 +23,7 @@ built-in `ClockTool` cross-check.
 | Family | Tool-calling | Notes |
 |---|---|---|
 | **Qwen 2.5 / 3** (1.5B – 14B, `mlx-community/*-Instruct-4bit`, `Qwen3-*-4bit`) | ✅ reliable | The reference set. 1.5B tool-calls but grounds shallowly; 8B/14B better. Qwen's `<tool_call>{…}</tool_call>` JSON convention is what the bridge is built against. **`code-buddy`'s default.** |
+| **Qwen3.8-27B** (4-bit `mlx-community/Qwen3.8-27B-4bit`, 6-bit `lmstudio-community/Qwen3.8-27B-MLX-6bit`, 8-bit `mlx-community/Qwen3.8-27B-8bit`) | ✅ reliable (confirmed 2026-09-27, SDK 1.0.0-GA, Mac Studio M5 Max / 64 GB) | Larger sibling of the Qwen3 family above — same tool-calling convention, tool-calls reliably across all three quantizations. Needs a Mac with enough unified memory to hold the weights (the 8-bit checkpoint's actual file size is ~29.5 GB — see `MLXModelProvider.validate`'s `sizeVsMemory` stage; 4-bit and 6-bit are proportionally smaller/larger). Couldn't be downloaded before the `1.0.0` GA preflight fix below — `usedStorage` overcounted the 8-bit checkpoint as 58.1 GB against its real 29.5 GB and it was rejected as too big for a 64 GB Mac (see the `1.0.0 — GA` entry in [CHANGELOG.md](../CHANGELOG.md)). Not part of the original 15-round eval below — added once confirmed separately. |
 | **Granite 4.0** (h-tiny) | ✅ | First non-Qwen to genuinely tool-call. Picked adjacent-but-wrong tools on an unnamed-tool prompt (name your tools explicitly). |
 | **Gemma 3 / 4** | ✅ | Best release-date precision of any local model tested, matching Claude — with one fabricated detail. |
 | **Ministral-3-3B** | ✅ | Cleanest grounding outside Claude/Gemma; zero fabrication in our run. |
