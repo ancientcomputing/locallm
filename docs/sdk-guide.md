@@ -9,8 +9,10 @@ below for the working reference apps this guide is drawn from.
 
 Requires macOS 26+ on Apple Silicon, Swift 6 tools.
 
-**Status note**: this SDK is early — this guide describes the API as it exists today, and it will
-change. `Components` in particular is newer and smaller than `Core`.
+**Status note**: `1.0.0` is generally available — source compatible from `1.0.0-RC.1` onward (see
+[§9](#9-whats-not-in-core-yet) for the compatibility policy, or
+[`migrating-to-1.0.md`](migrating-to-1.0.md) if you're coming from `0.8.x`). This guide describes
+the API as of `1.0.0` GA. `Components` in particular is newer and smaller than `Core`.
 
 ## Start here: run a real example before reading further
 
@@ -3474,6 +3476,20 @@ struct ModelOnboardingRequest: Sendable, Equatable, Identifiable {
 struct ModelOnboardingSource: Sendable {
     init(provider: any DownloadableModelProvider)     // or init(registry: ModelRegistry)
 }
+enum ModelOnboardingStepState: Sendable, Equatable {
+    case pending, running, done(String), failed(String)
+}
+struct ModelOnboardingItem: Sendable, Equatable, Identifiable {   // one repo's progress through the flow
+    var id: String { request.repoID }
+    var request: ModelOnboardingRequest
+    var validate: ModelOnboardingStepState = .pending
+    var download: ModelOnboardingStepState = .pending
+    var pin: ModelOnboardingStepState = .pending
+    var downloadFraction: Double?    // 0...1 while downloading, nil otherwise
+    var downloadedBytes: Int64 = 0
+    var totalBytes: Int64 = 0
+    var hasFailed: Bool { get }; var isComplete: Bool { get }     // true once `pin` is .done
+}
 @MainActor @Observable final class ModelOnboardingModel {
     init(requests: [ModelOnboardingRequest], source: ModelOnboardingSource)
     func start(); func cancel(); func reset()
@@ -3482,6 +3498,23 @@ struct ModelOnboardingSource: Sendable {
 struct ModelOnboardingView: View {
     init(model: ModelOnboardingModel, showsDownloadProgress: Bool = true,
          onFinished: (([InstalledModel]) -> Void)? = nil, onDismiss: (() -> Void)? = nil)
+}
+struct ModelFileChange: Sendable, Equatable, Identifiable {
+    enum Kind: Sendable, Equatable { case added, removed, modified }
+    var id: String { path }
+    init(path: String, kind: Kind, oldSize: Int64? = nil, newSize: Int64? = nil)
+}
+struct ModelUpdateOffer: Sendable, Equatable {
+    var current: String       // the version the model is on now
+    var available: String     // the version on offer
+    var changes: [ModelFileChange]
+    var isUpToDate: Bool { current == available }
+    init(current: String, available: String, changes: [ModelFileChange] = [])
+}
+enum ModelUpdateOwnership: Sendable, Equatable {
+    case userChosen             // the user picked this model, so the user decides; the offer is whatever is newest
+    case developerOffered       // built into the app — the developer vets versions; the offer is one they vouch for
+    case fixed(reason: String)  // can't be updated here; `reason` is shown as-is
 }
 struct ModelUpdateActions: Sendable {
     init(check: @escaping @Sendable () async throws -> ModelUpdateOffer,
@@ -3495,6 +3528,15 @@ struct ModelUpdateActions: Sendable {
     func checkForUpdate() async; func update() async; func rollBack() async; func revertToShippedVersion() async
 }
 struct ModelUpdateView: View { init(model: ModelUpdateModel) }
+struct ModelVersionRow: Sendable, Equatable, Identifiable {   // one cached version of a model, for the cleanup list
+    var id: String { revision }
+    var revision: String
+    var isCurrent: Bool     // the version in use; cannot be removed
+    var isComplete: Bool    // false for a half-downloaded version
+    var freesBytes: Int64   // what removing this version would actually free — its own files, not ones it shares
+    var sharedBytes: Int64  // bytes shared with other versions, which removing this one does NOT free
+    init(revision: String, isCurrent: Bool, isComplete: Bool = true, freesBytes: Int64, sharedBytes: Int64 = 0)
+}
 @MainActor @Observable final class ModelVersionsModel {
     init(list: @escaping @Sendable () async -> [ModelVersionRow],
          remove: @escaping @Sendable (ModelVersionRow) async throws -> Int64)   // returns bytes freed; must refuse the current version
