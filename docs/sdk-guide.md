@@ -889,6 +889,11 @@ signed in" behavior works.
 > (connect → build tools → run a turn); [`components-demo`](../examples/components-demo/)
 > additionally exercises resources and prompts.
 
+An app that uses `LocalLMLab` doesn't make this: it uses `lab.mcp`, set up with
+`LocalLMLab.Configuration(…, mcp: MCPSettings(…))` ([§6a](#6a-the-model-layer-local-models-routing-sessions)) —
+`makeSession` takes MCP tools from `lab.mcp`, so a second manager would be invisible to it. The
+calls below are the same on `lab.mcp`.
+
 ```swift
 let manager = MCPServerManager()  // NOT a singleton — you own the instance
 
