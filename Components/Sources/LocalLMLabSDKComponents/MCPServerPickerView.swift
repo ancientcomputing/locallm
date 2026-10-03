@@ -72,21 +72,35 @@ public struct MCPServerPickerView: View {
                     .frame(width: 140)
             }
 
+            // Radio group, not a segmented control. A segmented `Picker` with 3 long labels
+            // flips between "hug content" and "fill the frame" distribution across layout passes
+            // (an empty vs. filled `TextField` reports a different ideal width, and any keystroke
+            // re-runs layout), so it visibly resized and its label vanished as you typed in the URL
+            // field. A radio group has no width ambiguity and shows all three options at once.
+            // Same control as LocalLM Lab's MCP Servers view.
             Picker("Auth type", selection: $newServerAuthType) {
                 Text("None").tag(MCPAuthType.none)
                 Text("Personal Access Token").tag(MCPAuthType.pat)
                 Text("OAuth (manual client)").tag(MCPAuthType.oauthManual)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 420)
+            .pickerStyle(.radioGroup)
+            Text("A server that uses OAuth with dynamic client registration (most hosted servers) needs None: you sign in in your browser when you click Add.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
 
             if newServerAuthType == .pat {
                 SecureField("Personal access token", text: $newServerPATToken)
                     .textFieldStyle(.roundedBorder)
+                Text("The token's own permissions are what the server gets — this app doesn't narrow them.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
             if newServerAuthType == .oauthManual {
                 TextField("Client ID (from the server's developer console)", text: $newServerManualClientID)
                     .textFieldStyle(.roundedBorder)
+                Text("For servers with no dynamic client registration (e.g. Slack). Create an app in the server's developer console, opt into PKCE if offered, register \(MCPOAuthFlow.redirectURI) as a redirect URL, then paste the Client ID here — no client secret needed. You'll still sign in in your browser when you click Add.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
 
             Button(adding ? "Adding…" : "Add") {
@@ -135,6 +149,8 @@ public struct MCPServerPickerView: View {
             Text(server.url.absoluteString)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
+
+            trustControls(server)
 
             if !server.tools.isEmpty {
                 Text("\(server.tools.filter(\.enabled).count) of \(server.tools.count) tools enabled — ~\(server.estimatedTokens) tokens")
@@ -191,6 +207,92 @@ public struct MCPServerPickerView: View {
                         .lineLimit(2)
                 }
             }
+        }
+    }
+
+    // MARK: trust and approval
+
+    /// The approvals offered here. An approval decided by the app's policy (`by: .policy`) is the
+    /// app's setting, shown but not offered.
+    private enum ApprovalChoice: Hashable {
+        case automatic, allow, askChanges, askDeletions, askEverything, appPolicy
+
+        init(_ approval: ToolApproval?) {
+            switch approval {
+            case nil: self = .automatic
+            case .allow?: self = .allow
+            case .ask(_, .policy)?: self = .appPolicy
+            case .ask(.read, .user)?: self = .askEverything
+            case .ask(.mutate, .user)?: self = .askChanges
+            case .ask(.destructive, .user)?: self = .askDeletions
+            case .ask?: self = .askChanges
+            @unknown default: self = .askChanges
+            }
+        }
+
+        var approval: ToolApproval? {
+            switch self {
+            case .automatic: nil
+            case .allow: .allow
+            case .askChanges: .ask(atOrAbove: .mutate, by: .user)
+            case .askDeletions: .ask(atOrAbove: .destructive, by: .user)
+            case .askEverything: .ask(atOrAbove: .read, by: .user)
+            case .appPolicy: nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func trustControls(_ server: MCPServerState) -> some View {
+        let id = server.id
+        HStack(spacing: 16) {
+            Picker("Trust", selection: Binding(
+                get: { server.trust },
+                set: { manager.core.setTrust($0, server: id) }
+            )) {
+                Text("Untrusted").tag(MCPServerTrust.untrusted)
+                Text("Trusted").tag(MCPServerTrust.trusted)
+            }
+            .fixedSize()
+            Picker("Before a tool runs", selection: Binding(
+                get: { ApprovalChoice(server.toolApproval) },
+                set: { manager.core.setToolApproval($0.approval, server: id) }
+            )) {
+                Text(server.trust == .trusted ? "Default: ask before deletions" : "Default: ask before changes")
+                    .tag(ApprovalChoice.automatic)
+                Text("Don't ask").tag(ApprovalChoice.allow)
+                Text("Ask before changes").tag(ApprovalChoice.askChanges)
+                Text("Ask before deletions").tag(ApprovalChoice.askDeletions)
+                Text("Ask before every call").tag(ApprovalChoice.askEverything)
+                if ApprovalChoice(server.toolApproval) == .appPolicy {
+                    Text("Decided by the app's policy").tag(ApprovalChoice.appPolicy)
+                }
+            }
+            .fixedSize()
+            .disabled(ApprovalChoice(server.toolApproval) == .appPolicy)
+        }
+        .controlSize(.small)
+        Text(server.trust == .trusted
+             ? "Trusted: the server's own labels decide which tools only read and which delete. Trust only operators you vouch for — a server can label anything."
+             : "Untrusted: the server's labels are ignored, so every tool counts as one that may change data.")
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+
+        if server.toolsChangedSinceTrusted {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                Text("This server's tools changed since you trusted it. Review them below.")
+                Button("Trust Again") { manager.core.setTrust(.trusted, server: id) }
+            }
+            .font(.system(size: 12))
+        }
+        if server.connectionStatus == .connected, !server.tools.isEmpty,
+           !server.tools.contains(where: { $0.enabled && $0.isModelVisible }) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                Text("None of this server's tools are on, so a model can't use it yet. Turn on the ones you want below.")
+            }
+            .font(.system(size: 12))
         }
     }
 
