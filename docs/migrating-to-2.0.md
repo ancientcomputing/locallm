@@ -105,7 +105,7 @@ passed `restoring:` before `tools:`).
 | What | 2.0 |
 |---|---|
 | Make a session | One `makeSession(route:tools:instructions:restoring:includeMCPTools:mcpAppHints:options:authorizer:)`. Continue a saved conversation with `restoring:` (instead of `instructions:` — passing both traps). |
-| Run a turn | `session.respond(to:options:fromAppInstance:)` / `streamResponse(to:options:fromAppInstance:)`. `languageModelSession` is the escape hatch: a turn run on it directly skips the chat history, `turnContext`, widget context, the MCP tool refresh and `retryOnContextOverflow`. |
+| Run a turn | `session.respond(to:options:fromAppInstance:)` / `streamResponse(to:options:fromAppInstance:)`. `languageModelSession` is the escape hatch: a turn run on it directly skips the chat history, `turnContext`, widget context, the MCP tool refresh and `retryOnContextOverflow` — table and when to still use it in [`sdk-guide.md` "Running a turn"](sdk-guide.md#running-a-turn-and-when-to-use-languagemodelsession). |
 | Set up MCP | `lab.mcp`, configured with `LocalLMLab.Configuration(providers:state:mcp:)` and `MCPSettings` (handlers, response limits, version negotiation, live updates). An app that uses `LocalLMLab` doesn't make its own `MCPServerManager`; making one directly is for apps without `LocalLMLab`. |
 | Describe a pending call | One `PendingToolCall` / `PendingToolCallSummary` initializer each; `initiator:` defaults to `.model`, `serverApproval:` to `nil`. |
 

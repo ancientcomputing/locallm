@@ -696,7 +696,8 @@ through your session's authorizer as `ToolCallInitiator.app(instance:)`, recorde
 `hostTranscript` like the model's (tools the server marks app-only, such as a dashboard's polling,
 are counted per view instead of recorded). Sending a message as the user (`ui/message`), sharing
 context with the model (`ui/update-model-context`) and opening links are denied unless your
-policy allows them. `ConfirmingToolAuthorizer` remembers the user's answer per view and tool, so a
+policy allows them. Shared context reaches the model with the next `respond` / `streamResponse`
+turn — a turn run on `languageModelSession` doesn't send it ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)). `ConfirmingToolAuthorizer` remembers the user's answer per view and tool, so a
 polling view asks once (destructive calls ask each time).
 
 ## 4. Keychain storage — automatic isolation, native API, sandbox-safe
@@ -1143,6 +1144,8 @@ mlx.cancelDownload("mlx-community/Qwen3-8B-4bit")
 // Post-download smoke test — a real prompt + a trivial tool call. Authoritative for
 // that model's ModelCapabilities (some downloaded models can't reliably tool-call).
 let report = await mlx.capabilityProbe(installed.id)   // ModelCapabilityReport
+// report.capabilities: .toolCalling, .guidedGeneration (respond(to:generating:) — run on
+// languageModelSession, see "Running a turn"), .reasoningToggle
 // This is authoritative. For a starting shortlist of what tool-calls and what doesn't,
 // see docs/tested-models.md — but always confirm your own model with capabilityProbe.
 
@@ -1382,16 +1385,18 @@ function, `makeSession(route:tools:instructions:restoring:includeMCPTools:mcpApp
 - **MCP tools follow `lab.mcp`.** With `includeMCPTools` (the default) the session offers the
   enabled MCP tools and keeps following `lab.mcp`: turn a tool on or off, add a server, or change
   a server's trust, and the model has it on its next `respond` / `streamResponse` — same session.
+  (A turn run on `languageModelSession` directly doesn't pick changes up — [Running a turn](#running-a-turn-and-when-to-use-languagemodelsession).)
   For a fixed, per-session set of MCP tools, pass them in `tools:` with `includeMCPTools: false`.
 - **`restoring:`** continues a saved conversation (see [Building a chat app](#building-a-chat-app--hosttranscript-streamresponse-turncontext));
   leave `instructions` nil then — the saved transcript carries its own (passing both traps).
 - **`mcpAppHints: true`** adds one line to the description of each MCP tool that has an MCP App
   view, so a model can prefer it when the user asks to *see* something ([§3f](#3f-mcp-apps-showing-a-servers-interactive-views)).
 
-**Run turns with `respond` / `streamResponse`.** They keep `hostTranscript` up to date, send
-`turnContext` and any widget context, refresh MCP tools and apply `retryOnContextOverflow`.
-`languageModelSession` is Apple's session underneath — the escape hatch for what the SDK doesn't
-surface (the raw `transcript` to save, say); a turn run on it directly skips all of the above.
+**Run every turn with `respond` / `streamResponse`.** They are what make the rest of this
+section work — the MCP tool refresh above, the sampling options below, `turnContext`, the chat
+history, the overflow retry. `languageModelSession` is Apple's session underneath, and a turn run
+on it directly skips all of that; what it costs, and when it's still the right call (guided
+generation, reading the raw transcript), is in [Running a turn](#running-a-turn-and-when-to-use-languagemodelsession).
 
 **`options: SessionOptions`** carries per-call knobs — provider-native web search, sampling
 (`temperature` / `topP` / `topK` / `seed` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
@@ -1435,8 +1440,61 @@ process launch occasionally differed, and the model itself can change with an OS
 seed → usually the same text" as the contract; don't build tests or caching on exact matches.
 (On MLX, where the weights are pinned, a seed is a stronger tool for replay and golden-output tests.)
 
-If you call `session.languageModelSession.respond(...)` directly to opt out of the SDK's wrapper,
-these options are **not** applied — pass `try options.appleGenerationOptions()` yourself.
+These options are applied by `respond` / `streamResponse`. A turn run on
+`session.languageModelSession` directly does **not** get them — pass
+`try options.appleGenerationOptions()` yourself ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)).
+
+### Running a turn, and when to use `languageModelSession`
+
+> **Use `respond` / `streamResponse` for every turn.** Reach for `languageModelSession` only for
+> what the SDK has no method for — guided generation, or reading the raw transcript.
+>
+> **Examples that use it:** every example built on `LocalLMLab` runs its turns this way;
+> [`vistanova`](../examples/vistanova/) also shows the one escape-hatch case, guided generation.
+> (The small examples that don't use `LocalLMLab` — `repo-qa`, `plate-today`, `workspace-buddy` —
+> make Apple's `LanguageModelSession` themselves; with no SDK session there is nothing to skip.)
+
+```swift
+let answer = try await session.respond(to: prompt)                  // the whole reply, a String
+for try await soFar in session.streamResponse(to: prompt) {         // the reply so far, a String
+    show(soFar)
+}
+```
+
+`session.languageModelSession` is Apple's `LanguageModelSession` underneath, and you can call
+`respond` / `streamResponse` on it directly. The tools still run through the SDK — so tool
+approval, tool-call records and tool events work either way — but everything the SDK does *around*
+a turn doesn't happen:
+
+| | `session.respond` / `streamResponse` | `session.languageModelSession.respond` / `.streamResponse` |
+|---|---|---|
+| Tool approval (`authorizer:`), tool-call records in `hostTranscript`, `.toolCallStarted` / `.toolCallFinished` | yes | yes — these live in the tools themselves |
+| The user's message in `hostTranscript` as the turn starts; reply and reasoning when it ends; `replyInProgress` while streaming | yes | no message at turn start, no `replyInProgress`; text only after you call `reconcileServerToolArtifacts()` |
+| `turnContext` (e.g. the date) and context an MCP App view shared, sent with the prompt | yes | no — the model never sees them |
+| MCP tools turned on, or servers added, since the last turn | offered | not offered — the model session keeps the tools it had |
+| `retryOnContextOverflow` | applied (`.contextCompacted`) | no — the overflow error reaches you |
+| `SessionOptions` sampling on Apple's on-device model | applied | no — pass `try options.appleGenerationOptions()` yourself |
+| `session.citations`, `.serverToolCall` (provider web search) | updated | only after `reconcileServerToolArtifacts()` |
+| `session.cancel()` | stops the turn | doesn't — cancel your own `Task` |
+
+**When the escape hatch is the right call:**
+
+- **Guided generation** — `respond(to:generating:)` with a `@Generable` result type. The SDK has no
+  turn method for it, so call it on `languageModelSession`, then `session.reconcileServerToolArtifacts()`
+  so `hostTranscript` and `citations` catch up. For a downloaded model, check
+  `ModelCapabilities.guidedGeneration` (`capabilityProbe`) first. [`vistanova`](../examples/vistanova/)'s
+  structured search does exactly this, and uses `respond` for its plain-text fallback.
+- **Reading the raw transcript** — `languageModelSession.transcript`, to save the model's memory
+  ([Building a chat app](#building-a-chat-app--hosttranscript-streamresponse-turncontext)) or to see
+  what it was given. Reading is fine; it's *running a turn* there that skips the SDK.
+- **Any other Apple session API** the SDK doesn't wrap.
+
+**Coming from Apple's methods:** `respond` returns the reply as a `String` (Apple: a `Response`, read
+`.content`); `streamResponse` yields `String`s, the reply so far — *usually* append-only, not across a
+tool call or when a reasoning model's `<think>` block gives way to the answer (Apple: snapshots,
+`.content`). Failures arrive as `LocalLMLabError.generation(underlying:)`, cancellation as
+`CancellationError`; `GenerationErrorDescription.describe(_:)` reads either. Per-call options are
+`respond(to:options:)` — on-device model only, as above.
 
 ### Building a chat app — `hostTranscript`, `streamResponse`, `turnContext`
 
@@ -1473,12 +1531,12 @@ if let reply = session.hostTranscript.replyInProgress { StreamingReply(reply) } 
   when it starts and changes in place as it finishes; the reply and reasoning land when the turn
   ends (`replyInProgress` until then — cleared in the same update, so a view never shows both).
   A turn run on `languageModelSession` directly gets text only after
-  `reconcileServerToolArtifacts()`.
+  `reconcileServerToolArtifacts()` ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)).
 - **Tool calls are full records** (`ToolCallRecord`): state, arguments, the output the model saw,
   the full `MCPToolResult` (`mcpResult` — kept under a memory budget, spilled to disk past it),
   the tool's MCP App link (`app`), who made the call (`initiator`: the model, an MCP App view, or
   your app), and timestamps.
-- **A model has no clock.** `turnContext` is called as each turn starts and its text goes ahead of
+- **A model has no clock.** `turnContext` is called as each `respond` / `streamResponse` turn starts and its text goes ahead of
   the user's message — current even in a restored conversation, whose instructions were written
   long ago. (The ready-made `ClockTool` lets the model ask too, but a small model may not.)
 - **Tools of a newly added MCP server start off.** Show the user that, or the model gets no tools
@@ -1531,6 +1589,9 @@ it), `.contextCompacted` (the retry-and-trim above), `.modelLoadProgress` (a loc
 load), `.routeSwitched` (the route this session was on just repointed to a different model —
 rare, but real if your app calls `lab.models.route(_:to:)` mid-session), and
 `.serverToolCall` (a provider running web search/fetch on its own infrastructure — §6b).
+`.toolCallStarted` / `.toolCallFinished` arrive however you run the turn; `.contextCompacted` only
+from `respond` / `streamResponse` (it's their retry), and `.serverToolCall` once
+`reconcileServerToolArtifacts()` has run — which they do for you ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)).
 
 ### `ContextBudget` + `RetryPolicy` — surviving a long session
 
@@ -1545,8 +1606,9 @@ rare, but real if your app calls `lab.models.route(_:to:)` mid-session), and
 - `session.retryOnContextOverflow = RetryPolicy(maxRetries: 2, compact: { transcript in
   myTrim(transcript) })` — when a turn throws `contextSizeExceeded`, the SDK calls your
   `compact` hook, rebuilds the session with the smaller transcript, emits `.contextCompacted`,
-  and retries. Only applies to the SDK's `respond` wrappers; with no `compact` hook it just
-  rethrows.
+  and retries. Applies to turns run with `respond` / `streamResponse`; a turn run on
+  `languageModelSession` directly isn't retried ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)). With no `compact` hook it
+  just rethrows.
 
 ### `ModelAvailability` — gray out a model and say why
 
@@ -1651,7 +1713,8 @@ let answer = try await lab.makeSession(route: "chat").respond(to: prompt)
   `.serverToolCall(ServerToolActivity)` — its `.kind` is `.webSearch(queries:hits:)`, `hits`
   being `[WebHit]` (`url`/`title`/`snippet`) — so a "Searched: …" activity line doesn't need to
   wait for the final answer. `session.citations: [Citation]` (`url`/`title`/`citedText`) carries
-  the sources once the turn finishes — render these as footnotes, since a provider's web-search
+  the sources once the turn finishes (filled in by `respond` / `streamResponse`; after a turn on
+  `languageModelSession`, call `reconcileServerToolArtifacts()` first — [Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)) — render these as footnotes, since a provider's web-search
   answer without visible sources reads as an unverifiable claim. `SessionOptions.userLocation`
   (`city`/`region`/`country`/`timezone`) localizes results when the provider supports it — set
   it if your search-heavy queries are location-sensitive ("restaurants near me").
@@ -2870,7 +2933,7 @@ struct LocalLMLabSession: Sendable {
     var retryOnContextOverflow: RetryPolicy         // .disabled by default; set before respond()
     var turnContext: (@Sendable () -> String?)?    // sent ahead of every prompt (e.g. the date); not shown in hostTranscript
     var hostTranscript: HostTranscript { get }      // the conversation as a UI shows it (below)
-    var languageModelSession: LanguageModelSession { get }   // Apple's session — the escape hatch; a turn run on it skips the SDK's turn handling
+    var languageModelSession: LanguageModelSession { get }   // Apple's session — the escape hatch; a turn run on it skips the SDK's turn handling ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession))
     var events: AsyncStream<SessionEvent> { get }
     var citations: [Citation] { get }               // web-search sources accumulated this session ([§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote))
     func reconcileServerToolArtifacts()             // re-derive citations/events from the transcript after a manual edit
