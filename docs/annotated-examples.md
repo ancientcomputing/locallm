@@ -1242,14 +1242,15 @@ func run() async {
     let interrupt = Interrupt()
     let sigint = startSigintWatch(interrupt)
 
-    // One turn. streamResponse snapshots are *usually* append-only — but not across a tool
+    // One turn, through the session's own turn method (not `languageModelSession`, the escape
+    // hatch that skips the SDK's turn handling). session.streamResponse yields the reply so far —
+    // *usually* append-only, but not across a tool
     // call, and not when a reasoning model drops its <think> block once the answer begins.
     // So diff against what we actually printed rather than slicing at a running offset.
     func ask(_ prompt: String) async {
         do {
             var shown = ""
-            for try await partial in session.languageModelSession.streamResponse(to: prompt) {   // ← SDK
-                let content = partial.content
+            for try await content in session.streamResponse(to: prompt) {   // ← SDK
                 if content.isEmpty || content == shown { continue }
                 if content.hasPrefix(shown) { print(content.dropFirst(shown.count), terminator: "") }
                 else if shown.hasPrefix(content) { continue }   // snapshot shrank; already shown
@@ -1742,14 +1743,14 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 }
                 defer { events.cancel() }
 
-                // Each snapshot is the whole answer so far. Usually append-only — but a reasoning
+                // session.streamResponse (the session's own turn method) yields the whole answer so far. Usually append-only — but a reasoning
                 // model drops its <think> block once the answer starts, and the snapshot can reset
                 // across a tool call, so show the latest non-empty one rather than diffing.
                 // (code-buddy does the careful append-only version — stdout can't un-print.)
                 var text = ""
-                for try await snapshot in session.languageModelSession.streamResponse(to: request) {   // ← SDK
-                    guard !snapshot.content.isEmpty else { continue }
-                    text = snapshot.content
+                for try await latest in session.streamResponse(to: request) {   // ← SDK
+                    guard !latest.isEmpty else { continue }
+                    text = latest
                     self.activity = nil
                     self.state = .working(text)
                 }
@@ -3014,6 +3015,9 @@ final class AppModel {
 
         if supportsGuidedGeneration {
             do {
+                // Guided generation (`generating:`) has no SDK turn method, so this one call stays on
+                // Apple's session — the escape hatch — which also keeps the recovery below reading
+                // Apple's own error.
                 let response = try await session.languageModelSession.respond(   // ← SDK — a plain FoundationModels session
                     to: query, generating: SearchResults.self)
                 guard toolWasCalled else { throw SearchParseError.toolNotCalled }
@@ -3026,7 +3030,7 @@ final class AppModel {
             }
         } else {
             // No guided generation on this model: plain text, parsed leniently for (title, url).
-            let response = try await session.languageModelSession.respond(to: query)   // ← SDK
+            let reply = try await session.respond(to: query)          // ← SDK — the session's own turn method
             // …
         }
     }
@@ -3430,10 +3434,10 @@ final class ControlRoomModel: ObservableObject {
             let start = Date()
             var firstChunkAt: Date?
             var wordCount = 0
-            for try await partial in session.languageModelSession.streamResponse(to: prompt) {  // ← SDK
-                if firstChunkAt == nil, !partial.content.isEmpty { firstChunkAt = Date() }
-                lastOutput = partial.content
-                wordCount = partial.content.split(separator: " ").count
+            for try await partial in session.streamResponse(to: prompt) {  // ← SDK
+                if firstChunkAt == nil, !partial.isEmpty { firstChunkAt = Date() }
+                lastOutput = partial
+                wordCount = partial.split(separator: " ").count
             }
             let elapsed = Date().timeIntervalSince(start)
             tokensPerSecond = elapsed > 0 ? Double(wordCount) / elapsed : nil
