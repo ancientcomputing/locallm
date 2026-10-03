@@ -1918,49 +1918,87 @@ declares its impact (`ImpactRatedTool`).
 is the checkpoint between "the model chose to call this" and "the side effect happens." It's
 opt-in: with no `authorizer:`, `makeSession` installs no invocation gate — every tool in the
 list is callable by the model, with whatever arguments it chooses, and every call runs
-immediately with no confirmation and no way to deny it. That is the pre-authorizer behaviour,
-unchanged.
+immediately with no confirmation and no way to deny it.
+
+The SDK's one authorizer is **`ConfirmingToolAuthorizer`**. You say **who may approve what**
+where the tools come from — per MCP server on `lab.mcp`, and for your own tools on the
+authorizer — and it applies that on every call (new in 2.0):
 
 ```swift
+// Per MCP server, on lab.mcp. The server is the unit of trust.
+lab.mcp.setTrust(.trusted, server: companyServer)        // believe its read-only / destructive labels
+lab.mcp.setToolApproval(.allow, server: companyServer)   // its tools run without asking
+// An untrusted server (the default) asks the user before every call.
+
 let session = try lab.makeSession(
     route: "chat",
-    tools: tools,
-    authorizer: RuleBasedToolAuthorizer(
-        rules: [.confirm(atOrAbove: .mutate), .denyMCPTools],
-        confirm: { call in await myConfirmationUI.ask(call) }))
+    tools: tools,                                         // your own tools
+    authorizer: ConfirmingToolAuthorizer(
+        channel: presenter,                               // how the user is asked
+        policy: { call in await myPolicyService.decide(call) },   // optional external function
+        hostTools: .ask(atOrAbove: .mutate, by: .user)))  // your own tools' approval (the default)
 ```
 
-- **`RuleBasedToolAuthorizer`** (Core) is pure logic: `denyTool` / `denyMCPTools` /
-  `deny(atOrAbove:)` / `allowTool` / `confirm(atOrAbove:)` / `confirmMCPTools`,
-  most-restrictive-wins. A `.confirm…` rule invokes your `confirm` closure; with no closure it
-  fails closed to deny.
-- **`ConfirmingToolAuthorizer`** (Core) is "ask a human per call." It takes a
-  `ToolConfirmationChannel`; in a single-process SwiftUI app that's
-  `ToolConfirmationPresenter` (Components) plus `.toolConfirmationSheet(presenter)` on a root
-  view — no sheet UI of your own. `authorize(_:)` is `async`, and this denies after a timeout
-  (default 120s) so a forgotten sheet can't pin a turn open.
+**The settings at a glance** (per server in 2.0; a tool has only on/off for now):
+
+| Level | Setting | Options | What it decides |
+|---|---|---|---|
+| Server | **Trust** — `setTrust(_:server:)` | `.untrusted` (default) · `.trusted` | Whether the server's own labels (`readOnlyHint`, `destructiveHint`) are believed. Untrusted: every tool counts as one that may change data (`.mutate`). |
+| Server | **Approval** — `setToolApproval(_:server:)` | `.allow` — nothing asks<br>`.ask(atOrAbove: .mutate, …)` — reads run, changes and deletions ask<br>`.ask(atOrAbove: .destructive, …)` — only deletions ask<br>`.ask(atOrAbove: .read, …)` — every call asks<br>`nil` — the default for the trust level: untrusted asks before changes, trusted before deletions | Which calls need authorization before they run. |
+| Server | ↳ **who answers** an ask — the `by:` of `.ask` | `.user` — the confirmation channel · `.policy` — your `ToolPolicy` (allow / deny / ask the user) | Who authorizes the calls that need it. |
+| Tool | **On / Off** — `setToolEnabled(server:tool:enabled:)` | on · off (new tools start off) | Whether the model is offered the tool at all. |
+| Tool | **Approval** — *a later release* | its own `.allow` / `.ask`, overriding the server's | e.g. allow `find-tasks` on an untrusted server, or always ask before `delete-object` on a trusted one. |
+
+- **Trust is only ever yours or the user's to give** — never anything the server says.
+  `MCPServerState.toolsChangedSinceTrusted` turns true when a trusted server's tools change, so
+  the user can review and re-confirm (`setTrust(.trusted, …)` again); trust isn't dropped
+  automatically.
+- **The policy** (`ToolPolicy`) is your external authorization function — a policy service, an
+  IT rule set, a rule over the arguments. It returns `.allow`, `.deny(reason:)` or `.askUser`.
+  Use it for anything the per-server settings can't say (a per-tool allow list, a
+  per-connector rule).
+- **Fails closed.** No channel when the user must answer (a headless host: pass
+  `channel: nil`), no policy when the policy must, a timeout (default 120s), or a declined
+  question all deny.
+- **Read live.** Settings are read on every call, so a change applies to a running session's
+  next call — the model's and an MCP App view's alike. A view's answer is remembered per view
+  and tool, so a polling dashboard asks once; deletions are asked each time.
+- **Not persisted by the manager.** Save `MCPServerState.trust` / `.toolApproval` with your
+  server list and set them again after `restore(from:)` (before or after both work).
+- **To stop being asked about deletions** on a server you rely on, set `.allow`, or route them
+  to your policy with `.ask(atOrAbove: .destructive, by: .policy)` so a rule decides and no one
+  is interrupted.
+- In a single-process SwiftUI app the channel is `ToolConfirmationPresenter` (Components) plus
+  `.toolConfirmationSheet(presenter)` on a root view — no sheet UI of your own. Components'
+  `MCPServerPickerView` shows each server's trust and approval.
 - A denied call comes back to the model as the tool result `"DENIED: <reason>"` (for
   `String`-returning tools — all the SDK's and `MCPTool`), so the model adapts rather than the
-  turn failing.
+  turn failing. A policy denial reads `"denied by policy: <reason>"`.
 
 The authorizer is a floor, not a ceiling: it can't grant access to a tool that isn't in the
 list, and it doesn't restrain your own code calling `CalendarAccess.deleteEvent(...)` directly.
-It gates model-initiated calls only.
+It gates model- and view-initiated calls only.
 
 **Across processes.** If your app runs the session in a headless helper and the UI in another
 process, implement `ToolConfirmationChannel` with your transport — that's the *only* security
 code you write. `PendingToolCall.summary` is a `Codable` `PendingToolCallSummary` (`toolName` /
-`argumentsDescription` / `origin` / `impact`; drops the non-serializable `arguments`) built for
-exactly that hop; `DecisionGate` (Core) handles the resume-once race between the reply and a
-cancellation.
+`argumentsDescription` / `origin` / `impact` / `initiator` / `serverApproval`; drops the
+non-serializable `arguments`) built for exactly that hop; `DecisionGate` (Core) handles the
+resume-once race between the reply and a cancellation. If the MCP connections live in the other
+process, record each server's approval on the helper's `lab.mcp` before `makeSession` —
+approvals are keyed by server id and need no connection.
 
-**The SDK can't see inside an MCP tool.** It didn't write it, so it can't know if a call is a
-read or a delete — every `MCPTool` is rated `.mutate`. `limited(toMaxImpact:)` can only include
-or exclude a whole MCP server, not grade it, and `ConfirmingToolAuthorizer` will confirm even a
-read-shaped MCP call. With `makeSession(includeMCPTools:
-true)` the SDK tags them `.mcp` origin so `denyMCPTools` / `confirmMCPTools` and a rule's
-`call.origin` check apply. A host that builds its own MCP-backed `Tool` type (e.g. one proxying
-to a connection in another process) conforms it to `OriginTaggedTool` to keep that origin.
+**What the SDK can see inside an MCP tool.** It didn't write the tool, so on an untrusted server
+every call is `.mutate`: `limited(toMaxImpact:)` can only include or exclude a whole server,
+and the default approval asks even before a read-shaped call. Trust the server and its own
+`readOnlyHint` / `destructiveHint` set each tool's impact. With `makeSession(includeMCPTools:
+true)` the SDK tags the tools with their server (`.mcp` origin), which is how the server's
+approval applies. A host that builds its own MCP-backed `Tool` type (e.g. one proxying to a
+connection in another process) conforms it to `OriginTaggedTool` to keep that origin.
+
+**Coming from 1.x.** `RuleBasedToolAuthorizer`, `ConfirmingToolAuthorizer`'s `requirement:`
+closure and `setTrustsToolAnnotations` are gone — see
+[migrating-to-2.0.md](migrating-to-2.0.md) §3 for the mapping.
 
 ## 8. Filesystem access: security-scoped bookmarks (example, not in Core)
 
@@ -2368,8 +2406,12 @@ dependency on `Core.xcframework` and no source access to Core's internals.
   SwiftUI apps that want `@Published`-style reactivity without writing the wrapper themselves (see
   [§6](#6-general-api-reference)'s note).
 - **`MCPServerPickerView`** — add/list/reconnect/disconnect/remove MCP servers, all three auth
-  types from [§3](#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them), per-tool and per-resource enable/disable, and a "Save As…" action that
-  exports a server's tools/resources/prompts to a text file.
+  types from [§3](#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them) (picked with a radio group), per-tool and per-resource enable/disable, and a "Save As…" action that
+  exports a server's tools/resources/prompts to a text file. New in 2.0: each server row has its
+  **Trust** and **"Before a tool runs"** approval ([§7c](#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)) — an approval your app routes to its
+  policy shows as "Decided by the app's policy" and isn't editable there — plus a notice when none
+  of a server's tools are on (so a model can't use it yet) and one when a trusted server's tools
+  changed since it was trusted ("Trust Again").
 - **`MCPOAuthWaitingView`** — shown while an OAuth sign-in is in flight in the system browser;
   `MCPServerPickerView` already uses this internally during its own add-server flow.
 - **`MCPResourcesView`** / **`MCPPromptsView`** — browse a session's enabled resources/prompts and
@@ -3011,39 +3053,45 @@ struct PendingToolCall: Sendable {
     let arguments: GeneratedContent?       // structured; nil only for a rare third-party From-only Arguments
     let argumentsDescription: String       // always present
     let origin: ToolOrigin                 // .host | .mcp(server:displayName:)
-    let impact: ToolImpact
-    init(toolName: String, arguments: GeneratedContent?, argumentsDescription: String, origin: ToolOrigin, impact: ToolImpact)
+    let impact: ToolImpact                 // MCP: .mutate unless the server is trusted (then its annotations)
+    let initiator: ToolCallInitiator       // .model | .app(instance:) (an MCP App view) | .host
+    let serverApproval: ToolApproval?      // MCP: the server's approval at call time, filled by the SDK; nil for your own tools
+    init(toolName: String, arguments: GeneratedContent?, argumentsDescription: String, origin: ToolOrigin, impact: ToolImpact,
+         initiator: ToolCallInitiator = .model, serverApproval: ToolApproval? = nil)
     var summary: PendingToolCallSummary { get }   // the Codable projection, for crossing a process boundary
 }
-struct PendingToolCallSummary: Codable, Sendable, Equatable {
+struct PendingToolCallSummary: Codable, Sendable, Equatable {   // a missing initiator decodes as .model, serverApproval as nil
     let toolName: String; let argumentsDescription: String; let origin: ToolOrigin; let impact: ToolImpact
+    let initiator: ToolCallInitiator; let serverApproval: ToolApproval?
+    init(toolName: String, argumentsDescription: String, origin: ToolOrigin, impact: ToolImpact,
+         initiator: ToolCallInitiator = .model, serverApproval: ToolApproval? = nil)
 }
 enum ToolOrigin: Sendable, Codable, Equatable { case host; case mcp(server: MCPServerID, displayName: String) }
+enum ToolCallInitiator: Sendable, Hashable, Codable { case model; case app(instance: String); case host }
+
+// --- per-server trust and approval (new in 2.0; set on lab.mcp — see "MCP client" below) ---
+enum MCPServerTrust: String, Sendable, Codable, CaseIterable { case untrusted, trusted }   // trusted ⇒ annotations set impact
+enum ToolApprover: String, Sendable, Codable { case user, policy }
+enum ToolApproval: Sendable, Codable, Equatable {
+    case allow                                            // every call runs
+    case ask(atOrAbove: ToolImpact, by: ToolApprover)     // calls at/above the impact need authorization by `by`
+    static func `default`(for trust: MCPServerTrust) -> ToolApproval   // untrusted: .ask(.mutate, .user); trusted: .ask(.destructive, .user)
+}
+typealias ToolPolicy = @Sendable (PendingToolCall) async -> ToolPolicyDecision   // your external authorization function
+enum ToolPolicyDecision: Sendable, Equatable { case allow; case deny(reason: String); case askUser }
 
 // makeSession(..., authorizer:) — [§12](#12-full-functiontype-reference) "The model layer" — installs the gate; nil = unchanged, no gate.
 
-struct RuleBasedToolAuthorizer: ToolCallAuthorizer {   // pure logic, most-restrictive rule wins
-    enum Rule: Sendable {
-        case denyTool(String)
-        case denyMCPTools
-        case deny(atOrAbove: ToolImpact)
-        case allowTool(String)
-        case confirm(atOrAbove: ToolImpact)
-        case confirmMCPTools
-    }
-    init(rules: [Rule], denyReason: String = "blocked by this app's tool policy",
-         confirm: @escaping @Sendable (PendingToolCall) async -> Bool = { _ in false })
-    static func confirmingMutations(confirm: @escaping @Sendable (PendingToolCall) async -> Bool) -> RuleBasedToolAuthorizer
-    static func confirmingDestructive(confirm: @escaping @Sendable (PendingToolCall) async -> Bool) -> RuleBasedToolAuthorizer
-}
-
-protocol ToolConfirmationChannel: Sendable {   // the transport a "ask a human" authorizer suspends on
+protocol ToolConfirmationChannel: Sendable {   // the transport an "ask the user" decision suspends on
     func requestDecision(for call: PendingToolCall) async -> Bool
 }
-struct ConfirmingToolAuthorizer: ToolCallAuthorizer {   // "ask a human per call," via any ToolConfirmationChannel
-    enum Requirement: Sendable { case allow; case confirm; case deny(reason: String) }
-    init(channel: any ToolConfirmationChannel, timeout: Duration = .seconds(120),
-         requirement: @escaping @Sendable (PendingToolCall) -> Requirement = { _ in .confirm })
+struct ConfirmingToolAuthorizer: ToolCallAuthorizer {   // the SDK's one authorizer
+    // Per call: the MCP server's approval (call.serverApproval; nil ⇒ the untrusted default) or `hostTools`
+    // for your own tools; below the threshold runs, .ask(by: .user) asks `channel`, .ask(by: .policy) asks
+    // `policy` (which may hand it to the user). Fails closed: no channel / no policy / timeout / declined ⇒ deny.
+    // A view's (initiator .app) answer is remembered per view, server and tool; .destructive and timeouts aren't.
+    init(channel: (any ToolConfirmationChannel)?, policy: ToolPolicy? = nil,
+         hostTools: ToolApproval = .ask(atOrAbove: .mutate, by: .user), timeout: Duration = .seconds(120))
 }
 final class DecisionGate: @unchecked Sendable {   // guards the resume-once race between a reply and the timeout
     init()
@@ -3388,6 +3436,11 @@ final class MCPServerManager {
 
     func toolsForSession() -> [MCPToolDescriptor]
     func setToolEnabled(server: MCPServerID, tool: String, enabled: Bool)
+    // Per-server trust and approval ([§7c](#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first), new in 2.0).
+    // Kept across reconnects, cleared by removeServer; not persisted — save the state's trust / toolApproval and set them again after restore.
+    func setTrust(_ trust: MCPServerTrust, server: MCPServerID)                // .trusted ⇒ its annotations set each tool's impact
+    func setToolApproval(_ approval: ToolApproval?, server: MCPServerID)       // nil ⇒ ToolApproval.default(for: trust)
+    func toolApproval(server: MCPServerID) -> ToolApproval                     // the effective approval, read on every call
     // -> MCPToolResult ([§3b](#3b-what-a-tool-call-gives-you-back-mcptoolresult)), not a String. A tool that ran but failed is .success with isError == true.
     // allowElicitation: false on a code path that can't show a prompt (headless / background).
     func callTool(server: MCPServerID, tool: String, arguments: [String: MCPValue], allowElicitation: Bool = true) async -> Result<MCPToolResult, MCPServerError>
@@ -3423,6 +3476,10 @@ struct MCPServerState: Codable, Sendable {
     var negotiatedProtocolVersion: MCPProtocolVersion?   // nil until connected ([§3a](#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care))
     var serverInstructions: String?                       // server's own usage note (initialize or server/discover)
     var liveUpdates: MCPLiveUpdates?                      // stateless servers only; nil otherwise ([§3a](#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care))
+    var trust: MCPServerTrust                             // setTrust (default .untrusted)
+    var toolApproval: ToolApproval?                       // setToolApproval's value; nil = default for the trust level
+    var trustedToolsDigest: String?                       // the tool list when last trusted
+    var toolsChangedSinceTrusted: Bool { get }            // a trusted, connected server whose tools changed — show it for review
     func exportSummary() -> String      // plain-text listing of tools/resources/prompts, enabled state, token cost
 }
 
@@ -3793,6 +3850,8 @@ struct MCPServerPickerView: View {
     init(manager: MCPServerManagerObservable)
     // Add/list/reconnect/disconnect/remove, all three auth types, per-tool and per-resource
     // enable/disable, prompts listing (read-only), and a "Save As…" text export per server.
+    // Per server (2.0): trust + approval controls (setTrust / setToolApproval), a "no tools on" notice,
+    // and a "tools changed since trusted" notice with Trust Again.
 }
 
 struct MCPOAuthWaitingView: View {
