@@ -86,19 +86,24 @@ gated.
 
 ### Gate 2 — invocation (`ConfirmingToolAuthorizer`)
 
-For tools that *are* in the session, "Confirm each" decides whether a call runs or asks first:
+For tools that *are* in the session, "Confirm each" decides whether a call runs or asks first.
+The approval is set where the tools come from — per MCP server on `lab.mcp`, and for the app's
+own tools on the authorizer (docs/sdk-authority-model.md §9):
 
 ```swift
+// Todoist (an MCP server): nil = the untrusted default, ask before each call; .allow = don't ask.
+lab.mcp.setToolApproval(policy.todoistConfirm ? nil : .allow, server: todoist)
+
 let authorizer = ConfirmingToolAuthorizer(
     channel: presenter,                       // Components.ToolConfirmationPresenter
-    requirement: { call in policy.requirement(for: call) })
+    hostTools: policy.calendarConfirm ? .ask(atOrAbove: .mutate, by: .user) : .allow)
 
 let session = try lab.makeSession(route: "frontier", tools: hostTools,
                                   includeMCPTools: true, authorizer: authorizer)
 ```
 
-`requirement(for:)` returns `.allow` / `.confirm` / `.deny` per call. Here: reads always run;
-a `.mutate`/`.destructive` call is confirmed when its connector's toggle is on. Deny a card and
+Here: reads always run; a `.mutate`/`.destructive` call is confirmed when its connector's toggle
+is on. Deny a card and
 the model gets `DENIED: not approved` back and continues — the turn doesn't crash. No answer
 within ~120s auto-denies (a forgotten sheet can't pin a turn open).
 
@@ -115,7 +120,9 @@ confirm toggle — and even a search like `find-tasks` asks. LocalLM Lab's "don'
 session / always)" is how you'd quiet the safe ones; this demo leaves it noisy on purpose.
 
 Because the connection lives in this process, `makeSession(includeMCPTools: true)` builds the
-SDK's own `MCPTool` and tags it `.mcp` — so `requirement(for:)` can apply MCP policy to it.
+SDK's own `MCPTool` and tags it `.mcp` — so the server's approval on `lab.mcp` applies to it.
+(Marking the server **trusted** — `lab.mcp.setTrust(.trusted, server:)` — would let its own
+read-only / destructive labels split the tools; the demo keeps it untrusted.)
 
 ---
 
@@ -124,7 +131,7 @@ SDK's own `MCPTool` and tags it `.mcp` — so `requirement(for:)` can apply MCP 
 | Panel control | SDK | Where |
 |---|---|---|
 | Calendar **level** | `Sequence<any Tool>.limited(toMaxImpact:)` | [`DemoSecurity.swift`](Sources/SecurityDemo/DemoSecurity.swift) |
-| **Confirm each** | `ConfirmingToolAuthorizer(channel:requirement:)` → `makeSession(authorizer:)` | [`AppModel.run()`](Sources/SecurityDemo/AppModel.swift) |
+| **Confirm each** | Calendar: `ConfirmingToolAuthorizer(channel:hostTools:)`; Todoist: `lab.mcp.setToolApproval(_:server:)` → `makeSession(authorizer:)` | [`AppModel.run()`](Sources/SecurityDemo/AppModel.swift) |
 | the confirmation sheet | `Components.ToolConfirmationPresenter` + `.toolConfirmationSheet(_:)` | [`ContentView.swift`](Sources/SecurityDemo/ContentView.swift) — one line |
 
 `DemoSecurity` is `@MainActor @Observable` UI state; `DemoPolicy` is an immutable `Sendable`

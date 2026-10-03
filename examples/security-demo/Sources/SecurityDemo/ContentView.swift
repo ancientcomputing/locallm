@@ -12,7 +12,7 @@ struct ContentView: View {
                 .frame(minWidth: 420)
         }
         // The Components-provided sheet — one line, no sheet UI of our own. This is what
-        // `ConfirmingToolAuthorizer` drives every time `requirement(for:)` returns `.confirm`.
+        // `ConfirmingToolAuthorizer` drives every time a call's approval says to ask the user.
         .toolConfirmationSheet(model.presenter)
     }
 }

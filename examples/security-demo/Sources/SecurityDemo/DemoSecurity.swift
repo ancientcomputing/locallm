@@ -63,17 +63,15 @@ struct DemoPolicy: Sendable {
         tools.limited(toMaxImpact: calendarLevel.maxImpact)
     }
 
-    /// Lever 2 — invocation: the per-call policy for `ConfirmingToolAuthorizer`. Reads always
-    /// run; a mutating/destructive call is confirmed when its connector's toggle is on.
-    func requirement(for call: PendingToolCall) -> ConfirmingToolAuthorizer.Requirement {
-        guard call.impact >= .mutate else { return .allow }
-        switch call.origin {
-        case .host:            // the only host tools here are Calendar's
-            return calendarConfirm ? .confirm : .allow
-        case .mcp:
-            return todoistConfirm ? .confirm : .allow
-        @unknown default:
-            return .confirm
-        }
+    /// Lever 2 — invocation. The app's own tools (here only Calendar's): ask before a change when
+    /// the toggle is on. Reads always run.
+    var calendarApproval: ToolApproval {
+        calendarConfirm ? .ask(atOrAbove: .mutate, by: .user) : .allow
+    }
+
+    /// Lever 2 — invocation, per MCP server (`lab.mcp.setToolApproval`). Todoist stays untrusted, so
+    /// its tools all count as changes: `nil` (the untrusted default) asks before each call.
+    var todoistApproval: ToolApproval? {
+        todoistConfirm ? nil : .allow
     }
 }

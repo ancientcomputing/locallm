@@ -2226,7 +2226,9 @@ seam that keeps `Components` free of any dependency on `Remote`.
 
 ### `Sources/SecurityDemo/DemoSecurity.swift`
 
-This file is the whole idea: a "Security panel" is **two SDK levers**, and nothing else. `DemoSecurity` is the observable UI state; `DemoPolicy` is the immutable snapshot a run takes so editing the panel mid-turn can't change a session already built (the same split `SecurityPolicy` uses in LocalLM Lab).
+This file is the whole idea: a "Security panel" is **two SDK levers**, and nothing else. In 2.0
+the second lever is stated **where the tools come from** — the app's own tools on the
+authorizer, an MCP server's on `lab.mcp` ([sdk-guide.md §7c](sdk-guide.md#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)). `DemoSecurity` is the observable UI state; `DemoPolicy` is the immutable snapshot a run takes so editing the panel mid-turn can't change a session already built (the same split `SecurityPolicy` uses in LocalLM Lab).
 
 ```swift
 import FoundationModels
@@ -2273,22 +2275,23 @@ struct DemoPolicy: Sendable {
         tools.limited(toMaxImpact: calendarLevel.maxImpact)           // ← SDK  — Sequence<any Tool> extension
     }
 
-    // Lever 2 — invocation. Per-call: reads always run; a mutating/destructive call is
-    // confirmed when its connector's toggle is on.
-    func requirement(for call: PendingToolCall) -> ConfirmingToolAuthorizer.Requirement {   // ← SDK (types)
-        guard call.impact >= .mutate else { return .allow }           // ← SDK  — call.impact
-        switch call.origin {                                          // ← SDK  — .host vs .mcp
-        case .host: return calendarConfirm ? .confirm : .allow
-        case .mcp:  return todoistConfirm  ? .confirm : .allow
-        @unknown default: return .confirm
-        }
+    // Lever 2 — invocation, for the app's own tools (here only Calendar's): ask the user before
+    // a change when the toggle is on. Reads always run.
+    var calendarApproval: ToolApproval {                              // ← SDK  — .allow | .ask(atOrAbove:by:)
+        calendarConfirm ? .ask(atOrAbove: .mutate, by: .user) : .allow   // ← SDK
+    }
+
+    // Lever 2 — invocation, per MCP server (set on lab.mcp). Todoist stays untrusted, so its tools
+    // all count as changes: nil (the untrusted default) asks before each call; .allow never asks.
+    var todoistApproval: ToolApproval? {                              // ← SDK
+        todoistConfirm ? nil : .allow
     }
 }
 ```
 
 ### `Sources/SecurityDemo/AppModel.swift`
 
-*130 lines of code (226 with comments).* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`.
+*About 130 lines of code (230 with comments).* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`.
 
 ```swift
 import LocalLMLabSDKComponents                                        // ← Components
@@ -2354,10 +2357,12 @@ final class AppModel {
                 UpdateCalendarEventTool(), DeleteCalendarEventTool(),
             ])
 
-            // Lever 2 — invocation. nil when the panel asks for no confirmation.
+            // Lever 2 — invocation. Todoist's approval lives on its server in lab.mcp; the Calendar
+            // tools' on the authorizer. nil when the panel asks for no confirmation.
+            lab.mcp.setToolApproval(policy.todoistApproval,               // ← SDK  — per-server approval
+                                    server: MCPServerID(rawValue: todoistURL.absoluteString))
             let authorizer: (any ToolCallAuthorizer)? = policy.wantsConfirmation   // ← SDK (type)
-                ? ConfirmingToolAuthorizer(channel: presenter,                     // ← SDK
-                                           requirement: { call in policy.requirement(for: call) })
+                ? ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)   // ← SDK
                 : nil
 
             let session = try lab.makeSession(                        // ← SDK
@@ -2379,12 +2384,13 @@ final class AppModel {
 }
 ```
 
-**Tally**: of the file's 130 non-comment/non-blank lines, 21 touch the SDK directly (marked
+**Tally**: of the file's ~130 non-comment/non-blank lines, 22 touch the SDK directly (marked
 above, plus 2 more marked `← Components`) — and every SDK one is either setup (`LocalLMLab()`,
 `registerProvider`, `addServer` + `setToolEnabled`,
 `CalendarAccess.requestAccess`) or the one `run()` call site: `route` → build `hostTools` with
-`limited(toMaxImpact:)` → wrap in `ConfirmingToolAuthorizer` → `makeSession(authorizer:)` →
-`respond`. `DemoSecurity.swift` adds 6 more, all in `DemoPolicy` — the two levers themselves.
+`limited(toMaxImpact:)` → set Todoist's approval with `setToolApproval` → a
+`ConfirmingToolAuthorizer` carrying Calendar's approval → `makeSession(authorizer:)` →
+`respond`. `DemoSecurity.swift` adds 4 more, all in `DemoPolicy` — the two levers themselves.
 The `ToolConfirmationPresenter` + `.toolConfirmationSheet(_:)` (in `ContentView`, one line) is
 the entire confirmation UI. Nothing in the three panel views touches the SDK — they bind to
 `DemoSecurity`, and the snapshot does the rest.
