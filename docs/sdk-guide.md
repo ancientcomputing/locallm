@@ -638,6 +638,64 @@ Full detail — every log category, what `MCPDiagnostics.observer` gives you, th
 guarantees, and the end-to-end support flow — is in
 [`mcp-diagnostics.md`](mcp-diagnostics.md).
 
+### 3f. MCP Apps: showing a server's interactive views
+
+> **Reach for this when** a server you connect to ships a view with its tools (Todoist's task
+> list, a dashboard) and you want it in your app's conversation.
+>
+> **Examples that use it:** [`mcp-chat`](../examples/mcp-chat/).
+
+An **MCP App** is a small interactive view (HTML, `ui://` resource) a server provides alongside a
+tool. The model never asks for a view: it picks a tool as usual, and if that tool's listing names a
+view (`MCPToolDescriptor.app`), your app shows it under the call once it finishes, handed the
+call's arguments and result. Three pieces:
+
+1. **Say you can show views.** Servers only offer them to a client that declares support:
+
+   ```swift
+   let lab = LocalLMLab(configuration: .init(
+       providers: [...],
+       mcp: MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())))   // LocalLMLabSDKMCPAppsHost
+   let session = try lab.makeSession(route: .chat, mcpAppHints: true, authorizer: authorizer)
+   ```
+
+2. **Render the view** for a finished call with `LocalLMLabSDKMCPAppsHost` (open source, a
+   separate package built on Core's public API):
+
+   ```swift
+   import LocalLMLabSDKMCPAppsHost
+
+   let cache = MCPAppWidgetCache()
+   let resource = try await cache.fetch(resourceURI: record.app!.resourceURI, server: server,
+                                        manager: lab.mcp, recordID: record.id)   // checked, cached by hash
+   let controller = MCPAppViewController(
+       resource: resource,
+       tools: lab.mcp.servers[server]?.tools ?? [],
+       backend: MCPAppsSessionBackend(session: session, manager: lab.mcp, server: server, instance: record.id),
+       configuration: MCPAppsBridgeConfiguration(hostName: "My App", hostVersion: "1.0"),
+       actions: .session(session, instance: record.id))   // ui/message, ui/update-model-context → the session
+   MCPAppRecreation.deliver(record, to: controller)      // the call's arguments and result
+   await controller.load()
+   // SwiftUI: MCPAppView(controller: controller).frame(height: controller.contentHeight ?? 360)
+   ```
+
+3. **Keep many views in one conversation.** Each live view is a WebKit process (~100 MB).
+   `MCPAppViewPool` keeps a few live (`limit`, default 3) and snapshots the rest
+   (`snapshot(for:)`) until they're needed again. To show an old call again — after a relaunch,
+   say — `MCPAppRecreation.revalidate(record, source:cache:)` decides: the current view with the
+   stored result when the tool's output still has the same shape, `.needsRefresh` when it changed,
+   view-only from the cache when the server can't be reached.
+
+**What a view may do.** It runs in a sandboxed `WKWebView`: no network unless your
+`MCPAppsSandboxPolicy` allows the hosts it declares, no camera, microphone or location. Its tool
+calls go through the bridge's `MCPAppsBridgePolicy` and then — with `MCPAppsSessionBackend` —
+through your session's authorizer as `ToolCallInitiator.app(instance:)`, recorded in
+`hostTranscript` like the model's (tools the server marks app-only, such as a dashboard's polling,
+are counted per view instead of recorded). Sending a message as the user (`ui/message`), sharing
+context with the model (`ui/update-model-context`) and opening links are denied unless your
+policy allows them. `ConfirmingToolAuthorizer` remembers the user's answer per view and tool, so a
+polling view asks once (destructive calls ask each time).
+
 ## 4. Keychain storage — automatic isolation, native API, sandbox-safe
 
 > **You don't reach for this — you get it for free.** There is no "set up credential storage"
@@ -959,10 +1017,16 @@ let lab = LocalLMLab(configuration: .init(providers: [
 // rest inside `if #available(macOS 27, *)` — see [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build).
 
 lab.models      // the @Observable ModelRegistry — providers, routes, residency, downloads
-lab.mcp         // MCPServerManager, unchanged from 0.8.x
+lab.mcp         // the app's one MCPServerManager — set up via Configuration(…, mcp: MCPSettings(…)), §3a
 lab.workspace   // security-scoped workspace access + ready-made tools
 lab.connectors  // Calendar / Reminders / Contacts / Location
 ```
+
+An app that uses `LocalLMLab` uses `lab.mcp` and never makes an `MCPServerManager` of its own:
+`makeSession` takes MCP tools from `lab.mcp`, and a second manager would be invisible to it.
+Configure it with `MCPSettings` (handlers, response limits, version negotiation, live updates —
+the same settings `MCPServerManager`'s initializer takes, same defaults); making an
+`MCPServerManager` directly is for apps that don't use `LocalLMLab`.
 
 `lab.snapshot() -> LocalLMLabState` gives you a `Codable` snapshot of the route map + residency
 policy + installed-model records to persist wherever you like (the SDK writes nothing to disk);
@@ -1298,13 +1362,28 @@ let session = try lab.makeSession(
     tools: [SearchWorkspaceTool(), ApplyPatchTool(), myGitTool],
     instructions: "You are a coding assistant.",
 )
-// Drive the tool loop yourself — nothing here runs an agent loop:
+// Run a turn — nothing here runs an agent loop:
 let answer = try await session.respond(to: task)
-// or opt out of the SDK's retry wrapper and use Apple's session directly:
-for try await snapshot in session.languageModelSession.streamResponse(to: task) { … }
+// or stream it (each element is the reply so far):
+for try await partial in session.streamResponse(to: task) { … }
 ```
 
-`session.route` / `session.modelID` tell you what actually backs it.
+`session.route` / `session.modelID` tell you what actually backs it. `makeSession` is one
+function, `makeSession(route:tools:instructions:restoring:includeMCPTools:mcpAppHints:options:authorizer:)`:
+
+- **MCP tools follow `lab.mcp`.** With `includeMCPTools` (the default) the session offers the
+  enabled MCP tools and keeps following `lab.mcp`: turn a tool on or off, add a server, or change
+  a server's trust, and the model has it on its next `respond` / `streamResponse` — same session.
+  For a fixed, per-session set of MCP tools, pass them in `tools:` with `includeMCPTools: false`.
+- **`restoring:`** continues a saved conversation (see [Building a chat app](#building-a-chat-app--hosttranscript-streamresponse-turncontext));
+  leave `instructions` nil then — the saved transcript carries its own (passing both traps).
+- **`mcpAppHints: true`** adds one line to the description of each MCP tool that has an MCP App
+  view, so a model can prefer it when the user asks to *see* something ([§3f](#3f-mcp-apps-showing-a-servers-interactive-views)).
+
+**Run turns with `respond` / `streamResponse`.** They keep `hostTranscript` up to date, send
+`turnContext` and any widget context, refresh MCP tools and apply `retryOnContextOverflow`.
+`languageModelSession` is Apple's session underneath — the escape hatch for what the SDK doesn't
+surface (the raw `transcript` to save, say); a turn run on it directly skips all of the above.
 
 **`options: SessionOptions`** carries per-call knobs — provider-native web search, sampling
 (`temperature` / `topP` / `topK` / `seed` / `maxOutputTokens`), and `effort`. `effort: .off` asks the model **not
@@ -1351,11 +1430,72 @@ seed → usually the same text" as the contract; don't build tests or caching on
 If you call `session.languageModelSession.respond(...)` directly to opt out of the SDK's wrapper,
 these options are **not** applied — pass `try options.appleGenerationOptions()` yourself.
 
+### Building a chat app — `hostTranscript`, `streamResponse`, `turnContext`
+
+> **Use it when** you're drawing a conversation: user bubbles, tool-call rows, the streaming
+> reply, the model's reasoning — and want it to survive a relaunch.
+>
+> **Examples that use it:** [`mcp-chat`](../examples/mcp-chat/) — the whole chat UI is
+> `session.hostTranscript` plus `streamResponse`.
+
+Apple's transcript is the model's context: it can be compacted, and it keeps only what the model
+saw of a tool result. `session.hostTranscript` is the conversation as your UI shows it —
+append-only, in the order the model worked, and `@Observable`, so a SwiftUI view that reads it
+redraws as it changes:
+
+```swift
+session.turnContext = { "[Current date and time: \(Date().formatted())]" }  // sent with every turn,
+                                                                         // not shown in the transcript
+for try await _ in session.streamResponse(to: text) {}   // the view reads hostTranscript
+
+ForEach(session.hostTranscript.entries) { entry in
+    switch entry.content {
+    case .user(let text):            UserBubble(text)               // appears as the turn starts
+    case .assistant(let text):       Reply(text)                    // the answer only
+    case .reasoning(let text):       ReasoningDisclosure(text)      // incl. Qwen3's <think> block, split out
+    case .toolCall(let record):      ToolCallRow(record)            // live: .running → .finished
+    case .appContext(_, let text):   ViewSharedContext(text)        // an MCP App view told the model this
+    @unknown default:                EmptyView()
+    }
+}
+if let reply = session.hostTranscript.replyInProgress { StreamingReply(reply) }  // .reasoning / .text / .isReasoning
+```
+
+- **When it updates.** The user's message is added as the turn starts; each tool call appears
+  when it starts and changes in place as it finishes; the reply and reasoning land when the turn
+  ends (`replyInProgress` until then — cleared in the same update, so a view never shows both).
+  A turn run on `languageModelSession` directly gets text only after
+  `reconcileServerToolArtifacts()`.
+- **Tool calls are full records** (`ToolCallRecord`): state, arguments, the output the model saw,
+  the full `MCPToolResult` (`mcpResult` — kept under a memory budget, spilled to disk past it),
+  the tool's MCP App link (`app`), who made the call (`initiator`: the model, an MCP App view, or
+  your app), and timestamps.
+- **A model has no clock.** `turnContext` is called as each turn starts and its text goes ahead of
+  the user's message — current even in a restored conversation, whose instructions were written
+  long ago. (The ready-made `ClockTool` lets the model ask too, but a small model may not.)
+- **Tools of a newly added MCP server start off.** Show the user that, or the model gets no tools
+  — and may claim to have used one anyway.
+
+**Reopening a conversation.** Save both halves and restore both:
+
+```swift
+let shown  = try session.hostTranscript.archive()                         // what the user saw
+let memory = try JSONEncoder().encode(session.languageModelSession.transcript)   // the model's memory
+// next launch:
+let saved   = try JSONDecoder().decode(Transcript.self, from: memory)
+let session = try lab.makeSession(route: .chat, restoring: saved)
+try session.hostTranscript.restore(from: shown)
+```
+
+Restore only `shown` to show an old conversation while the model starts fresh. The restored
+transcript's entries are history: never added to `hostTranscript` again.
+
 ### `LocalLMLabSession.events` — the side-channel Apple's streaming doesn't give you
 
 > **Use it when** your UI needs to show what's happening *around* generation — a spinner per
 > tool call, a "compacting context…" notice. Token streaming stays on
-> `languageModelSession.streamResponse`; `events` carries only the rest.
+> `session.streamResponse`; `events` carries only the rest. (A chat UI can also read tool calls
+> live from `hostTranscript` — next section.)
 >
 > **Examples that use it:** [`code-buddy`](../examples/code-buddy/)'s `→ tool` / `✓ tool` stderr
 > trace is this stream.
@@ -2327,9 +2467,12 @@ the signature; the numbered sections above are the intended learning path.
 ```swift
 // --- front door ---------------------------------------------------------------
 @MainActor final class LocalLMLab {
-    struct Configuration { var providers: [any ModelProvider]; var state: LocalLMLabState? ; init(providers: [any ModelProvider] = [], state: LocalLMLabState? = nil) }
+    struct Configuration {
+        var providers: [any ModelProvider]; var state: LocalLMLabState?; var mcp: MCPSettings
+        init(providers: [any ModelProvider] = [], state: LocalLMLabState? = nil, mcp: MCPSettings = MCPSettings())
+    }
     let models: ModelRegistry
-    let mcp: MCPServerManager
+    let mcp: MCPServerManager           // the one manager, made from Configuration.mcp
     let connectors: ConnectorsFacade    // .calendar/.reminders/.contacts/.location permission lifecycle
     let workspace: WorkspaceFacade
     init(configuration: Configuration = .init())
@@ -2337,8 +2480,20 @@ the signature; the numbered sections above are the intended learning path.
     func restore(from state: LocalLMLabState)
     // from LocalLMLab+makeSession:
     func makeSession(route: RouteName, tools: [any Tool] = [], instructions: String? = nil,
-                     includeMCPTools: Bool = true, options: SessionOptions = .init(),
+                     restoring transcript: Transcript? = nil,      // continue a saved conversation (instructions nil)
+                     includeMCPTools: Bool = true,                  // and keep following lab.mcp between turns
+                     mcpAppHints: Bool = false,                     // [§3f](#3f-mcp-apps-showing-a-servers-interactive-views)
+                     options: SessionOptions = .init(),
                      authorizer: (any ToolCallAuthorizer)? = nil) throws -> LocalLMLabSession   // authorizer: [§7c](#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)
+}
+
+struct MCPSettings {                    // how the lab sets up lab.mcp — MCPServerManager's own defaults
+    var handlers: MCPClientHandlers      // incl. extensions, e.g. .advertisingMCPApps() (LocalLMLabSDKMCPAppsHost)
+    var responseLimits: MCPResponseLimits
+    var versionNegotiation: MCPVersionNegotiation   // .auto
+    var liveUpdates: Bool                            // true
+    init(handlers: MCPClientHandlers = MCPClientHandlers(), responseLimits: MCPResponseLimits = .default,
+         versionNegotiation: MCPVersionNegotiation = .auto, liveUpdates: Bool = true)
 }
 
 struct LocalLMLabState: Codable, Sendable, Equatable {
@@ -2663,14 +2818,60 @@ struct LocalLMLabSession: Sendable {
     let route: RouteName
     let modelID: ModelID
     var retryOnContextOverflow: RetryPolicy         // .disabled by default; set before respond()
-    var languageModelSession: LanguageModelSession { get }   // Apple's session — use directly to opt out of the retry wrapper
+    var turnContext: (@Sendable () -> String?)?    // sent ahead of every prompt (e.g. the date); not shown in hostTranscript
+    var hostTranscript: HostTranscript { get }      // the conversation as a UI shows it (below)
+    var languageModelSession: LanguageModelSession { get }   // Apple's session — the escape hatch; a turn run on it skips the SDK's turn handling
     var events: AsyncStream<SessionEvent> { get }
     var citations: [Citation] { get }               // web-search sources accumulated this session ([§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote))
     func reconcileServerToolArtifacts()             // re-derive citations/events from the transcript after a manual edit
     var contextBudget: ContextBudget { get }
     func cancel()
-    // + respond(...) / streamResponse(...) wrappers (LocalLMLabSession+respond) that apply retryOnContextOverflow
-    func respond(to prompt: String, options: SessionOptions) async throws -> String   // per-call options, on-device model only
+    // Running a turn: hostTranscript, turnContext, widget context, MCP tool refresh, retryOnContextOverflow
+    @discardableResult
+    func respond(to prompt: String, options: SessionOptions = .init(),      // per-call options: on-device model only
+                 fromAppInstance instance: String? = nil) async throws -> String   // instance: a message an MCP App view sent
+    func streamResponse(to prompt: String, options: SessionOptions = .init(),
+                        fromAppInstance instance: String? = nil) -> AsyncThrowingStream<String, any Error>   // the reply so far
+    // Outside the model's loop (MCP App views, your app): same authorizer, recorded in hostTranscript
+    @MainActor func callMCPTool(server: MCPServerID, tool: String, arguments: [String: MCPValue],
+                                initiator: ToolCallInitiator) async -> Result<MCPToolResult, MCPServerError>
+    @MainActor func updateModelContext(_ text: String, fromAppInstance instance: String)   // sent with the next turn
+}
+
+@MainActor @Observable final class HostTranscript {
+    var entries: [Entry] { get }                    // in model order; append-only
+    var replyInProgress: ReplyInProgress? { get }   // while streamResponse runs
+    var toolCalls: [ToolCallRecord] { get }
+    func toolCall(id: String) -> ToolCallRecord?
+    func appOnlyCallCount(for instance: String) -> Int   // an MCP App view's calls to app-only tools (not recorded)
+    var resultMemoryBudget: Int                     // bytes of full MCP results kept in memory (8 MB); the rest spill to disk
+    var spillDirectory: URL?                        // nil: a temp directory the SDK deletes
+    func archive() throws -> Data                   // what the user saw, incl. full results
+    func restore(from data: Data) throws            // into an empty transcript; ArchiveError otherwise
+    struct Entry: Identifiable, Sendable {
+        let id: String; var content: Content; let turn: Int
+        var appInstance: String?                     // set when an MCP App view sent it
+        enum Content: Sendable {                     // non-frozen: switch with @unknown default
+            case user(String), assistant(String), reasoning(String)   // an inline <think> block becomes .reasoning
+            case toolCall(ToolCallRecord)
+            case appContext(instance: String, text: String)
+        }
+    }
+    struct ReplyInProgress: Sendable, Equatable { var reasoning: String?; var text: String; var isReasoning: Bool }
+    enum ArchiveError: Error, Equatable { case notEmpty, unsupportedFormat(String) }
+}
+struct ToolCallRecord: Identifiable, Sendable {
+    let id: String                       // same as the SessionEvent id
+    var modelCallID: String?             // the model's own call id, when the model made the call
+    let tool: ToolReference              // .mcp(server:tool:) | .host(name:) | .provider(ServerToolActivity)
+    let initiator: ToolCallInitiator     // .model | .app(instance:) | .host
+    let arguments: GeneratedContent?; let argumentsDescription: String
+    var state: State                     // .awaitingApproval | .running | .finished | .failed(reason:) | .denied(reason:)
+    var output: String?                  // what the model saw
+    var mcpResult: MCPToolResult? { get }   // the full result (read back from disk if spilled)
+    let app: MCPAppLink?                 // the tool's MCP App view, if any
+    let toolDescriptor: MCPToolDescriptor?
+    let startedAt: Date; var finishedAt: Date?
 }
 enum SessionEvent: Sendable {
     case modelLoadProgress(fraction: Double)
@@ -3273,6 +3474,15 @@ struct MCPToolDescriptor: Codable, Sendable {
     var enabled: Bool            // defaults to false for newly-discovered tools
     var title: String?           // human display name for UI (2025-06-18+); fall back to name
     var outputSchema: Data?      // declared shape of structuredContent, if any (2025-06-18+)
+    var meta: MCPValue?          // the tool's _meta
+    var annotations: MCPToolAnnotations?   // readOnlyHint / destructiveHint …: the server's claim (believed only for a trusted server)
+    var app: MCPAppLink? { get }           // its MCP App view (_meta.ui.resourceUri), if any
+    var isModelVisible: Bool { get }       // false for app-only tools: never offered to a model
+}
+struct MCPAppLink: Sendable, Equatable, Hashable { var resourceURI: String; var visibility: Set<MCPAppVisibility> }
+enum MCPAppVisibility: String, Sendable, Codable, CaseIterable { case model, app }
+struct MCPToolAnnotations: Codable, Sendable, Equatable {
+    var title: String?; var readOnlyHint: Bool?; var destructiveHint: Bool?; var idempotentHint: Bool?; var openWorldHint: Bool?
 }
 
 struct MCPResourceDescriptor: Codable, Sendable {
@@ -3282,6 +3492,8 @@ struct MCPResourceDescriptor: Codable, Sendable {
     var description: String
     var mimeType: String?
     var enabled: Bool            // defaults to true
+    var meta: MCPValue?
+    var isMCPAppResource: Bool { get }   // a ui:// view's HTML: left out of model-facing resource lists
 }
 
 struct MCPResourceTemplateDescriptor: Codable, Sendable {
@@ -3321,6 +3533,7 @@ struct MCPToolResult: Sendable, Codable, Equatable {
     var resourceLinks: [MCPResourceLink]
     var isError: Bool                        // the tool ran and reported failure
     var truncated: Bool                      // response hit MCPResponseLimits
+    var meta: MCPValue?                      // the result's _meta
     var renderedForModel: String { get }     // compact, context-sized rendering folding in all of the above
 }
 struct MCPResourceLink: Sendable, Codable, Equatable {
@@ -3350,8 +3563,12 @@ struct MCPClientHandlers: Sendable {
     init(elicitation: (any MCPElicitationHandler)? = nil,
          sampling:    (any MCPSamplingHandler)?    = nil,
          roots:       (any MCPRootsProvider)?      = nil,
-         logging:     (any MCPLoggingSink)?        = nil)
+         logging:     (any MCPLoggingSink)?        = nil,
+         extensions:  [String: MCPValue]           = [:])   // client capability extensions declared at initialize
+    var extensions: [String: MCPValue]
 }
+// LocalLMLabSDKMCPAppsHost: MCPClientHandlers().advertisingMCPApps() — declares MCP Apps support
+// (extensions["io.modelcontextprotocol/ui"]), which servers check before offering views.
 
 protocol MCPElicitationHandler: Sendable {
     func handleElicitation(_ request: MCPElicitationRequest) async -> MCPElicitationResponse
@@ -3496,6 +3713,69 @@ Common JSON Schema shapes (object/properties/required, array/items, string/numbe
 boolean, string enums) convert cleanly. Anything past that — `oneOf`/`anyOf` unions, `$ref`,
 `const`, regex `pattern` — degrades to a free-form string leaf rather than failing the whole tool,
 since the remote server is still the real source of argument validation.
+
+### MCP Apps (`LocalLMLabSDKMCPAppsHost`)
+
+Open source, shipped as source like `Components`, on Core's public API only. Walkthrough:
+[§3f](#3f-mcp-apps-showing-a-servers-interactive-views).
+
+```swift
+// --- declare support, fetch and check a view ----------------------------------
+extension MCPClientHandlers { func advertisingMCPApps() -> MCPClientHandlers; static let mcpAppsExtensionKey: String }
+struct MCPAppResource: Sendable {           // a validated view: text/html;profile=mcp-app, size-capped
+    static let mimeType = "text/html;profile=mcp-app"
+    let html: String; let sha256: String     // pin / compare versions by sha256
+    init(content: MCPResourceContent, requestedURI: String, listedMeta: MCPValue? = nil) throws
+}
+@MainActor final class MCPAppWidgetCache {   // views on disk by hash; LRU past maxBytes (64 MB)
+    init(directory: URL? = nil, maxBytes: Int = 64 * 1024 * 1024)
+    func fetch(resourceURI: String, server: MCPServerID, manager: MCPServerManager, recordID: String? = nil) async throws -> MCPAppResource
+    func store(_ content: MCPResourceContent, requestedURI: String) throws -> MCPAppResource
+    func resource(sha256: String) -> MCPAppResource?             // nil if missing or tampered
+    func bind(recordID: String, sha256: String); func sha256(forRecord recordID: String) -> String?
+}
+
+// --- render ---------------------------------------------------------------------
+@MainActor final class MCPAppViewController: NSObject, ObservableObject {
+    init(resource: MCPAppResource, tools: [MCPToolDescriptor], backend: any MCPAppsBackend,
+         configuration: MCPAppsBridgeConfiguration,
+         bridgePolicy: any MCPAppsBridgePolicy = MCPAppsDefaultPolicy(),   // tool calls allowed; messages, context, links denied
+         sandboxPolicy: MCPAppsSandboxPolicy = .closed,                   // no network unless allowed
+         actions: MCPAppsHostActions = MCPAppsHostActions(),
+         supportedDisplayModes: [String] = ["inline"],
+         audit: @escaping @MainActor (MCPAppsAuditEvent) -> Void = { _ in })
+    let webView: WKWebView; let bridge: MCPAppsBridge; let resource: MCPAppResource
+    var contentHeight: CGFloat? { get }      // the view's reported height
+    func load() async; func close() async    // after close(), release the controller to end its process
+}
+struct MCPAppView: NSViewRepresentable { init(controller: MCPAppViewController) }
+
+// --- a view's calls go through the session ----------------------------------------
+struct MCPAppsSessionBackend: MCPAppsBackend {     // tools/call → session.callMCPTool(…, initiator: .app(instance:))
+    init(session: LocalLMLabSession, manager: MCPServerManager, server: MCPServerID, instance: String)
+}
+extension MCPAppsHostActions {                     // ui/message → a turn; ui/update-model-context → model context
+    static func session(_ session: LocalLMLabSession, instance: String, openLink: … = { _ in },
+                        onReply: … = { _ in }, requestDisplayMode: … = { _ in false }) -> MCPAppsHostActions
+}
+
+// --- many views in one conversation -------------------------------------------------
+@MainActor final class MCPAppViewPool: ObservableObject {
+    init(limit: Int = 3); var limit: Int; var liveKeys: [String] { get }
+    func controller(for key: String, make: () throws -> MCPAppViewController) rethrows -> MCPAppViewController
+    func touch(_ key: String); func isLive(_ key: String) -> Bool; func snapshot(for key: String) -> NSImage?
+    func release(_ key: String) async; func releaseAll() async
+}
+enum MCPAppRecreation {
+    static func revalidate(_ record: ToolCallRecord, source: any MCPAppWidgetSource, cache: MCPAppWidgetCache,
+                           approvedSHA256: Set<String>? = nil) async -> Revalidation?
+    static func deliver(_ record: ToolCallRecord, to controller: MCPAppViewController) -> Bool   // stored arguments + result
+    struct Revalidation { var decision: MCPAppRecreationDecision; var resource: MCPAppResource?; var widgetChanged: Bool }
+}
+enum MCPAppRecreationDecision { case render(viewOnly: Bool), needsRefresh(mayRefreshAutomatically: Bool), notApproved, unavailable }
+struct MCPServerManagerWidgetSource: MCPAppWidgetSource { init(manager: MCPServerManager, server: MCPServerID) }
+// MCPResponseLimits.maxUIResourceBytes (Core) caps a view's HTML (4 MB).
+```
 
 ### Components (`LocalLMLabSDKComponents`)
 

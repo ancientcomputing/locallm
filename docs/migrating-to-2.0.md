@@ -116,12 +116,14 @@ passed `restoring:` before `tools:`).
   reply (`replyInProgress` while streaming) and the model's reasoning split from its answer. Plus
   `streamResponse(to:)`, `turnContext` (send the date and time with every message — a model has no
   clock), and saving and reopening a conversation with the model's memory of it
-  (`makeSession(…, restoring:)`, `hostTranscript.archive()` / `restore(from:)`).
+  (`makeSession(…, restoring:)`, `hostTranscript.archive()` / `restore(from:)`). See
+  [`sdk-guide.md` "Building a chat app"](sdk-guide.md#building-a-chat-app--hosttranscript-streamresponse-turncontext).
 - **MCP Apps.** Some MCP servers ship an interactive view with a tool — Todoist's task list. The
   new, open-source `LocalLMLabSDKMCPAppsHost` package shows it in the conversation when the model
   calls that tool, sandboxed, with the view's own tool calls going through your authorizer.
   Declare support with `MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())`.
-  Reference app: [`examples/mcp-chat`](../examples/mcp-chat/).
+  Reference app: [`examples/mcp-chat`](../examples/mcp-chat/); walkthrough
+  [`sdk-guide.md` §3f](sdk-guide.md#3f-mcp-apps-showing-a-servers-interactive-views).
 - **Per-server trust and tool approval** (§3), shown on each row of `Components`'
   `MCPServerPickerView`, which now also says when none of a server's tools are on.
 - **MCP protocol `2026-07-28`**, the current revision. It is stateless: no session, no
