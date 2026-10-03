@@ -1,0 +1,110 @@
+# Migrating to the LocalLM Lab SDK 2.0
+
+2.0 is a **one-time breaking release**: every 2.x release after it is source compatible with
+`2.0.0`, additive changes only until 3.0. It breaks for two reasons. Several APIs had grown a
+second way to do the same thing; 2.0 keeps one. And tool authorization moved to where trust
+actually lives, the MCP server.
+
+Most apps change little. The usual `makeSession`, `respond`, `LocalLMLab.Configuration` and
+`PendingToolCall` call sites compile unchanged. What you edit: tool authorization (§3), and a
+`switch` over two MCP enums (§4). What behaves differently is in §5.
+
+## 1. Platform: unchanged
+
+`platforms: [.macOS("26.0")]`, Xcode 27 to build, macOS-27-only providers behind
+`if #available(macOS 27, *)` — as in 1.0 ([`sdk-guide.md` §1a](sdk-guide.md)).
+
+## 2. Point your manifest at the new release
+
+Add `2.0.0` to your manifest's `knownSDKReleases` with the checksums from the release's
+`.sha256` assets (tag `v2.0.0`), and build with:
+
+```sh
+LOCALLM_SDK_VERSION=2.0.0 swift build
+```
+
+## 3. Tool authorization: one authorizer, decided per server
+
+In 1.0 an app wrote its policy as a closure (`ConfirmingToolAuthorizer`'s `requirement:`) or a
+rule list (`RuleBasedToolAuthorizer`). In 2.0 the **MCP server** is the unit of trust, and you
+state who may approve what where the tools come from:
+
+```swift
+lab.mcp.setTrust(.trusted, server: companyServer)            // believe its read-only / destructive labels
+lab.mcp.setToolApproval(.allow, server: dashboardServer)      // never ask for this one
+let authorizer = ConfirmingToolAuthorizer(channel: confirmations)   // the one authorizer
+```
+
+| 1.0 | 2.0 |
+|---|---|
+| `RuleBasedToolAuthorizer` (removed) | `ConfirmingToolAuthorizer` + per-server settings. `.confirm(atOrAbove: x)` → `hostTools: .ask(atOrAbove: x, by: .user)` for your own tools and `lab.mcp.setToolApproval(.ask(atOrAbove: x, by: .user), server:)` per server; `.confirmMCPTools` → nothing (an untrusted server asks by default); `.denyTool` / `.denyMCPTools` / `.deny(atOrAbove:)` / `.allowTool` → a `policy:` returning `.deny` / `.allow`, with those approvals routed `by: .policy`; the `confirm:` closure → a `ToolConfirmationChannel`. |
+| `ConfirmingToolAuthorizer(channel:timeout:requirement:)` and `Requirement` (removed) | `ConfirmingToolAuthorizer(channel:policy:hostTools:timeout:)`. Move the closure into `policy:` (now `async`): `.allow` → `ToolPolicyDecision.allow`, `.confirm` → `.askUser`, `.deny(reason:)` → `.deny(reason:)`. To send every call to it: `hostTools: .ask(atOrAbove: .read, by: .policy)` and, per server, `setToolApproval(.ask(atOrAbove: .read, by: .policy), server:)`. Then move what settings can say (per-server "ask" / "don't ask") out of the policy. |
+| `setTrustsToolAnnotations(true, server:)` / `trustsToolAnnotations(server:)` (removed) | `setTrust(.trusted, server:)`; `false` → `.untrusted`. Read it back from `MCPServerState.trust`. |
+| `ConfirmingToolAuthorizer(channel:)` | Unchanged; the channel may now be `nil` for a host with no one to ask (calls that need a person are denied). |
+
+The defaults match 1.0's default rule (ask before anything that may change data), with one
+difference for trusted servers — see §5. Save each server's `trust` and `toolApproval` with your
+server list (the manager doesn't persist them) and set them again after `restore(from:)`.
+`MCPServerState` gained fields, so a state JSON you encoded yourself under 1.0 won't decode;
+restore servers through `restore(from:)` instead. Full walkthrough:
+[`sdk-guide.md` §7c](sdk-guide.md).
+
+## 4. New cases on two MCP enums
+
+`MCPProtocolVersion` gained `.v2026_07_28` and `MCPConnectionMode` gained `.stateless(_:)`. Both
+are non-frozen; Swift 6 already requires `@unknown default` in a `switch` over them, so this only
+affects code that silenced that error another way.
+
+## 5. What behaves differently
+
+- **A session's MCP tools follow `lab.mcp` between turns.** Turn a tool on, add a server, or
+  change a server's trust, and the model has it on its next `respond` / `streamResponse` — same
+  session, same conversation. 1.0 fixed them at `makeSession`. To keep a session on a fixed set of
+  MCP tools, pass them in `tools:` with `includeMCPTools: false`.
+- **A trusted server asks only before destructive tools** by default (1.0 asked before every
+  change regardless of trust). To keep the 1.0 behavior:
+  `lab.mcp.setToolApproval(.ask(atOrAbove: .mutate, by: .user), server:)`.
+- **Tools an MCP server marks as only for its interactive view** (`_meta.ui.visibility` without
+  `"model"`) are no longer offered to models, and `ui://` resources are left out of model-facing
+  resource lists.
+- **A widget's tool calls** (an MCP App view, §6) that need the user's answer ask once per view and
+  tool; destructive calls and timeouts are asked again. Model calls are unchanged.
+
+### MCP protocol
+
+<!-- MCP protocol 2026-07 session: fill this subsection (behavior changes: 2024-11-05 servers
+refused with .protocolMismatch; HTTP+SSE-transport servers fail cleanly; elicitation capability
+declared as {"form":{},"url":{}} from 2025-11-25; versionNegotiation defaults to .auto). -->
+
+_To be written with the MCP protocol `2026-07-28` documentation._
+
+## 6. One way to do each thing
+
+These compile unchanged in their usual form; they are listed so you know which declaration is the
+one to use (and what to edit if your code referred to an old overload as a function value, or
+passed `restoring:` before `tools:`).
+
+| What | 2.0 |
+|---|---|
+| Make a session | One `makeSession(route:tools:instructions:restoring:includeMCPTools:mcpAppHints:options:authorizer:)`. Continue a saved conversation with `restoring:` (instead of `instructions:` — passing both traps). |
+| Run a turn | `session.respond(to:options:fromAppInstance:)` / `streamResponse(to:options:fromAppInstance:)`. `languageModelSession` is the escape hatch: a turn run on it directly skips the chat history, `turnContext`, widget context, the MCP tool refresh and `retryOnContextOverflow`. |
+| Set up MCP | `lab.mcp`, configured with `LocalLMLab.Configuration(providers:state:mcp:)` and `MCPSettings` (handlers, response limits, version negotiation, live updates). An app that uses `LocalLMLab` doesn't make its own `MCPServerManager`; making one directly is for apps without `LocalLMLab`. |
+| Describe a pending call | One `PendingToolCall` / `PendingToolCallSummary` initializer each; `initiator:` defaults to `.model`, `serverApproval:` to `nil`. |
+
+## 7. What's new (opt in when you want it)
+
+- **Building a chat app.** `session.hostTranscript` is the conversation as your UI shows it: the
+  user's message as soon as it's sent, every tool call as a live record with its full result, the
+  reply (`replyInProgress` while streaming) and the model's reasoning split from its answer. Plus
+  `streamResponse(to:)`, `turnContext` (send the date and time with every message — a model has no
+  clock), and saving and reopening a conversation with the model's memory of it
+  (`makeSession(…, restoring:)`, `hostTranscript.archive()` / `restore(from:)`).
+- **MCP Apps.** Some MCP servers ship an interactive view with a tool — Todoist's task list. The
+  new, open-source `LocalLMLabSDKMCPAppsHost` package shows it in the conversation when the model
+  calls that tool, sandboxed, with the view's own tool calls going through your authorizer.
+  Declare support with `MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())`.
+  Reference app: [`examples/mcp-chat`](../examples/mcp-chat/).
+- **Per-server trust and tool approval** (§3), shown on each row of `Components`'
+  `MCPServerPickerView`, which now also says when none of a server's tools are on.
+- **MCP protocol `2026-07-28`** <!-- MCP protocol 2026-07 session: summary + link to sdk-guide §3a -->
+  _(see [`sdk-guide.md` §3a](sdk-guide.md))._

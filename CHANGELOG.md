@@ -24,6 +24,99 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.0.0 — unreleased
+
+**A one-time breaking release.** From `2.0.0`, every 2.x release is source compatible with it
+(additive changes only, the same policy 1.x followed). Upgrading: [`docs/migrating-to-2.0.md`](docs/migrating-to-2.0.md).
+
+### Changed — breaking
+
+- **Tool authorization is decided per MCP server, by one authorizer.** `RuleBasedToolAuthorizer`
+  is removed; so are `ConfirmingToolAuthorizer.Requirement` and
+  `init(channel:timeout:requirement:)` — use `init(channel:policy:hostTools:timeout:)` with a
+  `ToolPolicy`. `MCPServerManager.setTrustsToolAnnotations(_:server:)` /
+  `trustsToolAnnotations(server:)` are replaced by `setTrust(_:server:)`. Mappings in the
+  migration guide §3.
+- **New cases** on `MCPProtocolVersion` (`.v2026_07_28`) and `MCPConnectionMode`
+  (`.stateless(_:)`); a `switch` needs `@unknown default` (Swift 6 already requires it).
+- **`MCPServerState`** gained fields (`trust`, `toolApproval`, `trustedToolsDigest`,
+  `liveUpdates`, …): a state JSON encoded under 1.0 no longer decodes. Restore servers with
+  `restore(from:)`.
+- **One declaration each** where 1.x had kept two (usual call sites compile unchanged):
+  `makeSession` (now with `restoring:` and `mcpAppHints:`), `respond` / `streamResponse` (with
+  `options:` and `fromAppInstance:`), `LocalLMLab.Configuration.init` (with `mcp: MCPSettings`),
+  `PendingToolCall` / `PendingToolCallSummary` initializers (with `initiator:` and
+  `serverApproval:`).
+
+### Changed — behavior
+
+- A session's MCP tools follow `lab.mcp` between turns (1.0: fixed at `makeSession`). For a fixed
+  set, pass the tools in `tools:` with `includeMCPTools: false`.
+- A trusted server asks only before destructive tools by default (1.0 asked before every change).
+- MCP tools marked app-only (`_meta.ui.visibility` without `"model"`) are no longer given to
+  models; `ui://` resources are left out of model-facing resource lists.
+- `languageModelSession` is documented as the escape hatch: run turns with `respond` /
+  `streamResponse`.
+
+<!-- MCP protocol 2026-07 session: protocol behavior changes go here (2024-11-05 refused,
+HTTP+SSE fails cleanly, elicitation capability shape, versionNegotiation .auto). -->
+
+### Added — building a chat app (`LocalLMLabSDKCore`)
+
+- `LocalLMLabSession.hostTranscript` (`HostTranscript`): the conversation as a UI shows it — the
+  user's message at turn start, tool calls as live `ToolCallRecord`s with their full MCP result
+  and app link, the reply and the model's reasoning (an inline `<think>` block is split out), in
+  model order, never shortened by compaction; `replyInProgress` while streaming;
+  `archive()` / `restore(from:)`; a memory budget with spill to disk.
+- `streamResponse(to:options:fromAppInstance:)`; `turnContext` (host text sent with every turn,
+  e.g. the date); `makeSession(…, restoring:)` to continue a saved conversation.
+- `LocalLMLab.Configuration.mcp: MCPSettings` — how the lab sets up `lab.mcp`, the one MCP
+  manager.
+
+### Added — MCP Apps (`LocalLMLabSDKMCPAppsHost`, new, open source)
+
+- Shows an MCP server's interactive view (`ui://`, MCP Apps) when the model calls its tool:
+  `MCPAppViewController` / `MCPAppView` (sandboxed `WKWebView`), the host↔view bridge with an
+  explicit policy, `MCPAppsSessionBackend` (a view's tool calls go through the session's
+  authorizer, `ToolCallInitiator.app`), `MCPAppWidgetCache`, `MCPAppViewPool`,
+  `MCPAppRecreation`; `MCPClientHandlers.advertisingMCPApps()`.
+- Core MCP client: `_meta` on tool, resource and result types (`MCPToolDescriptor.meta`,
+  `MCPResourceDescriptor.meta`, `MCPToolResult.meta`), `MCPToolAnnotations`, and
+  `MCPResponseLimits.maxUIResourceBytes` (cap on a view's HTML, default 4 MB).
+- Core: `MCPAppLink`, `MCPAppVisibility`, `MCPToolDescriptor.app`, `isMCPAppResource`;
+  `LocalLMLabSession.callMCPTool(server:tool:arguments:initiator:)`,
+  `updateModelContext(_:fromAppInstance:)`; `makeSession(…, mcpAppHints:)`.
+- `ConfirmingToolAuthorizer` remembers a view's answer per tool (a polling dashboard asks once).
+
+### Added — per-server trust and tool approval
+
+- `MCPServerTrust`, `ToolApproval` (+ `default(for:)`), `ToolApprover`, `ToolPolicy`,
+  `ToolPolicyDecision`; `MCPServerManager.setTrust(_:server:)`, `setToolApproval(_:server:)`,
+  `toolApproval(server:)`; `MCPServerState.trust` / `toolApproval` / `toolsChangedSinceTrusted`.
+- `Components`: `MCPServerPickerView` shows each server's trust and approval, a notice when none of
+  a server's tools are on, and one when a trusted server's tools changed; the auth type is chosen
+  with a radio group.
+
+### Added — MCP protocol `2026-07-28`
+
+<!-- MCP protocol 2026-07 session: fill (stateless mode, server/discover + MCPVersionNegotiation,
+live updates / listen(filter:), MRTR, MCPProtocolVersion.minimumSupported / statelessPreferred,
+MCPServerManager.init(versionNegotiation:liveUpdates:)). -->
+
+_To be written._
+
+### Added — examples
+
+- [`mcp-chat`](examples/mcp-chat/): a chat with a local model (Qwen3 8B via MLX, or Apple's
+  on-device model) that shows MCP Apps views inline, with streaming, per-server trust and
+  approval, the date every turn, and conversations that reopen.
+
+### Checksums (SHA-256)
+
+_Filled in at release._
+
+---
+
 ## 1.0.0 — GA — 2026-09-27
 
 Fixes only; no API change.
