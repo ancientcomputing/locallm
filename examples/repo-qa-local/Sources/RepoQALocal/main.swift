@@ -122,9 +122,11 @@ func run() async {
 
     let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
     note("\nAsking: \(prompt)\n")
+    // The session's own turn method (repo-qa calls `session.respond(to:)` on its
+    // LanguageModelSession). Not `session.languageModelSession.respond`: that escape hatch skips
+    // the context-overflow retry and the per-turn MCP tool refresh.
     do {
-        let response = try await session.languageModelSession.respond(to: prompt)
-        print(response.content)
+        print(try await session.respond(to: prompt))
     } catch {
         note("Error: \(await GenerationErrorDescription.describe(error))")
     }
