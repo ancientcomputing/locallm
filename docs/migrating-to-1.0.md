@@ -28,8 +28,8 @@ The `examples/*/Package.swift` files resolve each SDK module as a `binaryTarget`
 checksum, keyed by version. A newer version is a new entry:
 
 ```swift
-"1.0.0-beta.3": SDKRelease(
-    url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.3/LocalLMLabSDKCore-1.0.0-beta.3.xcframework.zip",
+"1.0.0-GA": SDKRelease(
+    url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip",
     checksum: "<the .sha256 asset next to the zip on that release>"
 ),
 ```

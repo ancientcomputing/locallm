@@ -1,10 +1,15 @@
 # LocalLM Lab
 
-**LocalLM Lab** is a macOS app (macOS 26+, Apple Silicon, Apple Intelligence
-enabled) that turns your Mac into a private chatbot with an OpenAI-compatible
-API — fully offline with Apple's on-device model or open-weight models you
-download and run locally, or pointed at a hosted provider when you want one —
-and gives other apps and scripts a way to call whichever model you've picked.
+**LocalLM Lab** is about running AI **on your own Mac** instead of renting it
+from a hosted provider — no per-token bill, no data leaving your machine, no
+dependency on someone else's uptime. It ships two ways to get there: an app,
+and an SDK.
+
+The **app** (macOS 26+, Apple Silicon, Apple Intelligence enabled) turns your
+Mac into a private chatbot with an OpenAI-compatible API — fully offline with
+Apple's on-device model or open-weight models you download and run locally,
+or pointed at a hosted provider when you want one — and gives other apps and
+scripts a way to call whichever model you've picked.
 
 It's a single Dock app with five panels:
 
@@ -26,16 +31,20 @@ It began local-only — hence the name — and 1.0 added the hosted providers be
 the same interface, so "local" is now the default rather than the only option.
 On macOS 26 only Apple's on-device model runs; open-weight (MLX) models and the
 hosted providers need macOS 27. **Private Cloud Compute** is wired up but needs
-an Apple entitlement that is still pending, so it is inert in this beta.
+an Apple entitlement that is still pending, so it is currently inert.
 
 **Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
 get the app directly:
-[LocalLM Lab 1.0.0-RC.1 (arm64 DMG)](https://github.com/ancientcomputing/locallm-releases/releases/download/1.0.0-RC.1/LocalLM.Lab-1.0.0-RC.1-arm64.dmg).
+[LocalLM Lab 1.0.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLM.Lab-1.0.0-GA-arm64.dmg).
 
 ## LocalLM Lab SDK
 
-The engine LocalLM Lab runs on is also published as an SDK — binary xcframeworks
-you link into your own native macOS app. `LocalLMLabSDKCore` carries the
+The **SDK** is the same engine LocalLM Lab runs on, published as binary
+xcframeworks you link into your own native macOS app — so *your* app can run
+local AI (Apple's on-device model, or an open-weight model you ship or let the
+user download) instead of routing every request through a paid host API,
+with hosted providers still available behind the same interface for when you
+want one. `LocalLMLabSDKCore` carries the
 connectors, a full MCP client, Core's Workspace (filesystem) tools, and the 1.0
 model layer — routing and residency across every provider behind one API, with
 `SystemModelProvider` (Apple on-device) built in. Add the provider modules you
@@ -63,11 +72,12 @@ what's public here is:
   OpenAI-compatible API Lab endpoint. Full list with descriptions in the
   [Building on the SDK](#building-on-the-sdk) section below.
 - **[toolkit/](toolkit/)** — the `localai-cli` toolkit (zip + `.sha256`).
-  `0.6`–`1.0.0-beta.3` are checked in here; from `1.0.0-beta.4` on it ships as a
-  release asset on
-  [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
-  alongside the app DMG. See that folder's README to download and verify; full
-  CLI reference at
+  `0.6`–`1.0.0-beta.3` are checked in here; `1.0.0-beta.4` through `1.0.0-RC.1`
+  shipped as a release asset on
+  [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases);
+  from **`1.0.0-GA`** on it ships as a release asset on this repo instead,
+  alongside the app DMG and the SDK xcframeworks. See that folder's README to
+  download and verify; full CLI reference at
   [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html).
 - **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
   managing MCP servers and models, built on the SDK's public API.
@@ -76,7 +86,7 @@ what's public here is:
 
 ## Building on the SDK
 
-> **1.0.0-beta — the model layer builds for macOS 26 & 27.** `SystemModelProvider` works on
+> **The model layer builds for macOS 26 & 27.** `SystemModelProvider` works on
 > macOS 26; MLX, `ClaudeForFoundationModels`, the hosted providers, and Private Cloud Compute
 > need macOS 27. Coming from `0.8.x`? See
 > **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** — it's mostly additive, with one

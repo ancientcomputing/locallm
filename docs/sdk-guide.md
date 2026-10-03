@@ -9,13 +9,17 @@ below for the working reference apps this guide is drawn from.
 
 Requires macOS 26+ on Apple Silicon, Swift 6 tools.
 
-**Status note**: this SDK is early — this guide describes the API as it exists today, and it will
-change. `Components` in particular is newer and smaller than `Core`.
+**Status note**: `1.0.0` is generally available — source compatible from `1.0.0-RC.1` onward (see
+[§9](#9-scope-and-boundaries-what-core-doesnt-do) for the compatibility policy, or
+[`migrating-to-1.0.md`](migrating-to-1.0.md) if you're coming from `0.8.x`). This guide describes
+the API as of `1.0.0` GA. `Components` in particular is newer and smaller than `Core`.
 
 ## Start here: run a real example before reading further
 
 This guide's actual on-ramp is the working code under [`examples/`](../examples/), not the prose
-below — each one is real, runnable code you can clone and read end to end, not a snippet. Most
+below — each one is real, runnable code you can clone and read end to end, not a snippet. These
+examples are yours to build on: clone one, strip out what you don't need, and ship the rest as
+part of your own app — they're starting points, not just reading material. Most
 are real signed `.app`s ([`aiql`](../examples/aiql/) is the most complete: App Sandbox, MCP, the
 model layer, and the SQL pipeline all in one place); a few (`repo-qa`, `os-matrix`, `code-buddy`,
 `repo-qa-local`) are plain command-line tools with no packaging step at all. Pick the one closest
@@ -1981,9 +1985,21 @@ over an MCP dataset → this pipeline → a CSV in a folder you chose, with a lo
 builds the session with `SessionOptions(effort: .off)` so the Qwen3 model skips its `<think>`
 pass — the pipeline is mechanical enough that the reasoning trace only adds latency ([§6a](#6a-the-model-layer-local-models-routing-sessions)).
 
-## 9. What's NOT in Core yet
+## 9. Scope and boundaries: what Core doesn't do
 
-- **No filesystem picker/bookmark UI in Core, and not planned** — a folder picker is host-app
+**Source compatibility is guaranteed from `1.0.0` GA on.** Every 1.x release keeps existing
+code compiling unmodified against a later one. New capability shows up as additive surface
+(new optional/defaulted parameters, new protocol methods with a default implementation, new
+enum cases per the `@unknown default` point below); anything that would force you to edit
+working code just to keep building waits for 2.0. If you hit "X is inaccessible due to
+internal protection level" on something that looks like it should be public, file it — that's
+a bug against the guarantee, not expected churn. This covers source compatibility, not binary
+— you rebuild against whatever version you pin, there's no supported "drop in a newer
+xcframework without recompiling" path.
+
+The following are deliberate boundaries, not gaps waiting on a future release:
+
+- **No filesystem picker/bookmark UI in Core** — a folder picker is host-app
   UI and Core ships no UI at all. But you're not writing it from scratch: [§8](#8-filesystem-access-security-scoped-bookmarks-example-not-in-core) (Filesystem
   access — security-scoped bookmarks) has a complete, copy-pasteable `FolderAccess`
   (`NSOpenPanel` + security-scoped bookmark persistence + the async-aware access window a
@@ -1991,29 +2007,9 @@ pass — the pipeline is mechanical enough that the reasoning trace only adds la
   [`workspace-buddy`](../examples/workspace-buddy/) is a full reference app that does exactly
   this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` ([§8a](#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) — Workspace tools) — the read/write/edit logic
   for once you have a resolved folder URL.
-- ~~No ready-made `Tool` wrappers for the connectors, no MCP-to-`Tool` bridge.~~ Both now exist —
-  see [§7a](#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own) (ready-made vs. hand-written tools).
-- ~~No handling of server-initiated requests (elicitation, sampling, roots).~~ All three are now
-  handler seams (`MCPClientHandlers`), with a default elicitation UI in Components — see [§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams). The
-  SDK still doesn't *implement* sampling or roots; it routes them to your handler if you register
-  one, else replies "method not found".
-- ~~No model abstraction — you construct a `LanguageModelSession` yourself.~~ 1.0 adds
-  the model layer ([§6a](#6a-the-model-layer-local-models-routing-sessions)): `LocalLMLab` / `ModelRegistry` / providers / `MLXModelProvider` (in
-  `LocalLMLabSDKInference`) / `makeSession`. Still optional — the MCP-only path is unchanged.
 - **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need
   an `@unknown default` — new cases can land in a minor version. (Same for `ResidencyEvent` /
   `SessionEvent` / `DownloadEvent` / `MCPConnectionStatus` / `MCPServerError`.)
-- **No public API stability guarantee before RC.1.** `1.0.0-beta.N` made none — access levels
-  were fixed reactively as real usage surfaced gaps, and a few signatures changed between beta.4
-  and RC.1 (see the CHANGELOG). If you hit "X is inaccessible due to internal protection level" on
-  something that looks like it should be public, it probably should. File it. **From `1.0.0-RC.1`
-  onward this changes**: later release candidates, `1.0.0` GA and every 1.x release commit to
-  source compatibility — existing code keeps compiling unmodified against a later one.
-  New capability shows up as additive surface (new optional/defaulted parameters, new
-  protocol methods with a default implementation, new enum cases per the `@unknown default` point
-  above); anything that would force you to edit working code just to keep building waits for 2.0. This covers source compatibility, not binary — you rebuild
-  against whatever version you pin, there's no supported "drop in a newer xcframework without
-  recompiling" path.
 - **No logging of prompts, responses, or tool calls.** The MCP client has `MCPDiagnostics`
   ([§3e](#3e-diagnostics-when-a-user-reports-an-mcp-problem)) for connection / auth / stream troubleshooting — `os.Logger` plus an opt-in event buffer
   — but it is strictly off-content (never prompt or response text; tokens redacted). Core writes
@@ -2073,9 +2069,9 @@ specific connector).
 - **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, [§4](#4-keychain-storage--automatic-isolation-native-api-sandbox-safe)) — round-tripped
   correctly under the sandboxed per-app-container Keychain access group.
 
-**Not yet tested under sandbox**: Contacts, Location's accuracy/reverse-geocoding behavior beyond
-"it returns something" (a real, pre-existing, non-sandbox-specific bug in reverse geocoding was
-hit during testing, unrelated to sandboxing itself).
+**Outside the scope of sandbox testing to date**: Contacts, and Location's accuracy/reverse-geocoding
+behavior beyond "it returns something" (a real, pre-existing, non-sandbox-specific bug in reverse
+geocoding was hit during testing, unrelated to sandboxing itself).
 
 ### 10c. A testing caution: reset TCC before you trust a "no prompt" result
 
@@ -2249,8 +2245,8 @@ polling):
   you adapt from your provider — about forty lines; `Components/README.md` has the adapter.
 
 `ModelPickerView` (local models + MLX download) and `AIModelsSettingsView` (online providers) are
-currently **separate surfaces** — a full "AI Models" panel composes both. Unifying them is on the
-list; for now, present whichever your app needs, or stack them.
+two separate surfaces by design — compose a full "AI Models" panel by presenting whichever your
+app needs, or stacking both.
 
 None of these views hold persistence of their own — the MCP views go through
 `manager.core.restore(from:)`, the model views through `lab.snapshot()` / `lab.restore(from:)`
@@ -3474,6 +3470,20 @@ struct ModelOnboardingRequest: Sendable, Equatable, Identifiable {
 struct ModelOnboardingSource: Sendable {
     init(provider: any DownloadableModelProvider)     // or init(registry: ModelRegistry)
 }
+enum ModelOnboardingStepState: Sendable, Equatable {
+    case pending, running, done(String), failed(String)
+}
+struct ModelOnboardingItem: Sendable, Equatable, Identifiable {   // one repo's progress through the flow
+    var id: String { request.repoID }
+    var request: ModelOnboardingRequest
+    var validate: ModelOnboardingStepState = .pending
+    var download: ModelOnboardingStepState = .pending
+    var pin: ModelOnboardingStepState = .pending
+    var downloadFraction: Double?    // 0...1 while downloading, nil otherwise
+    var downloadedBytes: Int64 = 0
+    var totalBytes: Int64 = 0
+    var hasFailed: Bool { get }; var isComplete: Bool { get }     // true once `pin` is .done
+}
 @MainActor @Observable final class ModelOnboardingModel {
     init(requests: [ModelOnboardingRequest], source: ModelOnboardingSource)
     func start(); func cancel(); func reset()
@@ -3482,6 +3492,23 @@ struct ModelOnboardingSource: Sendable {
 struct ModelOnboardingView: View {
     init(model: ModelOnboardingModel, showsDownloadProgress: Bool = true,
          onFinished: (([InstalledModel]) -> Void)? = nil, onDismiss: (() -> Void)? = nil)
+}
+struct ModelFileChange: Sendable, Equatable, Identifiable {
+    enum Kind: Sendable, Equatable { case added, removed, modified }
+    var id: String { path }
+    init(path: String, kind: Kind, oldSize: Int64? = nil, newSize: Int64? = nil)
+}
+struct ModelUpdateOffer: Sendable, Equatable {
+    var current: String       // the version the model is on now
+    var available: String     // the version on offer
+    var changes: [ModelFileChange]
+    var isUpToDate: Bool { current == available }
+    init(current: String, available: String, changes: [ModelFileChange] = [])
+}
+enum ModelUpdateOwnership: Sendable, Equatable {
+    case userChosen             // the user picked this model, so the user decides; the offer is whatever is newest
+    case developerOffered       // built into the app — the developer vets versions; the offer is one they vouch for
+    case fixed(reason: String)  // can't be updated here; `reason` is shown as-is
 }
 struct ModelUpdateActions: Sendable {
     init(check: @escaping @Sendable () async throws -> ModelUpdateOffer,
@@ -3495,6 +3522,15 @@ struct ModelUpdateActions: Sendable {
     func checkForUpdate() async; func update() async; func rollBack() async; func revertToShippedVersion() async
 }
 struct ModelUpdateView: View { init(model: ModelUpdateModel) }
+struct ModelVersionRow: Sendable, Equatable, Identifiable {   // one cached version of a model, for the cleanup list
+    var id: String { revision }
+    var revision: String
+    var isCurrent: Bool     // the version in use; cannot be removed
+    var isComplete: Bool    // false for a half-downloaded version
+    var freesBytes: Int64   // what removing this version would actually free — its own files, not ones it shares
+    var sharedBytes: Int64  // bytes shared with other versions, which removing this one does NOT free
+    init(revision: String, isCurrent: Bool, isComplete: Bool = true, freesBytes: Int64, sharedBytes: Int64 = 0)
+}
 @MainActor @Observable final class ModelVersionsModel {
     init(list: @escaping @Sendable () async -> [ModelVersionRow],
          remove: @escaping @Sendable (ModelVersionRow) async throws -> Int64)   // returns bytes freed; must refuse the current version
