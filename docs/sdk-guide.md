@@ -434,7 +434,10 @@ support. Nothing you wrote against the 1.x client changes.
   `elicitation/create` down an open stream. It returns "input required", and the client asks
   your handler and re-sends the call with the answer. Your `MCPElicitationHandler`
   ([§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams)) is called
-  exactly as before, on either revision. Multi-step flows are capped at 8 rounds.
+  exactly as before, on either revision. Multi-step flows are capped at 8 rounds. Your handler
+  is asked once per refusal: after a `.cancel` the call ends without re-sending, and after a
+  `.decline` a server that asks again gets "decline" without your handler being called. Either
+  way `callTool` returns `.success` with `isError == true` and a sentence the model can read.
 - **Live updates.** A stateless server that advertises `listChanged` gets one
   `subscriptions/listen` stream. When its tools, prompts or resources change, the manager
   re-lists them on its own (enabled flags are kept; a new tool arrives disabled) and

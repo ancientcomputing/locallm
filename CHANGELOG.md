@@ -115,7 +115,10 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   `MCPSettings(versionNegotiation:)` or `MCPServerManager(versionNegotiation:)`.
 - **Multi-round-trip requests (MRTR).** A request that comes back `input_required` is answered
   through the existing `MCPClientHandlers` (elicitation in form or URL mode, sampling, roots) and
-  re-sent with the answers, for up to 8 rounds. No handler API changes.
+  re-sent with the answers, for up to 8 rounds. No handler API changes. A user's Cancel ends the
+  call without re-sending; after a Decline, a server that asks again is declined without
+  prompting the user a second time. Both come back as a `tools/call` tool error
+  (`isError`) the model can read, not a transport failure.
 - **Live updates** (`subscriptions/listen`). One stream per stateless server that announces list
   changes; tools, prompts and resources are re-listed on change with enabled flags kept.
   `MCPServerState.liveUpdates: MCPLiveUpdates?` (`.active` / `.reconnecting` / `.unavailable`).
