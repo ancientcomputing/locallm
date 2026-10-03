@@ -124,7 +124,7 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   `MCPListenEnd` (default implementation ends as refused).
 - `MCPProtocolVersion.supportsURLElicitation` and `.sendsProtocolVersionHeader` feature gates.
 - Diagnostics: the `server/discover` probe and fallback, live-update status, and MRTR rounds
-  (export area `mrtr`) are logged ([`docs/mcp-diagnostics.md`](docs/mcp-diagnostics.md)).
+  (new category `MCP.mrtr`) are logged ([`docs/mcp-diagnostics.md`](docs/mcp-diagnostics.md)).
 - Authorization fixes found by the official MCP conformance suite: protected-resource metadata
   at the path-suffixed then root well-known URL; `resource` must cover the server URL; metadata
   `issuer` and redirect `iss` are checked (RFC 8414, RFC 9207); a changed authorization server
