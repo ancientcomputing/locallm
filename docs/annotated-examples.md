@@ -2,8 +2,9 @@
 
 The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
-`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, and `mlx-control-room`), `// ← SDK (Remote)` (online providers —
-`model-switch` and `security-demo`), or `// ← Components` (`components-demo` and `components-updates-demo`). Everything else is ordinary SwiftUI/Foundation — the point
+`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, and `mcp-chat`), `// ← SDK (Remote)` (online providers —
+`model-switch` and `security-demo`), `// ← SDK (MCPAppsHost)` (showing MCP servers' interactive views —
+`mcp-chat`), or `// ← Components` (`components-demo`, `components-updates-demo`, and `mcp-chat`). Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
 written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
@@ -39,11 +40,13 @@ non-comment lines; these examples are commented far more heavily than production
 | [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
 | [`aiql`](#examplesaiql) | 395 | 494 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
+| [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
 | [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
 | [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
-The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most,
-and each section's **Tally** breaks that down. The rest is ordinary SwiftUI, Foundation, and
+The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most
+(`mcp-chat`, whose conversation UI *is* the SDK's chat history, is the exception), and each
+section's **Tally** breaks that down. The rest is ordinary SwiftUI, Foundation, and
 argument parsing.
 
 ## `examples/plate-today`
@@ -3632,3 +3635,1057 @@ which puts a ready-made `Components` UI on the same flows, and [`vistanova`](#ex
 minimal end (one `pinnedRevisions:` and nothing else). The one thing worth copying verbatim is
 `AllowMLXCommunityOrShipped`: an allow-list keyed on `mlx-community/` plus the exact artifacts the app itself ships,
 because a curated adapter lives in a different namespace.
+
+## `examples/mcp-chat`
+
+*938 lines of code across 4 files (1,026 with comments). `ChatModel.swift`, `WidgetSlot.swift`
+and `MCPChatApp.swift` are below in full; from `ChatViews.swift` the views that read the SDK are
+shown and the plain-SwiftUI ones (bubbles, composer, settings, the first-run screen) are elided,
+marked `// …`.*
+
+A chat with a local model (Qwen3 8B through MLX, or Apple's on-device model) where a tool call
+that has an **MCP App** — a server's own interactive view, such as Todoist's task list — shows
+that view in the conversation ([`sdk-guide.md` §3f](sdk-guide.md#3f-mcp-apps-showing-a-servers-interactive-views)).
+The model never asks for a view: it calls a tool, and if the tool's listing names a view, the app
+draws it under the call. Three SDK pieces carry the app:
+
+- **`session.hostTranscript`** is the whole conversation UI — user bubbles, tool-call rows (live
+  records with the full result), the streaming reply, reasoning split from the answer
+  ([Building a chat app](sdk-guide.md#building-a-chat-app--hosttranscript-streamresponse-turncontext)).
+  The view never touches Apple's transcript.
+- **`LocalLMLabSDKMCPAppsHost`** renders a view in a sandboxed web view, routes the view's own
+  tool calls back through the session (so they meet the same approval as the model's), keeps a
+  few views live and the rest as snapshots, and caches each view by hash so it comes back after a
+  relaunch. Everything marked `// ← SDK (MCPAppsHost)` is that package — open source, built on
+  Core's public API.
+- **`lab.mcp` + `Components`**: the one MCP manager, set up to declare MCP Apps support; the
+  server list (with each server's trust and approval) and the approval sheet are prebuilt views.
+
+Links `LocalLMLabSDKCore`, `LocalLMLabSDKInference`, `LocalLMLabSDKComponents` and
+`LocalLMLabSDKMCPAppsHost`. App Sandbox with outbound network only.
+
+### `Sources/MCPChat/ChatModel.swift`
+
+The app's state: the lab, the session, the server list, the widget cache and pool. Note what
+isn't here: no tool list is rebuilt when the user turns a tool on (a session follows `lab.mcp` on
+its own), no approval policy (each server's trust and approval live on `lab.mcp`, set from the
+server list), no `<think>` parsing (`hostTranscript` splits it). A new session is made only when
+the user switches models — carrying both the model's memory and the transcript over.
+
+```swift
+import AppKit
+import Combine
+import Foundation
+import FoundationModels
+import LocalLMLabSDKComponents   // ← Components
+import LocalLMLabSDKCore   // ← SDK
+import LocalLMLabSDKInference   // ← SDK (Inference)
+import LocalLMLabSDKMCPAppsHost   // ← SDK (MCPAppsHost)
+
+// The model this app routes to by default, pinned to the commit it was tried against (see
+// workspace-buddy-local for why a revision is pinned).
+let qwenRepo = "mlx-community/Qwen3-8B-4bit"
+let qwenRevision = "545dc4251c05440727734bcd94334791f6ab0192"
+
+extension RouteName {   // ← SDK
+    static let chat: RouteName = "chat"   // ← SDK
+}
+
+enum ChatModelChoice: String, CaseIterable, Identifiable {
+    case qwen3
+    case apple
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .qwen3: "Qwen3 8B (MLX, local)"
+        case .apple: "Apple on-device model"
+        }
+    }
+    var modelID: ModelID {
+        switch self {
+        case .qwen3: ModelID(scheme: "mlx", rest: qwenRepo)!   // ← SDK
+        case .apple: .system
+        }
+    }
+}
+
+/// App settings (Settings window). Read where they are used, so a change applies from the next
+/// turn without restarting.
+enum ChatSettings {
+    static let modelKey = "model"
+    /// Whether a reopened conversation continues with the model's memory of it. Off: the user still
+    /// sees the earlier conversation, but the model starts fresh (and nothing the model saw is
+    /// written to disk).
+    static let rememberKey = "rememberConversation"
+    static let widgetMessagesKey = "allowWidgetMessages"
+    static let widgetContextKey = "allowWidgetContext"
+    static let liveWidgetsKey = "liveWidgetLimit"
+    static let clockToolKey = "clockTool"
+
+    static func register() {
+        UserDefaults.standard.register(defaults: [
+            modelKey: ChatModelChoice.qwen3.rawValue,
+            rememberKey: true,
+            widgetMessagesKey: false,
+            widgetContextKey: true,
+            liveWidgetsKey: 3,
+            clockToolKey: true,
+        ])
+    }
+
+    static var model: ChatModelChoice {
+        ChatModelChoice(rawValue: UserDefaults.standard.string(forKey: modelKey) ?? "") ?? .qwen3
+    }
+    static var remember: Bool { UserDefaults.standard.bool(forKey: rememberKey) }
+    static var allowWidgetMessages: Bool { UserDefaults.standard.bool(forKey: widgetMessagesKey) }
+    static var allowWidgetContext: Bool { UserDefaults.standard.bool(forKey: widgetContextKey) }
+    static var liveWidgets: Int { max(1, UserDefaults.standard.integer(forKey: liveWidgetsKey)) }
+    static var clockTool: Bool { UserDefaults.standard.bool(forKey: clockToolKey) }
+}
+
+@MainActor
+final class ChatModel: ObservableObject {
+    enum Status: Equatable {
+        /// The chosen model is not ready (e.g. Qwen3 is not downloaded yet).
+        case needsModel
+        case downloading(Double)
+        case ready
+        case responding
+    }
+
+    let manager: MCPServerManager
+    let servers: MCPServerManagerObservable   // ← Components
+    let toolConfirm = ToolConfirmationPresenter()   // ← Components
+    let widgetCache = MCPAppWidgetCache()   // ← SDK (MCPAppsHost)
+    let pool = MCPAppViewPool(limit: ChatSettings.liveWidgets)   // ← SDK (MCPAppsHost)
+
+    @Published private(set) var session: LocalLMLabSession?
+    @Published private(set) var status: Status = .needsModel
+    @Published private(set) var modelChoice = ChatSettings.model
+    /// Set when a conversation was reopened without the model's memory: turns up to this one were
+    /// not given to the model.
+    @Published private(set) var memoryBoundaryTurn: Int?
+    @Published var errorMessage: String?
+    @Published var showServers = false
+    /// One authorizer for every session. It follows each server's trust and tool approval, which
+    /// the user sets per server in the server list (Components' picker), and remembers a widget's
+    /// answers; a session made after a model switch keeps them.
+    private let authorizer: ConfirmingToolAuthorizer   // ← SDK
+
+    // Development only: MCPCHAT_MODEL_CACHE points at an existing Hugging Face cache, so a build
+    // without App Sandbox (SANDBOX=0 packaging/build-and-sign.sh) can skip the download. A
+    // sandboxed build can't read outside its container and downloads into it.
+    private let mlx = MLXModelProvider(   // ← SDK (Inference)
+        cacheDirectory: ProcessInfo.processInfo.environment["MCPCHAT_MODEL_CACHE"].map { URL(fileURLWithPath: $0) },
+        residentModelLimit: 1, pinnedRevisions: [qwenRepo: qwenRevision])
+    private let lab: LocalLMLab
+    private let store = ConversationStore()
+    private var sessionSignature: String?
+    private var cancellables: Set<AnyCancellable> = []
+
+    static let instructions = """
+        You are a helpful assistant in a chat app. Use the tools you have when the user asks about \
+        their data or asks you to change it. Some tools also show the user an interactive view of \
+        the result; when one does, keep your reply short and do not repeat what the view shows.
+        """
+
+    init() {
+        ChatSettings.register()
+        // The lab makes the one MCP manager (`lab.mcp`). Declare MCP Apps support so servers that
+        // gate their widgets on it offer them.
+        let lab = LocalLMLab(configuration: .init(   // ← SDK
+            providers: [mlx, SystemModelProvider()],   // ← SDK
+            mcp: MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())))   // ← SDK — MCPSettings; ← SDK (MCPAppsHost) — .advertisingMCPApps()
+        self.lab = lab
+        self.manager = lab.mcp   // ← SDK
+        self.servers = MCPServerManagerObservable(core: lab.mcp)   // ← Components
+        authorizer = ConfirmingToolAuthorizer(channel: toolConfirm)   // ← SDK
+        modelChoice = ChatSettings.model
+        lab.models.route(.chat, to: modelChoice.modelID)   // ← SDK
+    }
+
+    // MARK: launch
+
+    func start() async {
+        await restoreServers()
+        refreshModelStatus()
+        if status == .ready { openSavedConversation() }
+
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.settingsChanged() }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.save() } }
+            .store(in: &cancellables)
+    }
+
+    private func refreshModelStatus() {
+        switch lab.models.availability(for: modelChoice.modelID) {   // ← SDK
+        case .available: if status != .responding { status = .ready }
+        default: status = .needsModel
+        }
+    }
+
+    var modelUnavailableReason: String? {
+        switch lab.models.availability(for: modelChoice.modelID) {   // ← SDK
+        case .available, .notDownloaded: nil
+        case .needsCredential: "This model needs a credential."
+        case .unavailable(_, let detail): detail
+        @unknown default: "This model is not available."
+        }
+    }
+
+    func downloadModel() async {
+        guard modelChoice == .qwen3, status == .needsModel else { return }
+        status = .downloading(0)
+        do {
+            if let preflight = try? await mlx.validate(qwenRepo), !preflight.passed {   // ← SDK (Inference)
+                throw ChatError("This Mac can't run \(qwenRepo): \(preflight.detail ?? "pre-flight failed").")
+            }
+            for try await event in mlx.download(qwenRepo) {   // ← SDK (Inference)
+                if case .progress(_, _, let fraction) = event { status = .downloading(fraction) }
+            }
+        } catch {
+            errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+        status = .needsModel
+        refreshModelStatus()
+        if status == .ready, session == nil { openSavedConversation() }
+    }
+
+    private func settingsChanged() {
+        pool.limit = ChatSettings.liveWidgets   // ← SDK (MCPAppsHost)
+        if !ChatSettings.remember { store.forgetModelMemory() }
+        guard ChatSettings.model != modelChoice, status != .responding else { return }
+        modelChoice = ChatSettings.model
+        lab.models.route(.chat, to: modelChoice.modelID)   // ← SDK
+        refreshModelStatus()
+        // The session is rebuilt on the next turn, carrying the conversation over to the new model.
+        if status == .ready, session == nil { openSavedConversation() }
+    }
+
+    // MARK: conversation
+
+    /// Reopens the saved conversation: always what the user saw; the model's memory of it only
+    /// when "Remember conversations" is on.
+    private func openSavedConversation() {
+        let saved = store.load()
+        let memory = ChatSettings.remember ? saved?.model : nil
+        do {
+            let session = try makeSession(restoring: memory)
+            if let shown = saved?.shown { try session.hostTranscript.restore(from: shown) }   // ← SDK
+            if memory == nil, let last = session.hostTranscript.entries.last?.turn { memoryBoundaryTurn = last }   // ← SDK
+            install(session)
+        } catch {
+            errorMessage = "Couldn't open the saved conversation: \(error.localizedDescription)"
+            if let fresh = try? makeSession(restoring: nil) { install(fresh) }
+        }
+    }
+
+    func newConversation() {
+        guard status != .responding else { return }
+        Task { await pool.releaseAll() }   // ← SDK (MCPAppsHost)
+        store.clear()
+        memoryBoundaryTurn = nil
+        session = nil
+        sessionSignature = nil
+        if status == .ready, let fresh = try? makeSession(restoring: nil) { install(fresh) }
+    }
+
+    func send(_ text: String) {
+        let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return }
+        Task { await respond { $0.streamResponse(to: prompt) } }   // ← SDK
+    }
+
+    /// A widget's `ui/message` — only reached when Settings allows widget messages.
+    func sendFromWidget(_ text: String, instance: String) {
+        Task { await respond { $0.streamResponse(to: text, fromAppInstance: instance) } }   // ← SDK
+    }
+
+    /// Runs a streamed turn. The view draws the reply as it arrives from
+    /// `hostTranscript.replyInProgress`, so the stream only needs draining here.
+    private func respond(_ turn: (LocalLMLabSession) -> AsyncThrowingStream<String, any Error>) async {
+        guard status == .ready else { return }
+        let session: LocalLMLabSession
+        do {
+            session = try currentSession()
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        status = .responding
+        defer {
+            status = .ready
+            save()
+        }
+        do {
+            for try await _ in turn(session) {}
+        } catch {
+            errorMessage = await GenerationErrorDescription.describe(error)   // ← SDK
+        }
+    }
+
+    /// The session for the next turn. A session follows `lab.mcp` by itself (tools turned on or
+    /// off, servers added, trust changed: picked up on its next turn). What it can't follow is a
+    /// different model or a change to the app's own tools; then a new session takes over the
+    /// conversation: the model's memory (its transcript) and what the user sees (the archive).
+    private func currentSession() throws -> LocalLMLabSession {
+        if let session, sessionSignature == signature() { return session }
+        guard let old = session else {
+            let fresh = try makeSession(restoring: nil)
+            install(fresh)
+            return fresh
+        }
+        let fresh = try makeSession(restoring: old.languageModelSession.transcript)   // ← SDK
+        try fresh.hostTranscript.restore(from: old.hostTranscript.archive())   // ← SDK
+        // Live widgets call through the session they were made with: re-create them on the new one.
+        Task { await pool.releaseAll() }   // ← SDK (MCPAppsHost)
+        install(fresh)
+        return fresh
+    }
+
+    private func makeSession(restoring memory: Transcript?) throws -> LocalLMLabSession {
+        // A saved conversation carries its own instructions; a new one gets the app's.
+        var session = try lab.makeSession(   // ← SDK
+            route: .chat, tools: builtInTools, instructions: memory == nil ? Self.instructions : nil,
+            restoring: memory, mcpAppHints: true, authorizer: authorizer)
+        session.retryOnContextOverflow = RetryPolicy(maxRetries: 2, compact: Self.dropOldestHalf)   // ← SDK
+        session.turnContext = { Self.clock(Date()) }   // ← SDK
+        sessionSignature = signature()
+        return session
+    }
+
+    /// The app's own tools, alongside the MCP servers'. The SDK's clock (`getCurrentTime`, rated
+    /// read-only, so it never asks) lets the model check the date when it needs to — e.g. to turn
+    /// "tomorrow" into a date for Todoist. It is in addition to the date sent with each turn.
+    private var builtInTools: [any Tool] {
+        ChatSettings.clockTool ? [ClockTool()] : []   // ← SDK
+    }
+
+    var builtInToolNames: [String] { builtInTools.map(\.name) }
+
+    private func install(_ session: LocalLMLabSession) {
+        self.session = session
+    }
+
+    /// What a session can't change by itself: the model and the app's own tools.
+    private func signature() -> String {
+        ([modelChoice.rawValue] + builtInToolNames).joined(separator: "\n")
+    }
+
+    /// The current date and time, sent with every turn: a model has no clock, so without it
+    /// "what's due tomorrow?" resolves against a date from its training data.
+    nonisolated static func clock(_ now: Date, timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .weekday], from: now)
+        let weekday = calendar.weekdaySymbols[(parts.weekday ?? 1) - 1]
+        let offset = timeZone.secondsFromGMT(for: now) / 60
+        let date = String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+        let time = String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+        let utc = String(format: "UTC%@%02d:%02d", offset < 0 ? "-" : "+", abs(offset) / 60, abs(offset) % 60)
+        return "[Current date and time: \(weekday) \(date) \(time), \(timeZone.identifier) (\(utc)). "
+            + "Use it for relative dates such as today, tomorrow or next week.]"
+    }
+
+    /// Context overflow (e.g. a long conversation moved to the smaller on-device model): keep the
+    /// instructions and the newer half of the conversation, starting at a user turn.
+    nonisolated static func dropOldestHalf(_ transcript: Transcript) -> Transcript {
+        let entries = Array(transcript)
+        let prompts = entries.indices.filter { if case .prompt = entries[$0] { true } else { false } }
+        guard prompts.count > 1 else { return transcript }
+        let keepFrom = prompts[prompts.count / 2]
+        var kept: [Transcript.Entry] = []
+        if let first = entries.first, case .instructions = first { kept.append(first) }
+        kept.append(contentsOf: entries[keepFrom...])
+        return Transcript(entries: kept)
+    }
+
+    private func save() {
+        guard let session else { return }
+        store.save(shown: try? session.hostTranscript.archive(),   // ← SDK
+                   model: ChatSettings.remember ? session.languageModelSession.transcript : nil)   // ← SDK
+    }
+
+    // MARK: servers (saved list; quiet reconnect)
+
+    private struct SavedServer: Codable {
+        var url: URL
+        var name: String
+        var authType: MCPAuthType   // ← SDK
+        var manualClientID: String?
+        var noAuth: Bool
+        /// The server's tools as last seen, with the user's on/off choice for each. New tools from
+        /// a server start off (the SDK's default); restoring these keeps the user's choices.
+        var tools: [MCPToolDescriptor]?   // ← SDK
+        /// The user's trust and tool approval for the server (server list). The manager doesn't
+        /// persist them; they are set again after restore.
+        var trust: MCPServerTrust?   // ← SDK
+        var toolApproval: ToolApproval?   // ← SDK
+    }
+
+    private let savedServersKey = "servers.v1"
+
+    private func restoreServers() async {
+        let saved = (UserDefaults.standard.data(forKey: savedServersKey)
+            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
+        manager.restore(from: saved.map {   // ← SDK
+            (id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name, tools: $0.tools ?? [], estimatedTokens: 0,   // ← SDK
+             enabled: true, authType: $0.authType, manualClientID: $0.manualClientID, resources: [])
+        })
+        // Trust before reconnecting: trusting records the saved tool list, so a server whose tools
+        // changed while the app was closed shows "tools changed since trusted".
+        for server in saved {
+            let id = MCPServerID(rawValue: server.url.absoluteString)   // ← SDK
+            if let trust = server.trust { manager.setTrust(trust, server: id) }   // ← SDK
+            manager.setToolApproval(server.toolApproval, server: id)   // ← SDK
+        }
+        // Only servers that need no sign-in, or have a stored credential, reconnect at launch: this
+        // app never opens a browser unprompted.
+        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.url) != nil {   // ← SDK
+            _ = await manager.reconnect(MCPServerID(rawValue: server.url.absoluteString))   // ← SDK
+        }
+        servers.$servers.dropFirst().sink { [weak self] in self?.persist($0) }.store(in: &cancellables)   // ← Components
+    }
+
+    private func persist(_ states: [MCPServerID: MCPServerState]) {   // ← SDK
+        let previous = (UserDefaults.standard.data(forKey: savedServersKey)
+            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
+        let saved = states.values.map { state in
+            SavedServer(url: state.url, name: state.displayName, authType: state.authType, manualClientID: state.manualClientID,
+                        noAuth: state.connectionStatus == .connected
+                            ? MCPCredentialProbe.storedKind(for: state.url) == nil   // ← SDK
+                            : previous.first { $0.url == state.url }?.noAuth ?? false,
+                        tools: state.tools.isEmpty ? previous.first { $0.url == state.url }?.tools : state.tools,
+                        trust: state.trust, toolApproval: state.toolApproval)
+        }
+        if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data, forKey: savedServersKey) }
+    }
+
+    /// The MCP tools the model is given on its next turn.
+    var modelTools: [MCPToolDescriptor] { manager.toolsForSession() }   // ← SDK
+
+    /// Connected servers none of whose tools are on: the model can't use them yet. (New tools start
+    /// off; the user turns on the ones they want in the server list.)
+    var serversWithNoToolsOn: [MCPServerState] {   // ← SDK
+        servers.sortedServers.filter { state in   // ← Components
+            state.connectionStatus == .connected && !state.tools.isEmpty
+                && !state.tools.contains { $0.enabled && $0.isModelVisible }   // ← SDK
+        }
+    }
+
+    /// The server a tool call went to, for its widget.
+    func serverID(of record: ToolCallRecord) -> MCPServerID? {   // ← SDK
+        if case .mcp(let server, _) = record.tool { return server }   // ← SDK
+        return nil
+    }
+}
+
+struct ChatError: LocalizedError {
+    let errorDescription: String?
+    init(_ message: String) { errorDescription = message }
+}
+
+/// The open conversation on disk (Application Support/MCPChat): what the user saw
+/// (`HostTranscript.archive()`) and, when "Remember conversations" is on, the model's transcript.
+struct ConversationStore {
+    struct Saved {
+        var shown: Data?
+        var model: Transcript?
+    }
+
+    private let directory: URL = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("MCPChat/Conversation", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base
+    }()
+
+    private var shownFile: URL { directory.appendingPathComponent("shown.json") }
+    private var modelFile: URL { directory.appendingPathComponent("model.json") }
+
+    func load() -> Saved? {
+        let shown = try? Data(contentsOf: shownFile)
+        let model = (try? Data(contentsOf: modelFile)).flatMap { try? JSONDecoder().decode(Transcript.self, from: $0) }
+        return shown == nil && model == nil ? nil : Saved(shown: shown, model: model)
+    }
+
+    func save(shown: Data?, model: Transcript?) {
+        if let shown { try? shown.write(to: shownFile, options: .atomic) }
+        if let model, let data = try? JSONEncoder().encode(model) {
+            try? data.write(to: modelFile, options: .atomic)
+        } else {
+            forgetModelMemory()
+        }
+    }
+
+    func forgetModelMemory() {
+        try? FileManager.default.removeItem(at: modelFile)
+    }
+
+    func clear() {
+        try? FileManager.default.removeItem(at: shownFile)
+        forgetModelMemory()
+    }
+}
+```
+
+### `Sources/MCPChat/WidgetSlot.swift`
+
+One tool call's view. First showing: fetch the server's view, cache it by hash, bind it to the
+call. Later (scrolled back past the live limit, after a relaunch, after a session switch):
+`MCPAppRecreation.revalidate` decides whether the stored result still fits the server's current
+view. The view's own calls go through `MCPAppsSessionBackend` → the session's authorizer.
+
+```swift
+import AppKit
+import LocalLMLabSDKCore   // ← SDK
+import LocalLMLabSDKMCPAppsHost   // ← SDK (MCPAppsHost)
+import SwiftUI
+
+// A tool call's MCP App widget, inline under the call in the conversation.
+//
+// - First showing: the widget is fetched from the server, cached by hash and bound to the call.
+// - Live widgets are capped (`MCPAppViewPool`, Settings → Live widgets). A widget released past the
+//   cap shows its snapshot until it scrolls back into view or is clicked, then it is re-created.
+// - Re-creating (after the cap, after a relaunch, or after the session was rebuilt) checks the
+//   server first (`MCPAppRecreation.revalidate`): the current widget gets the stored result when the
+//   tool's output still has the same shape; otherwise the user is offered a refresh. Offline, the
+//   cached version is shown view-only.
+// - Calls a widget makes go through the session (`MCPAppsSessionBackend`), so the session's
+//   authorizer asks the user exactly as it does for the model's calls, and they are recorded.
+
+struct WidgetSlot: View {
+    let record: ToolCallRecord   // ← SDK
+    @ObservedObject var chat: ChatModel
+    @ObservedObject var pool: MCPAppViewPool   // ← SDK (MCPAppsHost)
+
+    enum Phase {
+        case idle
+        case loading
+        case live(MCPAppViewController, viewOnly: Bool, changed: Bool)   // ← SDK (MCPAppsHost)
+        case needsRefresh(automatic: Bool)
+        case unavailable(String)
+    }
+
+    @State private var phase: Phase = .idle
+    @State private var refreshing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            content
+            footer
+        }
+        .onAppear { if !pool.isLive(record.id) { Task { await activate() } } }   // ← SDK (MCPAppsHost)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch phase {
+        case .live(let controller, _, _) where pool.isLive(record.id):   // ← SDK (MCPAppsHost)
+            LiveWidget(controller: controller)
+                .onTapGesture { pool.touch(record.id) }   // ← SDK (MCPAppsHost)
+        case .live, .idle:
+            if let snapshot = pool.snapshot(for: record.id) {   // ← SDK (MCPAppsHost)
+                Image(nsImage: snapshot)
+                    .resizable().aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: 420)
+                    .opacity(0.6)
+                    .overlay { Label("Click to reactivate", systemImage: "play.circle").padding(8).background(.regularMaterial, in: Capsule()) }
+                    .onTapGesture { Task { await activate() } }
+            } else {
+                placeholder("Interactive view", systemImage: "rectangle.on.rectangle") {
+                    Button("Show") { Task { await activate() } }
+                }
+            }
+        case .loading:
+            placeholder("Loading view…", systemImage: nil) { ProgressView().controlSize(.small) }
+        case .needsRefresh(let automatic):
+            placeholder("This view changed since this answer. The saved result may not fit it.",
+                        systemImage: "arrow.triangle.2.circlepath") {
+                Button(automatic ? "Refresh" : "Re-run tool…") { Task { await refresh() } }
+                    .disabled(refreshing)
+            }
+        case .unavailable(let reason):
+            placeholder(reason, systemImage: "wifi.slash") {
+                Button("Retry") { Task { await activate() } }
+            }
+        }
+    }
+
+    @ViewBuilder private var footer: some View {
+        let background = chat.session?.hostTranscript.appOnlyCallCount(for: record.id) ?? 0   // ← SDK
+        HStack(spacing: 10) {
+            if case .live(_, let viewOnly, let changed) = phase {
+                if viewOnly { Label("Offline — view only", systemImage: "wifi.slash") }
+                if changed { Label("Updated view", systemImage: "sparkles") }
+            }
+            if background > 0 { Label("\(background) background update\(background == 1 ? "" : "s")", systemImage: "arrow.clockwise") }
+        }
+        .font(.caption2).foregroundStyle(.secondary)
+    }
+
+    private func placeholder(_ text: String, systemImage: String?, @ViewBuilder action: () -> some View) -> some View {
+        HStack(spacing: 10) {
+            if let systemImage { Image(systemName: systemImage).foregroundStyle(.secondary) }
+            Text(text).foregroundStyle(.secondary)
+            Spacer()
+            action()
+        }
+        .font(.callout)
+        .padding(12)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: lifecycle
+
+    private func activate() async {
+        if case .loading = phase { return }
+        guard let session = chat.session, let server = chat.serverID(of: record), let uri = record.app?.resourceURI,   // ← SDK
+              record.mcpResult != nil else { return }   // ← SDK
+        phase = .loading
+        let resource: MCPAppResource   // ← SDK (MCPAppsHost)
+        var viewOnly = false
+        var changed = false
+        if chat.widgetCache.sha256(forRecord: record.id) == nil {   // ← SDK (MCPAppsHost)
+            // First showing of this call: the server's current widget, kept and bound to the call.
+            do {
+                resource = try await chat.widgetCache.fetch(resourceURI: uri, server: server, manager: chat.manager, recordID: record.id)   // ← SDK (MCPAppsHost)
+            } catch {
+                phase = .unavailable("Couldn't load the view (\(error.localizedDescription)).")
+                return
+            }
+        } else {
+            let check = await MCPAppRecreation.revalidate(   // ← SDK (MCPAppsHost)
+                record, source: MCPServerManagerWidgetSource(manager: chat.manager, server: server), cache: chat.widgetCache)   // ← SDK (MCPAppsHost)
+            switch check?.decision {
+            case .render(let offline)?:
+                guard let current = check?.resource else { phase = .unavailable("The view is no longer available."); return }
+                resource = current
+                viewOnly = offline
+                changed = check?.widgetChanged ?? false
+            case .needsRefresh(let automatic)?:
+                phase = .needsRefresh(automatic: automatic)
+                return
+            case .notApproved?:
+                phase = .unavailable("This version of the view isn't approved.")
+                return
+            case .unavailable?, nil:
+                phase = .unavailable("The server can't be reached and this view isn't saved.")
+                return
+            }
+        }
+
+        let instance = record.id
+        let controller = pool.controller(for: instance) {   // ← SDK (MCPAppsHost)
+            var actions = MCPAppsHostActions.session(session, instance: instance, openLink: { NSWorkspace.shared.open($0) })   // ← SDK (MCPAppsHost)
+            // Route widget messages through the chat so the turn shows as running and is saved.
+            actions.sendMessage = { [weak chat] text in chat?.sendFromWidget(text, instance: instance) }
+            return MCPAppViewController(   // ← SDK (MCPAppsHost)
+                resource: resource,
+                tools: chat.manager.servers[server]?.tools ?? record.toolDescriptor.map { [$0] } ?? [],   // ← SDK
+                backend: viewOnly ? OfflineBackend() as any MCPAppsBackend   // ← SDK (MCPAppsHost)
+                    : MCPAppsSessionBackend(session: session, manager: chat.manager, server: server, instance: instance),   // ← SDK (MCPAppsHost)
+                configuration: MCPAppsBridgeConfiguration(   // ← SDK (MCPAppsHost)
+                    hostName: "MCP Chat", hostVersion: "0.1",
+                    hostContext: ["displayMode": .string("inline"), "locale": .string(Locale.current.identifier(.bcp47))]),
+                bridgePolicy: ChatWidgetPolicy(viewOnly: viewOnly),
+                sandboxPolicy: .closed,
+                actions: actions)
+        }
+        MCPAppRecreation.deliver(record, to: controller)   // ← SDK (MCPAppsHost)
+        phase = .live(controller, viewOnly: viewOnly, changed: changed)
+        await controller.load()   // ← SDK (MCPAppsHost)
+    }
+
+    /// Re-runs the call (as the host, through the session's authorizer). The fresh result arrives
+    /// as a new call at the end of the conversation, with the current view.
+    private func refresh() async {
+        guard let session = chat.session, let server = chat.serverID(of: record), case .mcp(_, let tool) = record.tool else { return }   // ← SDK
+        refreshing = true
+        defer { refreshing = false }
+        let arguments = MCPAppRecreation.toolInput(from: record.arguments)   // ← SDK (MCPAppsHost)
+        if case .failure(let error) = await session.callMCPTool(server: server, tool: tool, arguments: arguments, initiator: .host) {   // ← SDK
+            chat.errorMessage = "Refresh failed: \(error)"
+        }
+    }
+}
+
+/// Observes the controller so the slot follows the widget's reported height.
+private struct LiveWidget: View {
+    @ObservedObject var controller: MCPAppViewController   // ← SDK (MCPAppsHost)
+
+    var body: some View {
+        MCPAppView(controller: controller)   // ← SDK (MCPAppsHost)
+            .frame(height: max(80, controller.contentHeight ?? 360))   // ← SDK (MCPAppsHost)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary))
+    }
+}
+
+/// What a widget may ask the host for, on top of the protocol's own rules. Tool calls are allowed
+/// here because the session's authorizer asks the user; messages and model context follow Settings.
+struct ChatWidgetPolicy: MCPAppsBridgePolicy {   // ← SDK (MCPAppsHost)
+    let viewOnly: Bool
+
+    func authorizeToolCall(name: String, arguments: [String: MCPValue]) async -> MCPAppsDecision {   // ← SDK (MCPAppsHost)
+        viewOnly ? .deny("Offline: this view is view-only") : .allow
+    }
+
+    func authorizeOpenLink(_ url: URL) async -> MCPAppsDecision {   // ← SDK (MCPAppsHost)
+        url.scheme?.lowercased() == "https" ? .allow : .deny("Only https links may be opened")
+    }
+
+    func authorizeMessage(text: String) async -> MCPAppsDecision {   // ← SDK (MCPAppsHost)
+        ChatSettings.allowWidgetMessages ? .allow : .deny("Widget messages are off in Settings")
+    }
+
+    func authorizeModelContextUpdate() async -> MCPAppsDecision {   // ← SDK (MCPAppsHost)
+        ChatSettings.allowWidgetContext ? .allow : .deny("Widget context is off in Settings")
+    }
+}
+
+/// The backend for a view-only (offline) widget: nothing reaches the server.
+struct OfflineBackend: MCPAppsBackend {   // ← SDK (MCPAppsHost)
+    func callTool(name: String, arguments: [String: MCPValue]) async -> Result<MCPToolResult, MCPServerError> { .failure(.notConnected) }   // ← SDK
+    func readResource(uri: String) async -> Result<MCPResourceContent, MCPServerError> { .failure(.notConnected) }   // ← SDK
+}
+```
+
+### `Sources/MCPChat/ChatViews.swift` (excerpt)
+
+The conversation is a `ForEach` over `hostTranscript.entries` plus `replyInProgress`; the server
+list and the approval sheet are `Components`.
+
+```swift
+import LocalLMLabSDKComponents   // ← Components
+import LocalLMLabSDKCore   // ← SDK
+import LocalLMLabSDKMCPAppsHost   // ← SDK (MCPAppsHost)
+import SwiftUI
+
+struct ChatRootView: View {
+    @ObservedObject var chat: ChatModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let session = chat.session {
+                ConversationView(chat: chat, transcript: session.hostTranscript)   // ← SDK
+            } else {
+                ModelSetupView(chat: chat)
+            }
+            ForEach(chat.serversWithNoToolsOn, id: \.id) { server in
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                    Text("\(server.displayName) is connected, but none of its tools are on, so the model can't use it.")
+                    Spacer()
+                    Button("Choose Tools…") { chat.showServers = true }
+                }
+                .font(.callout)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(.orange.opacity(0.1))
+            }
+            Divider()
+            Composer(chat: chat)
+        }
+        .frame(minWidth: 640, minHeight: 560)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Text(chat.modelChoice.title).font(.callout).foregroundStyle(.secondary)
+            }
+            ToolbarItemGroup {
+                ToolsBadge(chat: chat)
+                Button { chat.showServers = true } label: { Label("MCP Servers", systemImage: "server.rack") }
+                Button { chat.newConversation() } label: { Label("New Chat", systemImage: "square.and.pencil") }
+                    .disabled(chat.status == .responding)
+            }
+        }
+        .sheet(isPresented: $chat.showServers) {
+            VStack(alignment: .trailing) {
+                MCPServerPickerView(manager: chat.servers)   // ← Components
+                Button("Done") { chat.showServers = false }.keyboardShortcut(.defaultAction)
+            }
+            .padding()
+            .frame(minWidth: 560, minHeight: 480)
+        }
+        .toolConfirmationSheet(chat.toolConfirm)   // ← Components
+        .alert("Something went wrong", isPresented: Binding(get: { chat.errorMessage != nil }, set: { if !$0 { chat.errorMessage = nil } })) {
+            Button("OK") { chat.errorMessage = nil }
+        } message: {
+            Text(chat.errorMessage ?? "")
+        }
+        .task { await chat.start() }
+    }
+}
+
+// … ModelSetupView — the first-run "download the model" screen (plain SwiftUI, omitted)
+
+private struct ConversationView: View {
+    @ObservedObject var chat: ChatModel
+    let transcript: HostTranscript   // ← SDK
+    @State private var position = ScrollPosition(edge: .bottom)
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                if transcript.entries.isEmpty {   // ← SDK
+                    Text("Ask something. Try “What's due today?” with Todoist connected.")
+                        .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 60)
+                }
+                ForEach(transcript.entries) { entry in   // ← SDK
+                    EntryView(entry: entry, chat: chat)
+                        .id(entry.id)
+                    if let boundary = chat.memoryBoundaryTurn, entry.id == lastID(ofTurn: boundary) {
+                        MemoryDivider()
+                    }
+                }
+                if let reply = transcript.replyInProgress {   // ← SDK
+                    ReplyInProgressView(reply: reply)
+                } else if chat.status == .responding {
+                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").foregroundStyle(.secondary) }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            // Room below the newest item, so it never sits against the message box.
+            .padding(.bottom, 72)
+        }
+        .scrollPosition($position)
+        .defaultScrollAnchor(.bottom)
+        // Follow the conversation while the user is at the bottom: whatever makes it taller — a new
+        // message, the spinner, streaming text, a widget loading or resizing — scrolls it into view.
+        // Someone who scrolled up to read stays where they are.
+        .onScrollGeometryChange(for: Layout.self) { geometry in
+            Layout(contentHeight: geometry.contentSize.height,
+                   distanceFromBottom: geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height)
+        } action: { old, new in
+            if new.contentHeight != old.contentHeight, old.distanceFromBottom < 120 {
+                position.scrollTo(edge: .bottom)
+            }
+        }
+        // Sending a message always brings the bottom into view.
+        .onChange(of: chat.status) { _, status in
+            if status == .responding { withAnimation { position.scrollTo(edge: .bottom) } }
+        }
+    }
+
+    private struct Layout: Equatable {
+        var contentHeight: CGFloat
+        var distanceFromBottom: CGFloat
+    }
+
+    private func lastID(ofTurn turn: Int) -> String? {
+        transcript.entries.last { $0.turn == turn }?.id   // ← SDK
+    }
+}
+
+// … MemoryDivider — "the model doesn't remember the messages above" (plain SwiftUI, omitted)
+
+private struct EntryView: View {
+    let entry: HostTranscript.Entry   // ← SDK
+    @ObservedObject var chat: ChatModel
+
+    var body: some View {
+        switch entry.content {   // ← SDK
+        case .user(let text):
+            UserBubble(text: text, fromWidget: entry.appInstance != nil)   // ← SDK
+        case .assistant(let text):
+            AssistantMessage(text: text)
+        case .reasoning(let text):
+            ReasoningDisclosure(text: text)
+        case .toolCall(let record):   // ← SDK
+            ToolCallView(record: record, chat: chat)
+        case .appContext(_, let text):   // ← SDK
+            DisclosureGroup {
+                Text(text).font(.caption.monospaced()).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            } label: {
+                Label("A view shared context with the model", systemImage: "rectangle.and.text.magnifyingglass")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        @unknown default:
+            EmptyView()
+        }
+    }
+}
+
+// … UserBubble — a right-aligned bubble ("Sent by a view" when appInstance is set) (plain SwiftUI, omitted)
+
+// … AssistantMessage — the answer as Markdown (plain SwiftUI, omitted)
+
+private struct ReplyInProgressView: View {
+    let reply: HostTranscript.ReplyInProgress   // ← SDK
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let reasoning = reply.reasoning { ReasoningDisclosure(text: reasoning, thinking: reply.isReasoning) }   // ← SDK
+            if reply.text.isEmpty {   // ← SDK
+                if reply.reasoning == nil {   // ← SDK
+                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking…").foregroundStyle(.secondary) }
+                }
+            } else {
+                AssistantMessage(text: reply.text)   // ← SDK
+            }
+        }
+    }
+}
+
+/// The model's reasoning, collapsed by default.
+// … ReasoningDisclosure — a collapsed "Reasoning" / "Thinking…" section (plain SwiftUI, omitted)
+
+private struct ToolCallView: View {
+    let record: ToolCallRecord   // ← SDK
+    @ObservedObject var chat: ChatModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Arguments").font(.caption2).foregroundStyle(.secondary)
+                    Text(record.argumentsDescription).font(.caption.monospaced()).textSelection(.enabled)   // ← SDK
+                    if let output = record.output {   // ← SDK
+                        Text("Result").font(.caption2).foregroundStyle(.secondary)
+                        Text(output.prefix(2000)).font(.caption.monospaced()).textSelection(.enabled)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } label: {
+                HStack(spacing: 6) {
+                    stateIcon
+                    Text(record.tool.name).font(.callout.monospaced())   // ← SDK
+                    if let by = initiatorLabel { Text(by).font(.caption2).foregroundStyle(.secondary) }
+                    if case .denied(let reason) = record.state { Text("Not allowed: \(reason)").font(.caption).foregroundStyle(.secondary) }   // ← SDK
+                    if case .failed(let reason) = record.state { Text(reason).font(.caption).foregroundStyle(.red).lineLimit(1) }   // ← SDK
+                }
+            }
+            if record.app != nil, record.state == .finished, record.mcpResult.map({ !$0.isError }) ?? false {   // ← SDK
+                WidgetSlot(record: record, chat: chat, pool: chat.pool)   // ← SDK (MCPAppsHost)
+            }
+        }
+    }
+
+    private var initiatorLabel: String? {
+        switch record.initiator {   // ← SDK
+        case .model: nil
+        case .app: "by a view"
+        case .host: "refresh"
+        @unknown default: nil
+        }
+    }
+
+    @ViewBuilder private var stateIcon: some View {
+        switch record.state {   // ← SDK
+        case .awaitingApproval: Image(systemName: "hand.raised").foregroundStyle(.orange)
+        case .running: ProgressView().controlSize(.mini)
+        case .finished: Image(systemName: "checkmark.circle").foregroundStyle(.green)
+        case .failed: Image(systemName: "exclamationmark.triangle").foregroundStyle(.red)
+        case .denied: Image(systemName: "nosign").foregroundStyle(.secondary)
+        @unknown default: Image(systemName: "questionmark.circle")
+        }
+    }
+}
+
+// … Composer — the message field (plain SwiftUI, omitted)
+
+// … SettingsView — @AppStorage toggles for the ChatSettings keys (plain SwiftUI, omitted)
+
+private struct ToolsBadge: View {
+    @ObservedObject var chat: ChatModel
+    @ObservedObject private var servers: MCPServerManagerObservable   // ← Components
+    @State private var showList = false
+
+    init(chat: ChatModel) {
+        self.chat = chat
+        self.servers = chat.servers
+    }
+
+    var body: some View {
+        let tools = chat.modelTools   // ← SDK
+        let builtIn = chat.builtInToolNames
+        let count = tools.count + builtIn.count
+        Button { showList.toggle() } label: {
+            Label("\(count) tool\(count == 1 ? "" : "s")", systemImage: "wrench.and.screwdriver")
+                .labelStyle(.titleAndIcon)
+        }
+        .help("MCP tools the model can use")
+        .popover(isPresented: $showList) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tools the model can use").font(.headline)
+                ForEach(builtIn, id: \.self) { name in
+                    HStack(spacing: 6) {
+                        Text(name).font(.callout.monospaced())
+                        Text("built in").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                if tools.isEmpty {
+                    Text("No MCP tools. Turn tools on in the server list.").foregroundStyle(.secondary)
+                }
+                ForEach(tools, id: \.name) { tool in
+                    HStack(spacing: 6) {
+                        Text(tool.name).font(.callout.monospaced())
+                        if tool.app != nil { Image(systemName: "rectangle.on.rectangle").help("Shows an interactive view") }   // ← SDK
+                    }
+                }
+                Button("Server List…") { showList = false; chat.showServers = true }.padding(.top, 4)
+            }
+            .padding(14).frame(minWidth: 260, alignment: .leading)
+        }
+    }
+}
+```
+
+### `Sources/MCPChat/MCPChatApp.swift`
+
+```swift
+import AppKit
+import LocalLMLabSDKCore   // ← SDK
+import SwiftUI
+
+// OAuth callbacks arrive as a custom-scheme URL. Route them through the AppDelegate, not SwiftUI's
+// .onOpenURL — WindowGroup opens an extra window per open-URL event.
+private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { MCPOAuthRedirectListener.shared.handleRedirect(url) }   // ← SDK
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+@main
+struct MCPChatApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var chat: ChatModel
+
+    init() {
+        // Distinct scheme (see Info.plist) so this app's OAuth callback can't reach another app.
+        MCPOAuthFlow.redirectURI = "mcpchat://oauth/callback"   // ← SDK
+        _chat = StateObject(wrappedValue: ChatModel())
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ChatRootView(chat: chat)
+        }
+        .handlesExternalEvents(matching: [])
+        .defaultSize(width: 820, height: 760)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Chat") { chat.newConversation() }.keyboardShortcut("n")
+            }
+        }
+
+        Settings {
+            SettingsView()
+        }
+    }
+}
+```
+
+**Tally**: 139 lines carry a marker — more than any other example, because this one is mostly SDK
+surface: 86 `← SDK` (setup, sessions, the transcript the UI draws, saving and restoring servers
+and conversations), 39 `← SDK (MCPAppsHost)` (rendering, the pool, the cache, re-creation, the
+bridge policy), 4 `← SDK (Inference)` (the pinned Qwen3 provider and its download), 10
+`← Components` (the server list, the approval sheet, the observable server state). What the app writes itself is the chat look,
+the settings, where conversations and servers are saved, and the policy a view runs under
+(`ChatWidgetPolicy`: tool calls allowed because the session's authorizer asks; messages and
+shared context per Settings; https links only).
