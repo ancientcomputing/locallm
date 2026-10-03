@@ -2,7 +2,7 @@
 import Foundation
 import PackageDescription
 
-// repo-qa-local — repo-qa's exact MCPTool setup, but the answer comes from a locally-run
+// repo-qa-local — repo-qa's Deepwiki setup (server in lab.mcp), but the answer comes from a locally-run
 // open-weight (MLX) model routed through the 1.0 model layer instead of Apple's on-device model.
 // Like code-buddy, it links BOTH SDK binaries: LocalLMLabSDKCore.xcframework AND
 // LocalLMLabSDKInference.xcframework (the MLX runtime — mlx-swift-lm + Metal statically linked).

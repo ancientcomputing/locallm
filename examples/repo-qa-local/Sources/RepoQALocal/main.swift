@@ -1,7 +1,8 @@
 // repo-qa-local — repo-qa, but the answer comes from an open-weight model you download and run
-// locally (via MLX) instead of Apple's on-device model. The Deepwiki / MCPTool half is a
-// verbatim copy of repo-qa's; the only difference is the ~20 lines that set up the 1.0 model
-// layer and swap `LanguageModelSession(tools:)` for `lab.makeSession(route:tools:)`.
+// locally (via MLX) instead of Apple's on-device model. The Deepwiki half follows repo-qa's, with
+// one change: the MCP server goes into `lab.mcp` (the lab's manager — an app that uses LocalLMLab
+// never makes an `MCPServerManager` of its own), and `lab.makeSession(route:)` builds the MCP tools
+// from it, instead of repo-qa's own manager + `MCPTool`s + `LanguageModelSession(tools:)`.
 //
 //   swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
 //   swift run RepoQALocal facebook/react                        # default question
@@ -77,11 +78,10 @@ func run() async {
         note("pinned to \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this example" : "first download"))")
     }
 
-    // --- everything below is repo-qa, unchanged ---
+    // --- the Deepwiki half: repo-qa's, with the server in lab.mcp ---
 
-    let manager = MCPServerManager()
     note("Connecting to Deepwiki…")
-    let connectResult = await manager.addServer(
+    let connectResult = await lab.mcp.addServer(
         url: URL(string: "https://mcp.deepwiki.com/mcp")!,
         displayName: "Deepwiki"
     )
@@ -89,29 +89,33 @@ func run() async {
         note("Could not connect to Deepwiki: \(connectResult)"); return
     }
 
-    // Build a Tool for each of Deepwiki's tools from its own live schema. `read_wiki_contents` is
-    // skipped by name: it dumps a repo's entire wiki unscoped (~165K tokens for anthropics/
-    // claude-code in one call), which `MCPTool` can't know from the schema — that curation is the
-    // app's job (see docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal.
-    var tools: [any Tool] = []
+    // A new server's tools start disabled (a security default: nothing reaches the model until the
+    // host opts in), so enable the ones this example uses. `read_wiki_contents` stays off: it dumps
+    // a repo's entire wiki unscoped (~165K tokens for anthropics/claude-code in one call), which
+    // `MCPTool` can't know from the schema — that curation is the app's job (see
+    // docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal (makeSession
+    // would otherwise fail on it).
+    var enabled: [String] = []
     for descriptor in state.tools {
         guard descriptor.name != "read_wiki_contents" else {
             note("Skipping \(descriptor.name): excluded by this example.")
             continue
         }
-        do { tools.append(try MCPTool(descriptor: descriptor, manager: manager)) }
-        catch { note("Skipping \(descriptor.name): \(error)") }
+        do { _ = try MCPTool(descriptor: descriptor, manager: lab.mcp) }
+        catch { note("Skipping \(descriptor.name): \(error)"); continue }
+        lab.mcp.setToolEnabled(server: state.id, tool: descriptor.name, enabled: true)
+        enabled.append(descriptor.name)
     }
-    guard !tools.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
-    note("Built \(tools.count) tool(s) from Deepwiki's live schema: \(tools.map(\.name).joined(separator: ", "))")
+    guard !enabled.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
+    note("Enabled \(enabled.count) tool(s) from Deepwiki's live schema: \(enabled.joined(separator: ", "))")
 
-    // The one line that changes from repo-qa: lab.makeSession(route:tools:) instead of
-    // LanguageModelSession(tools:) — same FoundationModels session underneath, just backed by
-    // whichever model the route points at.
+    // Where repo-qa makes `LanguageModelSession(tools:)`, this calls lab.makeSession(route:) — same
+    // FoundationModels session underneath, backed by whichever model the route points at, with
+    // lab.mcp's enabled tools included (`includeMCPTools`, on by default).
     let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     let session: LocalLMLabSession
     do {
-        session = try lab.makeSession(route: .local, tools: tools, instructions: instructions, includeMCPTools: false)
+        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true)
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }

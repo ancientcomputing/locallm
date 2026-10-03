@@ -13,8 +13,9 @@ once on first run.
 The part of the SDK that makes this manageable is the **model layer**: you name a model, and it
 checks the model fits in this Mac's memory, downloads it with a progress bar, loads and unloads
 it as needed, and hands you a chat session — the *same* session API you'd use for Apple's model
-or Claude. Moving from `repo-qa` to this version is about 20 lines of change; the Deepwiki / MCP
-half of the code is byte-for-byte identical.
+or Claude. Moving from `repo-qa` to this version is a small change; the Deepwiki / MCP half
+keeps repo-qa's shape, with the server added to the lab's manager (`lab.mcp`) instead of one of
+its own.
 
 **What it highlights for SDK developers:**
 
@@ -22,14 +23,17 @@ half of the code is byte-for-byte identical.
   it, point a name at it, open a session. [`code-buddy`](../code-buddy) is the full version (two
   models, routing between them, streamed output, an agent loop).
 - **The model layer is a swap-in, not a rewrite.** Diff this `main.swift` against `repo-qa`'s:
-  the tool-building code is unchanged; only how the session is created differs
-  ([table below](#what-the-model-layer-adds-diff-against-repo-qa)).
+  the same server, the same tools; what changes is where the MCP manager lives (`lab.mcp`) and how
+  the session is created ([table below](#what-the-model-layer-adds-diff-against-repo-qa)).
+- **One MCP manager: `lab.mcp`.** An app that uses `LocalLMLab` adds its servers to `lab.mcp` and
+  lets `makeSession` build the MCP tools; it never makes an `MCPServerManager` of its own. (repo-qa
+  has no `LocalLMLab`, so its own manager is right there.)
 - **Any MLX model, or fall back to Apple's.** `--model <hf-repo>` runs a different open-weight
   model; `--apple` uses Apple's on-device model instead — the same code path handles all of them.
 
 > **Want the on-device-model version instead?** [`repo-qa`](../repo-qa) is this exact tool with
 > `SystemLanguageModel.default` and no model layer. Diff the two `main.swift`s to see what the
-> model layer adds — it's about 20 lines.
+> model layer adds.
 
 ## Quick start
 
@@ -152,16 +156,18 @@ new version, then update the repo and its commit together. See
 
 ## What the model layer adds (diff against `repo-qa`)
 
-The Deepwiki / `MCPTool` half of `main.swift` is a verbatim copy of `repo-qa` — connecting,
-building an `MCPTool` per tool from its live schema, excluding `read_wiki_contents` (same
-reasons; see `repo-qa`'s README). The only differences:
+The Deepwiki half of `main.swift` follows `repo-qa` — connecting, offering each tool from its
+live schema, excluding `read_wiki_contents` (same reasons; see `repo-qa`'s README). The
+differences:
 
 | `repo-qa` | `repo-qa-local` |
 |---|---|
 | `import LocalLMLabSDKCore` | `+ import LocalLMLabSDKInference` |
 | `SystemLanguageModel.default` availability check | `MLXModelProvider` + `LocalLMLab` + `lab.models.route(.local, to: …)` |
 | — | `mlx.validate` → `mlx.download` (streamed) if the weights aren't local yet |
-| `LanguageModelSession(tools: tools) { instructions }` | `lab.makeSession(route: .local, tools: tools, instructions:)` |
+| `let manager = MCPServerManager()` → `manager.addServer(…)` | `lab.mcp.addServer(…)` — the lab's manager; never a second one |
+| an `MCPTool(descriptor:manager:)` per tool | `lab.mcp.setToolEnabled(server:tool:enabled: true)` per tool — a new server's tools start **disabled** (security default), so without this the model gets no tools |
+| `LanguageModelSession(tools: tools) { instructions }` | `lab.makeSession(route: .local, instructions:, includeMCPTools: true)` — builds the `MCPTool`s from `lab.mcp`'s enabled tools |
 | `session.respond(to:)` | `session.languageModelSession.respond(to:)` — same FoundationModels session underneath |
 
 That's the point: the model layer is a swap-in, not a rewrite.
@@ -175,20 +181,21 @@ That's the point: the model layer is a swap-in, not a rewrite.
 ## Verified live
 
 ```
-model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-RC.1
+model: mlx:mlx-community/Qwen3-8B-4bit  ·  SDK 1.0.0-GA
+pinned to 545dc42 (shipped with this example)
 Connecting to Deepwiki…
 Skipping read_wiki_contents: excluded by this example.
-Built 2 tool(s) from Deepwiki's live schema: ask_question, read_wiki_structure
+Enabled 2 tool(s) from Deepwiki's live schema: ask_wiki_question, read_wiki_structure
 
 Asking: Regarding the GitHub repository "facebook/react": What does this repo do?
 
-<think>… the response provided a detailed breakdown of the React monorepo structure … </think>
+<think>… The tool's response provided a detailed breakdown of the repository's components and purpose … </think>
 
 The **facebook/react** repository is the **monorepo for React**, a JavaScript library for
 building user interfaces. [...]
 ```
 
-A real, unmocked run — Qwen3-8B-4bit called Deepwiki's `ask_question` and answered from the
+A real, unmocked run — Qwen3-8B-4bit called Deepwiki's `ask_wiki_question` and answered from the
 repo's actual docs. (The `<think>…</think>` block is the model's own reasoning; the 1.0-beta MLX
 bridge streams it through inline — carve it out consumer-side if you want a clean answer.) The
 `--apple` path was confirmed the same way against the on-device model.
