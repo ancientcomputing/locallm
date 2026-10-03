@@ -8,11 +8,12 @@ import PackageDescription
 // that writes a CSV into a folder you chose — pull the dataset (FileBackedTool, so the raw
 // payload never enters the model's context), then project / filter / sort with the Core data
 // verbs (docs/sdk-guide.md §8b). The row data never passes through the model, so it can't be
-// fabricated.
+// fabricated. The data tools come from lab.mcp, file-backed (`setFileBackedOutput`, new in
+// 2.0.0) — so this example needs SDK 2.0.0-dev or later.
 //
 // Combines three existing examples: workspace-buddy-local (SwiftUI + App Sandbox + MLX model +
-// folder picker), plate-today (MCP client + OAuth redirect wiring), repo-qa (MCPTool from a live
-// schema). Like code-buddy / workspace-buddy-local it links BOTH SDK binaries:
+// folder picker), plate-today (MCP client + OAuth redirect wiring), repo-qa (tools from a live
+// MCP schema). Like code-buddy / workspace-buddy-local it links BOTH SDK binaries:
 // LocalLMLabSDKCore.xcframework AND LocalLMLabSDKInference.xcframework (the MLX runtime).
 //
 // Requires macOS 27 + Xcode 27 (the model layer is built on FoundationModels' `LanguageModel`
@@ -30,20 +31,20 @@ struct SDKRelease {
 // uses. `knownSDKReleases` carries this plus the previous release. Build against another
 // published version: set LOCALLM_SDK_VERSION in your shell (works for `swift build` / CI, NOT
 // inside Xcode), or edit `defaultSDKVersion` here.
-let defaultSDKVersion = "1.0.0-RC.1"
+let defaultSDKVersion = "2.0.0-dev"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-beta.4": SDKRelease(
-        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.4/LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip",
-        coreChecksum: "3ed0e79b6914e6b48b7ae27f3fdda139f71e3d60f603daf54901716c8c972cb3",
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.4/LocalLMLabSDKInference-1.0.0-beta.4.xcframework.zip",
-        inferenceChecksum: "fa8feb19883f9a465a69f39d756f1b41b515c8298c891b06fef5da5b81b2a03c"
-    ),
     "1.0.0-RC.1": SDKRelease(
         coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-RC.1/LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip",
         coreChecksum: "397e7b5f7efd1076293a3d5d06c41d75043bffa23cffdb821d71d21ee41e68de",
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-RC.1/LocalLMLabSDKInference-1.0.0-RC.1.xcframework.zip",
         inferenceChecksum: "e24cb0581807d37a7b595f0b198b9a9eeecc1c5c36fb59f61429b8a7b42dc169"
+    ),
+    "2.0.0-dev": SDKRelease(
+        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-dev/LocalLMLabSDKCore-2.0.0-dev.xcframework.zip",
+        coreChecksum: "ae20766fe20094b5703826143926f96a222cb98a0381291dac4c5cf9261c78c9",
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-dev/LocalLMLabSDKInference-2.0.0-dev.xcframework.zip",
+        inferenceChecksum: "014bcbf373cfad17aaae2aaff9e9b5460e33512a7ef5db76864981f313dc5a63"
     ),
 ]
 

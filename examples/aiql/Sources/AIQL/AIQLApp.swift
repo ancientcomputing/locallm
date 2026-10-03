@@ -13,7 +13,7 @@
 //
 // Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
 // picker + security-scoped bookmark), plate-today (MCP client + OAuth redirect via AppDelegate),
-// repo-qa (MCPTool / FileBackedTool.mcp from a live schema).
+// repo-qa (tools from a live MCP schema — here built by makeSession from lab.mcp, file-backed).
 
 import AppKit
 import Foundation
@@ -95,7 +95,6 @@ final class AIQLModel: ObservableObject {
     @Published private(set) var stage: Stage = .idle
     @Published private(set) var steps: [String] = []   // friendly progress lines
 
-    private let manager = MCPServerManager()
     // The field is free text, so this app can't pin everything ahead of time. Two layers instead:
     //  - the default model is pinned to a commit this app shipped with (developer-vouched);
     //  - any other model is pinned on first download (`MLXFilePinStore`, kept outside the model
@@ -106,6 +105,8 @@ final class AIQLModel: ObservableObject {
         pinnedRevisions: [AIQLModel.defaultModelRepo: AIQLModel.defaultModelRevision],
         supplyChainPolicy: MLXSupplyChainPolicy(trustPolicy: MlxCommunityOnly()),
         pinStore: MLXFilePinStore())
+    // The MCP server goes into `lab.mcp`, the lab's manager — an app that uses LocalLMLab never
+    // makes an `MCPServerManager` of its own.
     private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))
 
     init() {
@@ -152,7 +153,7 @@ final class AIQLModel: ObservableObject {
         // 1 — connect (triggers an OAuth browser sign-in automatically if the server needs one)
         stage = .connecting
         step("Connecting to \(serverURL.host ?? serverURL.absoluteString)…")
-        let connection = await manager.addServer(url: serverURL, displayName: serverURL.host ?? "MCP server")
+        let connection = await lab.mcp.addServer(url: serverURL, displayName: serverURL.host ?? "MCP server")
         guard case .success(let server) = connection else {
             if case .failure(let error) = connection {
                 stage = .failed("Couldn't connect to that MCP server — \(Self.describe(error))")
@@ -165,6 +166,9 @@ final class AIQLModel: ObservableObject {
             stage = .failed("Connected, but that server didn't offer any tools to get data from."); return
         }
         step("Connected — \(server.tools.count) data tool(s) available.")
+        // Only this server's tools go to the model: one from an earlier Go stays connected in
+        // lab.mcp otherwise. (disconnect, not removeServer, which would forget its sign-in.)
+        for id in lab.mcp.servers.keys where id != server.id { lab.mcp.disconnect(id) }
 
         // 2 — download the model on first use
         if case .notDownloaded = lab.models.availability(for: modelID) {
@@ -189,29 +193,37 @@ final class AIQLModel: ObservableObject {
         stage = .running
         step("Working… this takes a few minutes.")
         let outcome = await FolderAccess.withFolderAccessAsync { root in
-            await self.runPipeline(prompt: prompt, root: root, serverTools: server.tools, serverID: server.id, modelID: modelID)
+            await self.runPipeline(prompt: prompt, root: root, serverTools: server.tools, serverID: server.id)
         }
         stage = outcome ?? .failed("Couldn't open the folder you chose — pick it again.")
     }
 
-    private func runPipeline(prompt: String, root: URL, serverTools: [MCPToolDescriptor], serverID: MCPServerID, modelID: ModelID) async -> Stage {
-        // Wrap the server's tools as file-backed so the model can `saveAs` any of them. Cap the
-        // count — a small model degrades past ~8 tools; prefer names that look like "get a
-        // dataset" over admin/overview tools.
+    private func runPipeline(prompt: String, root: URL, serverTools: [MCPToolDescriptor], serverID: MCPServerID) async -> Stage {
+        // Offer the server's data tools from lab.mcp. Cap the count — a small model degrades past
+        // ~8 tools; prefer names that look like "get a dataset" over admin/overview tools. A new
+        // server's tools start disabled, so enable the chosen ones (and only those).
         let ranked = serverTools.sorted { lhs, rhs in Self.dataLikelihood(lhs.name) > Self.dataLikelihood(rhs.name) }
-        let dataTools: [any Tool] = ranked.prefix(4).compactMap {
-            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000,
-                                    followUp: "load it into a table with loadTable, then query it with one sqlQuery")
+        let chosen = ranked.prefix(4).map(\.name)
+        for tool in serverTools {
+            lab.mcp.setToolEnabled(server: serverID, tool: tool.name, enabled: chosen.contains(tool.name))
         }
-        guard !dataTools.isEmpty else { return .failed("Couldn't read that server's tools — its data format isn't supported yet.") }
+        // File-backed: each data tool gets a `saveAs` argument that writes its raw result into the
+        // chosen folder, so the dataset never enters the model's context. Only for this run —
+        // the folder's security-scoped access ends with it.
+        lab.mcp.setFileBackedOutput(
+            MCPFileBackedOutput(root: root, inlineCharacterLimit: 8_000,
+                                followUp: "load it into a table with loadTable, then query it with one sqlQuery"),
+            server: serverID)
+        defer { lab.mcp.setFileBackedOutput(nil, server: serverID) }
 
-        var tools: [any Tool] = dataTools
-        tools.append(LoadTableTool(root: root))
-        tools.append(SQLQueryTool(root: root))
-        tools.append(DescribeJSONTool(root: root))
-        tools.append(CSVInfoTool(root: root))
+        let tools: [any Tool] = [
+            LoadTableTool(root: root),
+            SQLQueryTool(root: root),
+            DescribeJSONTool(root: root),
+            CSVInfoTool(root: root),
+        ]
 
-        let dataToolNames = dataTools.map(\.name).joined(separator: ", ")
+        let dataToolNames = chosen.joined(separator: ", ")
         let instructions = """
         You answer a data question by loading the pulled data into tables and running ONE SQL \
         query. You never write row data yourself.
@@ -243,7 +255,9 @@ final class AIQLModel: ObservableObject {
             // template toggle; the pipeline is mechanical (pick a tool, name a table, write
             // one SELECT) so the reasoning trace buys nothing but latency.
             session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,
-                                          includeMCPTools: false, options: SessionOptions(effort: .off))
+                                          includeMCPTools: true, options: SessionOptions(effort: .off))
+        } catch LocalLMLabError.mcp {
+            return .failed("Couldn't read that server's tools — its data format isn't supported yet.")
         } catch {
             return .failed("Couldn't start the model: \(error.localizedDescription)")
         }

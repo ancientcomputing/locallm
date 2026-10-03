@@ -47,7 +47,7 @@ evaluates a condition, or handles a value.
   `sqlite3_set_authorizer` allowlist (SELECT/READ/FUNCTION only — no writes, no `ATTACH`), one
   statement, a timeout, a row cap. Only a receipt (columns, row count, first rows) returns
 - which tools the model even sees: the server's tools are ranked by how "dataset-like" the name
-  looks and only the top few are wrapped; the raw-file reader is withheld
+  looks and only the top few are enabled; the raw-file reader is withheld
 - the raw payload's path — `FileBackedTool`'s `saveAs` parks it in `raw/data.json`; it never
   enters the model's context
 
@@ -74,8 +74,8 @@ Three existing examples stitched together, plus the SQL tools:
 | from | what it contributes |
 |---|---|
 | [`workspace-buddy-local`](../workspace-buddy-local) | SwiftUI + App Sandbox + `MLXModelProvider` download + `NSOpenPanel` folder picker + security-scoped bookmark |
-| [`plate-today`](../plate-today) | `MCPServerManager` + the OAuth redirect wired through `AppDelegate` (not SwiftUI's `.onOpenURL`) + `CFBundleURLTypes` |
-| [`repo-qa`](../repo-qa) | building tools from a live MCP schema — here `FileBackedTool.mcp(descriptor:manager:root:)` |
+| [`plate-today`](../plate-today) | the MCP client + the OAuth redirect wired through `AppDelegate` (not SwiftUI's `.onOpenURL`) + `CFBundleURLTypes`. AIQL uses `LocalLMLab`, so its server goes into `lab.mcp`, the lab's manager — never an `MCPServerManager` of its own |
+| [`repo-qa`](../repo-qa) | tools built from a live MCP schema — here by `makeSession` from `lab.mcp`: `setToolEnabled` for the chosen data tools (a new server's tools start disabled), and `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)` so each one is offered as a `FileBackedTool` with `saveAs` |
 | SDK §8b | `loadTable` + `sqlQuery` — JSON records → an ephemeral SQLite table → one read-only `SELECT` → CSV. `describeJson` / `csvInfo` for discovery/verification |
 
 Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
@@ -83,7 +83,7 @@ Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
 - **`session.events`** — the pipeline's progress panel is driven by the session's tool-call
   side-channel (`SessionEvent.toolCallStarted` / `.toolCallFinished`), mapped to friendly labels.
 - **Tool curation for a small model** — the server's tools are ranked by how "dataset-like" the
-  name looks and only the top few are wrapped; `readWorkspaceFile` is deliberately not offered
+  name looks and only the top few are enabled; `readWorkspaceFile` is deliberately not offered
   (the raw dump is far past the context window, so the model only ever sees the bounded
   `describeJson` / `csvInfo` views).
 
@@ -102,8 +102,8 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Skip it if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere). Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
-or add it to your `~/.zshrc`). `Package.swift` builds against SDK `1.0.0-RC.1` with no further
-setup — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `2.0.0-dev` with no further
+setup (AIQL needs it: it uses `lab.mcp.setFileBackedOutput`, new in 2.0) — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
 `LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
 `export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain
 needed** — the prebuilt Inference xcframework bundles the compiled `default.metallib`; you only
