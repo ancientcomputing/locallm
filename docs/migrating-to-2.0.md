@@ -72,11 +72,29 @@ affects code that silenced that error another way.
 
 ### MCP protocol
 
-<!-- MCP protocol 2026-07 session: fill this subsection (behavior changes: 2024-11-05 servers
-refused with .protocolMismatch; HTTP+SSE-transport servers fail cleanly; elicitation capability
-declared as {"form":{},"url":{}} from 2025-11-25; versionNegotiation defaults to .auto). -->
+The client now speaks MCP `2026-07-28` and falls back to the `2025` handshake on its own
+([`sdk-guide.md` §3a](sdk-guide.md#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care)).
+Code needs no changes. What a user may notice:
 
-_To be written with the MCP protocol `2026-07-28` documentation._
+- **`2024-11-05` servers are refused.** `addServer` fails with `.protocolMismatch`, where 1.x
+  connected. Most servers of that era use the old two-endpoint HTTP+SSE transport, which the
+  client never supported; 1.x failed on them with a confusing "HTTP 404". 2.0 detects that
+  transport with one `GET` and reports `.protocolMismatch` instead. The oldest supported revision
+  is `MCPProtocolVersion.minimumSupported` (`2025-03-26`).
+- **`server/discover` is sent first.** With the default `versionNegotiation: .auto`, every
+  connect probes for `2026-07-28` before `initialize`. A server on an older revision rejects the
+  probe and the client falls back, so this is one extra request per connect. If a server
+  mishandles the probe, use `MCPSettings(versionNegotiation: .legacy)` to skip it.
+- **Elicitation is declared as `{"form":{},"url":{}}`** from `2025-11-25`, not `{}`. Strict
+  servers read `{}` as form-only and refused URL-mode elicitation, so URL mode now works on
+  them. Nothing to change unless you inspect the wire.
+- **Tool lists can change mid-connection.** A `2026-07-28` server that announces changes gets
+  them re-listed automatically, and `serverChanges` fires. A new tool arrives disabled; enabled
+  flags on existing tools are kept. If your UI assumes a fixed list after `addServer`, either
+  handle the update or set `MCPSettings(liveUpdates: false)`.
+- **`allowElicitation: false`** on a `2026-07-28` server leaves elicitation out of the request's
+  capabilities, and a server that requires it fails the call (`.serverError`). On a `2025`
+  server the same call still gets a decline.
 
 ## 6. One way to do each thing
 
@@ -106,5 +124,10 @@ passed `restoring:` before `tools:`).
   Reference app: [`examples/mcp-chat`](../examples/mcp-chat/).
 - **Per-server trust and tool approval** (§3), shown on each row of `Components`'
   `MCPServerPickerView`, which now also says when none of a server's tools are on.
-- **MCP protocol `2026-07-28`** <!-- MCP protocol 2026-07 session: summary + link to sdk-guide §3a -->
-  _(see [`sdk-guide.md` §3a](sdk-guide.md))._
+- **MCP protocol `2026-07-28`**, the current revision. It is stateless: no session, no
+  handshake, and requests that gateways can route by header. A tool that needs the user's input
+  mid-call reaches your existing `MCPElicitationHandler` through multi-round-trip requests. A
+  server can push tool, prompt and resource list changes, and the client applies them without a
+  reconnect (`MCPServerState.liveUpdates` shows the status). All automatic; older servers keep
+  working through the `2025` handshake. See
+  [`sdk-guide.md` §3a](sdk-guide.md#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care).

@@ -58,8 +58,15 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 - `languageModelSession` is documented as the escape hatch: run turns with `respond` /
   `streamResponse`.
 
-<!-- MCP protocol 2026-07 session: protocol behavior changes go here (2024-11-05 refused,
-HTTP+SSE fails cleanly, elicitation capability shape, versionNegotiation .auto). -->
+- MCP servers that only speak `2024-11-05`, or use the old HTTP+SSE transport, fail `addServer`
+  with `.protocolMismatch` (1.x connected to the former and failed on the latter with "HTTP 404").
+  `MCPProtocolVersion.v2024_11_05` is deprecated and kept so stored values decode.
+- Each connect first probes `server/discover` (`versionNegotiation: .auto`, the default) and falls
+  back to `initialize` when a server rejects it. `.legacy` skips the probe.
+- Elicitation is declared as `{"form":{},"url":{}}` from `2025-11-25` (was `{}`, which strict
+  servers read as form-only).
+- `MCP-Protocol-Version` is sent only when the negotiated revision is `2025-06-18` or later, and
+  an inbound `elicitation/create` is refused below `2025-06-18`.
 
 ### Added — building a chat app (`LocalLMLabSDKCore`)
 
@@ -99,11 +106,29 @@ HTTP+SSE fails cleanly, elicitation capability shape, versionNegotiation .auto).
 
 ### Added — MCP protocol `2026-07-28`
 
-<!-- MCP protocol 2026-07 session: fill (stateless mode, server/discover + MCPVersionNegotiation,
-live updates / listen(filter:), MRTR, MCPProtocolVersion.minimumSupported / statelessPreferred,
-MCPServerManager.init(versionNegotiation:liveUpdates:)). -->
-
-_To be written._
+- The MCP client speaks `2026-07-28`, the current revision, and negotiates down to `2025-03-26`
+  (`MCPProtocolVersion.v2026_07_28`, `.statelessPreferred`, `.minimumSupported`, `.isStateless`).
+- **Stateless mode** (`MCPConnectionMode.stateless(_:)`): `server/discover` instead of
+  `initialize`, no session, the per-request `_meta` envelope, and `Mcp-Method` / `Mcp-Name` /
+  `Mcp-Param-*` headers.
+- **`MCPVersionNegotiation`** (`.auto` / `.legacy` / `.pin(_:)`), set with
+  `MCPSettings(versionNegotiation:)` or `MCPServerManager(versionNegotiation:)`.
+- **Multi-round-trip requests (MRTR).** A request that comes back `input_required` is answered
+  through the existing `MCPClientHandlers` (elicitation in form or URL mode, sampling, roots) and
+  re-sent with the answers, for up to 8 rounds. No handler API changes.
+- **Live updates** (`subscriptions/listen`). One stream per stateless server that announces list
+  changes; tools, prompts and resources are re-listed on change with enabled flags kept.
+  `MCPServerState.liveUpdates: MCPLiveUpdates?` (`.active` / `.reconnecting` / `.unavailable`).
+  Opt out with `MCPSettings(liveUpdates: false)` or `MCPServerManager(liveUpdates: false)`. Custom
+  transports: `MCPConnection.listen(filter:)` with `MCPSubscriptionFilter`, `MCPChangeEvent`,
+  `MCPListenEnd` (default implementation ends as refused).
+- `MCPProtocolVersion.supportsURLElicitation` and `.sendsProtocolVersionHeader` feature gates.
+- Diagnostics: the `server/discover` probe and fallback, live-update status, and MRTR rounds
+  (export area `mrtr`) are logged ([`docs/mcp-diagnostics.md`](docs/mcp-diagnostics.md)).
+- Authorization fixes found by the official MCP conformance suite: protected-resource metadata
+  at the path-suffixed then root well-known URL; `resource` must cover the server URL; metadata
+  `issuer` and redirect `iss` are checked (RFC 8414, RFC 9207); a changed authorization server
+  mid-connection drops the old credentials and signs in again.
 
 ### Added — examples
 

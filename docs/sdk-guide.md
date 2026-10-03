@@ -418,25 +418,63 @@ instead of yours.
 > negotiates a revision automatically; none of them reads `negotiatedProtocolVersion` directly in
 > normal use.
 
-MCP is versioned by date-stamped revisions (`2024-11-05`, `2025-03-26`, `2025-06-18`,
-`2025-11-25`). You don't pick one. On `addServer` the client offers the newest it knows
-(`MCPProtocolVersion.clientPreferred`, currently `2025-11-25`) and the server replies with the
-newest *it* knows; they meet at the highest revision both support. An old server that only
-speaks `2025-03-26` still connects and works — nothing you wrote for the `0.8.x` MCP client
-breaks.
+MCP is versioned by date-stamped revisions. The client supports `2025-03-26`, `2025-06-18`,
+`2025-11-25` and **`2026-07-28`** (new in 2.0). You don't pick one. On `addServer` the client
+first sends `server/discover`, the `2026-07-28` way of asking a server which revisions it speaks.
+A server on the current revision answers, and the connection is **stateless**. Any older server
+rejects that unknown method, and the client falls back to the `initialize` handshake, offering
+`MCPProtocolVersion.clientPreferred` (`2025-11-25`). The two meet at the newest revision both
+support. Nothing you wrote against the 1.x client changes.
+
+`2026-07-28` reworks the wire protocol, and the SDK absorbs all of it:
+
+- **No session and no handshake.** Every request carries the protocol version and client
+  capabilities itself, plus `Mcp-Method` / `Mcp-Name` headers that gateways can route on.
+- **Server requests become retries (MRTR).** A tool that needs input mid-call no longer pushes
+  `elicitation/create` down an open stream. It returns "input required", and the client asks
+  your handler and re-sends the call with the answer. Your `MCPElicitationHandler`
+  ([§3c](#3c-server-initiated-requests-elicitation-and-the-sampling--roots-seams)) is called
+  exactly as before, on either revision. Multi-step flows are capped at 8 rounds.
+- **Live updates.** A stateless server that advertises `listChanged` gets one
+  `subscriptions/listen` stream. When its tools, prompts or resources change, the manager
+  re-lists them on its own (enabled flags are kept; a new tool arrives disabled) and
+  `serverChanges` fires. No Reconnect needed.
 
 What the negotiated revision changes is how much a server *can* hand you:
 
 | Revision the server meets you at | What you get |
 |---|---|
-| `2024-11-05` / `2025-03-26` | Tools, resources, prompts. Tool results are plain text. |
+| `2025-03-26` | Tools, resources, prompts. Tool results are plain text. |
 | `2025-06-18` | + structured tool results (`MCPToolResult.structuredContent`), `resource_link` results, elicitation, tool `title`s |
 | `2025-11-25` | + icons, richer elicitation field types, URL-mode elicitation |
+| `2026-07-28` | + stateless transport, elicitation via MRTR, live tool/prompt/resource updates |
 
 `MCPServerState.negotiatedProtocolVersion` tells you where a given connection landed (`nil`
-until connected). You rarely read it — the point of the table is that the newer fields on
-`MCPToolResult` and the elicitation seam below are simply empty / never-called against an older
-server, not errors to guard.
+until connected; `.isStateless` is true for `2026-07-28`). `MCPServerState.liveUpdates` is
+`.active(…)`, `.reconnecting` or `.unavailable(reason)` for a stateless server and `nil`
+otherwise. You rarely read either. The point of the table is that newer fields on
+`MCPToolResult` and the elicitation seam below are simply empty or never called against an older
+server. They are not errors to guard.
+
+**Servers the client refuses.** A `2024-11-05` server, or one on the old two-endpoint HTTP+SSE
+transport, fails `addServer` with `.protocolMismatch`. Both were accepted in 1.x. This is the
+one behaviour change in this area (see `migrating-to-2.0.md`).
+
+**Two knobs on `MCPSettings`, both rarely needed:**
+
+```swift
+let mcp = MCPSettings(
+    versionNegotiation: .auto,   // default. .legacy = never send server/discover (2025 handshake only);
+                                 // .pin(.v2026_07_28) = stateless only, no fallback
+    liveUpdates: true            // default. false = no subscriptions/listen streams
+)
+// pass as LocalLMLab.Configuration(…, mcp: mcp). An app without LocalLMLab passes the same
+// two arguments to MCPServerManager(versionNegotiation:liveUpdates:).
+```
+
+Use `.legacy` if a server mishandles the `server/discover` probe (for example, it hangs instead
+of rejecting it). The client already falls back on a timeout, so this only saves the wait. Use
+`liveUpdates: false` when your app shows a fixed tool list and must not change it mid-session.
 
 ### 3b. What a tool call gives you back: `MCPToolResult`
 
@@ -532,6 +570,13 @@ Your own UI or a headless policy: conform to `MCPElicitationHandler` — one `as
 URL-mode `url`) → `MCPElicitationResponse`. `callTool` also takes `allowElicitation: Bool = true`
 — pass `false` where there's no way to show a prompt (a background job) and the request is
 declined cleanly instead of hanging.
+
+On a `2026-07-28` server the same handlers are reached through MRTR rather than an in-stream
+request ([§3a](#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care)),
+and nothing in your code changes. The one visible difference: with `allowElicitation: false`
+the client leaves elicitation out of that request's declared capabilities. A server that
+requires it then fails the call outright (`.serverError`), where a `2025-11-25` server would
+have received a decline.
 
 **Sampling** has a security edge: a registered `MCPSamplingHandler` lets a server push a prompt
 through your model. Your handler owns the human-in-the-loop approval; the SDK gives you the seam,
@@ -3125,7 +3170,8 @@ enum GenerationErrorDescription {
 
 ```swift
 final class MCPServerManager {
-    init(responseLimits: MCPResponseLimits = .default, handlers: MCPClientHandlers = .init())  // NOT a singleton
+    init(responseLimits: MCPResponseLimits = .default, handlers: MCPClientHandlers = .init(),
+         versionNegotiation: MCPVersionNegotiation = .auto, liveUpdates: Bool = true)  // NOT a singleton
     private(set) var servers: [MCPServerID: MCPServerState] { get }
     var serverChanges: AsyncStream<[MCPServerID: MCPServerState]> { get }
     var estimatedTotalTokens: Int { get }
@@ -3174,17 +3220,42 @@ struct MCPServerState: Codable, Sendable {
     var resourceTemplates: [MCPResourceTemplateDescriptor]
     var prompts: [MCPPromptDescriptor]
     var negotiatedProtocolVersion: MCPProtocolVersion?   // nil until connected ([§3a](#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care))
-    var serverInstructions: String?                       // server's own usage note from `initialize`
+    var serverInstructions: String?                       // server's own usage note (initialize or server/discover)
+    var liveUpdates: MCPLiveUpdates?                      // stateless servers only; nil otherwise ([§3a](#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care))
     func exportSummary() -> String      // plain-text listing of tools/resources/prompts, enabled state, token cost
 }
 
 enum MCPProtocolVersion: String, CaseIterable, Comparable, Sendable, Codable {
-    case v2024_11_05 = "2024-11-05", v2025_03_26 = "2025-03-26"
-    case v2025_06_18 = "2025-06-18", v2025_11_25 = "2025-11-25"
-    static let clientPreferred: MCPProtocolVersion = .v2025_11_25
-    var supportsStructuredContent: Bool { get }   // >= 2025-06-18
-    var supportsElicitation: Bool { get }
+    @available(*, deprecated) case v2024_11_05 = "2024-11-05"   // no longer negotiated; kept so stored values decode
+    case v2025_03_26 = "2025-03-26", v2025_06_18 = "2025-06-18"
+    case v2025_11_25 = "2025-11-25", v2026_07_28 = "2026-07-28"
+    static let clientPreferred: MCPProtocolVersion = .v2025_11_25      // offered at initialize (handshake era)
+    static let statelessPreferred: MCPProtocolVersion = .v2026_07_28   // probed with server/discover
+    static let minimumSupported: MCPProtocolVersion = .v2025_03_26     // lower → .protocolMismatch
+    var isStateless: Bool { get }                         // >= 2026-07-28
+    var supportsStructuredContent: Bool { get }           // >= 2025-06-18
+    var supportsElicitation: Bool { get }                 // >= 2025-06-18
     var supportsIconsAndRicherElicitation: Bool { get }   // >= 2025-11-25
+    var supportsURLElicitation: Bool { get }              // >= 2025-11-25
+    var sendsProtocolVersionHeader: Bool { get }          // >= 2025-06-18
+}
+
+// How connect() chooses between the stateless and handshake models (mirrors the TS SDK's option).
+enum MCPVersionNegotiation: Sendable, Equatable {
+    case auto                       // default: server/discover, fall back to initialize
+    case legacy                     // initialize only
+    case pin(MCPProtocolVersion)    // stateless at this revision, no fallback
+}
+
+// Live updates (2026-07-28 subscriptions/listen). The manager runs these for you; read
+// MCPServerState.liveUpdates for status. Opt out with MCPServerManager(liveUpdates: false).
+enum MCPLiveUpdates: Sendable, Codable, Equatable {
+    case active(MCPSubscriptionFilter)   // listening; what the server granted
+    case reconnecting                    // stream dropped, retrying with backoff
+    case unavailable(String)             // refused or sign-in expired; resumes on next connect
+}
+struct MCPSubscriptionFilter: Sendable, Codable, Equatable {
+    var toolsListChanged: Bool; var promptsListChanged: Bool; var resourcesListChanged: Bool
 }
 
 enum MCPAuthType: String, Codable, Sendable { case none, pat, oauthManual }
@@ -3355,13 +3426,22 @@ struct MCPServerCapabilities: Sendable, Codable, Equatable {
     var logging: Bool; var completions: Bool
     var hasExperimental: Bool            // server declared something in `experimental`, kept opaque
 }
-// How the connection talks to the server. Only .handshake exists today (every revision through
-// 2025-11-25); 2026-07-28's stateless model adds a second case later without changing callers.
+// How the connection talks to the server: initialize + session (through 2025-11-25), or
+// 2026-07-28's stateless model (server/discover, per-request _meta, MRTR). Callers of
+// MCPServerManager never see the difference.
 enum MCPConnectionMode: Sendable, Equatable {
     case handshake(MCPProtocolVersion)
+    case stateless(MCPProtocolVersion)
     var negotiatedVersion: MCPProtocolVersion { get }
+    var isStateless: Bool { get }
 }
 ```
+
+A custom `MCPConnection` also inherits `listen(filter:) -> AsyncStream<MCPChangeEvent>` with a
+default that ends at once as `.refused`. Override it only if your transport supports change
+notifications. `MCPChangeEvent` is `.acknowledged(filter)`, `.toolsChanged`, `.promptsChanged`,
+`.resourcesChanged`, then a final `.ended(MCPListenEnd)`, where `MCPListenEnd` is `.closed`,
+`.failed(String)`, `.refused(String)` or `.unauthorized`.
 
 **Credential presence, without a Keychain prompt.** A host that lets a user swap the entire MCP
 server list in one shot — a config-profile Load — needs to know, for each server about to be
