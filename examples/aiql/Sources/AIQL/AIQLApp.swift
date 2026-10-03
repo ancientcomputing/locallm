@@ -278,8 +278,10 @@ final class AIQLModel: ObservableObject {
         }
         defer { stepTask.cancel() }
 
+        // The session's own turn method, not `languageModelSession.respond`: that escape hatch
+        // skips the context-overflow retry, the MCP tool refresh and the host transcript.
         do {
-            _ = try await session.languageModelSession.respond(to: "Question: \(prompt)\n\nBegin with step 1 now.")
+            try await session.respond(to: "Question: \(prompt)\n\nBegin with step 1 now.")
         } catch {
             return .failed(await GenerationErrorDescription.describe(error))
         }
