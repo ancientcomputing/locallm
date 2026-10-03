@@ -88,7 +88,7 @@ gated.
 
 For tools that *are* in the session, "Confirm each" decides whether a call runs or asks first.
 The approval is set where the tools come from — per MCP server on `lab.mcp`, and for the app's
-own tools on the authorizer (docs/sdk-authority-model.md §9):
+own tools on the authorizer ([SDK guide §7c](../../docs/sdk-guide.md#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)):
 
 ```swift
 // Todoist (an MCP server): nil = the untrusted default, ask before each call; .allow = don't ask.

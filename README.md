@@ -81,6 +81,9 @@ what's public here is:
   [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html).
 - **[Components/](Components/)** — `LocalLMLabSDKComponents`, prebuilt SwiftUI for
   managing MCP servers and models, built on the SDK's public API.
+- **[MCPAppsHost/](MCPAppsHost/)** — `LocalLMLabSDKMCPAppsHost` (2.0), host-side support for
+  MCP Apps: the sandboxed view for a server's `ui://` widgets, the widget↔host bridge, and the
+  widget lifecycle. Source, built on the SDK's public API like `Components`.
 - **[skills/locallmlab-swift-app/](skills/locallmlab-swift-app/)** — a repo-local
   Agent Skill for building SDK apps with Claude Code or Codex.
 
@@ -158,6 +161,9 @@ Roughly simplest to fullest — every one runnable, with full annotated source i
 - **[examples/vistanova/](examples/vistanova/)** — a tiny local search engine: web search through a
   Tavily MCP server, summaries from an MLX model **shipped pinned to an exact commit**, and
   defenses against a small model that skips the tool call. A SwiftUI app.
+- **[examples/mcp-chat/](examples/mcp-chat/)** (2.0) — a chat with a local model where a tool call
+  that has an MCP App shows the server's interactive widget inline (Todoist's task list, a system
+  monitor); the widget's own calls go through the same per-server approval as the model's.
 
 Plus **[examples/api-lab/](examples/api-lab/)** (scripts + a chat app for the OpenAI-compatible
 endpoint) and **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cli-swift/](examples/localai-cli-swift/)**
