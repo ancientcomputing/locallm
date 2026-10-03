@@ -29,7 +29,7 @@ non-comment lines; these examples are commented far more heavily than production
 |---|--:|--:|---|
 | [`repo-qa`](#examplesrepo-qa) | 66 | 115 | Apple's on-device model calling a real MCP server's tools, built from its live schema — no `Arguments` structs |
 | [`os-matrix`](#examplesos-matrix) | 74 | 97 | one binary that runs on macOS 26 **and** 27, model families gated by OS at registration |
-| [`repo-qa-local`](#examplesrepo-qa-local) | 96 | 134 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
+| [`repo-qa-local`](#examplesrepo-qa-local) | 96 | 129 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
 | [`components-demo`](#examplescomponents-demo) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-tools) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
 | [`workspace-buddy`](#examplesworkspace-buddy) | 173 | 227 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
@@ -38,7 +38,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
 | [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
 | [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
-| [`aiql`](#examplesaiql) | 395 | 494 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
+| [`aiql`](#examplesaiql) | 402 | 459 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
 | [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
 | [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
@@ -271,7 +271,7 @@ final class PlateTodayModel: ObservableObject {
             let response = try await session.respond(to: prompt)
             state = .ready(response.content)
         } catch {
-            state = .failed("\(error)")
+            state = .failed(await GenerationErrorDescription.describe(error))  // ← SDK
         }
     }
 }
@@ -370,7 +370,7 @@ struct PlateTodayApp: App {
 }
 ```
 
-**Tally**: of ~230 lines of actual code (excluding comments/blank lines), 17 touch the SDK directly
+**Tally**: of ~230 lines of actual code (excluding comments/blank lines), 18 touch the SDK directly
 (marked above) — everything else is ordinary SwiftUI state/view code and FoundationModels session
 setup that would look the same regardless of where the tools' data comes from.
 
@@ -1107,6 +1107,21 @@ func parseArgs() -> Options {
 
 func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
 
+// SIGINT on a background dispatch queue, so the handler fires even while the main thread is
+// parked in readLine(). Built in a non-isolated function on purpose: a closure formed in
+// @MainActor scope is inferred main-actor-isolated, and Dispatch then traps when it runs off the
+// main queue.
+func startSigintWatch(_ interrupt: Interrupt) -> any DispatchSourceSignal {
+    signal(SIGINT, SIG_IGN)
+    let src = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
+    src.setEventHandler {
+        if interrupt.fire() { note("\nquitting…"); exit(130) }   // process exit; no explicit session.cancel() here
+        note("\n^C  interrupting this turn — Ctrl-C again to quit")
+    }
+    src.resume()
+    return src
+}
+
 // Ctrl-C policy: first press during a turn cancels *that turn* and returns to the prompt;
 // a press at an idle prompt — or a second press mid-turn — quits.
 final class Interrupt: @unchecked Sendable {
@@ -1218,21 +1233,14 @@ func run() async {
             case .toolCallStarted(_, let name, _): if opts.verbose { note("  → \(name)") }
             case .toolCallFinished(_, let name, let failed, _): if opts.verbose { note("  \(failed ? "✗" : "✓") \(name)") }
             case .contextCompacted(let n): note("  (compacted \(n) transcript entries)")
-            @unknown default: break                                  // non-frozen — see sdk-guide §9
+            default: break                                           // the other SessionEvent cases (load progress, …)
             }
         }
     }
 
-    // Ctrl-C: SIG_IGN + a DispatchSource on a background queue, so the handler runs even
-    // while the main thread is parked in readLine().
+    // Ctrl-C: first press cancels the running turn, a press at an idle prompt quits.
     let interrupt = Interrupt()
-    signal(SIGINT, SIG_IGN)
-    let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
-    sigint.setEventHandler {
-        if interrupt.fire() { note("\nquitting…"); exit(130) }   // process exit; no explicit session.cancel() here
-        note("\n^C  interrupting this turn — Ctrl-C again to quit")
-    }
-    sigint.resume()
+    let sigint = startSigintWatch(interrupt)
 
     // One turn. streamResponse snapshots are *usually* append-only — but not across a tool
     // call, and not when a reasoning model drops its <think> block once the answer begins.
@@ -1356,12 +1364,12 @@ struct GitTool: Tool {
         "rev-parse", "describe", "remote", "tag", "shortlog", "grep", "cat-file", "reflog",
     ]
     @Generable struct Arguments {
-        @Guide(description: "A read-only git subcommand with its args, e.g. \"status\", \"log --oneline -10\".")
+        @Guide(description: "A read-only git subcommand with its args, e.g. \"status\", \"diff HEAD~1 -- Sources\", \"log --oneline -10\".")
         var command: String
     }
     let name = "git"
     var description: String {
-        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands are refused — make edits with editWorkspaceFile instead."
+        "Runs a read-only git command in the workspace. Allowed: \(Self.readOnlySubcommands.sorted().joined(separator: ", ")). Mutating commands (commit, push, reset, checkout, clean, rebase) are refused — make edits with editWorkspaceFile instead."
     }
     func call(arguments: Arguments) async throws -> String {
         try Task.checkCancellation()   // a tool call queued after a Ctrl-C never launches
@@ -1380,12 +1388,12 @@ struct RunTestsTool: Tool {
     let root: URL
     let command: [String]                  // e.g. ["swift", "test"] or ["npm", "test", "--silent"]
     @Generable struct Arguments {
-        @Guide(description: "Optional substring to pass to the test runner's filter, to run a subset.")
+        @Guide(description: "Optional substring to pass to the test runner's filter, to run a subset. Omit to run all tests.")
         var filter: String?
     }
     let name = "run_tests"
     var description: String {
-        "Runs the project's test suite (`\(command.joined(separator: " "))`) in the workspace and returns the output."
+        "Runs the project's test suite (`\(command.joined(separator: " "))`) in the workspace and returns the output. Pass `filter` to run a subset."
     }
     func call(arguments: Arguments) async throws -> String {
         try Task.checkCancellation()
@@ -1415,22 +1423,27 @@ make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it
 
 ## `examples/repo-qa-local`
 
-*`Sources/RepoQALocal/main.swift` — 96 lines of code (134 with comments) — ~30 more than `repo-qa`, all of it the model layer.*
+*`Sources/RepoQALocal/main.swift` — 96 lines of code (129 with comments).*
 
-The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qa) above,
-with the ~30 lines that swap Apple's on-device model for an open-weight MLX model you download and
-run locally — including the **pin**: the default model is tied to the exact Hugging Face commit the example
-was tried against (`pinnedRevisions`), and a model you pick with `--model` is pinned on first download
-(`MLXFilePinStore`, trust on first use), so a later fresh download never silently fetches whatever `main`
-has become. The Deepwiki / `MCPTool` half is a verbatim copy of `repo-qa`'s — diff the two to see
-exactly what adopting the model layer costs. One of several examples linking
-`LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as elsewhere.
+The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qa) above, with Apple's
+on-device model swapped for an open-weight MLX model you download and run locally — including the
+**pin**: the default model is tied to the exact Hugging Face commit the example was tried against
+(`pinnedRevisions`), and a model you pick with `--model` is pinned on first download
+(`MLXFilePinStore`, trust on first use), so a later fresh download never silently fetches whatever
+`main` has become. The Deepwiki half is `repo-qa`'s, with one 2.0 difference: the server goes into
+**`lab.mcp`** — the lab's one MCP manager — and `makeSession` offers its enabled tools
+(`includeMCPTools`), instead of the example building `MCPTool`s itself. A new server's tools start
+off, so the example turns on the ones it wants (`MCPTool(descriptor:manager:)` is used only to skip
+a tool whose schema doesn't build). The turn runs on the session's own `respond(to:)`. One of
+several examples linking `LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as
+elsewhere.
 
 ```swift
 // repo-qa-local — repo-qa, but the answer comes from an open-weight model you download and run
-// locally (via MLX) instead of Apple's on-device model. The Deepwiki / MCPTool half is a
-// verbatim copy of repo-qa's; the only difference is the ~20 lines that set up the 1.0 model
-// layer and swap `LanguageModelSession(tools:)` for `lab.makeSession(route:tools:)`.
+// locally (via MLX) instead of Apple's on-device model. The Deepwiki half follows repo-qa's, with
+// one change: the MCP server goes into `lab.mcp` (the lab's manager — an app that uses LocalLMLab
+// never makes an `MCPServerManager` of its own), and `lab.makeSession(route:)` builds the MCP tools
+// from it, instead of repo-qa's own manager + `MCPTool`s + `LanguageModelSession(tools:)`.
 //
 //   swift run RepoQALocal anthropics/claude-code "What is the plugin system?"
 //   swift run RepoQALocal facebook/react                        # default question
@@ -1442,8 +1455,8 @@ exactly what adopting the model layer costs. One of several examples linking
 
 import Foundation
 import FoundationModels
-import LocalLMLabSDKCore                                              // ← SDK
-import LocalLMLabSDKInference                                         // ← SDK (Inference)
+import LocalLMLabSDKCore                                             // ← SDK
+import LocalLMLabSDKInference                                        // ← SDK (Inference)
 
 func note(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
 
@@ -1479,14 +1492,14 @@ func run() async {
     // new version, then update the repo and its commit together.
     let shippedPins = ["mlx-community/Qwen3-8B-4bit": "545dc4251c05440727734bcd94334791f6ab0192"]
     let mlx = MLXModelProvider(residentModelLimit: 1, pinnedRevisions: shippedPins, pinStore: MLXFilePinStore())  // ← SDK (Inference)
-    let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
-    let modelID = useApple ? ModelID.system : ModelID(scheme: "mlx", rest: modelRepo)!    // ← SDK
+    let lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))  // ← SDK
+    let modelID = useApple ? ModelID.system : ModelID(scheme: "mlx", rest: modelRepo)!  // ← SDK
     lab.models.route(.local, to: modelID)                            // ← SDK
-    note("model: \(modelID)  ·  SDK \(LocalLMLabSDKVersion.current)")   // ← SDK
+    note("model: \(modelID)  ·  SDK \(LocalLMLabSDKVersion.current)")  // ← SDK
 
     // Preflight + download the MLX weights on first run. (Nothing to download for `--apple`.)
-    if !useApple, case .notDownloaded = lab.models.availability(for: modelID) {   // ← SDK
-        if let pre = try? await mlx.validate(modelRepo), !pre.passed {            // ← SDK (Inference)
+    if !useApple, case .notDownloaded = lab.models.availability(for: modelID) {  // ← SDK
+        if let pre = try? await mlx.validate(modelRepo), !pre.passed {  // ← SDK (Inference)
             note("pre-flight failed (\(pre.failedStage?.rawValue ?? "?")): \(pre.detail ?? "")")
             exit(1)
         }
@@ -1502,15 +1515,14 @@ func run() async {
             note("download failed: \(error)"); exit(1)
         }
     }
-    if !useApple, let pin = mlx.effectivePin(for: modelRepo) {    // ← SDK (Inference)
+    if !useApple, let pin = mlx.effectivePin(for: modelRepo) {       // ← SDK (Inference)
         note("pinned to \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this example" : "first download"))")
     }
 
-    // --- everything below is repo-qa, unchanged ---
+    // --- the Deepwiki half: repo-qa's, with the server in lab.mcp ---
 
-    let manager = MCPServerManager()                                 // ← SDK
     note("Connecting to Deepwiki…")
-    let connectResult = await manager.addServer(                     // ← SDK
+    let connectResult = await lab.mcp.addServer(                     // ← SDK
         url: URL(string: "https://mcp.deepwiki.com/mcp")!,
         displayName: "Deepwiki"
     )
@@ -1518,40 +1530,46 @@ func run() async {
         note("Could not connect to Deepwiki: \(connectResult)"); return
     }
 
-    // Build a Tool for each of Deepwiki's tools from its own live schema. `read_wiki_contents` is
-    // skipped by name: it dumps a repo's entire wiki unscoped (~165K tokens for anthropics/
-    // claude-code in one call), which `MCPTool` can't know from the schema — that curation is the
-    // app's job (see docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal.
-    var tools: [any Tool] = []
+    // A new server's tools start disabled (a security default: nothing reaches the model until the
+    // host opts in), so enable the ones this example uses. `read_wiki_contents` stays off: it dumps
+    // a repo's entire wiki unscoped (~165K tokens for anthropics/claude-code in one call), which
+    // `MCPTool` can't know from the schema — that curation is the app's job (see
+    // docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal (makeSession
+    // would otherwise fail on it).
+    var enabled: [String] = []
     for descriptor in state.tools {
         guard descriptor.name != "read_wiki_contents" else {
             note("Skipping \(descriptor.name): excluded by this example.")
             continue
         }
-        do { tools.append(try MCPTool(descriptor: descriptor, manager: manager)) }   // ← SDK (Path A)
-        catch { note("Skipping \(descriptor.name): \(error)") }
+        do { _ = try MCPTool(descriptor: descriptor, manager: lab.mcp) }  // ← SDK
+        catch { note("Skipping \(descriptor.name): \(error)"); continue }
+        lab.mcp.setToolEnabled(server: state.id, tool: descriptor.name, enabled: true)  // ← SDK
+        enabled.append(descriptor.name)
     }
-    guard !tools.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
-    note("Built \(tools.count) tool(s) from Deepwiki's live schema: \(tools.map(\.name).joined(separator: ", "))")
+    guard !enabled.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
+    note("Enabled \(enabled.count) tool(s) from Deepwiki's live schema: \(enabled.joined(separator: ", "))")
 
-    // The one line that changes from repo-qa: lab.makeSession(route:tools:) instead of
-    // LanguageModelSession(tools:) — same FoundationModels session underneath, just backed by
-    // whichever model the route points at.
+    // Where repo-qa makes `LanguageModelSession(tools:)`, this calls lab.makeSession(route:) — same
+    // FoundationModels session underneath, backed by whichever model the route points at, with
+    // lab.mcp's enabled tools included (`includeMCPTools`, on by default).
     let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     let session: LocalLMLabSession                                   // ← SDK
     do {
-        session = try lab.makeSession(route: .local, tools: tools, instructions: instructions, includeMCPTools: false)   // ← SDK
+        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true)  // ← SDK
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }
 
     let prompt = "Regarding the GitHub repository \"\(repoName)\": \(effectiveQuestion)"
     note("\nAsking: \(prompt)\n")
+    // The session's own turn method (repo-qa calls `session.respond(to:)` on its
+    // LanguageModelSession). Not `session.languageModelSession.respond`: that escape hatch skips
+    // the context-overflow retry and the per-turn MCP tool refresh.
     do {
-        let response = try await session.languageModelSession.respond(to: prompt)   // ← SDK
-        print(response.content)
+        print(try await session.respond(to: prompt))                 // ← SDK
     } catch {
-        note("Error: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+        note("Error: \(await GenerationErrorDescription.describe(error))")  // ← SDK
     }
     session.cancel()                                                 // ← SDK
 }
@@ -1563,14 +1581,14 @@ if #available(macOS 26.0, *) {
 }
 ```
 
-**Tally**: of the file's 96 non-comment/non-blank lines, 19 touch the SDK directly (marked above)
-— and everything below the `--- everything below is repo-qa, unchanged ---` marker is
-`repo-qa`'s code (its long comments condensed) except the one `lab.makeSession` line. The model layer itself is
-~8 lines (`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` / `availability` / `validate` /
-`download`, plus the diagnostic `note(...)` line that reads `LocalLMLabSDKVersion.current`), and pinning adds
-three more: the `shippedPins` dictionary and `pinStore:` argument on `MLXModelProvider`, and an
-`effectivePin(for:)` call that reports which version is in use and where the pin came from (`.shipped` vs `.captured`);
-`--apple` proves the same route can point at Apple's on-device model with no other change.
+**Tally**: of the file's 96 non-comment/non-blank lines, 19 touch the SDK directly (marked above).
+The model layer is ~8 lines (`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` /
+`availability` / `validate` / `download`, plus the diagnostic `note(...)` line that reads
+`LocalLMLabSDKVersion.current`); pinning adds the `shippedPins` dictionary, the `pinStore:` argument
+and an `effectivePin(for:)` call that reports which version is in use and where the pin came from
+(`.shipped` vs `.captured`). The MCP half is `lab.mcp.addServer`, a `setToolEnabled` per tool, and
+`makeSession(includeMCPTools: true)`; `--apple` proves the same route can point at Apple's on-device
+model with no other change.
 
 ## `examples/workspace-buddy-local`
 
@@ -2400,33 +2418,54 @@ the entire confirmation UI. Nothing in the three panel views touches the SDK —
 
 ## `examples/aiql`
 
-*`Sources/AIQL/AIQLApp.swift` — 395 lines of code (494 with comments) — one file: view model + pipeline + SwiftUI UI. The
-`FolderAccess` enum and the `ContentView` UI are elided below.*
+*`Sources/AIQL/AIQLApp.swift` — 402 lines of code (459 with comments) — one file: view model +
+pipeline + SwiftUI UI. The `FolderAccess` enum and the `ContentView` UI are elided below.*
 
-The **`FileBackedTool` + `loadTable` + `sqlQuery`** showcase (`sdk-guide.md`
+The **file-backed MCP tools + `loadTable` + `sqlQuery`** showcase (`sdk-guide.md`
 [§8b](sdk-guide.md#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
 type a local model, an MCP data source, and a plain-English request; the app pulls the dataset
 into a file (so the raw payload never enters the model's context), `loadTable`s it into an
 ephemeral SQLite table, and has the model write **one read-only `SELECT`** to a CSV. The model
 names a table and describes one query — it never handles a row, and can't drop a step, because
 there's only ever one query call. `WHERE` / `BETWEEN` / `ORDER BY … LIMIT` / `JOIN` run inside
-SQLite. Links `LocalLMLabSDKInference` for the MLX model. Because the model field is free text, the app can't pin
-everything ahead of time, so it layers three supply-chain controls: the default model is **pinned** to a
-reviewed commit (`pinnedRevisions:`), any other model is pinned on first download (`MLXFilePinStore`), and a
-**trust policy** (`MlxCommunityOnly`) limits which repos can be fetched at all; downloads are hash-verified by
-default. `FolderAccess` is verbatim from
-`workspace-buddy-local` (`sdk-guide.md` §8) and elided.
+SQLite. In 2.0 the data tools come from **`lab.mcp`**: the app adds the server there, turns on its
+four most data-like tools, and sets `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)`
+for the run's folder, so `makeSession(includeMCPTools: true)` offers each with a `saveAs` argument
+that writes its result to a file. Links `LocalLMLabSDKInference` for the MLX model. Because the model
+field is free text, the app can't pin everything ahead of time, so it layers three supply-chain
+controls: the default model is **pinned** to a reviewed commit (`pinnedRevisions:`), any other model
+is pinned on first download (`MLXFilePinStore`), and a **trust policy** (`MlxCommunityOnly`) limits
+which repos can be fetched at all; downloads are hash-verified by default. `FolderAccess` is
+verbatim from `workspace-buddy-local` (`sdk-guide.md` §8) and elided.
 
 ```swift
+// AIQL — "ask your data". A SwiftUI app aimed at someone who lives in a marketing tool, not a
+// terminal: type a local model, an MCP data source, and a plain-English request; press Go.
+//
+//   Go  →  (1) connect to the MCP server (public, or an OAuth sign-in in the browser)
+//          (2) download the local model if it isn't cached yet
+//          (3) run the pipeline: pull the dataset into a file (FileBackedTool — the raw payload
+//              never enters the model's context), loadTable it into an ephemeral SQLite table,
+//              then one read-only sqlQuery (SELECT) → a CSV in the folder you chose.
+//
+// The model only writes the SQL — the host runs it read-only and the rows never enter the
+// model's context, so there is nothing to fabricate. loadTable + sqlQuery are Core tools; see
+// docs/sdk-guide.md §8b.
+//
+// Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
+// picker + security-scoped bookmark), plate-today (MCP client + OAuth redirect via AppDelegate),
+// repo-qa (tools from a live MCP schema — here built by makeSession from lab.mcp, file-backed).
+
 import AppKit
 import Foundation
 import FoundationModels
-import LocalLMLabSDKCore                                              // ← SDK
-import LocalLMLabSDKInference                                         // ← SDK (Inference)
+import LocalLMLabSDKCore                                             // ← SDK
+import LocalLMLabSDKInference                                        // ← SDK (Inference)
 import SwiftUI
 
-// MARK: - FolderAccess { pickFolder / resolveBookmarkedFolder / withFolderAccessAsync }
-//   — verbatim from workspace-buddy-local (docs/sdk-guide.md §8); elided here.
+// MARK: - Folder picker + security-scoped bookmark (docs/sdk-guide.md §8) — verbatim from workspace-buddy-local
+
+// … FolderAccess — elided (see the section intro)
 
 // MARK: - Trust policy
 
@@ -2435,15 +2474,18 @@ import SwiftUI
 /// uploads your users will run.
 struct MlxCommunityOnly: MLXModelTrustPolicy {                       // ← SDK (Inference)
     func evaluate(repoID: String) async -> MLXModelTrustDecision {   // ← SDK (Inference)
-        repoID.hasPrefix("mlx-community/") ? .allow : .deny(reason: "only mlx-community models are allowed in this app")
+        repoID.hasPrefix("mlx-community/") ? .allow : .deny(reason: "only mlx-community models are allowed in this app")  // ← SDK (Inference)
     }
 }
+
+// MARK: - View model
 
 @available(macOS 27.0, *)
 @MainActor
 final class AIQLModel: ObservableObject {
     enum Stage: Equatable {
-        case idle, connecting
+        case idle
+        case connecting
         case downloadingModel(Double)      // 0…1
         case running
         case done(fileName: String, csv: String, folder: URL)
@@ -2458,24 +2500,51 @@ final class AIQLModel: ObservableObject {
     @Published var request = ""
     @Published private(set) var folderURL: URL?
     @Published private(set) var stage: Stage = .idle
-    @Published private(set) var steps: [String] = []
+    @Published private(set) var steps: [String] = []   // friendly progress lines
 
-    private let manager = MCPServerManager()                          // ← SDK
     // The field is free text, so this app can't pin everything ahead of time. Two layers instead:
     //  - the default model is pinned to a commit this app shipped with (developer-vouched);
     //  - any other model is pinned on first download (`MLXFilePinStore`, kept outside the model
     //    cache), so re-downloading later fetches the same version the user first got.
     // A trust policy limits which repos can be fetched at all; downloads are hash-verified by default.
-    private let mlx = MLXModelProvider(                               // ← SDK (Inference)
+    private let mlx = MLXModelProvider(                              // ← SDK (Inference)
         residentModelLimit: 1,
-        pinnedRevisions: [AIQLModel.defaultModelRepo: AIQLModel.defaultModelRevision],   // ← SDK (Inference)
-        supplyChainPolicy: MLXSupplyChainPolicy(trustPolicy: MlxCommunityOnly()),        // ← SDK (Inference)
+        pinnedRevisions: [AIQLModel.defaultModelRepo: AIQLModel.defaultModelRevision],
+        supplyChainPolicy: MLXSupplyChainPolicy(trustPolicy: MlxCommunityOnly()),  // ← SDK (Inference)
         pinStore: MLXFilePinStore())                                 // ← SDK (Inference)
-    private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))   // ← SDK
+    // The MCP server goes into `lab.mcp`, the lab's manager — an app that uses LocalLMLab never
+    // makes an `MCPServerManager` of its own.
+    private lazy var lab = LocalLMLab(configuration: .init(providers: [mlx, SystemModelProvider()]))  // ← SDK
 
-    init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
+    init() {
+        folderURL = FolderAccess.resolveBookmarkedFolder()
+    }
 
-    // canGo / isBusy / chooseFolder / go() — plain view-model plumbing, elided.
+    var isBusy: Bool {
+        switch stage {
+        case .connecting, .downloadingModel, .running: return true
+        default: return false
+        }
+    }
+
+    var canGo: Bool {
+        folderURL != nil
+            && !modelRepo.trimmingCharacters(in: .whitespaces).isEmpty
+            && URL(string: serverURLString.trimmingCharacters(in: .whitespaces))?.scheme != nil
+            && !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isBusy
+    }
+
+    func chooseFolder() {
+        if let url = FolderAccess.pickFolder() { folderURL = url }
+    }
+
+    func go() {
+        guard canGo else { return }
+        Task { await run() }
+    }
+
+    private func step(_ line: String) { steps.append(line) }
 
     private func run() async {
         steps = []
@@ -2483,14 +2552,15 @@ final class AIQLModel: ObservableObject {
         guard let serverURL = URL(string: serverURLString.trimmingCharacters(in: .whitespaces)), serverURL.scheme != nil else {
             stage = .failed("That MCP server address doesn't look like a web link."); return
         }
-        guard let modelID = ModelID(scheme: "mlx", rest: modelRepo.trimmingCharacters(in: .whitespaces)) else {   // ← SDK
+        guard let modelID = ModelID(scheme: "mlx", rest: modelRepo.trimmingCharacters(in: .whitespaces)) else {  // ← SDK
             stage = .failed("The model name should look like mlx-community/Qwen3-8B-4bit."); return
         }
         lab.models.route(.local, to: modelID)                        // ← SDK
 
         // 1 — connect (triggers an OAuth browser sign-in automatically if the server needs one)
         stage = .connecting
-        let connection = await manager.addServer(url: serverURL, displayName: serverURL.host ?? "MCP server")   // ← SDK
+        step("Connecting to \(serverURL.host ?? serverURL.absoluteString)…")
+        let connection = await lab.mcp.addServer(url: serverURL, displayName: serverURL.host ?? "MCP server")  // ← SDK
         guard case .success(let server) = connection else {
             if case .failure(let error) = connection {
                 stage = .failed("Couldn't connect to that MCP server — \(Self.describe(error))")
@@ -2503,18 +2573,22 @@ final class AIQLModel: ObservableObject {
             stage = .failed("Connected, but that server didn't offer any tools to get data from."); return
         }
         step("Connected — \(server.tools.count) data tool(s) available.")
+        // Only this server's tools go to the model: one from an earlier Go stays connected in
+        // lab.mcp otherwise. (disconnect, not removeServer, which would forget its sign-in.)
+        for id in lab.mcp.servers.keys where id != server.id { lab.mcp.disconnect(id) }  // ← SDK
 
         // 2 — download the model on first use
-        if case .notDownloaded = lab.models.availability(for: modelID) {   // ← SDK
+        if case .notDownloaded = lab.models.availability(for: modelID) {  // ← SDK
             stage = .downloadingModel(0)
-            if let preflight = try? await mlx.validate(modelRepo.trimmingCharacters(in: .whitespaces)), !preflight.passed {   // ← SDK (Inference)
+            step("Downloading \(modelRepo) (first run only)…")
+            if let preflight = try? await mlx.validate(modelRepo.trimmingCharacters(in: .whitespaces)), !preflight.passed {  // ← SDK (Inference)
                 stage = .failed("That model didn't pass its check: \(preflight.detail ?? "unknown reason")."); return
             }
             do {
-                for try await event in mlx.download(modelRepo.trimmingCharacters(in: .whitespaces)) {   // ← SDK (Inference)
+                for try await event in mlx.download(modelRepo.trimmingCharacters(in: .whitespaces)) {  // ← SDK (Inference)
                     if case .progress(_, _, let fraction) = event { stage = .downloadingModel(fraction) }
                 }
-                if let pin = mlx.effectivePin(for: modelRepo.trimmingCharacters(in: .whitespaces)) {   // ← SDK (Inference)
+                if let pin = mlx.effectivePin(for: modelRepo.trimmingCharacters(in: .whitespaces)) {  // ← SDK (Inference)
                     step("Pinned to version \(pin.revision.prefix(7)) (\(pin.source == .shipped ? "shipped with this app" : "the version you just downloaded")).")
                 }
             } catch {
@@ -2524,56 +2598,73 @@ final class AIQLModel: ObservableObject {
 
         // 3 — run the pipeline inside the security-scoped access window
         stage = .running
+        step("Working… this takes a few minutes.")
         let outcome = await FolderAccess.withFolderAccessAsync { root in
-            await self.runPipeline(prompt: prompt, root: root, serverTools: server.tools, serverID: server.id, modelID: modelID)
+            await self.runPipeline(prompt: prompt, root: root, serverTools: server.tools, serverID: server.id)
         }
         stage = outcome ?? .failed("Couldn't open the folder you chose — pick it again.")
     }
 
-    private func runPipeline(prompt: String, root: URL, serverTools: [MCPToolDescriptor],   // ← SDK (type)
-                             serverID: MCPServerID, modelID: ModelID) async -> Stage {       // ← SDK (types)
-        // Wrap the server's tools as file-backed so the model can `saveAs` any of them. Cap the
-        // count — a small model degrades past ~8 tools; prefer names that look like "get a dataset".
-        let ranked = serverTools.sorted { Self.dataLikelihood($0.name) > Self.dataLikelihood($1.name) }
-        let dataTools: [any Tool] = ranked.prefix(4).compactMap {
-            try? FileBackedTool.mcp(descriptor: $0, manager: manager, root: root, inlineCharacterLimit: 8_000,   // ← SDK  — payload → file, receipt → model
-                                    followUp: "load it into a table with loadTable, then query it with one sqlQuery")
+    private func runPipeline(prompt: String, root: URL, serverTools: [MCPToolDescriptor], serverID: MCPServerID) async -> Stage {  // ← SDK
+        // Offer the server's data tools from lab.mcp. Cap the count — a small model degrades past
+        // ~8 tools; prefer names that look like "get a dataset" over admin/overview tools. A new
+        // server's tools start disabled, so enable the chosen ones (and only those).
+        let ranked = serverTools.sorted { lhs, rhs in Self.dataLikelihood(lhs.name) > Self.dataLikelihood(rhs.name) }
+        let chosen = ranked.prefix(4).map(\.name)
+        for tool in serverTools {
+            lab.mcp.setToolEnabled(server: serverID, tool: tool.name, enabled: chosen.contains(tool.name))  // ← SDK
         }
-        guard !dataTools.isEmpty else { return .failed("Couldn't read that server's tools — its data format isn't supported yet.") }
+        // File-backed: each data tool gets a `saveAs` argument that writes its raw result into the
+        // chosen folder, so the dataset never enters the model's context. Only for this run —
+        // the folder's security-scoped access ends with it.
+        lab.mcp.setFileBackedOutput(                                 // ← SDK
+            MCPFileBackedOutput(root: root, inlineCharacterLimit: 8_000,  // ← SDK
+                                followUp: "load it into a table with loadTable, then query it with one sqlQuery"),
+            server: serverID)
+        defer { lab.mcp.setFileBackedOutput(nil, server: serverID) }  // ← SDK
 
-        // loadTable stages a JSON records file into an ephemeral SQLite table (auto-detects the
-        // records array, sniffs column types, explodes a nested array into a child table) and
-        // returns its CREATE TABLE. sqlQuery runs ONE read-only SELECT to a CSV. describeJson /
-        // csvInfo are for discovery + verification. The row data never reaches the model.
-        var tools: [any Tool] = dataTools
-        tools.append(LoadTableTool(root: root))                      // ← SDK
-        tools.append(SQLQueryTool(root: root))                       // ← SDK
-        tools.append(DescribeJSONTool(root: root))                   // ← SDK
-        tools.append(CSVInfoTool(root: root))                        // ← SDK
+        let tools: [any Tool] = [
+            LoadTableTool(root: root),                               // ← SDK
+            SQLQueryTool(root: root),                                // ← SDK
+            DescribeJSONTool(root: root),                            // ← SDK
+            CSVInfoTool(root: root),                                 // ← SDK
+        ]
 
-        let dataToolNames = dataTools.map(\.name).joined(separator: ", ")
+        let dataToolNames = chosen.joined(separator: ", ")
         let instructions = """
         You answer a data question by loading the pulled data into tables and running ONE SQL \
-        query. You never write row data yourself …
-        1. Pick the ONE data tool whose result answers the question — from: \(dataToolNames) — \
-           and call it with `saveAs` set to "raw/data.json" (a second dataset → "raw/data2.json"; \
-           `saveAsAppend: true` for each further page).
-        2. loadTable  jsonPath "raw/data.json", a short tableName, recordsAt "". Read the \
-           CREATE TABLE it returns — use ONLY those column names. A nested array is a child \
-           table "<table>__<field>"; join it with "<child>.<table>_id = <table>.id".
-        3. sqlQuery — ONE call: one SELECT, outputPath "out.csv". A numeric range → BETWEEN; \
-           "top N" → ORDER BY … LIMIT N; "highest <X> first" → ORDER BY <X> DESC (never a rank \
-           column). The moment it succeeds you are done.
-        4. csvInfo  path "out.csv", then reply in one sentence with the column names and row \
-           count. Do not print the rows.
-        """  // (full prompt in the source)
+        query. You never write row data yourself.
+
+        Run these steps in order, without asking for confirmation:
+
+        1. Pick the ONE data tool whose result answers the question — from: \(dataToolNames) — and \
+           call it with its `saveAs` argument set to "raw/data.json". Never call a data tool \
+           without `saveAs`; the result is large. If the question needs a second dataset, pull \
+           that too, to "raw/data2.json". For a paged source call it once per page with the same \
+           `saveAs` path plus `saveAsAppend: true` until you have every page.
+        2. loadTable  jsonPath "raw/data.json", a short tableName, recordsAt "" (let it find the \
+           records). Do the same for any second file. Read each CREATE TABLE it returns — use \
+           ONLY those column names. A nested array comes back as a child table \
+           "<table>__<field>"; join it with "<child>.<table>_id = <table>.id".
+        3. sqlQuery — ONE call: one SELECT, outputPath "out.csv". Standard SQLite. A numeric \
+           range → BETWEEN. "top N" → ORDER BY … LIMIT N. For "highest / most <X> first" sort by \
+           <X> itself DESC, never a rank column. Combine two tables → JOIN on the columns whose \
+           sample values match. The moment it succeeds you are done — do NOT call sqlQuery again.
+        4. csvInfo  path "out.csv"  — then reply in one sentence with the column names and the \
+           row count. Do not print the rows.
+
+        If a tool returns text starting with "Error:", read it, fix that one call, and retry it.
+        """
 
         let session: LocalLMLabSession                               // ← SDK
         do {
-            // effort: .off — skip the model's <think> pass. The Qwen3 family has the template
-            // toggle; the pipeline is mechanical, so the reasoning trace buys nothing but latency.
-            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,   // ← SDK
-                                          includeMCPTools: false, options: SessionOptions(effort: .off))   // ← SDK
+            // effort: .off — skip the model's <think> pass. The Qwen3 family has the
+            // template toggle; the pipeline is mechanical (pick a tool, name a table, write
+            // one SELECT) so the reasoning trace buys nothing but latency.
+            session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,  // ← SDK
+                                          includeMCPTools: true, options: SessionOptions(effort: .off))  // ← SDK
+        } catch LocalLMLabError.mcp {                                // ← SDK
+            return .failed("Couldn't read that server's tools — its data format isn't supported yet.")
         } catch {
             return .failed("Couldn't start the model: \(error.localizedDescription)")
         }
@@ -2583,52 +2674,98 @@ final class AIQLModel: ObservableObject {
         let stepTask = Task { @MainActor in
             for await event in session.events {                      // ← SDK
                 switch event {
-                case .toolCallStarted(_, let name, _):
+                case .toolCallStarted(_, let name, _):               // ← SDK
                     self.step(Self.friendlyStep(for: name))
-                case .toolCallFinished(_, let name, let failed, _) where failed:
+                case .toolCallFinished(_, let name, let failed, _) where failed:  // ← SDK
                     self.step("  · \(Self.friendlyStep(for: name)) hit a snag — retrying")
-                default: break
+                default:
+                    break
                 }
             }
         }
         defer { stepTask.cancel() }
 
+        // The session's own turn method, not `languageModelSession.respond`: that escape hatch
+        // skips the context-overflow retry, the MCP tool refresh and the host transcript.
         do {
-            _ = try await session.languageModelSession.respond(to: "Question: \(prompt)\n\nBegin with step 1 now.")   // ← SDK
+            try await session.respond(to: "Question: \(prompt)\n\nBegin with step 1 now.")  // ← SDK
         } catch {
-            return .failed(await GenerationErrorDescription.describe(error))   // ← SDK
+            return .failed(await GenerationErrorDescription.describe(error))  // ← SDK
         }
 
-        // The result CSV. Instructions ask for "out.csv"; fall back to the newest .csv if a weak
-        // model left it in the last stage file.
+        // The result CSV. Instructions ask for "out.csv"; if a weak model wrote it somewhere
+        // else, fall back to the most recently written .csv.
         var name = "out.csv"
-        if case .failure = WorkspaceAccess.readFile(in: root, path: "out.csv"),               // ← SDK
-           case .success(let entries) = WorkspaceAccess.listFiles(in: root, subpath: nil) {   // ← SDK
+        if case .failure = WorkspaceAccess.readFile(in: root, path: "out.csv"),  // ← SDK
+           case .success(let entries) = WorkspaceAccess.listFiles(in: root, subpath: nil) {  // ← SDK
             if let newest = entries
                 .filter({ !$0.isDirectory && $0.name.hasSuffix(".csv") })
                 .max(by: { ($0.modifiedDate ?? .distantPast) < ($1.modifiedDate ?? .distantPast) }) {
                 name = newest.name
             }
         }
-        guard case .success(let csv) = WorkspaceAccess.readFile(in: root, path: name) else {   // ← SDK
-            return .failed("The model finished but didn't write a spreadsheet. Try rephrasing, or a larger model.")
+        guard case .success(let csv) = WorkspaceAccess.readFile(in: root, path: name) else {  // ← SDK
+            return .failed("The model finished but didn't write a spreadsheet. Try rephrasing the request, or a larger model.")
         }
         step("Saved \(name).")
         return .done(fileName: name, csv: csv, folder: root)
     }
 
-    // describe(_:) over MCPServerError, dataLikelihood / friendlyStep string helpers — elided.
+    // MARK: helpers
+
+    static func describe(_ error: MCPServerError) -> String {        // ← SDK
+        switch error {
+        case .unreachable: return "the server could not be reached."
+        case .malformedResponse: return "the server returned something unexpected."
+        case .protocolMismatch: return "the server speaks a different MCP version."
+        case .notConnected: return "not connected."
+        case .toolNotFound: return "a tool went missing."
+        case .serverError(let message): return message
+        case .authorizationRequired: return "it needs you to sign in."
+        case .credentialRejected: return "it rejected the saved sign-in."
+        case .httpError(let status): return "it returned HTTP \(status)."
+        case .oauthRegistrationNotSupported: return "it needs a manually configured OAuth client."
+        case .responseTooLarge: return "the server's response was too large to read."
+        @unknown default: return "\(error)"
+        }
+    }
+
+    static func dataLikelihood(_ name: String) -> Int {
+        let lower = name.lowercased()
+        var score = 0
+        for keyword in ["list", "search", "get_all", "contacts", "records", "rows", "dataset", "export", "find", "query", "items", "results", "countries", "people"] where lower.contains(keyword) {
+            score += 2
+        }
+        for keyword in ["overview", "schema", "help", "meta", "config", "auth", "whoami", "status", "count"] where lower.contains(keyword) {
+            score -= 2
+        }
+        return score
+    }
+
+    static func friendlyStep(for toolName: String) -> String {
+        switch toolName {
+        case "loadTable": return "Reading the data…"
+        case "describeJson": return "Looking at how the data is organised…"
+        case "sqlQuery": return "Building the spreadsheet…"
+        case "csvInfo": return "Checking the result…"
+        default: return "Fetching the data…"
+        }
+    }
 }
 
-// MARK: - ContentView — ordinary SwiftUI (four text fields, a Go button, a status area). Elided.
+// MARK: - UI
+
+@available(macOS 27.0, *)
+// … ContentView — elided (see the section intro)
 
 // Handle aiql://oauth/callback through the AppDelegate, not SwiftUI's .onOpenURL — WindowGroup
-// treats an open-URL event as a request for a new window. Same fix plate-today / components-demo use.
+// treats an open-URL event as a request for a new window (confirmed in plate-today: signing in
+// brought back a second window). Same fix LocalLM Lab's own app uses.
 @available(macOS 27.0, *)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "aiql" {
-            MCPOAuthRedirectListener.shared.handleRedirect(url)       // ← SDK
+            MCPOAuthRedirectListener.shared.handleRedirect(url)      // ← SDK
         }
     }
 }
@@ -2640,31 +2777,34 @@ struct AIQLApp: App {
     @StateObject private var model = AIQLModel()
 
     init() {
+        // Distinct from LocalLM Lab's "locallmlab" and plate-today's "platetoday" schemes so the
+        // callbacks don't collide if more than one is installed — matches Info.plist's
+        // CFBundleURLTypes.
         MCPOAuthFlow.redirectURI = "aiql://oauth/callback"           // ← SDK
     }
 
     var body: some Scene {
-        WindowGroup { ContentView(model: model) }
-            .windowResizability(.contentMinSize)
-            .handlesExternalEvents(matching: [])
+        WindowGroup {
+            ContentView(model: model)
+        }
+        .windowResizability(.contentMinSize)
+        .handlesExternalEvents(matching: [])
     }
 }
 ```
 
-**Tally**: the model layer is the same ~7 lines as `repo-qa-local` (`MLXModelProvider` / `LocalLMLab`
-/ `route` / `availability` / `validate` / `download` / `makeSession`), plus the supply-chain controls above:
-an `MLXModelTrustPolicy` conformance (~5 lines), and the `pinnedRevisions:` / `supplyChainPolicy:` / `pinStore:`
-arguments on `MLXModelProvider`, and an `effectivePin(for:)` call that tells the user which version they got. Everything new here is the
-pipeline: `FileBackedTool.mcp(descriptor:manager:root:)` wraps each MCP data tool so its payload
-lands in a file instead of the model's context, and four data-verb `Tool`s
-(`LoadTableTool` / `SQLQueryTool` / `DescribeJSONTool` / `CSVInfoTool`, marked above) do the
-mechanical work: `loadTable` stages a JSON records file into an ephemeral SQLite table,
-`sqlQuery` runs exactly one read-only `SELECT` to a CSV, and `describeJson`/`csvInfo` are for
-discovery and verification — the row data itself never passes through the model. The
-`instructions` string doing the orchestration is the real work of this example — the SDK surface
-it drives is the four data-verb `Tool`s plus up to four `FileBackedTool.mcp`-wrapped MCP tools
-(`ranked.prefix(4)`, marked above), eight one-line `Tool` instantiations at most, plus
-`WorkspaceAccess` to read the result back.
+**Tally**: 42 lines carry a marker (32 Core, 10 Inference). The model layer is the same ~7 lines as
+`repo-qa-local` (`MLXModelProvider` / `LocalLMLab` / `route` / `availability` / `validate` /
+`download` / `makeSession`), plus the supply-chain controls above: an `MLXModelTrustPolicy`
+conformance (~5 lines), the `pinnedRevisions:` / `supplyChainPolicy:` / `pinStore:` arguments on
+`MLXModelProvider`, and an `effectivePin(for:)` call that tells the user which version they got. The
+MCP side is `lab.mcp.addServer`, `setToolEnabled` for the chosen four, and one
+`setFileBackedOutput` (cleared when the run ends) — the server's tools need no wrapping. Four
+data-verb `Tool`s (`LoadTableTool` / `SQLQueryTool` / `DescribeJSONTool` / `CSVInfoTool`) do the
+mechanical work: `loadTable` stages a JSON records file into an ephemeral SQLite table, `sqlQuery`
+runs exactly one read-only `SELECT` to a CSV, and `describeJson`/`csvInfo` are for discovery and
+verification — the row data itself never passes through the model. The `instructions` string
+doing the orchestration is the real work of this example; `WorkspaceAccess` reads the result back.
 
 ## `examples/vistanova`
 
