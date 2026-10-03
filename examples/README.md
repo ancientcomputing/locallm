@@ -32,10 +32,11 @@ descriptions. Neither is the "real" one — both ship in Core, and an app can mi
 [`../docs/sdk-guide.md` §7a](../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
 for the full framing.
 
-The `localai-cli` examples require the CLI toolkit itself. From `1.0.0-beta.4`
-on it ships as a release asset on
-[`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
-alongside the app DMG (older versions are checked into [../toolkit/](../toolkit/)).
+The `localai-cli` examples require the CLI toolkit itself. `1.0.0-beta.4` through
+`1.0.0-RC.1` shipped it as a release asset on
+[`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases);
+from **`1.0.0-GA`** on it ships as a release asset on this repo instead, alongside
+the app DMG (older versions are checked into [../toolkit/](../toolkit/)).
 See that folder's README to download and install it, and
 [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html)
 for the full CLI reference.
@@ -48,14 +49,14 @@ Download LocalLM Lab from [its product page at https://thisbrain.ai/locallm](htt
 
 Each SDK example (everything except the `api-lab/` and `localai-cli*/` folders) is a standalone
 SwiftPM package. It resolves `LocalLMLabSDKCore` (and, where used, `LocalLMLabSDKInference` /
-`LocalLMLabSDKRemote`) as a **binary** dependency from a GitHub Release on this repo — nothing to
+`LocalLMLabSDKRemote` / `LocalLMLabSDKClaude`) as a **binary** dependency from a GitHub Release on this repo — nothing to
 download or unzip by hand. Requires **Apple Silicon** and the **Xcode 27** toolchain to build (a
 stable Xcode fails with `'v27' is unavailable`). **macOS 27 is recommended** — most of the SDK's
 advanced model-layer features (Private Cloud Compute, open-weight/MLX, Claude, online providers)
 need it — but it isn't universal: [`os-matrix/`](os-matrix/) is built and tested to run unchanged
 on **macOS 26** too (see its README).
 
-The examples on this `1.0.0-RC.1` branch build against SDK **`1.0.0-RC.1`**; the ones on `main`
+The examples on this `1.0.0-GA` branch build against SDK **`1.0.0-GA`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
 
 ### What each example needs
@@ -151,7 +152,7 @@ resolution doesn't inherit shell environment variables.
 
 ```bash
 cd examples/repo-qa
-LOCALLM_SDK_VERSION=1.0.0-RC.1 \
+LOCALLM_SDK_VERSION=1.0.0-GA \
   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift run RepoQA facebook/react
 ```
@@ -164,23 +165,27 @@ previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these �
 dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
 
 ```swift
-let defaultSDKVersion = "1.0.0-RC.1"
+let defaultSDKVersion = "1.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-beta.4": SDKRelease(url: "…/v1.0.0-beta.4/LocalLMLabSDKCore-1.0.0-beta.4.xcframework.zip",
-                               checksum: "3ed0e79b…"),
     "1.0.0-RC.1": SDKRelease(url: "…/v1.0.0-RC.1/LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip",
                              checksum: "397e7b5f…"),
+    "1.0.0-GA": SDKRelease(url: "…/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip",
+                           checksum: "7d77a9c2…"),
 ]
 ```
 
 To use a release that isn't listed, add an entry. The URL always follows
 `https://github.com/ancientcomputing/locallm/releases/download/v<version>/LocalLMLabSDK<Module>-<version>.xcframework.zip`,
-and the checksum is the `.sha256` file published next to each `.xcframework.zip` on that release:
+and the checksum is the `.sha256` file published next to each `.xcframework.zip` on that release —
+every module ships its own checksum (`Core`, `Inference`, `Remote`, and `Claude` each have a
+distinct `.xcframework.zip.sha256`; don't reuse Core's for another module):
 
 ```bash
-curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-beta.1/LocalLMLabSDKCore-1.0.0-beta.1.xcframework.zip.sha256
-# → 0b4ab34e474d1acd725161cfb591cf3d862a7529fe7c9dbadf01eece3ad1590f
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip.sha256
+# → 7d77a9c2e37dfb2f7925f01ed011262ee5a2aebc561a3ae7a93524acc0285b3e
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLMLabSDKClaude-1.0.0-GA.xcframework.zip.sha256
+# → 2c69c330c8a5e3929b9544fcb865738d0ec39abc7520462cae4f138214e6858f
 ```
 
 Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass

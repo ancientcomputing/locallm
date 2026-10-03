@@ -57,8 +57,8 @@ below for the same app rebuilt on Core's ready-made "Path A" `Tool`s instead.
 
 ```swift
 // "What's on my plate today" — v1: Todoist (via Core's MCP client) + Calendar + Reminders (also
-// via Core, through CalendarAccess/RemindersAccess — see below). Linear is a planned v2 addition,
-// deliberately deferred.
+// via Core, through CalendarAccess/RemindersAccess — see below). Linear is intentionally out of
+// scope for this example — it demonstrates Calendar/Reminders/Todoist only.
 //
 // SwiftUI app shape (not a bare CLI): launch -> request Calendar/Reminders/Todoist access on
 // first run -> pull + synthesize -> show result -> Done closes the app. Packaged as a real signed
@@ -79,10 +79,9 @@ struct TodaysEventsTool: Tool {
     let description = "Retrieve the user's calendar events for today"
 
     // Zero-property Arguments is valid and correct for a no-input tool (proven by Core's
-    // ClockTool) -- an earlier "unused placeholder" field here was a fragile workaround that
-    // actively caused decode failures: FoundationModels sometimes calls a tool with genuinely
-    // empty generated content when no argument makes sense, and a required-but-unused field then
-    // fails to decode from that empty content.
+    // ClockTool). Don't add a placeholder field to satisfy the schema: FoundationModels
+    // sometimes calls a tool with genuinely empty generated content when no argument makes
+    // sense, and a required-but-unused field then fails to decode from that empty content.
     @Generable
     struct Arguments {}
 
@@ -106,10 +105,9 @@ struct TodaysRemindersTool: Tool {
     let description = "Retrieve the user's incomplete reminders due today"
 
     // Zero-property Arguments is valid and correct for a no-input tool (proven by Core's
-    // ClockTool) -- an earlier "unused placeholder" field here was a fragile workaround that
-    // actively caused decode failures: FoundationModels sometimes calls a tool with genuinely
-    // empty generated content when no argument makes sense, and a required-but-unused field then
-    // fails to decode from that empty content.
+    // ClockTool). Don't add a placeholder field to satisfy the schema: FoundationModels
+    // sometimes calls a tool with genuinely empty generated content when no argument makes
+    // sense, and a required-but-unused field then fails to decode from that empty content.
     @Generable
     struct Arguments {}
 
@@ -137,10 +135,9 @@ struct TodaysLocationTool: Tool {
     let description = "Returns the user's current one-shot location (place name, if available) — useful as input to the weather tool."
 
     // Zero-property Arguments is valid and correct for a no-input tool (proven by Core's
-    // ClockTool) -- an earlier "unused placeholder" field here was a fragile workaround that
-    // actively caused decode failures: FoundationModels sometimes calls a tool with genuinely
-    // empty generated content when no argument makes sense, and a required-but-unused field then
-    // fails to decode from that empty content.
+    // ClockTool). Don't add a placeholder field to satisfy the schema: FoundationModels
+    // sometimes calls a tool with genuinely empty generated content when no argument makes
+    // sense, and a required-but-unused field then fails to decode from that empty content.
     @Generable
     struct Arguments {}
 
@@ -171,10 +168,9 @@ struct TodoistTasksTool: Tool {
     let serverURL: URL
 
     // Zero-property Arguments is valid and correct for a no-input tool (proven by Core's
-    // ClockTool) -- an earlier "unused placeholder" field here was a fragile workaround that
-    // actively caused decode failures: FoundationModels sometimes calls a tool with genuinely
-    // empty generated content when no argument makes sense, and a required-but-unused field then
-    // fails to decode from that empty content.
+    // ClockTool). Don't add a placeholder field to satisfy the schema: FoundationModels
+    // sometimes calls a tool with genuinely empty generated content when no argument makes
+    // sense, and a required-but-unused field then fails to decode from that empty content.
     @Generable
     struct Arguments {}
 
