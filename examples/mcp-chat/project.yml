@@ -1,0 +1,83 @@
+# XcodeGen spec for the "double-click, Run" variant of MCP Chat.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates MCPChat.xcodeproj
+#
+# The generated MCPChat.xcodeproj IS committed — a fresh clone opens it and Runs.
+# Edit project.yml, not the .xcodeproj, then regenerate. packaging/build-and-sign.sh remains the
+# way to make a distributable .app.
+#
+# App-Sandboxed with outbound network only (MCP servers, OAuth, the one-time model download) — the
+# same entitlements as packaging/MCPChat.entitlements. To use an existing model cache instead of
+# downloading, turn App Sandbox off and set MCPCHAT_MODEL_CACHE in the scheme's Run environment.
+#
+# Info.plist is written by XcodeGen to xcodeproj/MCPChat-Info.plist (committed) from the
+# `properties` below — separate from packaging/Info.plist, which build-and-sign.sh owns. The
+# `mcpchat:` URL scheme (MCP OAuth redirect target) is carried here too.
+#
+# Signing: CODE_SIGN_STYLE = Automatic, no hard-coded team — resolves to your Apple Development
+# identity in Xcode. None -> Run says "requires a development team" until you add an Apple ID
+# (Xcode > Settings > Accounts, free is enough) or switch to "Sign to Run Locally".
+name: MCPChat
+options:
+  bundleIdPrefix: lab.locallm.mcpapps
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  MCPChat:
+    build:
+      targets:
+        MCPChat: all
+    run:
+      config: Debug
+packages:
+  MCPChatPackage:
+    path: .
+  Components:
+    path: ../../Components
+  MCPAppsHost:
+    path: ../../MCPAppsHost
+targets:
+  MCPChat:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MCPChat
+    info:
+      path: xcodeproj/MCPChat-Info.plist
+      properties:
+        CFBundleDisplayName: MCP Chat
+        CFBundleName: MCP Chat
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+        CFBundleURLTypes:
+          - CFBundleURLName: lab.locallm.mcpapps.chat.oauth
+            CFBundleURLSchemes: [mcpchat]
+    # XcodeGen owns (regenerates) this file — separate from packaging/MCPChat.entitlements,
+    # which build-and-sign.sh owns.
+    entitlements:
+      path: xcodeproj/MCPChat.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.mcpapps.chat
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: Components
+        product: LocalLMLabSDKCore
+      - package: Components
+        product: LocalLMLabSDKComponents
+      - package: MCPAppsHost
+        product: LocalLMLabSDKMCPAppsHost
+      - package: MCPChatPackage
+        product: LocalLMLabSDKInference

@@ -13,7 +13,20 @@ Release, `Components` (`../../Components`) and `MCPAppsHost` (`../../MCPAppsHost
 source. Needs macOS 27 and Xcode 27 (Swift 6.4). No Metal Toolchain needed — the prebuilt Inference
 xcframework bundles the compiled shaders.
 
-## Build and run
+## Open in Xcode and Run
+
+```bash
+open -a Xcode MCPChat.xcodeproj
+```
+
+Pick the **MCPChat** scheme and Run. The app is App-Sandboxed with outbound network only, like the
+packaged build. Signing is *Automatic* with no hard-coded team: add an Apple ID in **Xcode ▸ Settings
+▸ Accounts** (free is enough), or switch Signing to **Sign to Run Locally**.
+
+Generated from [`project.yml`](project.yml) with [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Edit `project.yml`, not the `.xcodeproj`, then run `xcodegen generate`.
+
+## Build and run from the command line
 
 ```bash
 packaging/build-and-sign.sh            # sandboxed release build → dist/MCP Chat.app

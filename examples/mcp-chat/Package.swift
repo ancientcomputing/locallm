@@ -56,6 +56,12 @@ guard let sdk = knownSDKReleases[requested] else {
 let package = Package(
     name: "MCPChat",
     platforms: [.macOS("27.0")],
+    products: [
+        // Vend the Inference binary as a library product so the XcodeGen .xcodeproj variant
+        // (project.yml) can depend on it by name. `swift build` doesn't need this. Core comes from
+        // Components' own product, never re-declared here (see above).
+        .library(name: "LocalLMLabSDKInference", targets: ["LocalLMLabSDKInference"])
+    ],
     dependencies: [
         .package(path: "../../Components"),
         .package(path: "../../MCPAppsHost"),
