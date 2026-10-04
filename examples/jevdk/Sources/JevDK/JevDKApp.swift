@@ -45,6 +45,9 @@ struct JevDKApp: App {
         .commands {
             // Four kinds of file (README "Files"): the workspace (JevDK's own, everything), the
             // questions for your app (the SDK's DecisionQuestionSet), answers (CSV), and results (CSV).
+            CommandGroup(replacing: .appInfo) {
+                Button("About JevDK") { AboutPanel.show() }
+            }
             CommandGroup(replacing: .newItem) {
                 Section("Workspace") {
                     Button("Open…") { model.open() }.keyboardShortcut("o")
@@ -358,6 +361,40 @@ struct BackendsSheet: View {
         .padding(20)
         .frame(width: 620)
         .font(.jBody)
+    }
+}
+
+/// JevDK → About: the icon, the version, and where to read about decision models.
+enum AboutPanel {
+    static let webPage = URL(string: "https://thisbrain.ai/locallm/jev.html")!
+
+    /// The app's version when it runs as a built app (Xcode, or the DMG's), else "development build"
+    /// (`swift run` has no bundle to carry one).
+    static var version: String {
+        let info = Bundle.main.infoDictionary
+        guard let short = info?["CFBundleShortVersionString"] as? String else { return "development build" }
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { $0 == short ? short : "\(short) (\($0))" } ?? short
+    }
+
+    static func show() {
+        let body = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        let credits = NSMutableAttributedString(
+            string: "A playground for decision-model (Jev) questions.\nBuilt on the LocalLM Lab SDK \(LocalLMLabSDKVersion.current).\n\n",
+            attributes: [.font: body, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: centered])
+        credits.append(NSAttributedString(string: "Decision models (Jev) in your app", attributes: [
+            .font: body, .link: webPage, .paragraphStyle: centered,
+        ]))
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [
+            .applicationIcon: AppIcon.image(),
+            .applicationName: "JevDK",
+            .applicationVersion: version,
+            .version: "",                     // the build number is already in applicationVersion
+            .credits: credits,
+        ])
+        NSApplication.shared.activate()
     }
 }
 
