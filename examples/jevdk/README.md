@@ -23,7 +23,7 @@ Hugging Face cache and Keychain keys. Generated from [`project.yml`](project.yml
 **A signed, notarized DMG to share:** `VERSION=x.y.z APP_IDENTITY=… KEYCHAIN_PROFILE=… scripts/release_macos.sh`
 (Developer ID identity, `notarytool` profile; options in the script's header) → `dist/JevDK-x.y.z-arm64.dmg`.
 
-**New to decision models?** Read [the developer's guide](GUIDE.md) first: what a decider is,
+**New to decision models?** Read [the developer's guide](GUIDE.md) first ([on the web](https://thisbrain.ai/locallm/jdk-guide.html), with screenshots): what a decider is,
 when to use one, and the workflow from writing questions to shipping them, with a worked example.
 
 ## The idea
