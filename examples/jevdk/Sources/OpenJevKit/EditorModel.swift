@@ -217,8 +217,11 @@ public struct QuestionResult: Identifiable, Sendable {
             default:
                 return nil
             }
+            // Hosted runs have no labels of their own (they answer with the keys); show the same
+            // position labels a local run does (A, B, … for a choice) so the two line up.
+            let positional = q.kind == .choice ? keys.indices.map { String(UnicodeScalar(65 + min($0, 25))!) } : keys
             return QuestionResult(
-                question: q, keys: keys, labels: diag?.labels ?? keys, descriptions: descs, probabilities: probs,
+                question: q, keys: keys, labels: diag?.labels ?? positional, descriptions: descs, probabilities: probs,
                 rawProbabilities: probs, confidence: conf, labelMass: diag?.labelMass ?? 1, prompt: diag?.prompt ?? prompt,
                 milliseconds: diag?.milliseconds ?? perQuestionMS, fidelity: d.fidelity)
         }

@@ -256,6 +256,7 @@ struct BackendAnswer: View {
                 HStack(spacing: 8) {
                     Text(result.labels[i])
                         .font(.system(size: 12, design: .monospaced).weight(.bold))
+                        .lineLimit(1)
                         .frame(width: 28, alignment: .leading)
                     Text(optionText(i))
                         .font(.jCaption)
