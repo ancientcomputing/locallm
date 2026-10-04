@@ -64,6 +64,11 @@ let package = Package(
     platforms: [.macOS("27.0")],
     products: [
         .library(name: "OpenJevKit", targets: ["OpenJevKit"]),
+        // Vend the binaries as library products so the XcodeGen .xcodeproj variant (project.yml)
+        // can depend on them by name. `swift build` doesn't need this.
+        .library(name: "LocalLMLabSDKCore", targets: ["LocalLMLabSDKCore"]),
+        .library(name: "LocalLMLabSDKRemote", targets: ["LocalLMLabSDKRemote"]),
+        .library(name: "LocalLMLabSDKInference", targets: ["LocalLMLabSDKInference"]),
     ],
     targets: [
         .binaryTarget(name: "LocalLMLabSDKCore", url: sdk.coreURL, checksum: sdk.coreChecksum),

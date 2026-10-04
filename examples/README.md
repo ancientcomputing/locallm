@@ -72,7 +72,7 @@ build against the latest stable release. No environment variable is needed for e
 | `mlx-control-room` | SwiftUI + App Sandbox (network only) | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); it keeps no security-scoped bookmark, so **Sign to Run Locally** works too | **any** identity — `packaging/build-and-sign.sh` |
 | `components-updates-demo` | SwiftUI, no system permissions, simulated data | ✅ via `Package.swift` / `swift run` (no `.xcodeproj`) | — (no `packaging/`) |
 | `workspace-buddy`, `workspace-buddy-local`, `aiql` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
-| `jevdk` | SwiftUI, no system permissions, no sandbox; hosted deciders optional (Featherless demo needs no key) | ✅ via `Package.swift` / `swift run -c release JevDK` (no `.xcodeproj`) | — (no `packaging/`) |
+| `jevdk` | SwiftUI, no system permissions, no sandbox; hosted deciders optional (Featherless demo needs no key) | ✅ via the committed `.xcodeproj` — ad-hoc signed (*Sign to Run Locally*), not sandboxed, no account needed; or `swift build -c release` and run `.build/release/JevDK` | — (no `packaging/`) |
 | `mcp-chat` | SwiftUI + App Sandbox (network) | Compile-only via `Package.swift` / `swift build` (no `.xcodeproj`) | **any** identity, or **none** (`APP_IDENTITY=-`) — `packaging/build-and-sign.sh` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
