@@ -46,6 +46,7 @@ deeply. Ordered smallest → largest:
 | A CLI coding agent — two models with routing, workspace + host `Process` tools, MCP | [`code-buddy`](../examples/code-buddy) | 298 |
 | An MCP dataset pulled through a mechanical SQL pipeline instead of the model copying rows | [`aiql`](../examples/aiql) | 381 |
 | An MLX model shipped pinned to an exact commit, plus checking a small model really called its tool | [`vistanova`](../examples/vistanova) | 931 (whole app) |
+| Decision models (Jev): design and test typed questions on a local MLX model and hosted Jev, then export them for your app ([§6c](#6c-decision-models-jev--labdecide)) | [`jevdk`](../examples/jevdk) | ~3,000 (whole app) |
 
 Line counts are from
 [`annotated-examples.md`](annotated-examples.md#how-much-code-is-this-really), which also has the
@@ -1741,6 +1742,211 @@ plain `RemoteProviderDraft` / `ProviderTestOutcome` values, so a macOS-26 host a
 panel and hand the actual `RemoteModelProvider` work to a 27-only helper. → *the full pattern
 is [`examples/model-switch`](../examples/model-switch/).*
 
+## 6c. Decision models (Jev) — `lab.decide`
+
+> **Reach for this when** your app needs a small, fixed decision about some text — which route,
+> which team, does this need the web, is this sensitive — and you'd otherwise ask a chat model and
+> parse its reply.
+>
+> **New to decision models?** They behave nothing like a chatbot. Read
+> [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html) first (what they
+> are, for people who know chatbots, with links to TypeSafe's and others' docs), then
+> [JevDK's developer's guide](../examples/jevdk/GUIDE.md) for the workflow.
+>
+> **Examples that use it:** [`jevdk`](../examples/jevdk/).
+
+A **decision model** (a *decider*) takes one input and a few typed questions, and answers each
+with one of the options you allowed plus a probability for every option. It writes no text.
+TypeSafe's **Jev** is the original; the SDK uses Jev's vocabulary and asks the same questions of
+three backends:
+
+| Decider | Runs | Module | OS | `Decision.fidelity` |
+|---|---|---|---|---|
+| **OpenJev** (`OpenJevDecisionProvider`) | On the Mac, on an MLX model | Inference | macOS 27 | `.tokenScored(calibrated:)` |
+| **TypeSafe Jev** via OpenRouter (`JevDecisionProvider(.openRouter(key:))`) | Hosted | Remote | macOS 26+ | `.native` |
+| **Featherless Simple Jev** (`.featherless(key:)`, `.featherlessDemo()`) | Hosted | Remote | macOS 26+ | `.tokenScored(calibrated: false)` |
+
+`lab.decide` and everything else in this section except OpenJev is in Core and works on macOS 26.
+
+### Register a decider and route to it
+
+Deciders are registered and routed separately from chat models (they never appear in a chat
+model picker), with their own scheme namespace:
+
+```swift
+import LocalLMLabSDKInference   // OpenJev
+import LocalLMLabSDKRemote      // hosted Jev
+
+try lab.models.register(decision: OpenJevDecisionProvider(mlx: mlx))        // the MLXModelProvider you already use
+lab.models.route(decision: "support", to: ModelID("openjev:mlx-community/Qwen3-4B-4bit")!)
+
+// or hosted — off until you register one; questions and input are then sent to that service
+try lab.models.register(decision: JevDecisionProvider(.openRouter(key: key)))
+lab.models.route(decision: "support", to: ModelID("openrouter:typesafe/jev-1.13")!)
+```
+
+`ModelRegistry` also has `replace(decision:)`, `removeDecisionProvider(scheme:)`,
+`modelID(forDecision:)`, `decisionProvider(for:)` and `decisionAvailability(for:)` (a
+`ModelAvailability`, e.g. not downloaded or needs a key). Decision routes are saved by
+`lab.snapshot()` like chat routes.
+
+### Ask
+
+```swift
+let d = try await lab.decide(route: "support", state: .text(message), questions: [
+    .choice("team", "Which team should handle this message?", criteria: [
+        "billing": "payments, invoices and refunds",
+        "technical": "bugs, outages and product errors",
+        "account": "profile, login and subscription changes",
+    ]),
+    .noul("refund", "Does the customer explicitly ask for money back?"),
+    .score("urgency", "How urgent is it?", criteria: ["can wait", "soon", "now"]),
+])
+
+d.choice("team")      // ChoiceAnswer: .choice "technical", .confidence, .probabilities ["billing": …, …]
+d.noul("refund")      // Double: probability of yes
+d.score("urgency")    // ScoreAnswer: .score 1.6 (expected level, 0-based), .level, .probabilities, .legend
+d.fidelity            // .native or .tokenScored(calibrated:)
+d.modelID, d.latency, d.usage   // usage: tokens and cost, from hosted backends
+```
+
+- **Question kinds** use Jev's names: `noul` (yes / no; the answer is P(yes)), `choice` (one of
+  several, each with an optional description), `score` (an ordered scale described in words).
+  Ids are what your code reads; `instructions` is what the model reads.
+- **The input** is `state`: `.text(String)`, or `try .encoding(someEncodable)` to send JSON. For
+  a conversation, send the last few turns, not the whole history.
+- **There is no system prompt.** Hosted Jev has none, so context there never reaches it; put
+  anything a question needs in `state` or in the question. Then the same questions behave the same
+  on every backend.
+- **Validated before anything is sent** (unique ids, at least two options, the backend's
+  `DecisionLimits`) and checked after (every question answered, the right kind, probabilities in
+  0–1). Errors are `DecisionError`: `.invalidRequest`, `.noRoute`, `.unavailable`,
+  `.malformedAnswer`, `.backend` (a hosted service's own message), `.pairing`.
+- **Input size.** `DecisionLimits.maxStateCharacters` makes an over-long input fail before it's
+  sent, telling you to shorten it. The Featherless demo preset sets 6,000 characters.
+- **One route per call.** To ask some questions locally and others hosted, make two calls; the
+  split (and the order: a local privacy question first, say) is your app's policy.
+
+### Confidence, fidelity and calibration
+
+`.native` probabilities come from a model trained to make decisions (TypeSafe). `.tokenScored`
+ones are read off an ordinary language model — how likely it was to say each option's label —
+and on a small model they're often 100% even when it's wrong. Don't put tight thresholds on
+uncalibrated `.tokenScored` answers.
+
+For a local decider you fit a **calibration** on your own marked answers (JevDK's **Calibrate…**
+does it) and pass it in; `fidelity` then says `.tokenScored(calibrated: true)`. It holds for one
+model, revision, wrapper and kind of question, so the SDK ships no fitted values.
+
+```swift
+let cal = DecisionCalibration.fit(samples)            // [DecisionCalibration.Sample], from marked answers
+cal.measure(samples)                                   // accuracy, expectedCalibrationError, logLoss
+let openjev = OpenJevDecisionProvider(mlx: mlx, calibration: cal)
+```
+
+Calibration is temperature scaling per question kind: it never changes which answer wins, only
+how sure it says it is.
+
+### OpenJev: the local decider
+
+- **How it decides:** one forward pass per question, no generation. Each option gets a
+  single-token label (`A`–`Z`, `0`–`9`, `Yes`/`No`) and OpenJev reads the probability of each
+  label. The input is processed once and shared by all the questions, so four questions on Qwen3
+  4B take about 150 ms. That's also why its limits are smaller than hosted Jev's: up to 26 choice
+  options, 10 score levels, 64 questions a call.
+- **The wrapper.** Each question goes to the model inside a fixed prompt (`OpenJevWrapper.default`:
+  *"You answer questions about a piece of text…"*, the input labelled `Text`), chosen with the
+  SDK's evaluation set. You can pass your own `OpenJevWrapper`, but the wording moves answers as
+  much as your questions do, so change it only with your answer set to check against.
+- **Which model.** A small **dense** instruct model: Qwen3-4B-4bit is the tested default (2.6 GB).
+  Qwen3-1.7B is too weak. **Not a mixture-of-experts model**: an MoE model's probabilities
+  shifted with how the prompt was split. `openjev.warnings(for:)` returns
+  `.mixtureOfExperts` for one (a warning, not a block).
+- **Only models the SDK downloaded count.** Availability follows `MLXModelProvider`: a copy
+  another tool put in the Hugging Face cache reads as not downloaded until the SDK has verified it.
+- **Debugging:** `decideWithDiagnostics(_:using:)` also returns each question's exact prompt,
+  how much probability fell on the allowed labels (`labelMass`; low means the model wanted to
+  answer something else, so reword the question) and its timing.
+
+### Hosted Jev
+
+`JevProviderConfig` presets set the endpoint, scheme, fidelity, limits and model list:
+`.openRouter(key:)` (TypeSafe's `typesafe/jev-1.13`; `typesafe/jev-router` picks a model for
+you), `.featherless(key:)` and `.featherlessDemo()` (free, rate-limited, no key).
+`validated()` applies the chat providers' checks (https, no line breaks in keys). Questions and
+choice options keep your order on the wire, JSON `state` is sent as JSON, and `d.usage` carries
+the tokens and cost. Like other remote providers, it's off by default and your UI should say
+where inputs are sent.
+
+### A decider and your chat model: one model or two
+
+The pattern the SDK is built for is two models per feature: a decider for the typed choices (does
+this need the web, which tool, is it sensitive) and a chat model for the text, both on the Mac.
+
+- **Share one model.** Route OpenJev and the chat route to the same dense MLX model: one copy in
+  memory. The low-memory option; a big chat model makes a slower decider than a small one.
+- **Two models resident.** `MLXModelProvider` keeps one local model loaded by default
+  (`residentModelLimit: 1`), so a decider asked every turn would evict the chat model. Pair them:
+
+  ```swift
+  lab.models.route(decision: "triage", to: ModelID("openjev:mlx-community/Qwen3-4B-4bit")!)
+  lab.models.route("writer", to: ModelID("mlx:mlx-community/Qwen3.8-27B-4bit")!)
+  let pairing = try await lab.models.pair(decision: "triage", generator: "writer")
+  // DecisionPairing: deciderBytes, generatorBytes, budgetBytes, residentModels, note
+  ```
+
+  `pair(decision:generator:)` checks the two models' weights together against the memory budget
+  (`maxWeightFractionOfRAM`, 70% of RAM by default), raises the model cache's capacity to hold
+  both (never lowers it) and loads them. Doesn't fit: `DecisionError.pairing` with the numbers,
+  and nothing changes. A shared model counts once (and is refused if it's MoE); a hosted decider
+  or a non-MLX chat model (Apple's on-device model) needs only one. On a 64 GB Mac, pairing a
+  Qwen3 4B decider with Qwen3.8 27B took 2.3 s, and the next decision ran in 63 ms with no reload.
+
+- **Still in progress:** keeping the pair loaded under memory pressure (the cache can still
+  unload all but the most recent model then); a measured pair on a 16 GB Mac; and loading
+  text-only uses of vision-capable models with the faster text implementation.
+
+### From JevDK to your app: question sets, answer sets, `lab.evaluate`
+
+Questions are the work, so the SDK carries them from testing to shipping intact:
+
+```swift
+// The questions exactly as tested in JevDK (File → Export for App…), with the model, revision,
+// wrapper and calibration they were tested with.
+let set = try DecisionQuestionSet(contentsOf: Bundle.main.url(forResource: "support.decisions", withExtension: "json")!)
+let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)     // the tested wrapper + calibration
+try lab.models.register(decision: openjev)
+let decider = set.tuning?.model ?? ModelID("openjev:mlx-community/Qwen3-4B-4bit")!
+lab.models.route(decision: "support", to: decider)
+if let why = openjev.tuningMismatch(for: decider) { log(why) }      // a different model or revision on this Mac
+let d = try await lab.decide(route: "support", state: .text(message), questions: set.questions)
+
+// In CI: score any decider against your answer set (CSV: input, then one column per question id).
+let answers = try DecisionAnswerSet(csv: String(contentsOf: answersURL, encoding: .utf8))
+let result = try await lab.evaluate(route: "support", questions: set.questions, answerSet: answers)
+#expect(result.score("refund")!.accuracy >= 0.95)
+```
+
+- `DecisionQuestionSet` is JSON in Jev's question shape (`{id, type, instructions, criteria}`);
+  a file from a newer SDK, or with questions that couldn't be asked, is refused.
+- `DecisionAnswerSet` matches answers leniently (yes/no as Yes, No, true, false, 1, 0; a choice
+  by key; a score by level number or text); `problems(for:)` lists cells that don't fit, and
+  `evaluate` refuses such a set rather than skipping rows.
+- `DecisionEvaluation` gives accuracy per question, the misses, mean confidence when right and
+  when wrong (a big gap means a threshold can catch the misses), calibration error, and
+  `samples` for `DecisionCalibration.fit`.
+
+### Writing questions that work
+
+- Only ask what a model can judge from the input and general knowledge — **never current
+  facts**. "Does this user query need live data?" is fine; "has this changed recently?" isn't.
+- Ask about **what the text says**: "Does the customer *explicitly* ask for money back?" beats
+  "Does the customer want a refund?"
+- Prefer noul and choice; small local models are weakest on score scales.
+- Give choice options short descriptions, not just names.
+- Check every wording on the model you'll ship, against your answer set. Different models
+  prefer different wordings.
+
 ## 7. Connectors: Calendar, Reminders, Contacts, Location
 
 > **Reach for these when** your app's value is "the model can see — or change — my calendar,
@@ -3096,6 +3302,120 @@ enum LocalLMLabSDKVersion { static let current: String }   // "1.0.0-beta.N", "1
 `RemoteModelProvider` / `RemoteProviderConfig` / `RemoteError` in **`LocalLMLabSDKRemote`** (each
 a separate xcframework on the same release — [§1a](#1a-targeting-macos-26-and-macos-27-from-one-build), [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)); `ModelPickerView` / `ClaudeAuthField` /
 `AIModelsSettingsView` are in **`LocalLMLabSDKComponents`** ([§11](#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)).
+
+### Decision models (`lab.decide`, OpenJev, hosted Jev)
+
+Walkthrough: [§6c](#6c-decision-models-jev--labdecide). Core unless marked; `OpenJev*` is
+**`LocalLMLabSDKInference`** (macOS 27), `Jev*` is **`LocalLMLabSDKRemote`**.
+
+```swift
+// --- asking -----------------------------------------------------------------
+extension LocalLMLab {
+    func decide(route: RouteName, state: DecisionState, questions: [DecisionQuestion]) async throws -> Decision
+    func evaluate(route: RouteName, questions: [DecisionQuestion], answerSet: DecisionAnswerSet,
+                  progress: (@MainActor (Int, Int) -> Void)? = nil) async throws -> DecisionEvaluation
+}
+struct DecisionQuestion: Sendable, Hashable, Codable {     // Codable as Jev's {id, type, instructions, criteria}
+    enum Kind { case noul, choice(criteria: [Criterion]), score(levels: [String]) }
+    struct Criterion { var key: String; var description: String?; init(_ key: String, _ description: String? = nil) }
+    var id: String; var instructions: String; var kind: Kind
+    static func noul(_ id: String, _ instructions: String) -> DecisionQuestion
+    static func choice(_ id: String, _ instructions: String, criteria: KeyValuePairs<String, String>) -> DecisionQuestion
+    static func choice(_ id: String, _ instructions: String, criteria: [String]) -> DecisionQuestion
+    static func score(_ id: String, _ instructions: String, criteria: [String]) -> DecisionQuestion
+}
+enum DecisionState { case text(String), json(String); static func encoding<T: Encodable>(_ value: T) throws -> DecisionState }
+struct DecisionRequest { var state: DecisionState; var questions: [DecisionQuestion]; func validate(against: DecisionLimits = .jev) throws }
+struct DecisionLimits { var maxQuestions, maxChoiceCriteria, maxScoreLevels: Int; var maxStateCharacters: Int?; static let jev }
+
+// --- answers ----------------------------------------------------------------
+struct Decision: Sendable, Hashable, Codable {
+    var answers: [String: DecisionAnswer]
+    var modelID: ModelID; var fidelity: DecisionFidelity; var latency: Duration; var usage: DecisionUsage?
+    func noul(_ id: String) -> Double?            // P(yes)
+    func choice(_ id: String) -> ChoiceAnswer?
+    func score(_ id: String) -> ScoreAnswer?
+}
+enum DecisionAnswer { case noul(Double), choice(ChoiceAnswer), score(ScoreAnswer) }
+struct ChoiceAnswer { var choice: String; var confidence: Double; var probabilities: [String: Double] }
+struct ScoreAnswer { var score: Double; var confidence: Double; var probabilities: [Double]; var legend: [String]; var level: Int }
+enum DecisionFidelity { case native, tokenScored(calibrated: Bool) }
+struct DecisionUsage { var inputTokens: Int?; var outputTokens: Int?; var cost: Double? }
+enum DecisionError: Error { case invalidRequest(String), noRoute(RouteName), unavailable(ModelID, ModelAvailability),
+                            malformedAnswer(String), backend(String), pairing(String) }
+
+// --- providers and routes ---------------------------------------------------
+protocol DecisionProvider: Sendable {               // implement your own backend
+    var scheme: String { get }
+    var limits: DecisionLimits { get }               // default: .jev
+    func fidelity(for id: ModelID) -> DecisionFidelity
+    func availability(for id: ModelID) -> ModelAvailability
+    func decide(_ request: DecisionRequest, using id: ModelID) async throws -> Decision
+    func owns(_ id: ModelID) -> Bool                 // default: id.scheme == scheme
+    func prewarm(_ id: ModelID) async                // default: nothing
+}
+extension ModelRegistry {
+    func register(decision: any DecisionProvider) throws; func replace(decision: any DecisionProvider)
+    func removeDecisionProvider(scheme: String)
+    func route(decision: RouteName, to: ModelID); func modelID(forDecision: RouteName) -> ModelID?
+    func decisionProvider(for: ModelID) -> (any DecisionProvider)?; func decisionAvailability(for: ModelID) -> ModelAvailability
+    func pair(decision: RouteName, generator: RouteName) async throws -> DecisionPairing
+}
+struct DecisionPairing { var decider, generator: ModelID; var deciderBytes, generatorBytes, budgetBytes: Int64?
+                         var residentModels: Int; var note: String? }
+protocol PairableDecisionProvider: DecisionProvider { /* a local decider that can stay resident with a generator */ }
+
+// --- OpenJev (LocalLMLabSDKInference, macOS 27) --------------------------------
+struct OpenJevDecisionProvider: PairableDecisionProvider {     // scheme "openjev"; limits 64 questions, 26 options, 10 levels
+    init(mlx: MLXModelProvider, wrapper: OpenJevWrapper = .default, calibration: DecisionCalibration? = nil, scheme: String = "openjev")
+    init(mlx: MLXModelProvider, tunedWith set: DecisionQuestionSet, scheme: String = "openjev")
+    let wrapper: OpenJevWrapper; let calibration: DecisionCalibration?; let tuning: DecisionQuestionSet.Tuning?
+    func warnings(for id: ModelID) -> [OpenJevWarning]          // .mixtureOfExperts
+    func tuningMismatch(for id: ModelID) -> String?             // not the model / revision the set was tested with
+    func decideWithDiagnostics(_ request: DecisionRequest, using id: ModelID) async throws -> (decision: Decision, diagnostics: OpenJevDiagnostics)
+}
+struct OpenJevWrapper { var system: String; var inputLabel: String; static let `default` }
+struct OpenJevDiagnostics { let questions: [String: Question]; let sharedPrefixTokens: Int }   // Question: labels, prompt, labelMass, latency
+
+// --- hosted Jev (LocalLMLabSDKRemote) -------------------------------------------
+struct JevDecisionProvider: DecisionProvider { init(_ config: JevProviderConfig) }
+struct JevProviderConfig {   // scheme, displayName, endpoint, auth, models, allowArbitraryModelIDs, fidelity, limits, responseLimits, timeout
+    static func openRouter(key: String) -> JevProviderConfig     // TypeSafe Jev, .native
+    static func featherless(key: String) -> JevProviderConfig    // .tokenScored(calibrated: false)
+    static func featherlessDemo() -> JevProviderConfig           // no key, rate-limited, maxStateCharacters 6000
+    func validated() throws -> JevProviderConfig
+}
+
+// --- calibration, question sets, answer sets, evaluation ---------------------------
+struct DecisionCalibration: Codable {
+    var noulTemperature, choiceTemperature, scoreTemperature: Double; static let none
+    struct Sample { var kind: Kind; var probabilities: [Double]; var correct: [Int] }   // Kind: .noul, .choice, .score
+    struct Measurement { var count: Int; var accuracy, expectedCalibrationError, logLoss: Double }
+    static func fit(_ samples: [Sample]) -> DecisionCalibration
+    func measure(_ samples: [Sample]) -> Measurement
+    func apply(_ probabilities: [Double], kind: Sample.Kind) -> [Double]
+}
+struct DecisionQuestionSet: Codable {                   // JevDK's "Export for App…"
+    static let currentFormat: Int
+    var format: Int; var name: String; var questions: [DecisionQuestion]; var tuning: Tuning?
+    struct Tuning { var model: ModelID?; var revision, system, inputLabel: String?; var calibration: DecisionCalibration?; var testedAt: Date? }
+    init(name: String, questions: [DecisionQuestion], tuning: Tuning? = nil)
+    init(contentsOf url: URL) throws; init(json: Data) throws; func jsonData() throws -> Data
+}
+struct DecisionAnswerSet: Codable {                     // CSV: input, then one column per question id
+    struct Example { var input: String; var answers: [String: String] }
+    var examples: [Example]
+    init(csv: String) throws; func csv(questionIDs: [String]) -> String
+    func problems(for questions: [DecisionQuestion]) -> [String]
+    static func answerKey(_ raw: String, for q: DecisionQuestion) -> String?
+}
+struct DecisionEvaluation {
+    var modelID: ModelID; var fidelity: DecisionFidelity; var questions: [QuestionScore]; var misses: [Miss]
+    var samples: [DecisionCalibration.Sample]; var decisions: Int; var totalLatency: Duration
+    var accuracy: Double; var calibration: DecisionCalibration.Measurement
+    func score(_ questionID: String) -> QuestionScore?   // marked, correct, accuracy, meanConfidenceWhenRight / WhenWrong
+}
+```
 
 ### Tool authority (`ToolCallAuthorizer`, `ToolImpact`, confirmation)
 

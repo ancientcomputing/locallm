@@ -136,6 +136,18 @@ passed `restoring:` before `tools:`).
   Declare support with `MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())`.
   Reference app: [`examples/mcp-chat`](../examples/mcp-chat/); walkthrough
   [`sdk-guide.md` §3f](sdk-guide.md#3f-mcp-apps-showing-a-servers-interactive-views).
+- **Decision models (Jev).** `lab.decide(route:state:questions:)` asks typed questions (yes / no,
+  one of several, a scale) and gets one allowed answer per question with probabilities, no text.
+  The same call works with TypeSafe's Jev via OpenRouter and Featherless's Simple Jev
+  (`JevDecisionProvider`, `LocalLMLabSDKRemote`) or **OpenJev** on a local MLX model
+  (`OpenJevDecisionProvider`, `LocalLMLabSDKInference`, macOS 27). `lab.models.pair(decision:generator:)`
+  keeps a small decider and your chat model loaded together. `DecisionQuestionSet`,
+  `DecisionAnswerSet` and `lab.evaluate` carry tested questions into your app and score them in
+  CI. Decision routes are separate from chat routes and are saved by `lab.snapshot()`
+  (`LocalLMLabState` gains `decisionRoutes`, defaulted, so existing call sites and saved snapshots
+  are unaffected). Introduction: [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html);
+  API: [`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide); playground:
+  [`examples/jevdk`](../examples/jevdk/).
 - **Local (MLX) model usage, speed and memory per turn**: `MLXUsageMetadataKey` on the response's
   `usage.metadata` (tokens, pp / tg, model calls, MLX memory), and `MLXPrefillMonitor` for "what is the model
   reading right now" while nothing has appeared yet.

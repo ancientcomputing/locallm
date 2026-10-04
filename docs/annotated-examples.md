@@ -2,8 +2,8 @@
 
 The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
-`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, and `mcp-chat`), `// ← SDK (Remote)` (online providers —
-`model-switch` and `security-demo`), `// ← SDK (MCPAppsHost)` (showing MCP servers' interactive views —
+`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat` and `jevdk`), `// ← SDK (Remote)` (online providers —
+`model-switch`, `security-demo` and `jevdk`), `// ← SDK (MCPAppsHost)` (showing MCP servers' interactive views —
 `mcp-chat`), or `// ← Components` (`components-demo`, `components-updates-demo`, and `mcp-chat`). Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
 `plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
@@ -41,6 +41,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`aiql`](#examplesaiql) | 402 | 459 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
 | [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
+| [`jevdk`](#examplesjevdk) | 2,529 | 2,748 | a playground for decision-model questions: local OpenJev and hosted Jev side by side through one API, marked answers, calibration, and the tested questions exported for an app (14 files, excerpted) |
 | [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
 | [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
@@ -3779,6 +3780,230 @@ which puts a ready-made `Components` UI on the same flows, and [`vistanova`](#ex
 minimal end (one `pinnedRevisions:` and nothing else). The one thing worth copying verbatim is
 `AllowMLXCommunityOrShipped`: an allow-list keyed on `mlx-community/` plus the exact artifacts the app itself ships,
 because a curated adapter lives in a different namespace.
+
+## `examples/jevdk`
+
+*2,529 lines of code across 14 files (2,748 with comments). Excerpted: the SDK-facing parts of
+`AppModel.swift` and `HostedBackends.swift` are below; the editor, batch grid, calibration
+sheet, model browser and results-CSV writer are plain SwiftUI and Foundation and are omitted
+(`// …`).*
+
+A playground for **decision models** ([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide);
+for what a decision model is, see [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html)).
+Write yes / no, choice and score questions, run them on a local MLX model and on hosted Jev side
+by side, mark the right answers, calibrate, and export the tested questions for your app. Three
+SDK pieces carry it:
+
+- **`lab.decide`** for every hosted run: each enabled backend is a `JevDecisionProvider`
+  registered under its own scheme with its own decision route, so the demo and the keyed
+  Featherless endpoint coexist in one lab.
+- **`OpenJevDecisionProvider`** for local runs, built with the editor's wrapper so the system
+  instructions stay editable, and called through `decideWithDiagnostics` for the exact prompts
+  and how much probability fell on the allowed labels. It validates against the provider's limits
+  first, as `lab.decide` would.
+- **`DecisionCalibration`, `DecisionQuestionSet`, `DecisionAnswerSet`** for the workflow around
+  the runs: fitting, exporting for an app, and importing / exporting marked answers as CSV.
+
+Links `LocalLMLabSDKCore`, `LocalLMLabSDKInference` and `LocalLMLabSDKRemote`. Not sandboxed;
+API keys live in the Keychain (or, for headless runs, environment variables), never in a file.
+
+### `Sources/JevDK/AppModel.swift` (excerpt)
+
+Runs one input on every enabled backend concurrently: hosted through `lab.decide`, local through
+the OpenJev provider directly. Note there is no prompt building and no answer parsing anywhere:
+questions go in typed, answers come back typed.
+
+```swift
+import AppKit
+import Foundation
+import LocalLMLabSDKCore   // ← SDK
+import LocalLMLabSDKInference   // ← SDK (Inference)
+import LocalLMLabSDKRemote   // ← SDK (Remote)
+import Observation
+import OpenJevKit
+import UniformTypeIdentifiers
+    // …
+    let lab = LocalLMLab()   // ← SDK
+    /// Local models: listing, preflight, download, and the weights OpenJev scores on.
+    let mlx = MLXModelProvider()   // ← SDK (Inference)
+    private var batchTask: Task<Void, Never>?
+    // …
+    func refreshModels() {
+        let probe = OpenJevDecisionProvider(mlx: mlx)   // ← SDK (Inference)
+        models = mlx.installed.map { m in   // ← SDK (Inference)
+            LocalChoice(repoID: m.repoID, sizeBytes: m.sizeBytes,
+                        isMoE: probe.warnings(for: Self.openJevID(m.repoID)).contains(.mixtureOfExperts))   // ← SDK (Inference)
+        }.sorted { ($0.sizeBytes ?? 0) < ($1.sizeBytes ?? 0) }
+    // …
+    private struct HostedPlan {
+        let route: RouteName   // ← SDK
+        let label: String
+        let requestPreview: String
+        let info: ResultsCSV.BackendInfo
+    }
+
+    /// Register the enabled hosted backends and point a decision route at each. Re-registered every
+    /// run so a changed key or model takes effect.
+    private func hostedPlans(for request: DecisionRequest) -> [HostedPlan] {   // ← SDK
+        enabledHosted.compactMap { b in
+            let model = hostedModel[b] ?? b.defaultModel
+            guard let id = b.modelID(model) else { return nil }
+            lab.models.replace(decision: JevDecisionProvider(b.config(key: b.needsKey ? apiKey(b) : nil)))   // ← SDK (Remote)
+            let route = RouteName("hosted.\(b.rawValue)")   // ← SDK
+            lab.models.route(decision: route, to: id)   // ← SDK
+            let body = (try? JevDecisionProvider.requestBody(model: model, request: request))   // ← SDK (Remote)
+                .flatMap { try? JSONSerialization.jsonObject(with: $0) }
+                .flatMap { try? JSONSerialization.data(withJSONObject: $0, options: [.prettyPrinted]) }
+                .map { String(decoding: $0, as: UTF8.self) } ?? ""
+            return HostedPlan(route: route, label: hostedLabel(b),
+                              requestPreview: "POST \(b.config(key: nil).endpoint.absoluteString)\n\(body)",
+                              info: .init(backend: b.rawValue, model: model, revision: nil, sizeBytes: nil, isMoE: nil,
+                                          wrapperLabel: nil, wrapperSystem: nil))
+        }
+    }
+
+    /// Run `input` on every enabled backend, concurrently.
+    private func runAll(_ input: String) async -> [BackendRun] {
+        let questions = set.questions
+        let request = DecisionRequest(state: .text(input), questions: questions.map(\.sdkQuestion))   // ← SDK
+        let plans = hostedPlans(for: request)
+        let local: (LocalChoice, OpenJevDecisionProvider)? = useLocal ? selectedModel.map { m in   // ← SDK (Inference)
+            (m, OpenJevDecisionProvider(mlx: mlx, wrapper: OpenJevWrapper(system: set.system, inputLabel: set.inputLabel)))   // ← SDK (Inference)
+        } : nil
+        let localLabel = self.localLabel
+        let localInfo = local.map { m, openjev in
+            ResultsCSV.BackendInfo(backend: "local", model: m.repoID,
+                                   revision: mlx.installed.first { $0.repoID == m.repoID }?.resolvedRevision,   // ← SDK (Inference)
+                                   sizeBytes: m.sizeBytes, isMoE: m.isMoE,
+                                   wrapperLabel: openjev.wrapper.inputLabel, wrapperSystem: openjev.wrapper.system)
+        }
+
+        return await withTaskGroup(of: (Int, BackendRun).self) { group in
+            if let (m, openjev) = local {
+                // Local runs call the provider directly for its diagnostics (exact prompts, label
+                // mass), validating against its limits first as lab.decide would.
+                group.addTask {
+                    do {
+                        try request.validate(against: openjev.limits)   // ← SDK
+                        let (d, diag) = try await openjev.decideWithDiagnostics(request, using: Self.openJevID(m.repoID))   // ← SDK (Inference)
+                        let qd = diag.questions.mapValues {
+                            QuestionDiagnostics(labels: $0.labels, prompt: $0.prompt, labelMass: $0.labelMass,
+                                                milliseconds: Self.ms($0.latency))
+                        }
+                        let rows = QuestionResult.rows(for: questions, decision: d, diagnostics: qd)
+                        return (0, BackendRun(label: localLabel, result: DecisionResult(
+                            input: input, results: rows, sharedPrefixTokens: diag.sharedPrefixTokens,
+                            milliseconds: Self.ms(d.latency), backend: localLabel), info: localInfo))
+                    } catch {
+                        return (0, BackendRun(label: localLabel, error: error.localizedDescription, info: localInfo))
+                    }
+                }
+            }
+            for (i, plan) in plans.enumerated() {
+                group.addTask { @MainActor in
+                    do {
+                        let d = try await self.lab.decide(route: plan.route, state: .text(input), questions: request.questions)   // ← SDK
+                        let rows = QuestionResult.rows(for: questions, decision: d, prompt: plan.requestPreview)
+                        return (i + 1, BackendRun(label: plan.label, result: DecisionResult(
+                            input: input, results: rows, sharedPrefixTokens: 0, milliseconds: Self.ms(d.latency),
+                            backend: plan.label, usage: d.usage?.summary), info: plan.info,
+                            inputTokens: d.usage?.inputTokens, costUSD: d.usage?.cost))
+                    } catch {
+                        return (i + 1, BackendRun(label: plan.label, error: error.localizedDescription, info: plan.info))
+                    }
+                }
+            }
+            var out: [(Int, BackendRun)] = []
+            for await r in group { out.append(r) }
+            return out.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+    // …
+    /// Fit on the marked answers with the SDK's `DecisionCalibration.fit`.
+    func fitCalibration() {
+        guard let m = selectedModel else { errorMessage = "Pick a local model first."; return }
+        let samples = calibrationSamples
+        guard !samples.isEmpty else { errorMessage = "Mark some correct answers in the batch grid first."; return }
+        let fitted = DecisionCalibration.fit(samples)   // ← SDK
+        calibration = FittedCalibration(
+            noulTemperature: fitted.noulTemperature, choiceTemperature: fitted.choiceTemperature,
+            scoreTemperature: fitted.scoreTemperature, repoID: m.repoID, revision: selectedRevision ?? "?",
+            system: set.system, inputLabel: set.inputLabel, fittedAt: Date(),
+            samples: Dictionary(grouping: samples, by: \.kind.rawValue).mapValues(\.count))
+        applyCalibration = true
+    }
+    // …
+    // MARK: Question set for the app, answer sets
+
+    /// What the questions are being tested with, for the exported question set: the local model,
+    /// its revision, the wrapper and (when it matches) the calibration. Nil with Local off.
+    var exportTuning: DecisionQuestionSet.Tuning? {   // ← SDK
+        guard useLocal, let m = selectedModel else { return nil }
+        let cal = calibrationMismatch == nil ? calibration?.sdk : nil
+        return .init(model: Self.openJevID(m.repoID), revision: selectedRevision, system: set.system,
+                     inputLabel: set.inputLabel, calibration: cal, testedAt: Date())
+    }
+
+    /// The questions as the SDK's `DecisionQuestionSet` JSON, for the app to bundle and load, so
+    /// the shipped questions are exactly the tested ones.
+    func exportForApp() {
+        if let q = set.questions.first(where: { !$0.problems.isEmpty }) {
+            errorMessage = "Fix “\(q.name)” first: \(q.problems.joined(separator: "; "))."
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        let base = set.name.isEmpty ? "questions" : set.name.lowercased().replacingOccurrences(of: " ", with: "-")
+        panel.nameFieldStringValue = "\(base).decisions.json"
+        panel.message = "A question set for your app: bundle it and load it with DecisionQuestionSet(contentsOf:)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let file = DecisionQuestionSet(name: set.name, questions: set.questions.map(\.sdkQuestion), tuning: exportTuning)   // ← SDK
+            try file.jsonData().write(to: url)   // ← SDK
+            errorMessage = nil
+        } catch {
+            errorMessage = "Couldn't export: \(error.localizedDescription)"
+        }
+    }
+
+```
+
+### `Sources/JevDK/HostedBackends.swift` (excerpt)
+
+The SDK presets, each given its own scheme, and where a key comes from.
+
+```swift
+    /// The SDK config, with a scheme of its own so the demo and the keyed Featherless endpoint
+    /// can both be registered in one lab.
+    func config(key: String?) -> JevProviderConfig {   // ← SDK (Remote)
+        var c: JevProviderConfig   // ← SDK (Remote)
+        switch self {
+        case .featherlessDemo: c = .featherlessDemo()   // ← SDK (Remote)
+        case .featherless: c = .featherless(key: key ?? "")   // ← SDK (Remote)
+        case .openRouter: c = .openRouter(key: key ?? "")   // ← SDK (Remote)
+        }
+        c.scheme = rawValue.lowercased()
+        return c
+    }
+    // …
+/// The API key for a hosted backend: the one saved in the Keychain from **Backends**, else the
+/// environment variable (for CI and headless runs). Never printed. There is no key file: a key
+/// in a file next to the code is too easy to commit or share.
+enum APIKeys {
+    static func key(for backend: HostedBackend) -> String? {
+        if let k = Keychain.get(account(backend)), !k.isEmpty { return k }
+        guard let name = backend.keyVariable, let v = ProcessInfo.processInfo.environment[name], !v.isEmpty else { return nil }
+        return v
+    }
+
+    static func account(_ backend: HostedBackend) -> String { "key.\(backend.rawValue)" }
+}
+
+```
+
+**Tally:** 13 lines Core (`// ← SDK`), 9 Inference, 8 Remote, in the excerpts
+above. The decision API itself is a handful of calls (`register`/`replace(decision:)`,
+`route(decision:)`, `decide`, `decideWithDiagnostics`, `DecisionCalibration.fit`,
+`DecisionQuestionSet`, `DecisionAnswerSet`); the rest of the app is the playground around them.
 
 ## `examples/mcp-chat`
 
