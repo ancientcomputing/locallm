@@ -31,6 +31,8 @@ struct JevDKApp: App {
         if NSApplication.shared.activationPolicy() != .regular {
             NSApplication.shared.setActivationPolicy(.regular)
         }
+        // The Dock icon, drawn in code: `swift run` has no bundle to hold one.
+        NSApplication.shared.applicationIconImage = AppIcon.image()
         DispatchQueue.main.async { NSApplication.shared.activate() }
     }
 
@@ -346,5 +348,33 @@ struct BackendsSheet: View {
         .padding(20)
         .frame(width: 620)
         .font(.jBody)
+    }
+}
+
+/// JevDK's Dock icon: "Jdk" in white on LocalLM Lab's blue rounded square (the same design as the
+/// LocalLM Lab app icon). Drawn in code so `swift run` gets it too, with no bundle to hold an image.
+enum AppIcon {
+    static let blue = NSColor(srgbRed: 0x2f / 255, green: 0x6f / 255, blue: 0xed / 255, alpha: 1)
+
+    static func image(size: CGFloat = 512) -> NSImage {
+        NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            // Full-bleed rounded square, corner radius as in LocalLM Lab's icon (14 of 64).
+            blue.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: size * 14 / 64, yRadius: size * 14 / 64).fill()
+
+            let text = NSMutableAttributedString(string: "J", attributes: [
+                .font: NSFont.systemFont(ofSize: size * 0.50, weight: .bold),
+                .foregroundColor: NSColor.white,
+            ])
+            text.append(NSAttributedString(string: "dk", attributes: [
+                .font: NSFont.systemFont(ofSize: size * 0.30, weight: .semibold),
+                .foregroundColor: NSColor.white,
+                .kern: -size * 0.004,
+            ]))
+            // Centre on the glyphs' ink, not the line box, so the mark sits optically centred.
+            let ink = text.boundingRect(with: rect.size, options: [.usesLineFragmentOrigin, .usesDeviceMetrics])
+            text.draw(at: NSPoint(x: rect.midX - ink.midX, y: rect.midY - ink.midY))
+            return true
+        }
     }
 }
