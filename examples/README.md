@@ -22,6 +22,7 @@ Code samples for LocalLM Lab, split by which feature they use.
 | [security-demo/](security-demo/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | Tool authorization: a "Security" panel whose two controls are `Sequence.limited(toMaxImpact:)` (which tools the model sees) and `ConfirmingToolAuthorizer` + `Components.ToolConfirmationPresenter` (whether a call runs or asks first). A frontier model against a real Calendar and a real Todoist MCP server. |
 | [vistanova/](vistanova/) | LocalLM Lab SDK (Core **+ Inference**) | A tiny local search engine: a SwiftUI app that runs web search through a Tavily MCP server on one local model and summarizes on another — by default a downloaded MLX model **shipped pinned to an exact commit** (`MLXModelProvider(pinnedRevisions:)`), so a new upstream version is never picked up silently. Also shows a hand-written `Tool` over an MCP tool, and the defenses a small model needs: verify from `session.events` that it really called the tool, probe `capabilityProbe` before trusting structured output. |
 | [aiql/](aiql/) | LocalLM Lab SDK (Core **+ Inference**) | "Ask your data": a SwiftUI app that pulls an MCP-fronted dataset and writes the spreadsheet you asked for — `FileBackedTool` + the data verbs (`jsonToCsv` / `filterRows` / `sortRows` / …, guide §8b) do every row-level step so a local MLX model can't fabricate a value. Sandboxed; MCP OAuth via the `aiql://` URL scheme. |
+| [jevdk/](jevdk/) | LocalLM Lab SDK (Core **+ Inference + Remote**), **2.0** | The decision API (Jev): a playground for the yes/no, choice and score questions an app asks a decision model. Runs them on a local MLX model (`OpenJevDecisionProvider`) and on hosted Jev (TypeSafe via OpenRouter, Featherless) side by side, scores a batch against your marked answers, fits calibration, appends runs to a results CSV for comparing models, and exports the tested questions for your app (`DecisionQuestionSet`). Comes with [a developer's guide](jevdk/GUIDE.md). |
 | [mcp-chat/](mcp-chat/) | LocalLM Lab SDK (Core **+ Inference** + `Components` + `MCPAppsHost`), **2.0** | MCP Apps in a chat: a local MLX model (or Apple's on-device model) whose tool calls show the server's interactive widget inline in the conversation — Todoist's task list, a system monitor. The widget's own calls go through the session, so they meet the same per-server trust / approval as the model's. Streaming replies, reasoning split out, conversations that survive relaunch. Sandboxed `.app`. |
 
 **Path A vs Path B**, for the four Core-based examples above: two ways to turn a connector or MCP
@@ -71,6 +72,7 @@ build against the latest stable release. No environment variable is needed for e
 | `mlx-control-room` | SwiftUI + App Sandbox (network only) | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); it keeps no security-scoped bookmark, so **Sign to Run Locally** works too | **any** identity — `packaging/build-and-sign.sh` |
 | `components-updates-demo` | SwiftUI, no system permissions, simulated data | ✅ via `Package.swift` / `swift run` (no `.xcodeproj`) | — (no `packaging/`) |
 | `workspace-buddy`, `workspace-buddy-local`, `aiql` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
+| `jevdk` | SwiftUI, no system permissions, no sandbox; hosted deciders optional (Featherless demo needs no key) | ✅ via `Package.swift` / `swift run -c release JevDK` (no `.xcodeproj`) | — (no `packaging/`) |
 | `mcp-chat` | SwiftUI + App Sandbox (network) | Compile-only via `Package.swift` / `swift build` (no `.xcodeproj`) | **any** identity, or **none** (`APP_IDENTITY=-`) — `packaging/build-and-sign.sh` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
@@ -173,7 +175,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     "1.0.0-GA": SDKRelease(url: "…/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip",
                            checksum: "7d77a9c2…"),
     "2.0.0-dev": SDKRelease(url: "…/v2.0.0-dev/LocalLMLabSDKCore-2.0.0-dev.xcframework.zip",
-                            checksum: "20ac14db…"),
+                            checksum: "532bc89a…"),
 ]
 ```
 

@@ -1,0 +1,350 @@
+import AppKit
+import LocalLMLabSDKCore
+import LocalLMLabSDKInference
+import LocalLMLabSDKRemote
+import OpenJevKit
+import SwiftUI
+
+@main
+struct JevDKApp: App {
+    @State private var model = AppModel()
+
+    init() {
+        // Headless checks, both through `lab.decide` like the window:
+        // `JevDK --check <preset name> <repo id>` runs a preset's batch on a local model the SDK
+        // has downloaded and prints the answers, then exits.
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--check"), args.count > i + 2 {
+            HeadlessCheck.run(preset: args[i + 1], modelDir: args[i + 2])
+        }
+        // `JevDK --check-remote <preset> <featherlessDemo|featherless|openRouter> [model]`: the
+        // same, against a hosted Jev. Keys come from the environment or ./.env
+        // (FEATHERLESS_API_KEY / OPENROUTER_API_KEY) and are never printed.
+        if let i = args.firstIndex(of: "--check-remote"), args.count > i + 2 {
+            HeadlessCheck.runRemote(preset: args[i + 1], provider: args[i + 2],
+                                    model: args.count > i + 3 && !args[i + 3].hasPrefix("--") ? args[i + 3] : nil)
+        }
+
+        // Launched with `swift run` there is no app bundle, so macOS starts this as a
+        // background-style process that never becomes active. Claim regular-app status
+        // (only if needed; re-setting it logs "Task policy set failed").
+        if NSApplication.shared.activationPolicy() != .regular {
+            NSApplication.shared.setActivationPolicy(.regular)
+        }
+        DispatchQueue.main.async { NSApplication.shared.activate() }
+    }
+
+    var body: some Scene {
+        WindowGroup("JevDK") {
+            ContentView(model: model)
+                .font(.jBody)
+                .frame(minWidth: 1060, minHeight: 660)
+        }
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Open Question Set…") { model.open() }.keyboardShortcut("o")
+            }
+            CommandGroup(replacing: .saveItem) {
+                Button("Save") { model.save() }.keyboardShortcut("s")
+                Button("Save As…") { model.save(as: true) }.keyboardShortcut("s", modifiers: [.command, .shift])
+                Divider()
+                Button("Export for App…") { model.exportForApp() }.keyboardShortcut("e")
+                Divider()
+                Button("Import Answer Set…") { model.importAnswerSet() }
+                Button("Export Answer Set…") { model.exportAnswerSet() }
+            }
+        }
+    }
+}
+
+struct ContentView: View {
+    @Bindable var model: AppModel
+    @State private var showDownload = false
+    @State private var showBackends = false
+    /// An example waiting for "replace your work?" confirmation.
+    @State private var pendingPreset: Presets.Preset?
+
+    /// The questions panel on the left; hiding it gives the batch grid the whole window.
+    @AppStorage("showQuestionsPanel") private var showEditor = true
+
+    var body: some View {
+        HSplitView {
+            if showEditor {
+                EditorView(model: model)
+                    .frame(minWidth: 380, idealWidth: 460)
+            }
+            ResultsView(model: model)
+                .frame(minWidth: 480)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button {
+                    showEditor.toggle()
+                } label: {
+                    Label(showEditor ? "Hide questions" : "Show questions", systemImage: "sidebar.left")
+                }
+                .help(showEditor ? "Hide the questions panel to give results the whole window" : "Show the questions panel")
+                Menu {
+                    ForEach(Presets.all) { p in
+                        Button(p.set.name) {
+                            if model.workspaceIsPristine { model.loadPreset(p) } else { pendingPreset = p }
+                        }
+                    }
+                } label: {
+                    Label("Examples", systemImage: "square.stack")
+                }
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Picker("Model", selection: $model.selectedModelID) {
+                    if model.models.isEmpty { Text("No models found").tag(String?.none) }
+                    ForEach(model.models) { m in
+                        Text("\(m.displayName) · \(m.sizeText)\(m.isMoE ? " · MoE ⚠︎" : "")")
+                            .tag(Optional(m.id))
+                    }
+                }
+                .frame(width: 300)
+                .help(modelHelp)
+                Button {
+                    model.refreshModels()
+                } label: {
+                    Label("Rescan models", systemImage: "arrow.clockwise")
+                }
+                Button {
+                    showDownload = true
+                } label: {
+                    Label("Models", systemImage: "square.and.arrow.down.on.square")
+                }
+                .help("Choose, download or remove local models")
+                Button {
+                    showBackends = true
+                } label: {
+                    Label("Backends", systemImage: "square.3.layers.3d")
+                }
+                .help("Compare the local model with hosted Jev (Featherless, OpenRouter · TypeSafe)")
+            }
+        }
+        .safeAreaInset(edge: .bottom) { statusBar }
+        .sheet(isPresented: $showDownload) { ModelsSheet(model: model) }
+        .confirmationDialog("Replace your current questions with “\(pendingPreset?.set.name ?? "")”?",
+                            isPresented: Binding(get: { pendingPreset != nil }, set: { if !$0 { pendingPreset = nil } })) {
+            Button("Save to a file first…") {
+                if let p = pendingPreset, model.save(as: true) { model.loadPreset(p) }
+                pendingPreset = nil
+            }
+            Button("Replace", role: .destructive) {
+                if let p = pendingPreset { model.loadPreset(p) }
+                pendingPreset = nil
+            }
+            Button("Cancel", role: .cancel) { pendingPreset = nil }
+        } message: {
+            Text("Your questions, system instructions, inputs, marked answers and calibration are replaced. JevDK only keeps your latest workspace, so save it to a file (⌘S) if you want it back.")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            model.persistNow()
+        }
+        .sheet(isPresented: $showBackends) { BackendsSheet(model: model) }
+    }
+
+    private var modelHelp: String {
+        guard let m = model.selectedModel else { return "No SDK-verified models yet: open Models to choose one." }
+        var s = "\(m.repoID) · \(m.sizeText) · verified by the SDK"
+        if m.isMoE {
+            s += "\nMixture-of-experts: not recommended as a decider. Its probabilities can shift with how the prompt is split."
+        }
+        return s
+    }
+
+    private var statusBar: some View {
+        HStack(spacing: 6) {
+            if model.useLocal, let m = model.selectedModel {
+                Text(m.repoID)
+                if m.isMoE {
+                    Text("· MoE: not recommended as a decider").foregroundStyle(.orange)
+                }
+            }
+            Spacer()
+            let hosted = model.enabledHosted
+            if !hosted.isEmpty {
+                Label("Inputs are sent to \(hosted.map(\.displayName).joined(separator: ", "))", systemImage: "network")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Local only · nothing leaves this Mac").foregroundStyle(.secondary)
+            }
+            Text("· via lab.decide").foregroundStyle(.tertiary)
+        }
+        .font(.jCaption)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(.bar)
+    }
+}
+
+/// `--check` / `--check-remote`: a preset's batch through `lab.decide`, printed.
+@MainActor
+enum HeadlessCheck {
+    static func runRemote(preset name: String, provider: String, model: String?) -> Never {
+        guard let p = preset(name), let backend = HostedBackend(rawValue: provider) else {
+            print("unknown preset or provider (have: \(HostedBackend.allCases.map(\.rawValue)))"); exit(1)
+        }
+        let key = backend.keyVariable.flatMap { KeyFile.key(named: $0) }
+        if backend.needsKey { print("key: \(key == nil ? "MISSING" : "found (\(key!.count) chars)")") }
+        let lab = LocalLMLab()
+        try? lab.models.register(decision: JevDecisionProvider(backend.config(key: key)))
+        let modelName = model ?? backend.defaultModel
+        lab.models.route(decision: "check", to: backend.modelID(modelName)!)
+        print(backend.label(model: modelName))
+        run(lab: lab, preset: p, pause: backend.minInterval,
+            info: .init(backend: backend.rawValue, model: modelName, revision: nil, sizeBytes: nil, isMoE: nil,
+                        wrapperLabel: nil, wrapperSystem: nil))
+    }
+
+    static func run(preset name: String, modelDir repo: String) -> Never {
+        guard let p = preset(name) else { print("unknown preset \(name)"); exit(1) }
+        let mlx = MLXModelProvider()
+        let openjev = OpenJevDecisionProvider(mlx: mlx, wrapper: OpenJevWrapper(system: p.set.system, inputLabel: p.set.inputLabel))
+        let id = AppModel.openJevID(repo)
+        guard openjev.availability(for: id).isAvailable else {
+            print("\(repo) isn't available to the SDK (\(openjev.availability(for: id))); download or verify it first."); exit(1)
+        }
+        print("\(repo)\(openjev.warnings(for: id).isEmpty ? "" : " · \(openjev.warnings(for: id))")")
+        let lab = LocalLMLab()
+        try? lab.models.register(decision: openjev)
+        lab.models.route(decision: "check", to: id)
+        let installed = mlx.installed.first { $0.repoID == repo }
+        run(lab: lab, preset: p, pause: .zero,
+            info: .init(backend: "local", model: repo, revision: installed?.resolvedRevision, sizeBytes: installed?.sizeBytes,
+                        isMoE: openjev.warnings(for: id).contains(.mixtureOfExperts),
+                        wrapperLabel: p.set.inputLabel, wrapperSystem: p.set.system))
+    }
+
+    private static func preset(_ name: String) -> Presets.Preset? {
+        Presets.all.first { $0.set.name.lowercased() == name.lowercased() }
+    }
+
+    /// `--csv <file>` after either check appends the run to a results CSV, as the window's
+    /// Results CSV button does (no marked answers headless, so `expected` / `correct` are empty).
+    private static func run(lab: LocalLMLab, preset p: Presets.Preset, pause: Duration, info: ResultsCSV.BackendInfo,
+                            setup: @escaping @Sendable () async -> Void = {}) -> Never {
+        let args = CommandLine.arguments
+        let csv = args.firstIndex(of: "--csv").flatMap { args.count > $0 + 1 ? URL(fileURLWithPath: args[$0 + 1]) : nil }
+        let started = Date()
+        let runInfo = ResultsCSV.RunInfo(runID: ResultsCSV.newRunID(at: started), savedAt: started,
+                                         sdkVersion: LocalLMLabSDKVersion.current, machine: ResultsCSV.machine,
+                                         questionSet: p.set.name)
+        Task { @MainActor in
+            await setup()
+            var lines: [String] = []
+            let questions = p.set.questions.map(\.sdkQuestion)
+            for line in p.batch.split(separator: "\n").map(String.init) where !line.isEmpty {
+                do {
+                    let d = try await lab.decide(route: "check", state: .text(line), questions: questions)
+                    let rows = QuestionResult.rows(for: p.set.questions, decision: d)
+                    let result = DecisionResult(input: line, results: rows, sharedPrefixTokens: 0,
+                                                milliseconds: Double(d.latency.components.seconds) * 1000 + Double(d.latency.components.attoseconds) / 1e15,
+                                                backend: info.model)
+                    lines += ResultsCSV.rows(run: runInfo, backend: info, result: result, labels: [:],
+                                             inputTokens: d.usage?.inputTokens, costUSD: d.usage?.cost)
+                    let cells = rows.map { "\($0.question.name)=\($0.answer) \(Int(($0.confidence * 100).rounded()))%" }
+                    let ms = Double(d.latency.components.seconds) * 1000 + Double(d.latency.components.attoseconds) / 1e15
+                    print(String(format: "%5.0f ms  ", ms) + line.prefix(60) + "\n          " + cells.joined(separator: "  ")
+                          + (d.usage?.summary.map { "\n          [\($0)]" } ?? ""))
+                } catch {
+                    print("error: \(error.localizedDescription)")
+                    break
+                }
+                if pause > .zero { try? await Task.sleep(for: pause) }
+            }
+            if let csv {
+                do {
+                    try ResultsCSV.append(lines, to: csv)
+                    print("appended \(lines.count) rows to \(csv.path) (run \(runInfo.runID))")
+                } catch {
+                    print("csv: \(error.localizedDescription)")
+                }
+            }
+            exit(0)
+        }
+        RunLoop.main.run()
+        exit(0)
+    }
+}
+
+struct BackendsSheet: View {
+    @Bindable var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var keyDrafts: [HostedBackend: String] = [:]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Backends").font(.jHeadline)
+            Text("Every backend that's on answers the same questions through lab.decide, shown side by side. Hosted backends receive the input text and the questions.")
+                .font(.jCallout).foregroundStyle(.secondary)
+
+            GroupBox {
+                Toggle(isOn: $model.useLocal) {
+                    VStack(alignment: .leading) {
+                        Text("Local").fontWeight(.medium)
+                        Text("openjev:\(model.selectedModel?.repoID ?? "no model") · token-scored · on this Mac").font(.jCaption).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
+            ForEach(HostedBackend.allCases) { b in
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle(isOn: Binding(get: { model.hostedEnabled[b] ?? false }, set: { model.hostedEnabled[b] = $0 })) {
+                            VStack(alignment: .leading) {
+                                Text(b.displayName).fontWeight(.medium)
+                                Text(b.blurb).font(.jCaption).foregroundStyle(.secondary)
+                            }
+                        }
+                        HStack {
+                            Text("Model").font(.jCallout)
+                            TextField("model id", text: Binding(get: { model.hostedModel[b] ?? b.defaultModel },
+                                                                set: { model.hostedModel[b] = $0 }))
+                                .textFieldStyle(.roundedBorder)
+                            Menu {
+                                ForEach(model.hostedModelChoices[b] ?? b.suggestedModels, id: \.self) { m in
+                                    Button(m) { model.hostedModel[b] = m }
+                                }
+                                if b.modelsURL != nil {
+                                    Divider()
+                                    Button("Refresh list") { Task { await model.refreshHostedModels(b) } }
+                                }
+                            } label: { Image(systemName: "list.bullet") }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                        }
+                        if b.needsKey {
+                            HStack {
+                                Text("API key").font(.jCallout)
+                                SecureField(model.apiKey(b) == nil ? "paste key" : "saved in Keychain",
+                                            text: Binding(get: { keyDrafts[b] ?? "" }, set: { keyDrafts[b] = $0 }))
+                                    .textFieldStyle(.roundedBorder)
+                                Button("Save") {
+                                    model.setAPIKey(keyDrafts[b]?.trimmingCharacters(in: .whitespacesAndNewlines), b)
+                                    keyDrafts[b] = ""
+                                }
+                                .disabled((keyDrafts[b] ?? "").isEmpty)
+                                if model.apiKey(b) != nil {
+                                    Button("Forget") { model.setAPIKey(nil, b); keyDrafts[b] = "" }
+                                }
+                            }
+                        }
+                    }
+                    .padding(4)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 620)
+        .font(.jBody)
+    }
+}
