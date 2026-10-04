@@ -689,7 +689,7 @@ final class AppModel {
         if url == nil || `as` {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [.json]
-            panel.nameFieldStringValue = set.name.isEmpty ? "questions.json" : "\(set.name).json"
+            panel.nameFieldStringValue = set.name.isEmpty ? "workspace.jevdk.json" : "\(set.name).jevdk.json"
             guard panel.runModal() == .OK, let picked = panel.url else { return false }
             url = picked
         }
@@ -706,9 +706,12 @@ final class AppModel {
         }
     }
 
+    /// Open a workspace file (what Save Workspace writes), or a questions file exported for an app
+    /// (`.decisions.json`): its questions and system instructions, and the calibration it carries.
     func open() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
+        panel.message = "A JevDK workspace, or a questions file exported for an app (.decisions.json)."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
@@ -719,6 +722,25 @@ final class AppModel {
                 labels = saved.labels ?? [:]
                 calibration = saved.calibration
                 applyCalibration = saved.calibration != nil
+            } else if let exported = try? DecisionQuestionSet(json: data) {
+                let t = exported.tuning
+                set = QuestionSet(name: exported.name, system: t?.system ?? QuestionSet.defaultSystem,
+                                  inputLabel: t?.inputLabel ?? QuestionSet.defaultInputLabel,
+                                  questions: exported.questions.map(EditableQuestion.init))
+                labels = [:]
+                if let cal = t?.calibration, let model = t?.model {
+                    calibration = FittedCalibration(
+                        noulTemperature: cal.noulTemperature, choiceTemperature: cal.choiceTemperature,
+                        scoreTemperature: cal.scoreTemperature, repoID: model.rest, revision: t?.revision ?? "?",
+                        system: set.system, inputLabel: set.inputLabel, fittedAt: t?.testedAt ?? Date(), samples: [:])
+                } else {
+                    calibration = nil
+                }
+                applyCalibration = calibration != nil
+                // An app file isn't a workspace: ⌘S asks where to save one rather than overwriting it.
+                results = []; batchRows = []; samples = []
+                fileURL = nil
+                return
             } else {
                 set = try JSONDecoder().decode(QuestionSet.self, from: data)
             }

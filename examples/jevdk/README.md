@@ -70,12 +70,31 @@ again. **Examples** asks before replacing work you've changed, and can save it t
 Your own questions: **Add question** on the left. Pick **Noul** (yes / no), **Choice** (one of
 several options) or **Score** (a scale). Give it a short name (what your app reads), the
 question text (what the model reads), and for Choice / Score the options. **Duplicate** a question
-to try a second wording side by side. **⌘S / ⌘O** saves and opens a question set with its inputs.
+to try a second wording side by side. **⌘S** saves the whole workspace to a file, **⌘O** opens one
+(see [Files](#files)).
+
+## Files
+
+JevDK works with four kinds of file. The File menu groups them:
+
+| File menu | The file | What's in it | Use it to |
+|---|---|---|---|
+| **Workspace:** Open…, Save Workspace (⌘S), Save Workspace As… | `Customer support.jevdk.json`, JevDK's own format | Everything: questions, system instructions, the input and batch list, your marked answers, the calibration | Pick your work back up, or hand it to a colleague. JevDK also keeps the last workspace between launches on its own. |
+| **For your app:** Export Questions for App… (⌘E) | `customer-support.decisions.json`, the SDK's `DecisionQuestionSet` | The questions exactly as tested, plus the model, version, system instructions and calibration they were tested with. No inputs or marks. | Bundle it in your app; `OpenJevDecisionProvider(mlx:tunedWith:)` loads it. |
+| **Test data:** Import Answers (CSV)…, Export Answers (CSV)… | `customer-support.answers.csv` | Your batch inputs and the correct answers you marked: an `input` column, then one column per question | Edit test cases in a spreadsheet, share them, and run them in your app's tests with `lab.evaluate`. |
+| **Test data:** Append Run to Results CSV… | `jevdk-results.csv`, grows with every run | Every answer from every backend in a run, with the model, timing and whether it was right | Compare models and wordings over time (below). |
+
+Which one when: while you're working, **Save Workspace**. When the questions are ready to ship,
+**Export Questions for App**, and **Export Answers** for your app's tests. **Open…** reads a
+workspace or an exported `.decisions.json`, so a file you shipped can come back into JevDK to work
+on (its questions, system instructions and calibration; it has no inputs or marks).
+
+The Batch toolbar has the same answer and results actions (**Answers**, **Results CSV**).
 
 ## Comparing models: the results CSV
 
 JevDK doesn't tell you which model to use; your questions and your answers do. After a batch,
-**Results CSV** appends the run to a CSV file: one row per input × question × backend. Run the
+**Results CSV** (Batch toolbar, or File → Append Run to Results CSV…) appends the run to a CSV file: one row per input × question × backend. Run the
 same batch with another model (or quantization, wrapper or question wording) and append again;
 the runs line up in one spreadsheet. The first click asks for a file; later clicks append to it
 (**Append to another CSV…** to switch). A file with a different header is never touched.
@@ -106,17 +125,18 @@ for your app:
 3. **Calibrate…** → **Fit calibration**. It shows the calibration error and log-loss before →
    after for each kind of question (aim for 30+ marks per kind).
 4. Turn on **Show local results calibrated** to see what your app will see. It's saved with
-   the question set (⌘S). If you change the model or the system instructions, JevDK flags the
+   the workspace (⌘S). If you change the model or the system instructions, JevDK flags the
    calibration until you refit.
 
 ## Taking it to your app
 
-- **File → Export for App…** writes a `DecisionQuestionSet` JSON file: the questions plus the
+- **File → Export Questions for App…** writes a `DecisionQuestionSet` JSON file: the questions plus the
   model, revision, wrapper and calibration you tested. Bundle it and load it with
   `DecisionQuestionSet(contentsOf:)`; `OpenJevDecisionProvider(mlx:tunedWith:)` applies the
   wrapper and calibration.
-- **Answer set → Export** (Batch toolbar, or the File menu) saves your inputs and marks as CSV:
-  an `input` column and one column per question. **Import** loads one, e.g. from a spreadsheet.
+- **File → Export Answers (CSV)…** (also under **Answers** on the Batch toolbar) saves your
+  inputs and marks as CSV: an `input` column and one column per question. **Import Answers
+  (CSV)…** loads one, e.g. from a spreadsheet.
   In your app's tests, `lab.evaluate(route:questions:answerSet:)` scores a backend against it.
 
 See [GUIDE.md](GUIDE.md) step 8.

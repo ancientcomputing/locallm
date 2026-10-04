@@ -33,10 +33,10 @@ struct FittedCalibration: Codable, Hashable {
     }
 
     /// What the developer pastes into their app. The questions, wrapper and this calibration travel
-    /// in the exported question set (File → Export for App…), so the code only loads it.
+    /// in the exported question set (File → Export Questions for App…), so the code only loads it.
     var swiftSnippet: String {
         """
-        // Export the question set from JevDK (File → Export for App…) and bundle it with your app.
+        // Export the questions from JevDK (File → Export Questions for App…) and bundle the file with your app.
         // It holds the questions, the wrapper and this calibration, fitted on \(samples.values.reduce(0, +)) marked answers
         // for \(repoID) @ \(revision.prefix(12)) (\(fittedAt.formatted(date: .abbreviated, time: .omitted))).
         let set = try DecisionQuestionSet(contentsOf: Bundle.main.url(forResource: "questions.decisions", withExtension: "json")!)
@@ -83,6 +83,7 @@ extension DecisionCalibration.Sample.Kind {
         case .noul: "Noul (yes / no)"
         case .choice: "Choice"
         case .score: "Score"
+        @unknown default: "Other"
         }
     }
 }

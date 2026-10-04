@@ -133,10 +133,10 @@ struct ResultsView: View {
                     Label("calibrated", systemImage: "dial.medium").font(.jCaption).foregroundStyle(.tint)
                 }
                 Menu {
-                    Button("Import answer set (CSV)…") { model.importAnswerSet() }
-                    Button("Export answer set (CSV)…") { model.exportAnswerSet() }
+                    Button("Import Answers (CSV)…") { model.importAnswerSet() }
+                    Button("Export Answers (CSV)…") { model.exportAnswerSet() }
                 } label: {
-                    Label("Answer set", systemImage: "checklist")
+                    Label("Answers", systemImage: "checklist")
                 }
                 .fixedSize()
                 .help("Load inputs with their correct answers from a CSV (input column, then one column per question), or save yours")

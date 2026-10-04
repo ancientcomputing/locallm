@@ -79,6 +79,22 @@ public struct EditableQuestion: Codable, Hashable, Identifiable, Sendable {
         options = try c.decodeIfPresent([AnswerOption].self, forKey: .options) ?? []
     }
 
+    /// The editor question for an SDK one, e.g. from a `DecisionQuestionSet` exported for an app.
+    public init(_ q: DecisionQuestion) {
+        switch q.kind {
+        case .noul:
+            self.init(name: q.id, kind: .noul, text: q.instructions)
+        case .choice(let criteria):
+            self.init(name: q.id, kind: .choice, text: q.instructions,
+                      options: criteria.map { AnswerOption(key: $0.key, description: $0.description ?? "") })
+        case .score(let levels):
+            self.init(name: q.id, kind: .score, text: q.instructions,
+                      options: levels.enumerated().map { AnswerOption(key: String($0.offset), description: $0.element) })
+        @unknown default:
+            self.init(name: q.id, kind: .noul, text: q.instructions)
+        }
+    }
+
     /// The SDK question this becomes.
     public var sdkQuestion: DecisionQuestion {
         switch kind {

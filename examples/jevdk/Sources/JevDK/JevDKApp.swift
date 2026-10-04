@@ -43,17 +43,27 @@ struct JevDKApp: App {
                 .frame(minWidth: 1060, minHeight: 660)
         }
         .commands {
+            // Four kinds of file (README "Files"): the workspace (JevDK's own, everything), the
+            // questions for your app (the SDK's DecisionQuestionSet), answers (CSV), and results (CSV).
             CommandGroup(replacing: .newItem) {
-                Button("Open Question Set…") { model.open() }.keyboardShortcut("o")
+                Section("Workspace") {
+                    Button("Open…") { model.open() }.keyboardShortcut("o")
+                }
             }
             CommandGroup(replacing: .saveItem) {
-                Button("Save") { model.save() }.keyboardShortcut("s")
-                Button("Save As…") { model.save(as: true) }.keyboardShortcut("s", modifiers: [.command, .shift])
-                Divider()
-                Button("Export for App…") { model.exportForApp() }.keyboardShortcut("e")
-                Divider()
-                Button("Import Answer Set…") { model.importAnswerSet() }
-                Button("Export Answer Set…") { model.exportAnswerSet() }
+                Section("Workspace") {
+                    Button("Save Workspace") { model.save() }.keyboardShortcut("s")
+                    Button("Save Workspace As…") { model.save(as: true) }.keyboardShortcut("s", modifiers: [.command, .shift])
+                }
+                Section("For your app") {
+                    Button("Export Questions for App…") { model.exportForApp() }.keyboardShortcut("e")
+                }
+                Section("Test data") {
+                    Button("Import Answers (CSV)…") { model.importAnswerSet() }
+                    Button("Export Answers (CSV)…") { model.exportAnswerSet() }
+                    Button("Append Run to Results CSV…") { model.appendResults(choose: model.resultsCSVPath == nil) }
+                        .disabled(model.batchRows.isEmpty || model.batchProgress != nil)
+                }
             }
         }
     }

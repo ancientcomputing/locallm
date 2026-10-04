@@ -148,7 +148,7 @@ real messages are messier, and the mess is where models go wrong. Include:
 
 Paste them into **Batch**, one per line, and **Ask all**. If you already have them in a
 spreadsheet, save it as CSV with an `input` column and one column per question holding the
-correct answer (blank where you haven't decided), and use **Answer set → Import** instead: the
+correct answer (blank where you haven't decided), and use **File → Import Answers (CSV)…** instead: the
 inputs and your marks load together. Yes/no answers can be Yes/No, true/false or 1/0; a choice
 is its key; a score is its level number or text. Then, under each cell, use **mark…**
 to record the correct answer. This is the slow part, and the most valuable: from now on every
@@ -159,9 +159,9 @@ Tips:
 - Mark answers as **you** want your app to behave, not as you guess the model will.
 - If you hesitate over a mark, the question is probably ambiguous. Note it; you'll reword it in
   step 5.
-- Save the set (⌘S), and **Answer set → Export** the inputs and marks as CSV. That CSV is your
-  test suite: keep it with your app and grow it when you find new failure cases. JevDK also
-  remembers your workspace between launches.
+- **Save Workspace** (⌘S) keeps everything for JevDK. **File → Export Answers (CSV)…** saves the
+  inputs and marks as a CSV: that's your test suite. Keep it with your app and grow it when you
+  find new failure cases. JevDK also remembers your workspace between launches.
 
 ### Step 4. Run the batch and read the grid
 
@@ -200,7 +200,7 @@ set can tell you. JevDK doesn't keep a leaderboard on purpose.
    mixture-of-experts models are flagged because their probabilities were unstable in testing.
 2. **Backends** (toolbar): optionally add a hosted decider (Featherless, or TypeSafe on
    OpenRouter) as a reference point.
-3. Run the batch with model A, then **Results CSV** → append. Switch to model B, run, append.
+3. Run the batch with model A, then **Results CSV** (Batch toolbar) → append. Switch to model B, run, append.
 4. Open the CSV in Numbers or Excel. A pivot table of `correct` by `model` and `question` is
    per-question accuracy; `question_ms` and `decision_ms` are speed.
 
@@ -229,7 +229,7 @@ only use the top answer.
    and gets sharpened.
 3. Read the before → after table. Lower is better on both measures (see section 6).
 4. Turn on **Show local results calibrated** to see what your app will see.
-5. **Export for App…** (step 8) carries it into your app with the questions. If you change the
+5. **Export Questions for App…** (step 8) carries it into your app with the questions. If you change the
    model or the system instructions later, JevDK flags the calibration until you redo it.
 
 What calibration can't do: fix wrong answers. In our test, a confidently wrong answer stayed
@@ -238,8 +238,8 @@ wrong; it just became less confidently wrong. Get the questions right first (ste
 ### Step 8. Ship it
 
 Use the same questions, model, system instructions and calibration you tested. **File →
-Export for App…** writes them into one file (`support.decisions.json`); add it to your app and
-load it:
+Export Questions for App…** writes them into one file (`support.decisions.json`); add it to your
+app and load it:
 
 ```swift
 let set = try DecisionQuestionSet(contentsOf: Bundle.main.url(forResource: "support.decisions", withExtension: "json")!)
@@ -344,7 +344,11 @@ Sixteen messages are enough to show the method, not to choose a model. Use 50 or
   and a probability, instead of writing text.
 - **Noul, Choice, Score:** the three question types: yes/no, one of several options, a point on
   a scale. (Names from TypeSafe's Jev.)
-- **Answer set:** example inputs with the correct answers marked. Your test suite.
+- **Answer set:** example inputs with the correct answers marked. Your test suite. JevDK
+  imports and exports it as CSV (**File → Import / Export Answers**).
+- **Workspace:** JevDK's own file (⌘S / ⌘O) with everything you're working on. Not for your app;
+  for that, **Export Questions for App**. The README's [Files](README.md#files) section compares
+  the four kinds of file.
 - **Backend:** where the decider runs: locally (OpenJev on this Mac) or hosted (Featherless,
   TypeSafe).
 - **System instructions / wrapper:** the text that frames every question for a local model.

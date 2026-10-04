@@ -1911,7 +1911,7 @@ this need the web, which tool, is it sensitive) and a chat model for the text, b
 Questions are the work, so the SDK carries them from testing to shipping intact:
 
 ```swift
-// The questions exactly as tested in JevDK (File → Export for App…), with the model, revision,
+// The questions exactly as tested in JevDK (File → Export Questions for App…), with the model, revision,
 // wrapper and calibration they were tested with.
 let set = try DecisionQuestionSet(contentsOf: Bundle.main.url(forResource: "support.decisions", withExtension: "json")!)
 let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)     // the tested wrapper + calibration
@@ -3395,7 +3395,7 @@ struct DecisionCalibration: Codable {
     func measure(_ samples: [Sample]) -> Measurement
     func apply(_ probabilities: [Double], kind: Sample.Kind) -> [Double]
 }
-struct DecisionQuestionSet: Codable {                   // JevDK's "Export for App…"
+struct DecisionQuestionSet: Codable {                   // JevDK's "Export Questions for App…"
     static let currentFormat: Int
     var format: Int; var name: String; var questions: [DecisionQuestion]; var tuning: Tuning?
     struct Tuning { var model: ModelID?; var revision, system, inputLabel: String?; var calibration: DecisionCalibration?; var testedAt: Date? }
