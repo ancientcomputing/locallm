@@ -122,7 +122,8 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   (`MCPProtocolVersion.v2026_07_28`, `.statelessPreferred`, `.minimumSupported`, `.isStateless`).
 - **Stateless mode** (`MCPConnectionMode.stateless(_:)`): `server/discover` instead of
   `initialize`, no session, the per-request `_meta` envelope, and `Mcp-Method` / `Mcp-Name` /
-  `Mcp-Param-*` headers.
+  `Mcp-Param-*` headers. A tool whose `x-mcp-header` declarations break the rules (including one
+  on a `number` parameter; only `string` / `integer` / `boolean` are allowed) is left out.
 - **`MCPVersionNegotiation`** (`.auto` / `.legacy` / `.pin(_:)`), set with
   `MCPSettings(versionNegotiation:)` or `MCPServerManager(versionNegotiation:)`.
 - **Multi-round-trip requests (MRTR).** A request that comes back `input_required` is answered
@@ -141,7 +142,8 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 - Diagnostics: the `server/discover` probe and fallback, live-update status, and MRTR rounds
   (new category `MCP.mrtr`) are logged ([`docs/mcp-diagnostics.md`](docs/mcp-diagnostics.md)).
 - Authorization fixes found by the official MCP conformance suite: protected-resource metadata
-  at the path-suffixed then root well-known URL; `resource` must cover the server URL; metadata
+  at the path-suffixed then root well-known URL; `resource` must cover the server URL and is sent
+  exactly as the metadata publishes it (RFC 8707); metadata
   `issuer` and redirect `iss` are checked (RFC 8414, RFC 9207); a changed authorization server
   mid-connection drops the old credentials and signs in again.
 
