@@ -14,6 +14,12 @@ Needs an Apple-silicon Mac, macOS 27 and Xcode 27 (Swift 6.4). `Package.swift` b
 No Metal Toolchain needed; the prebuilt Inference xcframework bundles the compiled shaders. To
 build against another release, set `LOCALLM_SDK_VERSION` (see [the examples README](../README.md)).
 
+**Or open it in Xcode and Run:** `open -a Xcode JevDK.xcodeproj`, scheme **JevDK**. It's ad-hoc
+signed ("Sign to Run Locally") and not sandboxed, like the `swift build` binary, so it shares your
+Hugging Face cache and Keychain keys. Generated from [`project.yml`](project.yml) with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen): edit `project.yml`, not the `.xcodeproj`, then
+`xcodegen generate`.
+
 **New to decision models?** Read [the developer's guide](GUIDE.md) first: what a decider is,
 when to use one, and the workflow from writing questions to shipping them, with a worked example.
 
@@ -174,6 +180,7 @@ Headless checks:
 ```
 
 `--check` needs a model the SDK has downloaded (or verified). `--check-remote` takes
-`featherlessDemo`, `featherless` or `openRouter`, with keys from the environment or a
-git-ignored `./.env` (`OPENROUTER_API_KEY`, `FEATHERLESS_API_KEY`), never printed. The window
+`featherlessDemo`, `featherless` or `openRouter`, using the key saved in **Backends** (the
+Keychain) or, for CI, the `OPENROUTER_API_KEY` / `FEATHERLESS_API_KEY` environment variable. Keys
+are never printed, and never read from a file. The window
 hasn't been driven by a test.

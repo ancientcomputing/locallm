@@ -18,8 +18,8 @@ struct JevDKApp: App {
             HeadlessCheck.run(preset: args[i + 1], modelDir: args[i + 2])
         }
         // `JevDK --check-remote <preset> <featherlessDemo|featherless|openRouter> [model]`: the
-        // same, against a hosted Jev. Keys come from the environment or ./.env
-        // (FEATHERLESS_API_KEY / OPENROUTER_API_KEY) and are never printed.
+        // same, against a hosted Jev. Keys come from the Keychain (saved in Backends) or the
+        // environment (FEATHERLESS_API_KEY / OPENROUTER_API_KEY) and are never printed.
         if let i = args.firstIndex(of: "--check-remote"), args.count > i + 2 {
             HeadlessCheck.runRemote(preset: args[i + 1], provider: args[i + 2],
                                     model: args.count > i + 3 && !args[i + 3].hasPrefix("--") ? args[i + 3] : nil)
@@ -186,7 +186,7 @@ enum HeadlessCheck {
         guard let p = preset(name), let backend = HostedBackend(rawValue: provider) else {
             print("unknown preset or provider (have: \(HostedBackend.allCases.map(\.rawValue)))"); exit(1)
         }
-        let key = backend.keyVariable.flatMap { KeyFile.key(named: $0) }
+        let key = APIKeys.key(for: backend)
         if backend.needsKey { print("key: \(key == nil ? "MISSING" : "found (\(key!.count) chars)")") }
         let lab = LocalLMLab()
         try? lab.models.register(decision: JevDecisionProvider(backend.config(key: key)))

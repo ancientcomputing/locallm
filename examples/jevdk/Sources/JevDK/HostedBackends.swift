@@ -27,7 +27,7 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
 
     var needsKey: Bool { self != .featherlessDemo }
 
-    /// Environment / .env variable for headless runs.
+    /// Environment variable checked when no key is saved in the Keychain (CI, headless runs).
     var keyVariable: String? {
         switch self {
         case .featherlessDemo: nil
@@ -82,18 +82,15 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Reads an API key from the environment or a `.env` file, never printing it. Accepts
-/// `NAME=value` lines or a file holding just the key.
-enum KeyFile {
-    static func key(named name: String, file: URL = URL(fileURLWithPath: ".env")) -> String? {
-        if let v = ProcessInfo.processInfo.environment[name], !v.isEmpty { return v }
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
-        let lines = text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
-        for line in lines where line.hasPrefix(name + "=") || line.hasPrefix("export " + name + "=") {
-            let v = line.split(separator: "=", maxSplits: 1).last.map(String.init) ?? ""
-            return v.trimmingCharacters(in: CharacterSet(charactersIn: "\"' "))
-        }
-        let bare = lines.filter { !$0.isEmpty && !$0.hasPrefix("#") }
-        return bare.count == 1 && !bare[0].contains("=") ? bare[0] : nil
+/// The API key for a hosted backend: the one saved in the Keychain from **Backends**, else the
+/// environment variable (for CI and headless runs). Never printed. There is no key file: a key
+/// in a file next to the code is too easy to commit or share.
+enum APIKeys {
+    static func key(for backend: HostedBackend) -> String? {
+        if let k = Keychain.get(account(backend)), !k.isEmpty { return k }
+        guard let name = backend.keyVariable, let v = ProcessInfo.processInfo.environment[name], !v.isEmpty else { return nil }
+        return v
     }
+
+    static func account(_ backend: HostedBackend) -> String { "key.\(backend.rawValue)" }
 }

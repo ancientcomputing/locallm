@@ -143,8 +143,8 @@ final class AppModel {
         }
     }
 
-    func apiKey(_ b: HostedBackend) -> String? { Keychain.get("key.\(b.rawValue)") }
-    func setAPIKey(_ key: String?, _ b: HostedBackend) { Keychain.set(key, for: "key.\(b.rawValue)") }
+    func apiKey(_ b: HostedBackend) -> String? { Keychain.get(APIKeys.account(b)) }
+    func setAPIKey(_ key: String?, _ b: HostedBackend) { Keychain.set(key, for: APIKeys.account(b)) }
 
     var enabledHosted: [HostedBackend] { HostedBackend.allCases.filter { hostedEnabled[$0] == true } }
 
