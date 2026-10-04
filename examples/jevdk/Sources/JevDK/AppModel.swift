@@ -124,8 +124,8 @@ final class AppModel {
         let verified = Set(models.map(\.repoID))
         unverifiedRepos = ModelCatalog.cachedRepoIDs().filter { !verified.contains($0) }
         if selectedModelID == nil || selectedModel == nil {
-            // Default to the smallest non-MoE model of at least ~2 GB (Qwen3-4B-class, the eval's
-            // pick), else the smallest non-MoE one.
+            // Default to the smallest non-MoE model of at least ~2 GB (Qwen3-4B-class, the tested
+            // default), else the smallest non-MoE one.
             let dense = models.filter { !$0.isMoE }
             selectedModelID = (dense.first { ($0.sizeBytes ?? 0) >= 2_000_000_000 } ?? dense.first ?? models.first)?.id
         }

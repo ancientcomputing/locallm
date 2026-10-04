@@ -49,7 +49,7 @@ struct EditorView: View {
                 .fixedSize()
 
                 Text("""
-                    Tips from the eval: yes/no and multiple choice beat scales on small models; give \
+                    Tips: yes/no and multiple choice beat scales on small models; give \
                     options short descriptions; only ask what a model can judge from the input and \
                     stable general knowledge, never current facts.
                     """)

@@ -4,18 +4,9 @@ import Security
 /// API keys for remote Jev providers, in the login Keychain. Never written to disk or logs.
 enum Keychain {
     private static let service = "JevDK"
-    /// The app's earlier names (AskJev, then JevLab); keys saved under them move across on first read.
-    private static let formerServices = ["JevLab", "AskJev"]
 
     static func get(_ account: String) -> String? {
-        if let value = read(account, service: service) { return value }
-        for former in formerServices {
-            guard let old = read(account, service: former) else { continue }
-            set(old, for: account)
-            delete(account, service: former)
-            return old
-        }
-        return nil
+        read(account, service: service)
     }
 
     static func set(_ value: String?, for account: String) {

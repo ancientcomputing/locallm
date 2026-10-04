@@ -130,7 +130,7 @@ public struct EditableQuestion: Codable, Hashable, Identifiable, Sendable {
 
 /// A named set of questions plus the local wrapper they're tuned with. What JevDK saves.
 public struct QuestionSet: Codable, Hashable, Sendable {
-    /// The SDK's `OpenJevWrapper.default` (chosen with the eval, D1b), mirrored here so this
+    /// The SDK's `OpenJevWrapper.default` (chosen by the SDK's evaluation), mirrored here so this
     /// module needs only Core. JevDK checks they match at launch.
     public static let defaultSystem = "You answer questions about a piece of text. Read the text, then answer the question about it. Reply with only the label of the correct answer."
     public static let defaultInputLabel = "Text"
