@@ -229,7 +229,7 @@ only use the top answer.
    and gets sharpened.
 3. Read the before → after table. Lower is better on both measures (see section 6).
 4. Turn on **Show local results calibrated** to see what your app will see.
-5. **Export Questions for App…** (step 8) carries it into your app with the questions. If you change the
+5. **Export Questions…** (step 8) carries it into your app with the questions. If you change the
    model or the system instructions later, JevDK flags the calibration until you redo it.
 
 What calibration can't do: fix wrong answers. In our test, a confidently wrong answer stayed
@@ -238,7 +238,7 @@ wrong; it just became less confidently wrong. Get the questions right first (ste
 ### Step 8. Ship it
 
 Use the same questions, model, system instructions and calibration you tested. **File →
-Export Questions for App…** writes them into one file (`support.decisions.json`); add it to your
+Export Questions…** writes them into one file (`support.decisions.json`); add it to your
 app and load it:
 
 ```swift
@@ -347,7 +347,7 @@ Sixteen messages are enough to show the method, not to choose a model. Use 50 or
 - **Answer set:** example inputs with the correct answers marked. Your test suite. JevDK
   imports and exports it as CSV (**File → Import / Export Answers**).
 - **Workspace:** JevDK's own file (⌘S / ⌘O) with everything you're working on. Not for your app;
-  for that, **Export Questions for App**. The README's [Files](README.md#files) section compares
+  for that, **Export Questions**. The README's [Files](README.md#files) section compares
   the four kinds of file.
 - **Backend:** where the decider runs: locally (OpenJev on this Mac) or hosted (Featherless,
   TypeSafe).

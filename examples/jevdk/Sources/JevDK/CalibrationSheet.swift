@@ -124,7 +124,7 @@ struct CalibrationSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
                 HStack {
-                    Button("Export Questions for App…") { model.exportForApp() }
+                    Button("Export Questions…") { model.exportForApp() }
                     Button("Copy code") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(c.swiftSnippet, forType: .string)

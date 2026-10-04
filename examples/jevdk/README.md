@@ -80,12 +80,12 @@ JevDK works with four kinds of file. The File menu groups them:
 | File menu | The file | What's in it | Use it to |
 |---|---|---|---|
 | **Workspace:** Open…, Save Workspace (⌘S), Save Workspace As… | `Customer support.jevdk.json`, JevDK's own format | Everything: questions, system instructions, the input and batch list, your marked answers, the calibration | Pick your work back up, or hand it to a colleague. JevDK also keeps the last workspace between launches on its own. |
-| **For your app:** Export Questions for App… (⌘E) | `customer-support.decisions.json`, the SDK's `DecisionQuestionSet` | The questions exactly as tested, plus the model, version, system instructions and calibration they were tested with. No inputs or marks. | Bundle it in your app; `OpenJevDecisionProvider(mlx:tunedWith:)` loads it. |
+| **For your app:** Export Questions… (⌘E) | `customer-support.decisions.json`, the SDK's `DecisionQuestionSet` | The questions exactly as tested, plus the model, version, system instructions and calibration they were tested with. No inputs or marks. | Bundle it in your app; `OpenJevDecisionProvider(mlx:tunedWith:)` loads it. |
 | **Test data:** Import Answers (CSV)…, Export Answers (CSV)… | `customer-support.answers.csv` | Your batch inputs and the correct answers you marked: an `input` column, then one column per question | Edit test cases in a spreadsheet, share them, and run them in your app's tests with `lab.evaluate`. |
 | **Test data:** Append Run to Results CSV… | `jevdk-results.csv`, grows with every run | Every answer from every backend in a run, with the model, timing and whether it was right | Compare models and wordings over time (below). |
 
 Which one when: while you're working, **Save Workspace**. When the questions are ready to ship,
-**Export Questions for App**, and **Export Answers** for your app's tests. **Open…** reads a
+**Export Questions**, and **Export Answers** for your app's tests. **Open…** reads a
 workspace or an exported `.decisions.json`, so a file you shipped can come back into JevDK to work
 on (its questions, system instructions and calibration; it has no inputs or marks).
 
@@ -130,7 +130,7 @@ for your app:
 
 ## Taking it to your app
 
-- **File → Export Questions for App…** writes a `DecisionQuestionSet` JSON file: the questions plus the
+- **File → Export Questions…** writes a `DecisionQuestionSet` JSON file: the questions plus the
   model, revision, wrapper and calibration you tested. Bundle it and load it with
   `DecisionQuestionSet(contentsOf:)`; `OpenJevDecisionProvider(mlx:tunedWith:)` applies the
   wrapper and calibration.

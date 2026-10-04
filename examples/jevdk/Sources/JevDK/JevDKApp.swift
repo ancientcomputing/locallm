@@ -56,7 +56,7 @@ struct JevDKApp: App {
                     Button("Save Workspace As…") { model.save(as: true) }.keyboardShortcut("s", modifiers: [.command, .shift])
                 }
                 Section("For your app") {
-                    Button("Export Questions for App…") { model.exportForApp() }.keyboardShortcut("e")
+                    Button("Export Questions…") { model.exportForApp() }.keyboardShortcut("e")
                 }
                 Section("Test data") {
                     Button("Import Answers (CSV)…") { model.importAnswerSet() }
