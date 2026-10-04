@@ -352,7 +352,8 @@ struct BackendsSheet: View {
 }
 
 /// JevDK's Dock icon: "Jdk" in white on LocalLM Lab's blue rounded square (the same design as the
-/// LocalLM Lab app icon). Drawn in code so `swift run` gets it too, with no bundle to hold an image.
+/// LocalLM Lab app icon), with a small "ev" under the J for "Jev". Drawn in code so `swift run`
+/// gets it too, with no bundle to hold an image.
 enum AppIcon {
     static let blue = NSColor(srgbRed: 0x2f / 255, green: 0x6f / 255, blue: 0xed / 255, alpha: 1)
 
@@ -362,18 +363,27 @@ enum AppIcon {
             blue.setFill()
             NSBezierPath(roundedRect: rect, xRadius: size * 14 / 64, yRadius: size * 14 / 64).fill()
 
-            let text = NSMutableAttributedString(string: "J", attributes: [
-                .font: NSFont.systemFont(ofSize: size * 0.50, weight: .bold),
-                .foregroundColor: NSColor.white,
-            ])
-            text.append(NSAttributedString(string: "dk", attributes: [
-                .font: NSFont.systemFont(ofSize: size * 0.30, weight: .semibold),
-                .foregroundColor: NSColor.white,
-                .kern: -size * 0.004,
-            ]))
-            // Centre on the glyphs' ink, not the line box, so the mark sits optically centred.
-            let ink = text.boundingRect(with: rect.size, options: [.usesLineFragmentOrigin, .usesDeviceMetrics])
-            text.draw(at: NSPoint(x: rect.midX - ink.midX, y: rect.midY - ink.midY))
+            func text(_ s: String, _ pt: CGFloat, _ weight: NSFont.Weight, alpha: CGFloat = 1) -> NSAttributedString {
+                NSAttributedString(string: s, attributes: [
+                    .font: NSFont.systemFont(ofSize: size * pt, weight: weight),
+                    .foregroundColor: NSColor.white.withAlphaComponent(alpha),
+                ])
+            }
+            func ink(_ t: NSAttributedString) -> NSRect {
+                t.boundingRect(with: rect.size, options: [.usesLineFragmentOrigin, .usesDeviceMetrics])
+            }
+            let j = text("J", 0.50, .bold), dk = text("dk", 0.30, .semibold), ev = text("ev", 0.19, .semibold, alpha: 0.85)
+            let jInk = ink(j), dkInk = ink(dk), evInk = ink(ev)
+            let gapX = size * 0.015, gapY = size * 0.025
+            // Line 1: J and dk on one baseline. Line 2: ev centred under the J.
+            let width = jInk.width + gapX + dkInk.width
+            let height = jInk.height + gapY + evInk.height
+            let left = rect.midX - width / 2, top = rect.midY + height / 2
+            let baselineJ = top - jInk.maxY                       // draw origin y so J's ink top = top
+            j.draw(at: NSPoint(x: left - jInk.minX, y: baselineJ))
+            dk.draw(at: NSPoint(x: left + jInk.width + gapX - dkInk.minX, y: baselineJ))
+            let evTop = top - jInk.height - gapY
+            ev.draw(at: NSPoint(x: left + jInk.width / 2 - evInk.midX, y: evTop - evInk.maxY))
             return true
         }
     }
