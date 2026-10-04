@@ -40,8 +40,9 @@ echo "== SwiftPM global artifact cache (ancientcomputing/locallm entries) =="
 swiftpm_cache="$HOME/Library/Caches/org.swift.swiftpm/artifacts"
 if [ -d "$swiftpm_cache" ]; then
   found=0
+  # Entries are zip files named after the URL (directories in older SwiftPM), so test -e, not -d.
   for dir in "$swiftpm_cache"/https___github_com_ancientcomputing_locallm_*; do
-    [ -d "$dir" ] || continue
+    [ -e "$dir" ] || continue
     found=1
     echo "  removing $(basename "$dir")"
     rm -rf "$dir"
