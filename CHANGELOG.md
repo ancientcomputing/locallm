@@ -42,6 +42,8 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 - **`MCPServerState`** gained fields (`trust`, `toolApproval`, `trustedToolsDigest`,
   `liveUpdates`, …): a state JSON encoded under 1.0 no longer decodes. Restore servers with
   `restore(from:)`.
+- **Defaulted parameters added**: `SessionOptions.init` and `MLXModelProvider.init` gain
+  `maxModelCallsPerTurn:` (usual call sites compile unchanged).
 - **One declaration each** where 1.x had kept two (usual call sites compile unchanged):
   `makeSession` (now with `restoring:` and `mcpAppHints:`), `respond` / `streamResponse` (with
   `options:` and `fromAppInstance:`), `LocalLMLab.Configuration.init` (with `mcp: MCPSettings`),
@@ -57,6 +59,15 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   models; `ui://` resources are left out of model-facing resource lists.
 - `languageModelSession` is documented as the escape hatch: run turns with `respond` /
   `streamResponse`.
+- **Local (MLX) models report real usage**: input and output token counts are the model's own (input was always
+  0). `languageModelSession.usage` sums every model call in the session; one turn's figures are on its response's
+  `usage`, with `mlx.*` metadata (`MLXUsageMetadataKey`).
+- **An MLX turn stops after 16 model calls** — a model that keeps calling tools without answering — with an error
+  saying so. Raise or remove the limit with `MLXModelProvider(maxModelCallsPerTurn:)` or
+  `SessionOptions.maxModelCallsPerTurn` (`Int.max` = no limit).
+- **An MLX prompt too long for the model's context window, or for the GPU memory left, is refused before it runs**
+  (`LocalLMLabError.context`). `respond` / `streamResponse` treat it as a context overflow, so
+  `retryOnContextOverflow` compacts and retries.
 
 - MCP servers that only speak `2024-11-05`, or use the old HTTP+SSE transport, fail `addServer`
   with `.protocolMismatch` (1.x connected to the former and failed on the latter with "HTTP 404").
@@ -132,6 +143,20 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   at the path-suffixed then root well-known URL; `resource` must cover the server URL; metadata
   `issuer` and redirect `iss` are checked (RFC 8414, RFC 9207); a changed authorization server
   mid-connection drops the old credentials and signs in again.
+
+### Added — local (MLX) models: usage, speed and memory per turn (`LocalLMLabSDKInference`)
+
+- **`MLXUsageMetadataKey`**: real prompt and generated token counts, prompt (pp) and generation (tg) speed,
+  seconds, model calls, stop reason, speculative-decoding draft stats, and MLX memory (resident, turn peak, GPU
+  limit) — turn totals on the response's `usage.metadata`.
+- **`MLXPrefillMonitor` / `MLXPrefillActivity`**: the prompt a local model is reading right now — exact tokens,
+  which model call of the turn, since when — so an app can say why nothing has appeared yet.
+- **`maxModelCallsPerTurn`** on `MLXModelProvider` and `SessionOptions`: the tool-loop limit, 16 by default.
+
+### Fixed
+
+- **`contextBudget`** reported the whole session's cumulative usage as the last turn's, so `fractionUsed` grew
+  every turn. It now reports the latest turn's last model call (the conversation as the model last read it).
 
 ### Added — examples
 

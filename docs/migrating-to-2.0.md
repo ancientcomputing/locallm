@@ -69,6 +69,18 @@ affects code that silenced that error another way.
   resource lists.
 - **A widget's tool calls** (an MCP App view, §6) that need the user's answer ask once per view and
   tool; destructive calls and timeouts are asked again. Model calls are unchanged.
+- **Local (MLX) models report real token counts.** `usage` input counts were always 0 in 1.0; now they're
+  the model's own, per model call. `languageModelSession.usage` sums the whole session — for one turn, read
+  the response's `usage`.
+- **A local model that keeps calling tools stops after 16 model calls in a turn**, with an error saying so.
+  If your app's tasks legitimately need more, raise it: `MLXModelProvider(maxModelCallsPerTurn: 40)`, or per
+  session `SessionOptions(maxModelCallsPerTurn:)`; `Int.max` removes the limit.
+- **A local-model prompt that can't fit** (over the context window, or the GPU memory left) is refused before
+  it runs, as `LocalLMLabError.context`. With `retryOnContextOverflow` set, it's compacted and retried like
+  any overflow.
+- **`contextBudget` measures the latest turn**, not the whole session (1.0's `fractionUsed` grew every
+  turn). It's recorded by `respond` / `streamResponse`; turns run on `languageModelSession` directly aren't
+  counted.
 
 ### MCP protocol
 
@@ -124,6 +136,9 @@ passed `restoring:` before `tools:`).
   Declare support with `MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())`.
   Reference app: [`examples/mcp-chat`](../examples/mcp-chat/); walkthrough
   [`sdk-guide.md` §3f](sdk-guide.md#3f-mcp-apps-showing-a-servers-interactive-views).
+- **Local (MLX) model usage, speed and memory per turn**: `MLXUsageMetadataKey` on the response's
+  `usage.metadata` (tokens, pp / tg, model calls, MLX memory), and `MLXPrefillMonitor` for "what is the model
+  reading right now" while nothing has appeared yet.
 - **Per-server trust and tool approval** (§3), shown on each row of `Components`'
   `MCPServerPickerView`, which now also says when none of a server's tools are on.
 - **MCP protocol `2026-07-28`**, the current revision. It is stateless: no session, no
