@@ -1241,6 +1241,84 @@ If you would rather store it yourself, persist `(repoID, resolvedRevision)` anyw
 under the Hugging Face cache directory (`remove(_:)` deletes that whole directory, refs and all), and
 pass it back in `pinnedRevisions` before redownloading.
 
+### Measuring and guarding a local model's turn — usage, speed, memory, limits
+
+> **Use it when** you want to show how a local model performed on a turn (tokens, prompt and
+> generation speed, memory), say why nothing has appeared yet on a long prompt, or decide how many
+> tool rounds one turn may take. New in 2.0; MLX models only — other providers don't report these.
+>
+> **Reference implementation:** LocalLM Lab's Playground **Benchmark** panel reads all of it.
+
+**Usage and speed, per turn.** Each turn's response carries the model's real token counts and an
+`mlx.*` metadata dictionary of turn totals — read it from the response's `usage`, or the last stream
+snapshot's:
+
+```swift
+var last: LanguageModelSession.Usage?
+for try await snapshot in session.languageModelSession.streamResponse(to: prompt) { last = snapshot.usage }
+let meta = last?.metadata ?? [:]
+func number(_ key: String) -> Double? { meta[key].flatMap { Double("\($0)") } }
+
+let tg = number(MLXUsageMetadataKey.tokensPerSecond)          // generation, t/s
+let pp = number(MLXUsageMetadataKey.promptTokensPerSecond)    // prompt processing, t/s
+let calls = number(MLXUsageMetadataKey.rounds)                // 1 + one per tool round
+```
+
+| `MLXUsageMetadataKey` | Value (turn total) |
+|---|---|
+| `promptTokens`, `generatedTokens` | Tokens read and written, summed over the turn's model calls |
+| `promptSeconds`, `generateSeconds` | Time in each phase |
+| `promptTokensPerSecond` (pp), `tokensPerSecond` (tg) | Σ tokens ÷ Σ seconds — absent if no time was measured |
+| `rounds` | Model calls: the first, plus one per round after tool calls |
+| `stopReason` | `stop`, `length` or `cancelled` |
+| `draftTokensProposed`, `draftTokensAccepted`, `speculativeRounds` | With a speed helper (`pairDraftModel`) only |
+| `residentMemoryBytes`, `peakMemoryBytes`, `gpuMemoryLimitBytes` | MLX memory when the turn began (the loaded weights), its peak during the turn, and how much the GPU may use |
+
+Three things to know when reading usage:
+
+- **`languageModelSession.usage` is the whole session**, summed over every model call — it grows
+  each turn. One turn's figures are on that turn's response, as above.
+- **A tool round re-reads the whole conversation.** Each model call in a turn processes everything
+  before it again, so `promptTokens` for a tool turn is roughly *calls × conversation*, and one tool
+  call can double a long prompt's reading time. Prefer giving the model facts directly over a tool
+  it must call each turn — e.g. the date through [`turnContext`](#building-a-chat-app--hosttranscript-streamresponse-turncontext), not a clock tool.
+- **pp from a short prompt is mostly overhead.** Measure prefill speed on a prompt of a few
+  thousand tokens.
+
+**What is it reading right now?** A long prompt can take tens of seconds before the first token.
+`MLXPrefillMonitor.active` lists prompts being processed in this process — exact tokens, which model
+call of the turn, and since when — from the moment prefill starts until the first output:
+
+```swift
+if let reading = MLXPrefillMonitor.active.last(where: { $0.repoID == repoID }),
+   Date().timeIntervalSince(reading.startedAt) > 3 {
+    status = "Reading a \(reading.promptTokens.formatted())-token prompt (model call \(reading.modelCall))"
+}
+```
+
+Poll it while a turn has produced no output (once a second is plenty); it's a cheap read.
+
+**Guards the SDK applies before every model call.**
+
+- **A prompt that can't be processed is refused up front** — over the model's context window
+  (`max_position_embeddings`), or one whose cache wouldn't fit in the GPU memory left — with
+  `LocalLMLabError.context` and a plain message, instead of starting a prefill that would fail or
+  crawl. `respond` / `streamResponse` treat it as a context overflow, so
+  [`retryOnContextOverflow`](#contextbudget--retrypolicy--surviving-a-long-session) compacts and
+  retries it.
+- **A turn that keeps calling tools stops** after `maxModelCallsPerTurn` model calls (default
+  `MLXModelProvider.defaultMaxModelCallsPerTurn`, 16: the first plus 15 tool rounds), with an error
+  saying the model kept calling tools without answering. Set your app's default on the provider, or
+  per session:
+
+```swift
+let mlx = MLXModelProvider(maxModelCallsPerTurn: 40)                        // this app's default
+let agent = try lab.makeSession(route: .local, tools: tools,
+                                options: .init(maxModelCallsPerTurn: .max))  // this session: no limit
+```
+
+  Session beats provider beats 16; values below 1 count as 1.
+
 ### Pinning, updating and cleaning up model versions
 
 *Part of [supply-chain hardening](#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference) for model downloads: the trust policy and verification above decide whether to fetch; pins decide which version you keep.*
@@ -1608,11 +1686,18 @@ from `respond` / `streamResponse` (it's their retry), and `.serverToolCall` once
 > each run.
 
 - `session.contextBudget` — `windowTokens`, `lastInputTokens`, `fractionUsed` (best-effort).
-  Show a "context 78% full" gauge; decide when to start a fresh session.
+  Show a "context 78% full" gauge; decide when to start a fresh session. It reflects the latest
+  turn's last model call — the conversation as the model last read it — recorded by `respond` /
+  `streamResponse` (a turn run on `languageModelSession` directly isn't seen). Not
+  `languageModelSession.usage`, which sums every call in the session. `windowTokens` is a per-model
+  estimate, `nil` for downloaded models; for those, take the window from the model's
+  `config.json` (`InstalledModel.contextTokens`).
 - `session.retryOnContextOverflow = RetryPolicy(maxRetries: 2, compact: { transcript in
   myTrim(transcript) })` — when a turn throws `contextSizeExceeded`, the SDK calls your
   `compact` hook, rebuilds the session with the smaller transcript, emits `.contextCompacted`,
-  and retries. Applies to turns run with `respond` / `streamResponse`; a turn run on
+  and retries. A local model's up-front refusal of a too-long prompt (`LocalLMLabError.context`,
+  [above](#measuring-and-guarding-a-local-models-turn--usage-speed-memory-limits)) is retried the
+  same way. Applies to turns run with `respond` / `streamResponse`; a turn run on
   `languageModelSession` directly isn't retried ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)). With no `compact` hook it
   just rethrows.
 
