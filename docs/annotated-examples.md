@@ -2433,7 +2433,7 @@ there's only ever one query call. `WHERE` / `BETWEEN` / `ORDER BY … LIMIT` / `
 SQLite. In 2.0 the data tools come from **`lab.mcp`**: the app adds the server there, turns on its
 four most data-like tools, and sets `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)`
 for the run's folder, so `makeSession(includeMCPTools: true)` offers each with a `saveAs` argument
-that writes its result to a file. Links `LocalLMLabSDKInference` for the MLX model. Because the model
+that writes its result to a file — under `raw/`, data-file types only (the default `SaveAsPolicy`). Links `LocalLMLabSDKInference` for the MLX model. Because the model
 field is free text, the app can't pin everything ahead of time, so it layers three supply-chain
 controls: the default model is **pinned** to a reviewed commit (`pinnedRevisions:`), any other model
 is pinned on first download (`MLXFilePinStore`), and a **trust policy** (`MlxCommunityOnly`) limits
@@ -2698,15 +2698,15 @@ final class AIQLModel: ObservableObject {
         // The result CSV. Instructions ask for "out.csv"; if a weak model wrote it somewhere
         // else, fall back to the most recently written .csv.
         var name = "out.csv"
-        if case .failure = WorkspaceAccess.readFile(in: root, path: "out.csv"),  // ← SDK
-           case .success(let entries) = WorkspaceAccess.listFiles(in: root, subpath: nil) {  // ← SDK
+        if (try? await WorkspaceAccess.readFile(in: root, path: "out.csv")) == nil,  // ← SDK (async throws in 2.0)
+           let entries = try? await WorkspaceAccess.listFiles(in: root, subpath: nil) {  // ← SDK
             if let newest = entries
                 .filter({ !$0.isDirectory && $0.name.hasSuffix(".csv") })
                 .max(by: { ($0.modifiedDate ?? .distantPast) < ($1.modifiedDate ?? .distantPast) }) {
                 name = newest.name
             }
         }
-        guard case .success(let csv) = WorkspaceAccess.readFile(in: root, path: name) else {  // ← SDK
+        guard let csv = try? await WorkspaceAccess.readFile(in: root, path: name) else {  // ← SDK
             return .failed("The model finished but didn't write a spreadsheet. Try rephrasing the request, or a larger model.")
         }
         step("Saved \(name).")

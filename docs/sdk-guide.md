@@ -2470,10 +2470,46 @@ Required entitlements for this to work under App Sandbox:
 
 Once you have a resolved, access-bracketed root `URL` from the pattern above,
 `WorkspaceAccess` — an ordinary Core type, not a permission-gated connector — is what actually
-reads and writes inside it: `listFiles`/`readFile`/`writeFile`/`editFile`/`deleteFile`, each
-scoped to the root with the same symlink-escape check the picker pattern itself doesn't need to
-worry about. No `requestAccess()` here — there's no OS dialog for this, the picker *is* the
-consent, entirely on your side.
+reads and writes inside it: `listFiles`/`readFile`/`writeFile`/`editFile`/`deleteFile` (plus
+`search`, `tree`, `readFileRange`, `applyPatch`). No `requestAccess()` here — there's no OS dialog
+for this, the picker *is* the consent, entirely on your side.
+
+Every operation is `async throws` (2.0): it throws `WorkspaceAccess.WorkspaceError` (its `message`
+is written for the model) or `CancellationError`, and runs off your actor, so calling it from the
+main actor doesn't block the UI:
+
+```swift
+do {
+    let text = try await WorkspaceAccess.readFile(in: root, path: "README.md")
+    try await WorkspaceAccess.editFile(in: root, path: "README.md",
+                                       oldString: "v1.0", newString: "v2.0", replaceAll: false)
+} catch let error as WorkspaceAccess.WorkspaceError {
+    print(error.message)
+}
+```
+
+**How it stays inside the folder.** A path is resolved once, to real (symlink-free) components
+under the root. From there every file is reached by descriptor: the root is opened, each folder
+below it is opened with `openat(… O_NOFOLLOW)`, and the file is checked through its own descriptor.
+A symlink that points outside the folder is refused, and so is one swapped in mid-operation —
+the race the 1.x path-based checks left open. A symlink whose target stays inside the folder still
+works for `readFile`/`writeFile`/`editFile`; `search`, `tree` and `listFiles` never follow symlinks.
+Writes go to a temp file that is renamed into place (a create never overwrites a file that
+appeared in the meantime), `editFile` keeps the file's permissions and refuses to commit if the
+file changed while it was being edited, and `deleteFile` removes single files only — never a
+folder, and for a symlink, the link rather than its target. What this can't stop: another local
+process that can write to the folder changing a file's *contents* between two of your calls. Treat
+the folder as a trust boundary shared with everything that can write to it.
+
+**How much work one call can do.** `WorkspaceLimits` bounds it; every operation and every
+workspace tool takes `limits:`. Defaults: `readFile` reads at most 8 MiB off disk (`maxReadBytes`)
+and returns at most 2,000,000 characters (`maxReturnedCharacters`), cutting at a character
+boundary and pointing the model at `readFileRange`; `editFile`, `applyPatch` and `search` won't
+process a file over 64 MiB (`maxFileBytes`) — search skips it and says so in
+`SearchResult.skippedTooLarge`; one `search` or `readFileRange` reads at most 256 MiB in total
+(`maxScanBytes`, `SearchResult.scanBudgetExhausted`); each line given to a regular expression is
+capped at 8 KiB (`maxRegexInputBytes` — `NSRegularExpression` can't be cancelled, so bounding its
+input is the only thing that bounds its work); `writeFile` accepts at most 64 MiB (`maxWriteBytes`).
 
 `editFile` — the one write operation actually meant for AI-assisted modification of an existing
 file — is search-and-replace, not a unified-diff/patch format: `oldString`/`newString`, and it
@@ -2525,7 +2561,7 @@ invents the ones it didn't see.
 
 **`FileBackedTool`** wraps a dynamic-schema tool (an MCP tool adapter is the motivating case)
 and adds one root-level argument, `saveAs`. When the model supplies a path, the wrapped tool's
-raw result is written to `<workspace>/<saveAs>` and only a short receipt — byte/line count and a
+raw result is written to `<workspace>/raw/<saveAs>` (the default `SaveAsPolicy`) and only a short receipt — byte/line count and a
 bounded head preview — returns. The model then works from the file (`readFileRange` a window →
 the verbs below), and the payload never enters its context. It's not a `Tool` that calls
 another `Tool` (the model can't invoke that) — it's a **decorator the host applies** when

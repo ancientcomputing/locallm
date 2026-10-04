@@ -289,15 +289,15 @@ final class AIQLModel: ObservableObject {
         // The result CSV. Instructions ask for "out.csv"; if a weak model wrote it somewhere
         // else, fall back to the most recently written .csv.
         var name = "out.csv"
-        if case .failure = WorkspaceAccess.readFile(in: root, path: "out.csv"),
-           case .success(let entries) = WorkspaceAccess.listFiles(in: root, subpath: nil) {
+        if (try? await WorkspaceAccess.readFile(in: root, path: "out.csv")) == nil,
+           let entries = try? await WorkspaceAccess.listFiles(in: root, subpath: nil) {
             if let newest = entries
                 .filter({ !$0.isDirectory && $0.name.hasSuffix(".csv") })
                 .max(by: { ($0.modifiedDate ?? .distantPast) < ($1.modifiedDate ?? .distantPast) }) {
                 name = newest.name
             }
         }
-        guard case .success(let csv) = WorkspaceAccess.readFile(in: root, path: name) else {
+        guard let csv = try? await WorkspaceAccess.readFile(in: root, path: name) else {
             return .failed("The model finished but didn't write a spreadsheet. Try rephrasing the request, or a larger model.")
         }
         step("Saved \(name).")

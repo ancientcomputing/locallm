@@ -37,6 +37,11 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   `ToolPolicy`. `MCPServerManager.setTrustsToolAnnotations(_:server:)` /
   `trustsToolAnnotations(server:)` are replaced by `setTrust(_:server:)`. Mappings in the
   migration guide §3.
+- **`WorkspaceAccess` operations are `async throws`** (`listFiles`, `readFile`, `writeFile`,
+  `editFile`, `deleteFile`, `search`, `tree`, `readFileRange`, `applyPatch`), not
+  `Result`-returning; they throw `WorkspaceError` or `CancellationError`. `search` returns
+  `SearchResult` (read `.matches`). The ready-made workspace tools are unchanged at the call site.
+  Migration guide §4a.
 - **New cases** on `MCPProtocolVersion` (`.v2026_07_28`) and `MCPConnectionMode`
   (`.stateless(_:)`); a `switch` needs `@unknown default` (Swift 6 already requires it).
 - **`MCPServerState`** gained fields (`trust`, `toolApproval`, `trustedToolsDigest`,
@@ -60,6 +65,14 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   models; `ui://` resources are left out of model-facing resource lists.
 - `languageModelSession` is documented as the escape hatch: run turns with `respond` /
   `streamResponse`.
+- **Workspace file access is hardened.** Files are reached by descriptor from the granted folder
+  and no symlink is followed out of it — including mid-operation (1.x `search` followed a symlink
+  inside the folder to a file outside it). Reads, searches and edits are bounded by
+  `WorkspaceLimits` and stream instead of loading whole files; `search` reports files it skipped.
+  `deleteFile` removes single files only (1.x deleted folders recursively) and deletes a symlink
+  itself, not its target. `editFile` keeps file permissions. Writes are temp-then-rename.
+- **`FileBackedTool` `saveAs` writes under `raw/` by default**, data-file extensions only, no
+  hidden paths (`SaveAsPolicy`; `.unrestricted` restores 1.x). The receipt gives the real path.
 - **Local (MLX) models report real usage**: input and output token counts are the model's own (input was always
   0). `languageModelSession.usage` sums every model call in the session; one turn's figures are on its response's
   `usage`, with `mlx.*` metadata (`MLXUsageMetadataKey`).

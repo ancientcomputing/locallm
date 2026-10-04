@@ -55,6 +55,32 @@ restore servers through `restore(from:)` instead. Full walkthrough:
 are non-frozen; Swift 6 already requires `@unknown default` in a `switch` over them, so this only
 affects code that silenced that error another way.
 
+## 4a. Workspace file access is `async throws`
+
+Every `WorkspaceAccess` operation now `throws` instead of returning a `Result`, and is `async`
+(it runs off your actor and can be cancelled):
+
+```swift
+// 1.x
+switch WorkspaceAccess.readFile(in: root, path: "notes.md") {
+case .success(let text): show(text)
+case .failure(let error): show(error.message)
+}
+
+// 2.0
+do {
+    show(try await WorkspaceAccess.readFile(in: root, path: "notes.md"))
+} catch let error as WorkspaceAccess.WorkspaceError {
+    show(error.message)
+}
+```
+
+`try WorkspaceAccess.x(…).get()` becomes `try await WorkspaceAccess.x(…)`. `search` returns a
+`SearchResult`: the hits are `.matches`, and `.skippedTooLarge` / `.scanBudgetExhausted` say what
+wasn't searched. If you only use the ready-made tools (`ReadWorkspaceFileTool`,
+`SearchWorkspaceTool`, …), nothing changes. Every operation and tool also takes an optional
+`limits: WorkspaceLimits` ([`sdk-guide.md` §8a](sdk-guide.md)).
+
 ## 5. What behaves differently
 
 - **A session's MCP tools follow `lab.mcp` between turns.** Turn a tool on, add a server, or
@@ -78,6 +104,16 @@ affects code that silenced that error another way.
 - **A local-model prompt that can't fit** (over the context window, or the GPU memory left) is refused before
   it runs, as `LocalLMLabError.context`. With `retryOnContextOverflow` set, it's compacted and retried like
   any overflow.
+- **Workspace access never follows a symlink out of the granted folder**, even one swapped in
+  mid-operation, and `search`, `tree` and `listFiles` don't follow symlinks at all. Big files are
+  read in bounded pieces: `readFile` returns the head of a file over 8 MiB with a pointer to
+  `readFileRange`; `search` skips files over 64 MiB and lists them. `deleteFile` refuses folders
+  (1.x deleted them recursively) and removes a symlink rather than its target. `editFile` matches
+  byte-for-byte and keeps the file's permissions.
+- **`saveAs` lands under `raw/`.** A model asking for `data.json` gets `raw/data.json` (the receipt
+  says so); paths outside `raw/`, non-data extensions and hidden paths are refused. For another
+  folder: `MCPFileBackedOutput(root:…, saveAsPolicy: SaveAsPolicy(directory: "exports"))`; for the
+  1.x behaviour, `.unrestricted`.
 - **`contextBudget` measures the latest turn**, not the whole session (1.0's `fractionUsed` grew every
   turn). It's recorded by `respond` / `streamResponse`; turns run on `languageModelSession` directly aren't
   counted.

@@ -49,7 +49,8 @@ evaluates a condition, or handles a value.
 - which tools the model even sees: the server's tools are ranked by how "dataset-like" the name
   looks and only the top few are enabled; the raw-file reader is withheld
 - the raw payload's path — `FileBackedTool`'s `saveAs` parks it in `raw/data.json`; it never
-  enters the model's context
+  enters the model's context. Since SDK 2.0 that's enforced, not just asked for: the default
+  `SaveAsPolicy` keeps `saveAs` under `raw/`, data-file types only, no hidden paths
 
 **The model decides** — a data-tool pick, a table name, then one `SELECT`:
 
