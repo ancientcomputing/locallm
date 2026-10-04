@@ -41,7 +41,7 @@ non-comment lines; these examples are commented far more heavily than production
 | [`aiql`](#examplesaiql) | 402 | 459 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
 | [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
-| [`jevdk`](#examplesjevdk) | 2,529 | 2,748 | a playground for decision-model questions: local OpenJev and hosted Jev side by side through one API, marked answers, calibration, and the tested questions exported for an app (14 files, excerpted) |
+| [`jevdk`](#examplesjevdk) | 2,627 | 2,862 | a playground for decision-model questions: local OpenJev and hosted Jev side by side through one API, marked answers, calibration, and the tested questions exported for an app (14 files, excerpted) |
 | [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
 | [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
@@ -3783,7 +3783,7 @@ because a curated adapter lives in a different namespace.
 
 ## `examples/jevdk`
 
-*2,529 lines of code across 14 files (2,748 with comments). Excerpted: the SDK-facing parts of
+*2,627 lines of code across 14 files (2,862 with comments). Excerpted: the SDK-facing parts of
 `AppModel.swift` and `HostedBackends.swift` are below; the editor, batch grid, calibration
 sheet, model browser and results-CSV writer are plain SwiftUI and Foundation and are omitted
 (`// …`).*
@@ -3810,7 +3810,8 @@ API keys live in the Keychain (or, for headless runs, environment variables), ne
 ### `Sources/JevDK/AppModel.swift` (excerpt)
 
 Runs one input on every enabled backend concurrently: hosted through `lab.decide`, local through
-the OpenJev provider directly. Note there is no prompt building and no answer parsing anywhere:
+the OpenJev provider directly. Then the files: the questions exported for an app, answers imported
+from a CSV, and Open, which also reads an exported `.decisions.json` back. Note there is no prompt building and no answer parsing anywhere:
 questions go in typed, answers come back typed.
 
 ```swift
@@ -3965,6 +3966,92 @@ import UniformTypeIdentifiers
         }
     }
 
+    // …
+    /// Load an answer set (CSV: `input`, then a column per question with the correct answer) into
+    /// the batch list and the marks. Inputs with line breaks are joined onto one line, since the
+    /// batch list is one input per line.
+    func importAnswerSet() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        panel.message = "An answer set: a CSV with an input column and one column per question, holding the correct answer."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let answers = try DecisionAnswerSet(csv: String(contentsOf: url, encoding: .utf8))   // ← SDK
+            let questions = set.questions.map(\.sdkQuestion)
+            let problems = answers.problems(for: questions)   // ← SDK
+            guard problems.isEmpty else {
+                errorMessage = "\(url.lastPathComponent) doesn't fit these questions: " + problems.prefix(3).joined(separator: " ")
+                    + (problems.count > 3 ? " (and \(problems.count - 3) more)" : "")
+                return
+            }
+            var newLabels: [String: [String: String]] = [:]
+            var inputs: [String] = []
+            var joined = 0
+            for e in answers.examples {
+                let one = e.input.split(whereSeparator: \.isNewline).joined(separator: " ")
+                if one != e.input { joined += 1 }
+                inputs.append(one)
+                var marks: [String: String] = [:]
+                for q in questions {
+                    if let raw = e.answers[q.id], let key = DecisionAnswerSet.answerKey(raw, for: q) { marks[q.id] = key }   // ← SDK
+                }
+                if !marks.isEmpty { newLabels[one] = marks }
+            }
+            batchText = inputs.joined(separator: "\n")
+            labels = newLabels
+            batchRows = []
+            errorMessage = joined > 0 ? "Imported \(inputs.count) inputs; \(joined) had line breaks and were joined onto one line." : nil
+        } catch {
+            errorMessage = "Couldn't import: \(error.localizedDescription)"
+        }
+    }
+    // …
+    /// Open a workspace file (what Save Workspace writes), or a questions file exported for an app
+    /// (`.decisions.json`): its questions and system instructions, and the calibration it carries.
+    func open() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.message = "A JevDK workspace, or a questions file exported for an app (.decisions.json)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            if let saved = try? JSONDecoder().decode(SavedSet.self, from: data) {
+                set = saved.set
+                input = saved.input ?? input
+                batchText = saved.batch ?? batchText
+                labels = saved.labels ?? [:]
+                calibration = saved.calibration
+                applyCalibration = saved.calibration != nil
+            } else if let exported = try? DecisionQuestionSet(json: data) {   // ← SDK
+                let t = exported.tuning   // ← SDK
+                set = QuestionSet(name: exported.name, system: t?.system ?? QuestionSet.defaultSystem,
+                                  inputLabel: t?.inputLabel ?? QuestionSet.defaultInputLabel,
+                                  questions: exported.questions.map(EditableQuestion.init))
+                labels = [:]
+                if let cal = t?.calibration, let model = t?.model {
+                    calibration = FittedCalibration(
+                        noulTemperature: cal.noulTemperature, choiceTemperature: cal.choiceTemperature,
+                        scoreTemperature: cal.scoreTemperature, repoID: model.rest, revision: t?.revision ?? "?",   // ← SDK
+                        system: set.system, inputLabel: set.inputLabel, fittedAt: t?.testedAt ?? Date(), samples: [:])
+                } else {
+                    calibration = nil
+                }
+                applyCalibration = calibration != nil
+                // An app file isn't a workspace: ⌘S asks where to save one rather than overwriting it.
+                results = []; batchRows = []; samples = []
+                fileURL = nil
+                return
+            } else {
+                set = try JSONDecoder().decode(QuestionSet.self, from: data)
+            }
+            results = []
+            batchRows = []
+            samples = []
+            fileURL = url
+        } catch {
+            errorMessage = "Couldn't open \(url.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
 ```
 
 ### `Sources/JevDK/HostedBackends.swift` (excerpt)
@@ -4000,7 +4087,7 @@ enum APIKeys {
 
 ```
 
-**Tally:** 13 lines Core (`// ← SDK`), 9 Inference, 8 Remote, in the excerpts
+**Tally:** 19 lines Core (`// ← SDK`), 9 Inference, 8 Remote, in the excerpts
 above. The decision API itself is a handful of calls (`register`/`replace(decision:)`,
 `route(decision:)`, `decide`, `decideWithDiagnostics`, `DecisionCalibration.fit`,
 `DecisionQuestionSet`, `DecisionAnswerSet`); the rest of the app is the playground around them.
