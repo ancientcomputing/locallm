@@ -115,7 +115,9 @@ if ! security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >/dev/nu
   security find-identity -v -p codesigning || true
   exit 1
 fi
-if [[ "$(security find-identity -v -p codesigning | grep -cF "$APP_IDENTITY")" -gt 1 ]]; then
+# Ambiguous only if the name matches different certificates. The same certificate is often listed
+# several times (login, System and iCloud keychains), each with the same SHA-1; that's fine.
+if [[ "$(security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" | awk '{print $2}' | sort -u | wc -l | tr -d ' ')" -gt 1 ]]; then
   echo "APP_IDENTITY matches more than one identity; pass its SHA-1 hash instead: $APP_IDENTITY" >&2
   security find-identity -v -p codesigning | grep -F "$APP_IDENTITY" >&2 || true
   exit 1
