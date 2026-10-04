@@ -91,9 +91,9 @@ what's public here is:
 
 > **The model layer builds for macOS 26 & 27.** `SystemModelProvider` works on
 > macOS 26; MLX, `ClaudeForFoundationModels`, the hosted providers, and Private Cloud Compute
-> need macOS 27. Coming from `0.8.x`? See
-> **[docs/migrating-to-1.0.md](docs/migrating-to-1.0.md)** — it's mostly additive, with one
-> enum-resilience compile caveat.
+> need macOS 27. Coming from 1.x? See **[docs/migrating-to-2.0.md](docs/migrating-to-2.0.md)**:
+> 2.0 is a one-time breaking release (mostly tool authorization), then source compatible for every
+> 2.x. From `0.8.x`, start with [docs/migrating-to-1.0.md](docs/migrating-to-1.0.md).
 
 Two ways to turn a connector or MCP server into something the on-device model can actually call as
 a tool. **Path A**: drop in a ready-made `Tool` Core already ships for it —
@@ -105,6 +105,12 @@ tool names, schemas, and descriptions. Neither is the "real" one — both ship i
 can mix them. See [`docs/sdk-guide.md` §7a](docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
 for the full framing.
 
+- **Decision models (Jev), new in 2.0** — `lab.decide` asks typed questions (yes / no, one of
+  several, a scale) and gets one allowed answer each with probabilities, no text, from TypeSafe's
+  Jev, Featherless or **OpenJev** on a local MLX model; a small decider can stay loaded next to
+  your chat model. Start with [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html),
+  then [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdecide) and
+  [examples/jevdk/](examples/jevdk/).
 - **[docs/sdk-guide.md](docs/sdk-guide.md)** — the full developer guide: linking Core, the model
   layer (§6a), entitlements, all three MCP auth types, Keychain storage, App Sandbox/MAS signing,
   ready-made vs. hand-written tool-calling (§7a), and a full function/type reference (§12).
@@ -164,6 +170,12 @@ Roughly simplest to fullest — every one runnable, with full annotated source i
 - **[examples/mcp-chat/](examples/mcp-chat/)** (2.0) — a chat with a local model where a tool call
   that has an MCP App shows the server's interactive widget inline (Todoist's task list, a system
   monitor); the widget's own calls go through the same per-server approval as the model's.
+- **[examples/jevdk/](examples/jevdk/)** (2.0) — JevDK, a playground for decision-model (Jev)
+  questions: run them on a local MLX model and on hosted Jev side by side, score a batch against
+  your marked answers, calibrate, compare models, and export the tested questions for your app.
+  [Developer's guide](https://thisbrain.ai/locallm/jdk-guide.html);
+  [download the app](https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-dev/JevDK-0.1.0-arm64.dmg)
+  (macOS 27, signed and notarized, a preview built on SDK 2.0.0-dev).
 
 Plus **[examples/api-lab/](examples/api-lab/)** (scripts + a chat app for the OpenAI-compatible
 endpoint) and **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cli-swift/](examples/localai-cli-swift/)**

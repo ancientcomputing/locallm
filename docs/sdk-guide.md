@@ -9,10 +9,15 @@ below for the working reference apps this guide is drawn from.
 
 Requires macOS 26+ on Apple Silicon, Swift 6 tools.
 
-**Status note**: `1.0.0` is generally available — source compatible from `1.0.0-RC.1` onward (see
-[§9](#9-scope-and-boundaries-what-core-doesnt-do) for the compatibility policy, or
-[`migrating-to-1.0.md`](migrating-to-1.0.md) if you're coming from `0.8.x`). This guide describes
-the API as of `1.0.0` GA. `Components` in particular is newer and smaller than `Core`.
+**Status note**: this guide describes the API as of `2.0.0`, a one-time breaking release; every 2.x
+release after it is source compatible with it (see [§9](#9-scope-and-boundaries-what-core-doesnt-do)
+for the compatibility policy). Coming from 1.x: [`migrating-to-2.0.md`](migrating-to-2.0.md); from
+`0.8.x`: [`migrating-to-1.0.md`](migrating-to-1.0.md) first. New in 2.0: per-server trust and tool
+approval ([§7c](#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)), MCP
+Apps ([§3f](#3f-mcp-apps-showing-a-servers-interactive-views)), chat-app support
+([Building a chat app](#building-a-chat-app--hosttranscript-streamresponse-turncontext)) and
+decision models ([§6c](#6c-decision-models-jev--labdecide)). `Components` in particular is newer and
+smaller than `Core`.
 
 ## Start here: run a real example before reading further
 

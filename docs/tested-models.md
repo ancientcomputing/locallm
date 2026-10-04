@@ -32,6 +32,26 @@ built-in `ClockTool` cross-check.
 | **Phi-4-mini**, **SmolLM3-3B** | ❌ | Fail on the *input* side: templates try to list tools via a convention `swift-transformers` doesn't supply. Structurally unreachable regardless of the model. SmolLM3 then fabricates badly. |
 | **gpt-oss-20B** | ⚠️ app-side gap | The model correctly formats a real call — in OpenAI's "Harmony" format, which `mlx-swift-lm` has no parser for, so the call is never recognized. Not a model gap; a known limitation of `mlx-swift-lm`'s parser. |
 
+## As a decider (OpenJev, `lab.decide`)
+
+Point-in-time too: **2026-10-03**, SDK `2.0.0-dev`, a 64 GB Apple-silicon Mac, the SDK's own
+decision-question evaluation and JevDK's customer-support example. A decider answers typed
+questions from the probabilities of each option's label, with no generation
+([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide)), so what matters is
+different from tool calling. **Test your own questions on your own marked inputs in
+[JevDK](../examples/jevdk/); these rows only say where to start.**
+
+| Model | As a decider | Notes |
+|---|---|---|
+| **Qwen3-4B-4bit** (`mlx-community/Qwen3-4B-4bit`) | ✅ the tested default | About 150 ms for four questions, about 2.3 GB. 89–93% on the evaluation with its best wording per question; 58/64 on JevDK's customer-support example. Says 100% even when wrong, so calibrate before using its confidence, and expect some questions (in our test, "is the customer blocked?") to need rewording or a hosted decider. |
+| **Qwen3.8-27B-4bit** | ✅ | 92% on the triage questions, but about 15 GB, and slower as a decider (about 1.2 s per triage case: the SDK's shared cache loads it as a vision model). Mostly worth it as the chat model, with a small decider beside it (`pair(decision:generator:)`). |
+| **Qwen3-1.7B-4bit** | ⚠️ too weak | Fast, but 74% on answer checks and about 50% on "does this need live data?". |
+| **Mixture-of-experts models** | ❌ not as a decider | Their probabilities moved by up to 0.45 depending on how the prompt was split. `OpenJevDecisionProvider.warnings(for:)` flags them. Use one as the chat model instead. |
+
+For comparison, the hosted Featherless classifiers (Qwen3.8-27B and Qwen3.5-4B) scored 61/64 on
+the same customer-support example, and TypeSafe's Jev is trained to decide and reports calibrated
+probabilities.
+
 ## Capacity notes (this Mac, this workload)
 
 - **Apple on-device** (`SystemModelProvider` / `.system`): ~8,192-token context window. A

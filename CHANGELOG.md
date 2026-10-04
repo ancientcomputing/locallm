@@ -43,7 +43,8 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   `liveUpdates`, …): a state JSON encoded under 1.0 no longer decodes. Restore servers with
   `restore(from:)`.
 - **Defaulted parameters added**: `SessionOptions.init` and `MLXModelProvider.init` gain
-  `maxModelCallsPerTurn:` (usual call sites compile unchanged).
+  `maxModelCallsPerTurn:`; `LocalLMLabState.init` gains `decisionRoutes:` (usual call sites
+  compile unchanged; snapshots saved by 1.0 still decode, with no decision routes).
 - **One declaration each** where 1.x had kept two (usual call sites compile unchanged):
   `makeSession` (now with `restoring:` and `mcpAppHints:`), `respond` / `streamResponse` (with
   `options:` and `fromAppInstance:`), `LocalLMLab.Configuration.init` (with `mcp: MCPSettings`),
@@ -153,6 +154,42 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
   which model call of the turn, since when — so an app can say why nothing has appeared yet.
 - **`maxModelCallsPerTurn`** on `MLXModelProvider` and `SessionOptions`: the tool-loop limit, 16 by default.
 
+### Added — decision models (Jev)
+
+A **decision model** answers a few typed questions about one input — yes / no, one of several
+options, a point on a scale — with a probability for every option, and writes no text. One API
+asks them of TypeSafe's Jev, Featherless's Simple Jev, or **OpenJev**, the SDK's own decider on a
+local MLX model. Introduction: [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html);
+API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdecide).
+
+- **Core:** `LocalLMLab.decide(route:state:questions:)`; questions in Jev's vocabulary
+  (`DecisionQuestion.noul` / `.choice` / `.score`, `DecisionState`, `DecisionRequest`,
+  `DecisionLimits` incl. `maxStateCharacters`); answers (`Decision`, `DecisionAnswer`,
+  `ChoiceAnswer`, `ScoreAnswer`, `DecisionFidelity`, `DecisionUsage`); `DecisionError`;
+  `DecisionProvider` for custom backends. Decision routes and providers are separate from chat:
+  `ModelRegistry.register(decision:)`, `replace(decision:)`, `removeDecisionProvider(scheme:)`,
+  `route(decision:to:)`, `modelID(forDecision:)`, `decisionProvider(for:)`,
+  `decisionAvailability(for:)`; saved by `lab.snapshot()`.
+- **A decider next to your chat model:** `ModelRegistry.pair(decision:generator:)` checks both
+  models fit the memory budget and keeps them loaded together (or shares one model);
+  `DecisionPairing`, `PairableDecisionProvider`, `DecisionError.pairing`.
+- **From testing to shipping:** `DecisionQuestionSet` (the tested questions as a JSON file, with
+  the model, revision, wrapper and calibration they were tested with); `DecisionAnswerSet`
+  (inputs with the correct answers, as CSV); `LocalLMLab.evaluate(route:questions:answerSet:)`
+  → `DecisionEvaluation` (accuracy per question, misses, confidence when right and wrong) for
+  regression tests in CI; `DecisionCalibration` (temperature scaling per question kind: `fit`,
+  `measure`, `apply`).
+- **`LocalLMLabSDKInference` (macOS 27):** `OpenJevDecisionProvider` — answers each question in
+  one forward pass over the allowed labels' probabilities, no generation, the input read once for
+  all questions (about 150 ms for four questions on Qwen3 4B). `OpenJevWrapper` (+ `.default`),
+  `calibration:`, `init(mlx:tunedWith:)`, `tuningMismatch(for:)`, `warnings(for:)`
+  (`OpenJevWarning.mixtureOfExperts`: use a dense model as the decider),
+  `decideWithDiagnostics(_:using:)` (`OpenJevDiagnostics`: exact prompts, label mass, timing).
+- **`LocalLMLabSDKRemote`:** `JevDecisionProvider` with `JevProviderConfig.openRouter(key:)`
+  (TypeSafe's Jev via OpenRouter), `.featherless(key:)` and `.featherlessDemo()` (no key,
+  rate-limited); `validated()`, `requestBody(model:request:)`. Off until registered; the
+  questions and input are then sent to that service.
+
 ### Fixed
 
 - **`contextBudget`** reported the whole session's cumulative usage as the last turn's, so `fractionUsed` grew
@@ -160,6 +197,10 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
 ### Added — examples
 
+- [`jevdk`](examples/jevdk/): JevDK, a playground for decision-model questions — run them on a
+  local MLX model and on hosted Jev side by side, score a batch against your marked answers,
+  calibrate, compare models in a results CSV, and export the tested questions for your app. With a
+  plain-English [developer's guide](examples/jevdk/GUIDE.md) ([on the web](https://thisbrain.ai/locallm/jdk-guide.html)).
 - [`mcp-chat`](examples/mcp-chat/): a chat with a local model (Qwen3 8B via MLX, or Apple's
   on-device model) that shows MCP Apps views inline, with streaming, per-server trust and
   approval, the date every turn, and conversations that reopen.

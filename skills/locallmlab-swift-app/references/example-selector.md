@@ -15,6 +15,7 @@ Pick the nearest reference app before inventing a new integration shape.
 - `examples/components-demo`: prebuilt Components UI for adding and managing MCP servers.
 - `examples/model-switch`: Core plus Remote plus Components for online providers, API keys, model selection, web search, and citations.
 - `examples/aiql`: SwiftUI "ask your data" app using MCP, `FileBackedTool`, data verbs, CSV output, sandboxing, and OAuth.
+- `examples/jevdk` (2.0): JevDK, a SwiftUI playground for decision models: `lab.decide` across local `OpenJevDecisionProvider` (Inference) and hosted `JevDecisionProvider` (Remote), batch scoring against marked answers, `DecisionCalibration`, and `DecisionQuestionSet` / `DecisionAnswerSet` export. The reference for any decision-model integration; its `GUIDE.md` is the workflow.
 
 ## Toolkit Examples
 
