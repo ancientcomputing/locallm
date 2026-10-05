@@ -232,21 +232,23 @@ only use the top answer.
 5. If you change the model or the system instructions later, JevDK flags the calibration until
    you redo it.
 
-**Use the calibration in your app.** You fit it in JevDK; your app only applies it. Two ways:
+**Use the calibration in your app.** A calibration is just three numbers: the **Temperature**
+column of the Calibrate window's **Fitted** table, **X** for yes/no questions, **Y** for choice and
+**Z** for score (a kind you have no questions of stays at 1.0, "no change"). Your app doesn't
+work them out again; it only needs to be given them. Two ways:
 
-- **With the questions (recommended):** **File → Export Questions…** writes the calibration into
-  the `.decisions.json` file, next to the questions, model and system instructions it was fitted
-  for. Load that file in your app and build the decider from it; the calibration is applied to
-  every answer (step 8):
+- **Let them travel with your questions (easiest).** **File → Export Questions…** saves your
+  questions as a file for your app, and that file includes the three numbers. Add the file to
+  your app and set up the decider from it; the numbers are used automatically (step 8):
 
   ```swift
   let set = try DecisionQuestionSet(contentsOf: url)
-  let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)   // calibration included
+  let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)   // the numbers come with the file
   ```
 
-- **Without the file:** in the Calibrate window, **Copy code** copies a snippet with the three
-  fitted values and the system instructions they were fitted with. Paste it into your app; keep
-  the system instructions too, since the calibration only holds with them:
+- **Put them in your code yourself.** **Copy code** in the Calibrate window copies ready-to-paste
+  code with X, Y and Z filled in, plus the system instructions you tested with. Paste it where
+  your app sets up its decider, and keep the instructions: the numbers only fit them.
 
   ```swift
   let openjev = OpenJevDecisionProvider(mlx: mlx,
@@ -254,16 +256,11 @@ only use the top answer.
       calibration: DecisionCalibration(noulTemperature: X, choiceTemperature: Y, scoreTemperature: Z))
   ```
 
-  The three numbers are the **Temperature** column of the Calibrate window's **Fitted** table: **X**
-  for yes/no (Noul), **Y** for Choice and **Z** for Score. A kind you have no questions of shows no
-  row and stays at 1.0, which means "no change".
-
-
-Either way, your app's answers then come back with `fidelity == .tokenScored(calibrated: true)`.
-A calibration holds only for the model version, system instructions and kinds of question it was
-fitted on: refit in JevDK and re-export when any of them changes. `openjev.tuningMismatch(for:)`
-tells your app when the model on the device isn't the one you calibrated. Hosted deciders don't
-use it: TypeSafe's Jev is calibrated already.
+Afterwards, your app's answers say they're calibrated (`fidelity == .tokenScored(calibrated: true)`).
+The numbers fit the model version, system instructions and kinds of question you tested, so fit
+them again and re-export when any of those changes; `openjev.tuningMismatch(for:)` tells your app
+when the model on the device isn't the one you calibrated. Hosted deciders don't need this:
+TypeSafe's Jev comes calibrated.
 
 What calibration can't do: fix wrong answers. In our test, a confidently wrong answer stayed
 wrong; it just became less confidently wrong. Get the questions right first (steps 4 and 5).
