@@ -26,6 +26,19 @@ struct ResultsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
                     .padding(.top, 8)
+            } else if let msg = model.notice {
+                HStack(alignment: .top) {
+                    Label(msg, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.jCallout)
+                        .textSelection(.enabled)
+                    Spacer()
+                    Button { model.notice = nil } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.borderless)
+                        .help("Dismiss")
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
             }
 
             switch mode {

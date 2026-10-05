@@ -68,7 +68,7 @@ struct ModelsSheet: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(m.repoID).font(.system(size: 14, design: .monospaced))
-                            Text("\(m.sizeText)\(m.isMoE ? " · mixture-of-experts: not recommended as a decider" : "")")
+                            Text("\(m.sizeText)\(m.shortRevision.map { " · version \($0)" } ?? "")\(m.isMoE ? " · mixture-of-experts: not recommended as a decider" : "")")
                                 .font(.jCaption).foregroundStyle(m.isMoE ? .orange : .secondary)
                         }
                         Spacer()

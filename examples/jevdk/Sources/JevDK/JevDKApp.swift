@@ -60,6 +60,8 @@ struct JevDKApp: App {
                 }
                 Section("For your app") {
                     Button("Export Questions…") { model.exportForApp() }.keyboardShortcut("e")
+                    Button("Export Server Config…") { model.exportServerConfig() }
+                        .disabled(!model.useLocal || model.selectedModel == nil)
                 }
                 Section("Test data") {
                     Button("Import Answers (CSV)…") { model.importAnswerSet() }
@@ -162,7 +164,8 @@ struct ContentView: View {
 
     private var modelHelp: String {
         guard let m = model.selectedModel else { return "No SDK-verified models yet: open Models to choose one." }
-        var s = "\(m.repoID) · \(m.sizeText) · verified by the SDK"
+        var s = "\(m.repoID)\(m.shortRevision.map { " @ \($0)" } ?? "") · \(m.sizeText) · verified by the SDK"
+        if let r = m.revision { s += "\nVersion \(r): exports pin this exact version." }
         if m.isMoE {
             s += "\nMixture-of-experts: not recommended as a decider. Its probabilities can shift with how the prompt is split."
         }
@@ -173,6 +176,9 @@ struct ContentView: View {
         HStack(spacing: 6) {
             if model.useLocal, let m = model.selectedModel {
                 Text(m.repoID)
+                if let r = m.shortRevision {
+                    Text("@ \(r)").foregroundStyle(.secondary).help("The model's version on this Mac (\(m.revision ?? r)). Exports pin it.")
+                }
                 if m.isMoE {
                     Text("· MoE: not recommended as a decider").foregroundStyle(.orange)
                 }

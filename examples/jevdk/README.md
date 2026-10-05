@@ -75,12 +75,13 @@ to try a second wording side by side. **⌘S** saves the whole workspace to a fi
 
 ## Files
 
-JevDK works with four kinds of file. The File menu groups them:
+JevDK works with five kinds of file. The File menu groups them:
 
 | File menu | The file | What's in it | Use it to |
 |---|---|---|---|
 | **Workspace:** Open…, Save Workspace (⌘S), Save Workspace As… | `Customer support.jevdk.json`, JevDK's own format | Everything: questions, system instructions, the input and batch list, your marked answers, the calibration | Pick your work back up, or hand it to a colleague. JevDK also keeps the last workspace between launches on its own. |
 | **For your app:** Export Questions… (⌘E) | `customer-support.decisions.json`, the SDK's `DecisionQuestionSet` | The questions exactly as tested, plus the model, version, system instructions and calibration they were tested with. No inputs or marks. | Bundle it in your app; `OpenJevDecisionProvider(mlx:tunedWith:)` loads it. |
+| **For your app:** Export Server Config… | `jev-serve.json` | Where jev-serve listens, an optional token, and the models it serves, each with its version, system instructions and calibration. Exporting again adds or replaces this question set's entry. Readable only by you. | Serve the tested setup over hosted Jev's HTTP API on this Mac, with the jev-serve example. |
 | **Test data:** Import Answers (CSV)…, Export Answers (CSV)… | `customer-support.answers.csv` | Your batch inputs and the correct answers you marked: an `input` column, then one column per question | Edit test cases in a spreadsheet, share them, and run them in your app's tests with `lab.evaluate`. |
 | **Test data:** Append Run to Results CSV… | `jevdk-results.csv`, grows with every run | Every answer from every backend in a run, with the model, timing and whether it was right | Compare models and wordings over time (below). |
 
@@ -90,6 +91,11 @@ workspace or an exported `.decisions.json`, so a file you shipped can come back 
 on (its questions, system instructions and calibration; it has no inputs or marks).
 
 The Batch toolbar has the same answer and results actions (**Answers**, **Results CSV**).
+
+**Model versions.** A model on Hugging Face can change. JevDK shows the exact version you're
+testing (a short commit id, e.g. `4dcb3d1`) in **Models**, the status bar and the Calibrate
+window, and every export records it, so your app or jev-serve uses (and downloads) exactly that
+version. If the model changes under you, JevDK says so next to the calibration.
 
 ## Comparing models: the results CSV
 

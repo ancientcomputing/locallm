@@ -61,7 +61,7 @@ struct CalibrationSheet: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(samples.isEmpty || model.selectedModel == nil)
                 if let m = model.selectedModel {
-                    Text("for \(m.repoID)").font(.jCaption).foregroundStyle(.secondary)
+                    Text("for \(m.repoID)\(m.shortRevision.map { " @ \($0)" } ?? "")").font(.jCaption).foregroundStyle(.secondary)
                 }
             }
 

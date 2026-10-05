@@ -27,7 +27,9 @@ struct FittedCalibration: Codable, Hashable {
     func mismatch(repoID: String?, revision: String?, system: String, inputLabel: String) -> String? {
         var reasons: [String] = []
         if repoID != self.repoID { reasons.append("it was fitted on \(self.repoID)") }
-        else if let revision, revision != self.revision { reasons.append("the model has been updated since") }
+        else if let revision, revision != self.revision {
+            reasons.append("the model has been updated since (fitted on version \(self.revision.prefix(7)), now \(revision.prefix(7)))")
+        }
         if system != self.system || inputLabel != self.inputLabel { reasons.append("the system instructions changed since") }
         return reasons.isEmpty ? nil : reasons.joined(separator: ", ")
     }

@@ -33,8 +33,12 @@ struct LocalChoice: Identifiable, Hashable {
     let repoID: String
     let sizeBytes: Int64?
     let isMoE: Bool
+    /// The exact version (Hugging Face commit) on this Mac; what an exported setup pins to.
+    var revision: String? = nil
 
     var displayName: String { repoID.split(separator: "/").last.map(String.init) ?? repoID }
+    /// The version as people read it: the commit's first 7 characters.
+    var shortRevision: String? { revision.map { String($0.prefix(7)) } }
     var sizeText: String { sizeBytes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "?" }
 }
 
@@ -71,7 +75,9 @@ final class AppModel {
     /// Rows appended by the last write, for the status line.
     var lastAppend: (rows: Int, file: String)?
     var isRunning = false
-    var errorMessage: String?
+    var errorMessage: String? { didSet { if errorMessage != nil { notice = nil } } }
+    /// A confirmation to show after a save or export ("Exported 4 questions … pinned to 4dcb3d1").
+    var notice: String?
 
     // Backends
     var useLocal = true { didSet { UserDefaults.standard.set(useLocal, forKey: "useLocal") } }
@@ -119,7 +125,8 @@ final class AppModel {
         let probe = OpenJevDecisionProvider(mlx: mlx)
         models = mlx.installed.map { m in
             LocalChoice(repoID: m.repoID, sizeBytes: m.sizeBytes,
-                        isMoE: probe.warnings(for: Self.openJevID(m.repoID)).contains(.mixtureOfExperts))
+                        isMoE: probe.warnings(for: Self.openJevID(m.repoID)).contains(.mixtureOfExperts),
+                        revision: m.resolvedRevision)
         }.sorted { ($0.sizeBytes ?? 0) < ($1.sizeBytes ?? 0) }
         let verified = Set(models.map(\.repoID))
         unverifiedRepos = ModelCatalog.cachedRepoIDs().filter { !verified.contains($0) }
@@ -390,12 +397,71 @@ final class AppModel {
         panel.message = "A question set for your app: bundle it and load it with DecisionQuestionSet(contentsOf:)."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let file = DecisionQuestionSet(name: set.name, questions: set.questions.map(\.sdkQuestion), tuning: exportTuning)
+            let tuning = exportTuning
+            let file = DecisionQuestionSet(name: set.name, questions: set.questions.map(\.sdkQuestion), tuning: tuning)
             try file.jsonData().write(to: url)
             errorMessage = nil
+            notice = "Exported \(set.questions.count) questions to \(url.lastPathComponent)" + Self.tuningSummary(tuning) + "."
         } catch {
             errorMessage = "Couldn't export: \(error.localizedDescription)"
         }
+    }
+
+    /// ", for Qwen3-4B-4bit pinned to 4dcb3d1, calibrated" — what an export carries.
+    static func tuningSummary(_ t: DecisionQuestionSet.Tuning?) -> String {
+        guard let t, let model = t.model else { return " (no local model: questions only)" }
+        let name = model.rest.split(separator: "/").last.map(String.init) ?? model.rest
+        var s = ", for \(name)"
+        if let r = t.revision { s += " pinned to \(r.prefix(7))" }
+        s += t.calibration == nil ? ", not calibrated" : ", calibrated"
+        return s
+    }
+
+    /// Add this setup (local model, its version, system instructions, calibration) to a jev-serve
+    /// config, creating one if needed (see the jev-serve example). An existing config keeps its other
+    /// models, listen address and token; the entry with this question set's name is replaced.
+    func exportServerConfig() {
+        guard let tuning = exportTuning else {
+            errorMessage = "Pick a local model first: jev-serve serves a local model."
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "jev-serve.json"
+        panel.message = "A jev-serve config. If the file exists, this setup is added to it (or replaces the one with the same name)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var config: JevServeConfig
+        var created = false
+        if FileManager.default.fileExists(atPath: url.path) {
+            do { config = try JevServeConfig.read(url) } catch {
+                errorMessage = "\(url.lastPathComponent) isn't a jev-serve config, so it wasn't changed: \(error.localizedDescription)"
+                return
+            }
+        } else {
+            created = true
+            let alert = NSAlert()
+            alert.messageText = "Require a token?"
+            alert.informativeText = "With a token, jev-serve only answers requests that send it (Authorization: Bearer …). It's saved in the config file, which only you can read."
+            alert.addButton(withTitle: "Generate a Token")
+            alert.addButton(withTitle: "No Token")
+            config = JevServeConfig(token: alert.runModal() == .alertFirstButtonReturn ? JevServeConfig.newToken() : nil)
+        }
+        let name = Self.slug(set.name.isEmpty ? "decider" : set.name)
+        config.upsert(.init(name: name, tuning: tuning))
+        do {
+            try config.write(to: url)
+            errorMessage = nil
+            notice = "\(created ? "Wrote" : "Updated") \(url.lastPathComponent): “\(name)”" + Self.tuningSummary(tuning)
+                + (config.token != nil ? ", token required" : "") + ". Serve it with: jev-serve --config \(url.lastPathComponent)"
+        } catch {
+            errorMessage = "Couldn't write \(url.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
+
+    /// "Customer support" → "customer-support", what requests send as "model".
+    static func slug(_ s: String) -> String {
+        let parts = s.lowercased().split { !($0.isLetter || $0.isNumber) }
+        return parts.isEmpty ? "decider" : parts.joined(separator: "-")
     }
 
     /// Load an answer set (CSV: `input`, then a column per question with the correct answer) into

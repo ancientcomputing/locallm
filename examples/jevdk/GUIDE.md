@@ -434,7 +434,9 @@ Sixteen messages are enough to show the method, not to choose a model. Use 50 or
   imports and exports it as CSV (**File → Import / Export Answers**).
 - **Workspace:** JevDK's own file (⌘S / ⌘O) with everything you're working on. Not for your app;
   for that, **Export Questions**. The README's [Files](README.md#files) section compares
-  the four kinds of file.
+  the five kinds of file.
+- **Model version:** the exact Hugging Face commit of a model (shown as e.g. `4dcb3d1`). Exports
+  record it, so what ships is what you tested.
 - **Backend:** where the decider runs: locally (OpenJev on this Mac) or hosted (Featherless,
   TypeSafe).
 - **System instructions / wrapper:** the text that frames every question for a local model.
