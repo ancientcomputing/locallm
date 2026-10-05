@@ -2042,6 +2042,27 @@ let result = try await lab.evaluate(route: "support", questions: set.questions, 
   when wrong (a big gap means a threshold can catch the misses), calibration error, and
   `samples` for `DecisionCalibration.fit`.
 
+### Decisions that need your product's knowledge
+
+A decider sees only `state` and the questions (there's no system prompt), so knowledge it needs,
+such as which part of your software a bug report concerns and who owns it, has to come through
+those, or stay in your code:
+
+- **Classify, then map in code** (usually best): ask which *component* the input is about, with the
+  product knowledge in each option's description, and map component → team with an ordinary table.
+  Ownership changes then touch the table, not the questions or the calibration.
+- **Knowledge in the options:** describe each team by what it owns (`"payments": "billing,
+  invoices, the Checkout module"`). Up to 26 options locally, 255 hosted.
+- **Knowledge in the input:** send the context your app already has as JSON alongside the input,
+  `try .encoding(Ticket(report:screen:stackTraceModules:))`. Keep it short (`maxStateCharacters`
+  on hosted backends; longer inputs are slower locally).
+- **Retrieve first:** for a large knowledge base, select the relevant passages in your app (or with
+  your chat model) and send only those.
+
+Don't put the knowledge in an `OpenJevWrapper`'s system text: hosted backends never see it, and a
+calibration only holds for the wrapper it was fitted with. Full walkthrough with code:
+[JevDK's guide](../examples/jevdk/GUIDE.md#when-the-decision-needs-your-products-knowledge).
+
 ### Writing questions that work
 
 - Only ask what a model can judge from the input and general knowledge — **never current

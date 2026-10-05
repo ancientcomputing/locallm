@@ -71,6 +71,62 @@ Poor fits:
 - **Judgements even people would disagree on.** If two colleagues wouldn't give the same answer,
   the model won't be consistent either.
 
+### When the decision needs your product's knowledge
+
+Say the decider routes bug reports to teams. To do that it has to know something about your
+software: which parts exist, and who owns what. It only knows what's in the **input** and the
+**questions**. There's no system prompt to put background in: hosted deciders don't have one,
+and the SDK leaves it out so local and hosted behave the same. So the knowledge has to reach it
+one of these ways, best first:
+
+1. **Ask what the report is about, and keep "who owns what" in your code.** The decider is good at
+   recognising which part of the product a report describes; it shouldn't need to know your org
+   chart. Ask about components, then look the team up in an ordinary table:
+
+   ```swift
+   let d = try await lab.decide(route: "triage", state: .text(report), questions: [
+       .choice("component", "Which part of the product does this bug report describe?", criteria: [
+           "checkout": "cart, payment form, Stripe errors, order confirmation",
+           "sync":     "files not syncing, conflicts, the desktop sync client",
+           "auth":     "sign-in, password reset, SSO, two-factor codes",
+           "editor":   "the document editor, formatting, comments, undo",
+       ]),
+   ])
+   let team = owners[d.choice("component")!.choice]     // your table: component → team
+   ```
+
+   When teams reorganise, you change the table, not the questions, so there's nothing to re-test
+   or recalibrate. The product knowledge lives in the **option descriptions**: write them in the
+   words users actually use ("Stripe errors", "files not syncing").
+2. **Describe each team by what it owns.** If teams map neatly onto areas, make the teams the
+   options: `"payments": "billing, invoices, the Checkout module, Stripe integration"`. Fine while
+   each description stays short. A local decider takes up to 26 options; hosted Jev up to 255.
+3. **Send the knowledge with the input.** When a line per option isn't enough, send structured
+   context alongside the report, as JSON:
+
+   ```swift
+   struct Ticket: Encodable { let report: String; let screen: String; let stackTraceModules: [String] }
+   let d = try await lab.decide(route: "triage", state: try .encoding(ticket), questions: [...])
+   ```
+
+   The best context is what your app already knows as data: the screen the user was on, the app
+   version, the modules in a stack trace. It's precise and free. Keep it short: a local decider
+   reads the input once for all the questions in a call, but a long input is still slower, and
+   hosted services cap the size (6,000 characters on the Featherless demo).
+4. **Look up the relevant part first.** For a big knowledge base (an architecture doc, a wiki),
+   don't send all of it. Have your app find the few relevant pieces (match file paths or error
+   codes, or search your docs) and send only those. If finding them is itself a judgement, let
+   your chat model do that step and give the decider its short summary.
+
+Don't put product knowledge in JevDK's **System instructions**: only the local decider sees them,
+and calibration is tied to their exact words. And don't ask questions whose answer isn't in the
+input or the options ("Which team owns the sync engine?"); like current facts, the decider can
+only judge what it's given.
+
+**Test it in JevDK** as usual: real reports in **Batch**, the knowledge in the option descriptions
+or pasted into each input the way your app will send it, the right component or team marked.
+Compare the approaches by their ✓s on your own reports.
+
 ---
 
 ## 3. The five things that decide your results
