@@ -1,2 +1,4 @@
 .build/
+build/
+dist/
 jev-serve.json

@@ -26,6 +26,7 @@ let usage = """
       --port <number>    port (default from the config, else 8746)
       --no-download      fail instead of downloading a missing model
       --log-bodies       also log request and response bodies (they hold your inputs)
+      --version          print the version and exit
       --self-check       start on a spare port, ask every model the same questions over HTTP and directly,
                          check the answers match, and exit (0 = all match)
       --help
@@ -53,6 +54,7 @@ func flag(_ name: String) -> Bool {
 }
 setvbuf(stdout, nil, _IOLBF, 0)          // line-buffered, so the banner shows when piped or logged
 if flag("--help") || flag("-h") { print(usage); exit(0) }
+if flag("--version") { print("jev-serve \(jevServeVersion) (LocalLM Lab SDK \(LocalLMLabSDKVersion.current))"); exit(0) }
 let configPath = option("--config")
 let modelOption = option("--model")
 let hostOption = option("--host")

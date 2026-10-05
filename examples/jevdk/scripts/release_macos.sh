@@ -158,10 +158,17 @@ ditto "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" "$APP_DIR"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$CONTENTS_DIR/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$CONTENTS_DIR/Info.plist"
 
-# Apache-2.0 §4(d): carry the SDK's NOTICE (it bundles the MLX stack) inside the app.
-if [[ -f "$APP_ROOT/../../NOTICE" ]]; then
+# Apache-2.0 §4(d): carry the SDK's NOTICE (it bundles the MLX stack) inside the app. It's at the
+# repository root: one level up in ancientcomputing/jevdk, two in ancientcomputing/locallm.
+NOTICE_FILE=""
+for candidate in "$APP_ROOT/../NOTICE" "$APP_ROOT/../../NOTICE"; do
+  if [[ -f "$candidate" ]]; then NOTICE_FILE="$candidate"; break; fi
+done
+if [[ -n "$NOTICE_FILE" ]]; then
   mkdir -p "$CONTENTS_DIR/Resources"
-  cp "$APP_ROOT/../../NOTICE" "$CONTENTS_DIR/Resources/NOTICE"
+  cp "$NOTICE_FILE" "$CONTENTS_DIR/Resources/NOTICE"
+else
+  echo "warning: no NOTICE found next to this repository; the app ships without it" >&2
 fi
 
 # The published xcframework zips carry AppleDouble/xattr detritus that breaks signing.

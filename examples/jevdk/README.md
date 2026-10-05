@@ -12,7 +12,7 @@ Needs an Apple-silicon Mac, macOS 27 and Xcode 27 (Swift 6.4). `Package.swift` b
 `2.0.0-dev` with no further setup (the decision API is new in 2.0): `LocalLMLabSDKCore`,
 `LocalLMLabSDKRemote` and `LocalLMLabSDKInference` (the MLX runtime) come from that GitHub Release.
 No Metal Toolchain needed; the prebuilt Inference xcframework bundles the compiled shaders. To
-build against another release, set `LOCALLM_SDK_VERSION` (see [the examples README](../README.md)).
+build against another release, set `LOCALLM_SDK_VERSION` (see [the README one folder up](../README.md)).
 
 **Or open it in Xcode and Run:** `open -a Xcode JevDK.xcodeproj`, scheme **JevDK**. It's ad-hoc
 signed ("Sign to Run Locally") and not sandboxed, like the `swift build` binary, so it shares your

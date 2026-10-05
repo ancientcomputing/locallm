@@ -217,13 +217,13 @@ func jsonString(_ s: String) -> String {
     return String(decoding: (try? e.encode(s)) ?? Data("\"\"".utf8), as: UTF8.self)
 }
 
-private let logFormatter: DateFormatter = {
+nonisolated(unsafe) private let logFormatter: DateFormatter = {   // DateFormatter is thread-safe for formatting
     let f = DateFormatter()
     f.dateFormat = "HH:mm:ss"
     return f
 }()
 
 /// One line on stderr, with the time.
-public func jevServeLog(_ line: String) {
+public let jevServeLog: @Sendable (String) -> Void = { line in
     FileHandle.standardError.write(Data("\(logFormatter.string(from: Date())) \(line)\n".utf8))
 }
