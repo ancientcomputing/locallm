@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds a Developer ID–signed, notarized, stapled JevDK.app and a drag-to-Applications DMG.
+# Builds a Developer ID–signed, notarized, stapled JevDK.app (with jev-serve inside, from
+# ../jev-serve) and a drag-to-Applications DMG.
 #
 #   VERSION=0.1.0 \
 #   APP_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
@@ -171,6 +172,27 @@ else
   echo "warning: no NOTICE found next to this repository; the app ships without it" >&2
 fi
 
+# jev-serve rides inside the app (Contents/MacOS/jev-serve) and uses the app's frameworks, so it's
+# signed and notarized with the app and covered by the app's stapled ticket: a browser download
+# runs without Gatekeeper prompts (a loose framework next to a CLI can't carry a ticket).
+# JevDK → Install jev-serve Command… links it onto the PATH.
+JEV_SERVE_ROOT="$APP_ROOT/../jev-serve"
+if [[ -d "$JEV_SERVE_ROOT" ]]; then
+  echo "Building jev-serve (release, arm64) to embed..."
+  JS_VERSION_FILE="$JEV_SERVE_ROOT/Sources/JevServe/Version.swift"
+  cp "$JS_VERSION_FILE" "$BUILD_DIR/Version.swift.orig"
+  trap 'cp "$BUILD_DIR/Version.swift.orig" "$JS_VERSION_FILE" 2>/dev/null || true' EXIT
+  sed -i '' "s/^let jevServeVersion = .*/let jevServeVersion = \"$VERSION\"/" "$JS_VERSION_FILE"
+  ( cd "$JEV_SERVE_ROOT" && swift build -c release --arch arm64 --product jev-serve )
+  JS_BIN="$(cd "$JEV_SERVE_ROOT" && swift build -c release --arch arm64 --show-bin-path)/jev-serve"
+  cp "$BUILD_DIR/Version.swift.orig" "$JS_VERSION_FILE"
+  cp "$JS_BIN" "$CONTENTS_DIR/MacOS/jev-serve"
+  # Its frameworks are the app's, in Contents/Frameworks. (Before signing: this edits the binary.)
+  install_name_tool -add_rpath @executable_path/../Frameworks "$CONTENTS_DIR/MacOS/jev-serve"
+else
+  echo "warning: $JEV_SERVE_ROOT not found; the app ships without jev-serve" >&2
+fi
+
 # The published xcframework zips carry AppleDouble/xattr detritus that breaks signing.
 find "$APP_DIR" -name '._*' -delete
 xattr -cr "$APP_DIR"
@@ -191,6 +213,7 @@ for fw in ${FRAMEWORKS[@]+"${FRAMEWORKS[@]}"}; do  # (empty-array safe under set
   sign "$fw/$(basename "$fw" .framework)"
   sign "$fw"
 done
+if [[ -f "$CONTENTS_DIR/MacOS/jev-serve" ]]; then sign "$CONTENTS_DIR/MacOS/jev-serve"; fi
 sign "$APP_DIR"
 
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"

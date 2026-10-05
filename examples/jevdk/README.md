@@ -151,7 +151,8 @@ for your app:
   In your app's tests, `lab.evaluate(route:questions:answerSet:)` scores a backend against it.
 
 - **File → Export Server Config…** writes a config for [jev-serve](../jev-serve/), which serves
-  the same tested setup over hosted Jev's HTTP API on this Mac, for apps in any language.
+  the same tested setup over hosted Jev's HTTP API on this Mac, for apps in any language. The
+  JevDK download includes jev-serve: **JevDK → Install jev-serve Command…** puts it on your PATH.
 
 See [GUIDE.md](GUIDE.md) step 8.
 

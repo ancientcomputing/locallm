@@ -9,12 +9,23 @@ changing its base URL.
 New to decision models? Start with [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html)
 and the [JevDK guide](https://thisbrain.ai/locallm/jdk-guide.html).
 
+**The easy way: it comes with JevDK.** Download JevDK from
+[ancientcomputing/jevdk](https://github.com/ancientcomputing/jevdk/releases/latest), move it to
+Applications, then choose **JevDK → Install jev-serve Command…**. That puts `jev-serve` on your
+PATH (signed and notarized with the app; it updates when JevDK does):
+
+```bash
+jev-serve --config jev-serve.json
+```
+
+**From source:**
+
 ```bash
 swift build -c release
 .build/release/jev-serve --config jev-serve.json
 ```
 
-Needs an Apple-silicon Mac, macOS 27 and Xcode 27 (Swift 6.4).
+Needs an Apple-silicon Mac with macOS 27; building needs Xcode 27 (Swift 6.4).
 
 ## 1. Make a config in JevDK
 

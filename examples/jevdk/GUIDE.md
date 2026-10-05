@@ -352,7 +352,8 @@ let result = try await lab.evaluate(route: "support", questions: set.questions, 
 **Not a Swift app, or several apps?** Serve the tested setup over HTTP instead: **File → Export
 Server Config…** writes a config for [jev-serve](../jev-serve/), which answers hosted Jev's API
 (OpenRouter's and Featherless's) on this Mac. Code that already calls hosted Jev, in any language,
-switches by changing its base URL:
+switches by changing its base URL. jev-serve comes with the JevDK download: choose **JevDK →
+Install jev-serve Command…** once to put it on your PATH.
 
 ```bash
 jev-serve --config jev-serve.json

@@ -47,6 +47,7 @@ struct JevDKApp: App {
             // questions for your app (the SDK's DecisionQuestionSet), answers (CSV), and results (CSV).
             CommandGroup(replacing: .appInfo) {
                 Button("About JevDK") { AboutPanel.show() }
+                Button("Install jev-serve Command…") { JevServeInstaller.install() }
             }
             CommandGroup(replacing: .newItem) {
                 Section("Workspace") {
@@ -367,6 +368,67 @@ struct BackendsSheet: View {
         .padding(20)
         .frame(width: 620)
         .font(.jBody)
+    }
+}
+
+/// JevDK → Install jev-serve Command…: the released app carries jev-serve (Contents/MacOS), signed
+/// and notarized with it. This links it into /usr/local/bin (on the default PATH), asking for an
+/// administrator password; if that doesn't work, it shows the command to run instead.
+enum JevServeInstaller {
+    static let target = "/usr/local/bin/jev-serve"
+
+    static func install() {
+        guard let tool = Bundle.main.url(forAuxiliaryExecutable: "jev-serve")?.path,
+              FileManager.default.isExecutableFile(atPath: tool) else {
+            inform("jev-serve isn't in this copy of JevDK",
+                   "The JevDK download includes jev-serve; a JevDK built from source doesn't. Build it from the jev-serve folder of the source: swift build -c release.")
+            return
+        }
+        let appPath = Bundle.main.bundlePath
+        if appPath.contains("/AppTranslocation/") || appPath.hasPrefix("/Volumes/") {
+            inform("Move JevDK to Applications first",
+                   "JevDK is running from the disk image or a temporary location, so a command installed now would stop working. Drag JevDK to Applications, open it from there, and choose this again.")
+            return
+        }
+        let command = "mkdir -p /usr/local/bin && ln -sf \(shellQuote(tool)) \(target)"
+        let source = "do shell script \"\(appleScriptEscape(command))\" with administrator privileges"
+        var error: NSDictionary?
+        _ = NSAppleScript(source: source)?.executeAndReturnError(&error)
+        if let error {
+            if (error[NSAppleScript.errorNumber] as? Int) == -128 { return }   // the user cancelled
+            fallback(command)
+            return
+        }
+        inform("jev-serve is installed",
+               "Run it in Terminal:\n\n  jev-serve --help\n  jev-serve --config jev-serve.json\n\nIt's a link to the copy inside JevDK, so it updates when JevDK does. Export a config with File → Export Server Config….")
+    }
+
+    /// The same, for the user to run: shown with a Copy button.
+    static func fallback(_ command: String) {
+        let alert = NSAlert()
+        alert.messageText = "Install jev-serve from Terminal"
+        alert.informativeText = "Run this in Terminal (it asks for your password):\n\nsudo sh -c '\(command.replacingOccurrences(of: "'", with: "'\\''"))'"
+        alert.addButton(withTitle: "Copy Command")
+        alert.addButton(withTitle: "Close")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("sudo sh -c '\(command.replacingOccurrences(of: "'", with: "'\\''"))'", forType: .string)
+        }
+    }
+
+    static func inform(_ title: String, _ text: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.runModal()
+    }
+
+    /// 'path' with single quotes escaped, for sh.
+    static func shellQuote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+
+    /// The text as the inside of an AppleScript string literal.
+    static func appleScriptEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 }
 
