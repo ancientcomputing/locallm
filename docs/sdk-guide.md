@@ -1935,12 +1935,12 @@ and use the result in your app**, with no fitting code of your own:
 let set = try DecisionQuestionSet(contentsOf: url)
 let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)       // applies set.tuning?.calibration
 
-// 2. Or copy the snippet (Calibrate sheet → Copy code): the values plus the system instructions
+// 2. Or copy the snippet (Calibrate window → Copy code): the values plus the system instructions
 //    they were fitted with — the calibration only holds with the same wrapper.
 let openjev2 = OpenJevDecisionProvider(mlx: mlx,
     wrapper: OpenJevWrapper(system: "…", inputLabel: "…"),
     calibration: DecisionCalibration(noulTemperature: X, choiceTemperature: Y, scoreTemperature: Z))
-// X, Y, Z: the Temperature column of JevDK's Calibrate sheet (yes/no, choice, score; 1.0 = no change).
+// X, Y, Z: the Temperature column of JevDK's Calibrate window (yes/no, choice, score; 1.0 = no change).
 ```
 
 To fit in code instead (for example from `lab.evaluate`'s `samples`):

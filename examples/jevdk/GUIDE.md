@@ -244,7 +244,7 @@ only use the top answer.
   let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)   // calibration included
   ```
 
-- **Without the file:** in the Calibrate sheet, **Copy code** copies a snippet with the three
+- **Without the file:** in the Calibrate window, **Copy code** copies a snippet with the three
   fitted values and the system instructions they were fitted with. Paste it into your app; keep
   the system instructions too, since the calibration only holds with them:
 
@@ -254,7 +254,7 @@ only use the top answer.
       calibration: DecisionCalibration(noulTemperature: X, choiceTemperature: Y, scoreTemperature: Z))
   ```
 
-  The three numbers are the **Temperature** column of the Calibrate sheet's **Fitted** table: **X**
+  The three numbers are the **Temperature** column of the Calibrate window's **Fitted** table: **X**
   for yes/no (Noul), **Y** for Choice and **Z** for Score. A kind you have no questions of shows no
   row and stays at 1.0, which means "no change".
 

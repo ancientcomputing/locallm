@@ -129,7 +129,7 @@ for your app:
    calibration until you refit.
 5. **Use it in your app.** **File → Export Questions…** puts the calibration in the
    `.decisions.json` file with the questions; `OpenJevDecisionProvider(mlx:tunedWith:)` applies it.
-   Or **Copy code** in the Calibrate sheet: a snippet with the three values and the system
+   Or **Copy code** in the Calibrate window: a snippet with the three values and the system
    instructions they were fitted with, for `OpenJevDecisionProvider(mlx:wrapper:calibration:)`. See
    [GUIDE.md](GUIDE.md) step 7.
 
