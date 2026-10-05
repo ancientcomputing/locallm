@@ -194,6 +194,8 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
   → `DecisionEvaluation` (accuracy per question, misses, confidence when right and wrong) for
   regression tests in CI; `DecisionCalibration` (temperature scaling per question kind: `fit`,
   `measure`, `apply`).
+- **`JevWire`** (Core): hosted Jev's JSON both ways (requests and responses, order kept), for
+  serving decisions over HTTP as well as calling hosted Jev; `JevDecisionProvider` is built on it.
 - **`LocalLMLabSDKInference` (macOS 27):** `OpenJevDecisionProvider` — answers each question in
   one forward pass over the allowed labels' probabilities, no generation, the input read once for
   all questions (about 150 ms for four questions on Qwen3 4B). `OpenJevWrapper` (+ `.default`),

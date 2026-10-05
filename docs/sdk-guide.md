@@ -3549,6 +3549,19 @@ struct JevProviderConfig {   // scheme, displayName, endpoint, auth, models, all
     func validated() throws -> JevProviderConfig
 }
 
+// --- hosted Jev's wire format (both directions; a server can answer the same API) ---
+enum JevWire {
+    struct Request { var model: String?; var request: DecisionRequest }
+    struct Response { var model: String?; var answers: [String: DecisionAnswer]; var usage: DecisionUsage?
+                      var fidelity: DecisionFidelity?; var errorMessage: String? }
+    static func encodeRequest(_ request: DecisionRequest, model: String) throws -> Data
+    static func decodeRequest(_ data: Data) throws -> Request            // order-preserving
+    static func encodeResponse(_ decision: Decision, model: String, request: DecisionRequest) throws -> Data
+    static func decodeResponse(_ data: Data, request: DecisionRequest) throws -> Response
+    static func encodeError(message: String, type: String, code: Int) -> Data
+    static func errorMessage(in data: Data) -> String?
+}
+
 // --- calibration, question sets, answer sets, evaluation ---------------------------
 struct DecisionCalibration: Codable {
     var noulTemperature, choiceTemperature, scoreTemperature: Double; static let none
