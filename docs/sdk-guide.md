@@ -1924,14 +1924,29 @@ ones are read off an ordinary language model — how likely it was to say each o
 and on a small model they're often 100% even when it's wrong. Don't put tight thresholds on
 uncalibrated `.tokenScored` answers.
 
-For a local decider you fit a **calibration** on your own marked answers (JevDK's **Calibrate…**
-does it) and pass it in; `fidelity` then says `.tokenScored(calibrated: true)`. It holds for one
-model, revision, wrapper and kind of question, so the SDK ships no fitted values.
+For a local decider you fit a **calibration** on your own marked answers and pass it in;
+`fidelity` then says `.tokenScored(calibrated: true)`. It holds for one model, revision, wrapper
+and kind of question, so the SDK ships no fitted values. **The usual way is to fit it in JevDK
+and use the result in your app**, with no fitting code of your own:
+
+```swift
+// 1. In JevDK: mark answers, Calibrate… → Fit calibration, then File → Export Questions….
+//    The .decisions.json carries the calibration with the questions it was fitted for.
+let set = try DecisionQuestionSet(contentsOf: url)
+let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)       // applies set.tuning?.calibration
+
+// 2. Or copy the snippet (Calibrate sheet → Copy code): the values plus the system instructions
+//    they were fitted with — the calibration only holds with the same wrapper.
+let openjev2 = OpenJevDecisionProvider(mlx: mlx,
+    wrapper: OpenJevWrapper(system: "…", inputLabel: "…"),
+    calibration: DecisionCalibration(noulTemperature: 9.11, choiceTemperature: 0.25, scoreTemperature: 1.0))
+```
+
+To fit in code instead (for example from `lab.evaluate`'s `samples`):
 
 ```swift
 let cal = DecisionCalibration.fit(samples)            // [DecisionCalibration.Sample], from marked answers
 cal.measure(samples)                                   // accuracy, expectedCalibrationError, logLoss
-let openjev = OpenJevDecisionProvider(mlx: mlx, calibration: cal)
 ```
 
 Calibration is temperature scaling per question kind: it never changes which answer wins, only

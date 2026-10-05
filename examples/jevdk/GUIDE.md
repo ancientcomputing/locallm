@@ -229,8 +229,36 @@ only use the top answer.
    and gets sharpened.
 3. Read the before → after table. Lower is better on both measures (see section 6).
 4. Turn on **Show local results calibrated** to see what your app will see.
-5. **Export Questions…** (step 8) carries it into your app with the questions. If you change the
-   model or the system instructions later, JevDK flags the calibration until you redo it.
+5. If you change the model or the system instructions later, JevDK flags the calibration until
+   you redo it.
+
+**Use the calibration in your app.** You fit it in JevDK; your app only applies it. Two ways:
+
+- **With the questions (recommended):** **File → Export Questions…** writes the calibration into
+  the `.decisions.json` file, next to the questions, model and system instructions it was fitted
+  for. Load that file in your app and build the decider from it; the calibration is applied to
+  every answer (step 8):
+
+  ```swift
+  let set = try DecisionQuestionSet(contentsOf: url)
+  let openjev = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)   // calibration included
+  ```
+
+- **Without the file:** in the Calibrate sheet, **Copy code** copies a snippet with the three
+  fitted values and the system instructions they were fitted with. Paste it into your app; keep
+  the system instructions too, since the calibration only holds with them:
+
+  ```swift
+  let openjev = OpenJevDecisionProvider(mlx: mlx,
+      wrapper: OpenJevWrapper(system: "…", inputLabel: "…"),      // as tested in JevDK
+      calibration: DecisionCalibration(noulTemperature: 9.11, choiceTemperature: 0.25, scoreTemperature: 1.0))
+  ```
+
+Either way, your app's answers then come back with `fidelity == .tokenScored(calibrated: true)`.
+A calibration holds only for the model version, system instructions and kinds of question it was
+fitted on: refit in JevDK and re-export when any of them changes. `openjev.tuningMismatch(for:)`
+tells your app when the model on the device isn't the one you calibrated. Hosted deciders don't
+use it: TypeSafe's Jev is calibrated already.
 
 What calibration can't do: fix wrong answers. In our test, a confidently wrong answer stayed
 wrong; it just became less confidently wrong. Get the questions right first (steps 4 and 5).
