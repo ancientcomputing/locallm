@@ -107,6 +107,7 @@ require_command xattr
 require_command codesign
 require_command ditto
 require_command hdiutil
+require_command iconutil
 require_command shasum
 require_command spctl
 require_command xcrun
@@ -158,6 +159,18 @@ ditto "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" "$APP_DIR"
 # project.yml's Info.plist carries fixed version strings; stamp the release version.
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$CONTENTS_DIR/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$CONTENTS_DIR/Info.plist"
+
+# The app icon is drawn in code (AppIcon), which only the running app's Dock sees. Render it into
+# Contents/Resources/AppIcon.icns so Finder and the DMG show it too. (Before signing: the bundle's
+# resources and Info.plist are sealed by the signature.)
+echo "Rendering the app icon..."
+ICONSET="$BUILD_DIR/AppIcon.iconset"
+rm -rf "$ICONSET"
+"$CONTENTS_DIR/MacOS/$APP_NAME" --write-iconset "$ICONSET"
+mkdir -p "$CONTENTS_DIR/Resources"
+iconutil -c icns -o "$CONTENTS_DIR/Resources/AppIcon.icns" "$ICONSET"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconFile" "$CONTENTS_DIR/Info.plist" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$CONTENTS_DIR/Info.plist"
 
 # Apache-2.0 §4(d): carry the SDK's NOTICE (it bundles the MLX stack) inside the app. It's at the
 # repository root: one level up in ancientcomputing/jevdk, two in ancientcomputing/locallm.

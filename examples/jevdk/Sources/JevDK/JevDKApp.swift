@@ -25,6 +25,13 @@ struct JevDKApp: App {
                                     model: args.count > i + 3 && !args[i + 3].hasPrefix("--") ? args[i + 3] : nil)
         }
 
+        // `JevDK --write-iconset <dir>.iconset` writes AppIcon as PNGs at every size `iconutil`
+        // wants, then exits: the release script makes the bundle's AppIcon.icns from them, so
+        // Finder and the DMG show the same icon as the Dock.
+        if let i = args.firstIndex(of: "--write-iconset"), args.count > i + 1 {
+            AppIcon.writeIconset(to: URL(fileURLWithPath: args[i + 1]))
+        }
+
         // Launched with `swift run` there is no app bundle, so macOS starts this as a
         // background-style process that never becomes active. Claim regular-app status
         // (only if needed; re-setting it logs "Task policy set failed").
@@ -471,6 +478,32 @@ enum AboutPanel {
 /// gets it too, with no bundle to hold an image.
 enum AppIcon {
     static let blue = NSColor(srgbRed: 0x2f / 255, green: 0x6f / 255, blue: 0xed / 255, alpha: 1)
+
+    /// The `.iconset` folder `iconutil -c icns` turns into AppIcon.icns. Exits.
+    static func writeIconset(to dir: URL) -> Never {
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            for points in [16, 32, 128, 256, 512] {
+                for scale in [1, 2] {
+                    let px = points * scale
+                    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
+                                                     bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                     colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+                          let context = NSGraphicsContext(bitmapImageRep: rep) else { throw CocoaError(.fileWriteUnknown) }
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = context
+                    image(size: CGFloat(px)).draw(in: NSRect(x: 0, y: 0, width: px, height: px))
+                    NSGraphicsContext.restoreGraphicsState()
+                    let name = "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png"
+                    try rep.representation(using: .png, properties: [:])!.write(to: dir.appendingPathComponent(name))
+                }
+            }
+            exit(0)
+        } catch {
+            FileHandle.standardError.write(Data("Couldn't write the iconset: \(error)\n".utf8))
+            exit(1)
+        }
+    }
 
     static func image(size: CGFloat = 512) -> NSImage {
         NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
