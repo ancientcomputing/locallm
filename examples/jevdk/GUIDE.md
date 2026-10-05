@@ -349,6 +349,16 @@ let result = try await lab.evaluate(route: "support", questions: set.questions, 
 #expect(result.score("refund")!.accuracy >= 0.95)
 ```
 
+**Not a Swift app, or several apps?** Serve the tested setup over HTTP instead: **File → Export
+Server Config…** writes a config for [jev-serve](../jev-serve/), which answers hosted Jev's API
+(OpenRouter's and Featherless's) on this Mac. Code that already calls hosted Jev, in any language,
+switches by changing its base URL:
+
+```bash
+jev-serve --config jev-serve.json
+curl -s http://127.0.0.1:8746/v1/classifier -H "Authorization: Bearer $TOKEN" -d @request.json
+```
+
 Patterns that work:
 
 - **A threshold:** act on the answer when it's sure; otherwise do something safer (ask a

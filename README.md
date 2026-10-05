@@ -176,6 +176,9 @@ Roughly simplest to fullest — every one runnable, with full annotated source i
   [Developer's guide](https://thisbrain.ai/locallm/jdk-guide.html);
   [download the app](https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-dev/JevDK-0.1.0-arm64.dmg)
   (macOS 27, signed and notarized, a preview built on SDK 2.0.0-dev).
+- **[examples/jev-serve/](examples/jev-serve/)** (2.0) — hosted Jev's HTTP API (OpenRouter's and
+  Featherless's) answered by OpenJev on your Mac: point existing hosted-Jev code, in any language,
+  at it to get private, on-device decisions, using the setup you tested and exported from JevDK.
 
 Plus **[examples/api-lab/](examples/api-lab/)** (scripts + a chat app for the OpenAI-compatible
 endpoint) and **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cli-swift/](examples/localai-cli-swift/)**

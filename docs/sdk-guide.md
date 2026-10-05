@@ -2042,6 +2042,26 @@ let result = try await lab.evaluate(route: "support", questions: set.questions, 
   when wrong (a big gap means a threshold can catch the misses), calibration error, and
   `samples` for `DecisionCalibration.fit`.
 
+### Serving decisions over HTTP: `jev-serve`
+
+To use a local decider from another process or language, run the
+[`jev-serve`](../examples/jev-serve/) example. It answers hosted Jev's API, OpenRouter's
+`POST /api/alpha/decisions` and Featherless's `POST /v1/classifier`, with OpenJev on this Mac, so
+existing hosted-Jev client code switches by changing its base URL. It serves the setup you tested
+in JevDK (**File → Export Server Config…**): each model pinned to its tested revision (downloaded
+if missing), with its wrapper and calibration; loopback by default, an optional bearer token.
+Responses add `"fidelity": "tokenScored"` and `"calibrated"`, which `JevDecisionProvider` reads.
+
+The wire format is `JevWire` (Core), used by both the client (`JevDecisionProvider`) and the
+server:
+
+```swift
+let wire = try JevWire.decodeRequest(body)                          // model?, DecisionRequest (order kept)
+try wire.request.validate(against: provider.limits)
+let decision = try await provider.decide(wire.request, using: id)
+let response = try JevWire.encodeResponse(decision, model: repo, request: wire.request)
+```
+
 ### Decisions that need your product's knowledge
 
 A decider sees only `state` and the questions (there's no system prompt), so knowledge it needs,

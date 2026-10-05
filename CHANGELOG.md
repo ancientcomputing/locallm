@@ -214,6 +214,10 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
 
 ### Added — examples
 
+- [`jev-serve`](examples/jev-serve/): hosted Jev's HTTP API (`/api/alpha/decisions`,
+  `/v1/classifier`) answered by OpenJev on this Mac, from a config JevDK exports (**File → Export
+  Server Config…**: the model pinned to its tested version, the system instructions, the
+  calibration, an optional token). Downloads the model if needed; loopback by default.
 - [`jevdk`](examples/jevdk/): JevDK, a playground for decision-model questions — run them on a
   local MLX model and on hosted Jev side by side, score a batch against your marked answers,
   calibrate, compare models in a results CSV, and export the tested questions for your app. With a

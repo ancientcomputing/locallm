@@ -150,6 +150,9 @@ for your app:
   (CSV)…** loads one, e.g. from a spreadsheet.
   In your app's tests, `lab.evaluate(route:questions:answerSet:)` scores a backend against it.
 
+- **File → Export Server Config…** writes a config for [jev-serve](../jev-serve/), which serves
+  the same tested setup over hosted Jev's HTTP API on this Mac, for apps in any language.
+
 See [GUIDE.md](GUIDE.md) step 8.
 
 ## Reading the results
