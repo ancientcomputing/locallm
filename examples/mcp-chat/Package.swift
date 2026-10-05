@@ -36,7 +36,7 @@ let defaultSDKVersion = "2.0.0-dev"
 let knownSDKReleases: [String: SDKRelease] = [
     "2.0.0-dev": SDKRelease(
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-dev/LocalLMLabSDKInference-2.0.0-dev.xcframework.zip",
-        inferenceChecksum: "32f832bc103fd0e689e296f24539987973d3c5f989a65c210196b9f3c771d9b4"
+        inferenceChecksum: "79a393f494a9f865f3c039b1954eedbd7598bf77b3e50a786e83a297f1f6ed9e"
     ),
 ]
 
