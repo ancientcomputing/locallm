@@ -251,8 +251,13 @@ only use the top answer.
   ```swift
   let openjev = OpenJevDecisionProvider(mlx: mlx,
       wrapper: OpenJevWrapper(system: "…", inputLabel: "…"),      // as tested in JevDK
-      calibration: DecisionCalibration(noulTemperature: 9.11, choiceTemperature: 0.25, scoreTemperature: 1.0))
+      calibration: DecisionCalibration(noulTemperature: X, choiceTemperature: Y, scoreTemperature: Z))
   ```
+
+  The three numbers are the **Temperature** column of the Calibrate sheet's **Fitted** table: **X**
+  for yes/no (Noul), **Y** for Choice and **Z** for Score. A kind you have no questions of shows no
+  row and stays at 1.0, which means "no change".
+
 
 Either way, your app's answers then come back with `fidelity == .tokenScored(calibrated: true)`.
 A calibration holds only for the model version, system instructions and kinds of question it was
