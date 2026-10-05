@@ -2,7 +2,7 @@
 
 The full source of every reference app, with every line that actually touches the SDK marked
 `// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
-`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat` and `jevdk`), `// ← SDK (Remote)` (online providers —
+`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat`, `jevdk` and `jev-serve`), `// ← SDK (Remote)` (online providers —
 `model-switch`, `security-demo` and `jevdk`), `// ← SDK (MCPAppsHost)` (showing MCP servers' interactive views —
 `mcp-chat`), or `// ← Components` (`components-demo`, `components-updates-demo`, and `mcp-chat`). Everything else is ordinary SwiftUI/Foundation — the point
 of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
@@ -41,7 +41,8 @@ non-comment lines; these examples are commented far more heavily than production
 | [`aiql`](#examplesaiql) | 402 | 459 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
 | [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
 | [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
-| [`jevdk`](#examplesjevdk) | 2,627 | 2,862 | a playground for decision-model questions: local OpenJev and hosted Jev side by side through one API, marked answers, calibration, and the tested questions exported for an app (14 files, excerpted) |
+| [`jevdk`](#examplesjevdk) | 2,819 | 3,080 | a playground for decision-model questions: local OpenJev and hosted Jev side by side through one API, marked answers, calibration, and the tested setup exported for an app or for jev-serve (15 files, excerpted) |
+| [`jev-serve`](#examplesjev-serve) | 591 | 640 | hosted Jev's HTTP API answered by OpenJev on this Mac: `JevWire` for the wire format, the tested setup from JevDK's config, models pinned and downloaded (4 files, excerpted) |
 | [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
 | [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
@@ -3783,16 +3784,16 @@ because a curated adapter lives in a different namespace.
 
 ## `examples/jevdk`
 
-*2,627 lines of code across 14 files (2,862 with comments). Excerpted: the SDK-facing parts of
+*2,819 lines of code across 15 files (3,080 with comments). Excerpted: the SDK-facing parts of
 `AppModel.swift` and `HostedBackends.swift` are below; the editor, batch grid, calibration
-sheet, model browser and results-CSV writer are plain SwiftUI and Foundation and are omitted
-(`// …`).*
+sheet, model browser, About panel and results-CSV writer are plain SwiftUI and Foundation and are
+omitted (`// …`).*
 
 A playground for **decision models** ([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide);
 for what a decision model is, see [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html)).
 Write yes / no, choice and score questions, run them on a local MLX model and on hosted Jev side
-by side, mark the right answers, calibrate, and export the tested questions for your app. Three
-SDK pieces carry it:
+by side, mark the right answers, calibrate, and export the tested setup for your app or for
+[`jev-serve`](#examplesjev-serve). Four SDK pieces carry it:
 
 - **`lab.decide`** for every hosted run: each enabled backend is a `JevDecisionProvider`
   registered under its own scheme with its own decision route, so the demo and the keyed
@@ -3802,7 +3803,14 @@ SDK pieces carry it:
   and how much probability fell on the allowed labels. It validates against the provider's limits
   first, as `lab.decide` would.
 - **`DecisionCalibration`, `DecisionQuestionSet`, `DecisionAnswerSet`** for the workflow around
-  the runs: fitting, exporting for an app, and importing / exporting marked answers as CSV.
+  the runs: fitting, exporting the questions with their `Tuning` (model, version, wrapper,
+  calibration), opening an exported file again, and importing / exporting marked answers as CSV.
+- **`MLXModelProvider`** lists, checks and downloads models, and reports each one's version
+  (`resolvedRevision`), which every export records so what ships is what was tested.
+
+**Export Server Config…** writes the same `Tuning` into a `jev-serve` config (`JevServeConfig`,
+the example's own type in `OpenJevKit`). The released JevDK app carries `jev-serve` inside it; the
+app menu's **Install jev-serve Command…** links it onto the PATH (that's plain AppKit, not shown).
 
 Links `LocalLMLabSDKCore`, `LocalLMLabSDKInference` and `LocalLMLabSDKRemote`. Not sandboxed;
 API keys live in the Keychain (or, for headless runs, environment variables), never in a file.
@@ -3810,9 +3818,10 @@ API keys live in the Keychain (or, for headless runs, environment variables), ne
 ### `Sources/JevDK/AppModel.swift` (excerpt)
 
 Runs one input on every enabled backend concurrently: hosted through `lab.decide`, local through
-the OpenJev provider directly. Then the files: the questions exported for an app, answers imported
-from a CSV, and Open, which also reads an exported `.decisions.json` back. Note there is no prompt building and no answer parsing anywhere:
-questions go in typed, answers come back typed.
+the OpenJev provider directly. Then the files: the questions exported for an app (and for
+jev-serve), answers imported from a CSV, and Open, which also reads an exported `.decisions.json`
+back. There's no prompt building and no answer parsing anywhere: questions go in typed, answers
+come back typed.
 
 ```swift
 import AppKit
@@ -3824,16 +3833,17 @@ import Observation
 import OpenJevKit
 import UniformTypeIdentifiers
     // …
+    /// The SDK front door hosted runs go through.
     let lab = LocalLMLab()   // ← SDK
     /// Local models: listing, preflight, download, and the weights OpenJev scores on.
     let mlx = MLXModelProvider()   // ← SDK (Inference)
-    private var batchTask: Task<Void, Never>?
     // …
     func refreshModels() {
         let probe = OpenJevDecisionProvider(mlx: mlx)   // ← SDK (Inference)
         models = mlx.installed.map { m in   // ← SDK (Inference)
             LocalChoice(repoID: m.repoID, sizeBytes: m.sizeBytes,
-                        isMoE: probe.warnings(for: Self.openJevID(m.repoID)).contains(.mixtureOfExperts))   // ← SDK (Inference)
+                        isMoE: probe.warnings(for: Self.openJevID(m.repoID)).contains(.mixtureOfExperts),   // ← SDK (Inference)
+                        revision: m.resolvedRevision)
         }.sorted { ($0.sizeBytes ?? 0) < ($1.sizeBytes ?? 0) }
     // …
     private struct HostedPlan {
@@ -3918,6 +3928,7 @@ import UniformTypeIdentifiers
             for await r in group { out.append(r) }
             return out.sorted { $0.0 < $1.0 }.map(\.1)
         }
+    }
     // …
     /// Fit on the marked answers with the SDK's `DecisionCalibration.fit`.
     func fitCalibration() {
@@ -3933,8 +3944,6 @@ import UniformTypeIdentifiers
         applyCalibration = true
     }
     // …
-    // MARK: Question set for the app, answer sets
-
     /// What the questions are being tested with, for the exported question set: the local model,
     /// its revision, the wrapper and (when it matches) the calibration. Nil with Local off.
     var exportTuning: DecisionQuestionSet.Tuning? {   // ← SDK
@@ -3955,17 +3964,69 @@ import UniformTypeIdentifiers
         panel.allowedContentTypes = [.json]
         let base = set.name.isEmpty ? "questions" : set.name.lowercased().replacingOccurrences(of: " ", with: "-")
         panel.nameFieldStringValue = "\(base).decisions.json"
-        panel.message = "A question set for your app: bundle it and load it with DecisionQuestionSet(contentsOf:)."
+        panel.message = "A question set for your app: bundle it and load it with DecisionQuestionSet(contentsOf:)."   // ← SDK
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let file = DecisionQuestionSet(name: set.name, questions: set.questions.map(\.sdkQuestion), tuning: exportTuning)   // ← SDK
-            try file.jsonData().write(to: url)   // ← SDK
+            let tuning = exportTuning
+            let file = DecisionQuestionSet(name: set.name, questions: set.questions.map(\.sdkQuestion), tuning: tuning)   // ← SDK
+            try file.jsonData().write(to: url)
             errorMessage = nil
+            notice = "Exported \(set.questions.count) questions to \(url.lastPathComponent)" + Self.tuningSummary(tuning) + "."
         } catch {
             errorMessage = "Couldn't export: \(error.localizedDescription)"
         }
     }
 
+    /// ", for Qwen3-4B-4bit pinned to 4dcb3d1, calibrated" — what an export carries.
+    static func tuningSummary(_ t: DecisionQuestionSet.Tuning?) -> String {   // ← SDK
+        guard let t, let model = t.model else { return " (no local model: questions only)" }
+        let name = model.rest.split(separator: "/").last.map(String.init) ?? model.rest   // ← SDK
+        var s = ", for \(name)"
+        if let r = t.revision { s += " pinned to \(r.prefix(7))" }
+        s += t.calibration == nil ? ", not calibrated" : ", calibrated"
+        return s
+    }
+
+    /// Add this setup (local model, its version, system instructions, calibration) to a jev-serve
+    /// config, creating one if needed (see the jev-serve example). An existing config keeps its other
+    /// models, listen address and token; the entry with this question set's name is replaced.
+    func exportServerConfig() {
+        guard let tuning = exportTuning else {
+            errorMessage = "Pick a local model first: jev-serve serves a local model."
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "jev-serve.json"
+        panel.message = "A jev-serve config. If the file exists, this setup is added to it (or replaces the one with the same name)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var config: JevServeConfig
+        var created = false
+        if FileManager.default.fileExists(atPath: url.path) {
+            do { config = try JevServeConfig.read(url) } catch {
+                errorMessage = "\(url.lastPathComponent) isn't a jev-serve config, so it wasn't changed: \(error.localizedDescription)"
+                return
+            }
+        } else {
+            created = true
+            let alert = NSAlert()
+            alert.messageText = "Require a token?"
+            alert.informativeText = "With a token, jev-serve only answers requests that send it (Authorization: Bearer …). It's saved in the config file, which only you can read."
+            alert.addButton(withTitle: "Generate a Token")
+            alert.addButton(withTitle: "No Token")
+            config = JevServeConfig(token: alert.runModal() == .alertFirstButtonReturn ? JevServeConfig.newToken() : nil)
+        }
+        let name = Self.slug(set.name.isEmpty ? "decider" : set.name)
+        config.upsert(.init(name: name, tuning: tuning))
+        do {
+            try config.write(to: url)
+            errorMessage = nil
+            notice = "\(created ? "Wrote" : "Updated") \(url.lastPathComponent): “\(name)”" + Self.tuningSummary(tuning)
+                + (config.token != nil ? ", token required" : "") + ". Serve it with: jev-serve --config \(url.lastPathComponent)"
+        } catch {
+            errorMessage = "Couldn't write \(url.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
     // …
     /// Load an answer set (CSV: `input`, then a column per question with the correct answer) into
     /// the batch list and the marks. Inputs with line breaks are joined onto one line, since the
@@ -4084,13 +4145,200 @@ enum APIKeys {
 
     static func account(_ backend: HostedBackend) -> String { "key.\(backend.rawValue)" }
 }
-
 ```
 
-**Tally:** 19 lines Core (`// ← SDK`), 9 Inference, 8 Remote, in the excerpts
-above. The decision API itself is a handful of calls (`register`/`replace(decision:)`,
-`route(decision:)`, `decide`, `decideWithDiagnostics`, `DecisionCalibration.fit`,
-`DecisionQuestionSet`, `DecisionAnswerSet`); the rest of the app is the playground around them.
+**Tally:** 21 lines Core (`// ← SDK`), 9 Inference, 8 Remote, in the excerpts above. The
+decision API itself is a handful of calls (`register`/`replace(decision:)`, `route(decision:)`,
+`decide`, `decideWithDiagnostics`, `DecisionCalibration.fit`, `DecisionQuestionSet`,
+`DecisionAnswerSet`); the rest of the app is the playground around them.
+
+## `examples/jev-serve`
+
+*591 lines of code across 4 files (640 with comments), plus 13 tests. Excerpted: the routes'
+decision path and the decider from `Service.swift`, and model readiness and the providers from
+`main.swift`; the HTTP/1.1 server (`HTTPServer.swift`, on `Network.framework`), the health and
+model-list routes, the token check, the queue, argument parsing and `--self-check` are omitted
+(`// …`).*
+
+Hosted Jev's HTTP API, answered on this Mac: `POST /api/alpha/decisions` (OpenRouter / TypeSafe)
+and `POST /v1/classifier` (Featherless) take hosted Jev's request and return its response, from
+OpenJev on a local MLX model. Code that calls hosted Jev, in any language, switches by changing its
+base URL ([`sdk-guide.md` §6c](sdk-guide.md#serving-decisions-over-http-jev-serve)). It serves the
+setup tested in [`jevdk`](#examplesjevdk), from the config JevDK exports. Three SDK pieces carry it:
+
+- **`JevWire`** (Core) reads the request and writes the response, keeping questions and options in
+  the caller's order: the same code the SDK's `JevDecisionProvider` uses as a client, so the
+  client and this server can't disagree (the tests check it both ways).
+- **`OpenJevDecisionProvider(mlx:tunedWith:)`** answers with each config entry's wrapper and
+  calibration; `tuningMismatch(for:)` turns calibration off, with a warning, if the model on disk
+  isn't the version it was fitted on.
+- **`MLXModelProvider(pinnedRevisions:)`** makes each model ready before the server listens:
+  pinned to the version in the config, then found, verified or pre-flighted and downloaded.
+
+The server talks to its model through a small `Decider` protocol, so the routes, token, limits and
+queue are tested with a scripted decider and no GPU. Links `LocalLMLabSDKCore` and
+`LocalLMLabSDKInference` (tests add `LocalLMLabSDKRemote` for the client round trip). The JevDK
+download carries it; `swift build` builds it.
+
+### `Sources/JevServeKit/Service.swift` (excerpt)
+
+A decision request: decode, pick the model, validate against the decider's limits (plus the
+config's input cap), wait its turn, decide, encode. Every failure is hosted Jev's error shape.
+
+```swift
+/// What answers a served model's questions. jev-serve uses `OpenJevDecider` (OpenJev on MLX); tests
+/// use a scripted one, so routing, auth, limits and the queue are tested without a GPU.
+public protocol Decider: Sendable {
+    var limits: DecisionLimits { get }   // ← SDK
+    var calibrated: Bool { get }
+    /// The decision, and the input tokens it read (for `usage`).
+    func decide(_ request: DecisionRequest) async throws -> (decision: Decision, inputTokens: Int?)   // ← SDK
+}
+    // …
+/// OpenJev on a local MLX model, with one config entry's wrapper and calibration.
+public struct OpenJevDecider: Decider {
+    public let provider: OpenJevDecisionProvider   // ← SDK (Inference)
+    public let id: ModelID   // ← SDK
+
+    public init(provider: OpenJevDecisionProvider, id: ModelID) {   // ← SDK (Inference)
+        self.provider = provider
+        self.id = id
+    }
+
+    public var limits: DecisionLimits { provider.limits }   // ← SDK
+    public var calibrated: Bool { provider.calibration != nil }
+
+    public func decide(_ request: DecisionRequest) async throws -> (decision: Decision, inputTokens: Int?) {   // ← SDK
+        let (decision, diagnostics) = try await provider.decideWithDiagnostics(request, using: id)   // ← SDK (Inference)
+        return (decision, diagnostics.sharedPrefixTokens)
+    }
+}
+    // …
+    private func decide(_ req: HTTPRequest) async -> (HTTPResponse, String) {
+        let wire: JevWire.Request   // ← SDK
+        do { wire = try JevWire.decodeRequest(req.body) } catch {   // ← SDK
+            return (Self.error(400, Self.message(error)), "")
+        }
+        let name = wire.model ?? defaultModel
+        guard let served = model(named: name) else {
+            return (Self.error(404, "jev-serve doesn't serve “\(name)”. Served: \(models.map(\.name).joined(separator: ", ")).", type: "not_found"), "")
+        }
+        let note = "\(served.name) \(wire.request.questions.count)q"
+        let l = served.decider.limits
+        let limits = DecisionLimits(maxQuestions: l.maxQuestions, maxChoiceCriteria: l.maxChoiceCriteria,   // ← SDK
+                                    maxScoreLevels: l.maxScoreLevels, maxStateCharacters: maxStateCharacters ?? l.maxStateCharacters)
+        do { try wire.request.validate(against: limits) } catch {   // ← SDK
+            return (Self.error(400, Self.message(error)), note)
+        }
+        guard await queue.acquire() else {
+            return (Self.error(503, "Busy: too many requests waiting. Try again shortly.", type: "overloaded"), note)
+        }
+        do {
+            var (decision, tokens) = try await served.decider.decide(wire.request)
+            await queue.release()
+            decision.usage = DecisionUsage(inputTokens: tokens, outputTokens: 0, cost: 0)   // ← SDK
+            let body = try JevWire.encodeResponse(decision, model: served.repo, request: wire.request)   // ← SDK
+            return (.json(200, body), note)
+        } catch let e as DecisionError {   // ← SDK
+            await queue.release()
+            switch e {
+            case .invalidRequest: return (Self.error(400, Self.message(e)), note)
+            case .unavailable: return (Self.error(503, Self.message(e), type: "unavailable"), note)
+            default: return (Self.error(500, Self.message(e), type: "server_error"), note)
+            }
+        } catch {
+            await queue.release()
+            return (Self.error(500, Self.message(error), type: "server_error"), note)
+        }
+    }
+```
+
+### `Sources/JevServe/main.swift` (excerpt)
+
+Startup: one MLX provider pinned to the configured versions; each model made ready (with download
+progress); each config entry's provider built from its `Tuning`; the default model loaded before
+the server listens.
+
+```swift
+let mlx = MLXModelProvider(residentModelLimit: max(1, repos.count), pinnedRevisions: pins, pinStore: MLXFilePinStore())   // ← SDK (Inference)
+// …
+@MainActor func ensureReady(_ repo: String) async {
+    let id = ModelID(scheme: "mlx", rest: repo)!   // ← SDK
+    switch mlx.availability(for: id) {   // ← SDK (Inference)
+    case .available:
+        return
+    case .unavailable(_, let detail):
+        fail("\(repo) can't run here: \(detail)")
+    case .needsCredential:
+        fail("\(repo) needs a Hugging Face credential")
+    case .notDownloaded:
+        break
+    @unknown default:
+        break
+    }
+    let other = mlx.installed.first { $0.repoID == repo }?.resolvedRevision   // ← SDK (Inference)
+    let what: String
+    if let want = pins[repo], let other, other != want {
+        what = "\(repo) version \(want.prefix(7)) (the one in the config) isn't on this Mac; version \(other.prefix(7)) is"
+    } else {
+        what = "\(repo) isn't on this Mac"
+    }
+    if noDownload { fail("\(what), and --no-download is set. Drop --no-download to fetch it, or download it in JevDK's Models.") }
+    if other != nil { jevServeLog("\(what): fetching the configured version") }
+    if let pre = try? await mlx.validate(repo), !pre.passed {   // ← SDK (Inference)
+        fail("pre-flight failed for \(repo) (\(pre.failedStage?.rawValue ?? "?")): \(pre.detail ?? "")")
+    }
+    let version = pins[repo].map { " @ \($0.prefix(7))" } ?? ""
+    jevServeLog("downloading \(repo)\(version) (a copy already in the Hugging Face cache is verified, only missing files fetched)…")
+    do {
+        var last = -1
+        for try await event in mlx.download(repo) {   // ← SDK (Inference)
+            if case .progress(_, _, let f) = event {
+                let pct = Int(f * 100)
+                if pct != last {
+                    last = pct
+                    FileHandle.standardError.write(Data("\u{1B}[2K\r  \(repo)\(version)  \(pct)%".utf8))
+                }
+            }
+        }
+        FileHandle.standardError.write(Data("\u{1B}[2K\r".utf8))
+        jevServeLog("\(repo): ready")
+    } catch {
+        FileHandle.standardError.write(Data("\n".utf8))
+        fail("download of \(repo) failed: \(error.localizedDescription)")
+    }
+}
+// …
+var served: [ServedModel] = []
+for m in config.models {
+    let repo = m.tuning.model!.rest   // ← SDK
+    var tuning = m.tuning
+    let set = DecisionQuestionSet(name: m.name, questions: [], tuning: tuning)   // ← SDK
+    let probe = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)   // ← SDK (Inference)
+    let id = ModelID(scheme: probe.scheme, rest: repo)!   // ← SDK
+    if let why = probe.tuningMismatch(for: id) {   // ← SDK (Inference)
+        jevServeLog("warning: “\(m.name)”: \(why); serving it without its calibration")
+        tuning.calibration = nil
+    }
+    if probe.warnings(for: id).contains(.mixtureOfExperts) {   // ← SDK (Inference)
+        jevServeLog("warning: \(repo) is a mixture-of-experts model; its probabilities are unstable as a decider")
+    }
+    let provider = OpenJevDecisionProvider(mlx: mlx, tunedWith: DecisionQuestionSet(name: m.name, questions: [], tuning: tuning))   // ← SDK (Inference)
+    let revision = mlx.effectivePin(for: repo)?.revision ?? tuning.revision   // ← SDK (Inference)
+        ?? mlx.installed.first { $0.repoID == repo }?.resolvedRevision   // ← SDK (Inference)
+    served.append(ServedModel(name: m.name, repo: repo, revision: revision, decider: OpenJevDecider(provider: provider, id: id)))
+}
+let defaultName = config.defaultModel ?? served[0].name
+guard let defaultModel = served.first(where: { $0.name == defaultName }) else {
+    fail("defaultModel “\(defaultName)” isn't one of the models")
+}
+jevServeLog("loading \(defaultModel.repo)…")
+if let d = defaultModel.decider as? OpenJevDecider { await d.provider.prewarm(d.id) }   // ← SDK (Inference)
+```
+
+**Tally:** 16 lines Core (`// ← SDK`), 15 Inference, 0 Remote, in the excerpts above. The wire
+format is three `JevWire` calls; the decision is one `decideWithDiagnostics`; the rest is
+HTTP, configuration and model housekeeping.
 
 ## `examples/mcp-chat`
 
