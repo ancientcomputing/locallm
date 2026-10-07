@@ -17,11 +17,11 @@ release assets on
 **[github.com/ancientcomputing/locallm-releases](https://github.com/ancientcomputing/locallm-releases/releases)**,
 alongside the LocalLM Lab app DMG. From **`1.0.0-GA`** on, both ship as release
 assets on this repo instead, alongside the app DMG and the SDK xcframeworks.
-Latest (`1.0.0-GA`):
+Latest (`2.0.0-GA`):
 
 ```bash
-curl -LO https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/localai-toolkit-1.0.0-GA-arm64.zip
-curl -LO https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/localai-toolkit-1.0.0-GA-arm64.zip.sha256
+curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/localai-toolkit-2.0.0-GA-arm64.zip
+curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/localai-toolkit-2.0.0-GA-arm64.zip.sha256
 ```
 
 (For `1.0.0-beta.4` through `1.0.0-RC.1`, replace the repo/tag above with
@@ -39,13 +39,13 @@ curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/t
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-1.0.0-GA-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-2.0.0-GA-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-1.0.0-GA-arm64.zip
+unzip localai-toolkit-2.0.0-GA-arm64.zip
 ```
 
 This produces `localai-cli`, `localai-playground-run` (macOS 27),

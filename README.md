@@ -35,7 +35,7 @@ an Apple entitlement that is still pending, so it is currently inert.
 
 **Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
 get the app directly:
-[LocalLM Lab 1.0.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLM.Lab-1.0.0-GA-arm64.dmg).
+[LocalLM Lab 2.0.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLM.Lab-2.0.0-GA-arm64.dmg).
 
 ## LocalLM Lab SDK
 

@@ -16,11 +16,11 @@ Most apps change little. The usual `makeSession`, `respond`, `LocalLMLab.Configu
 
 ## 2. Point your manifest at the new release
 
-Add `2.0.0` to your manifest's `knownSDKReleases` with the checksums from the release's
-`.sha256` assets (tag `v2.0.0`), and build with:
+Add `2.0.0-GA` to your manifest's `knownSDKReleases` with the checksums from the release's
+`.sha256` assets (tag `v2.0.0-GA`), and build with:
 
 ```sh
-LOCALLM_SDK_VERSION=2.0.0 swift build
+LOCALLM_SDK_VERSION=2.0.0-GA swift build
 ```
 
 ## 3. Tool authorization: one authorizer, decided per server
