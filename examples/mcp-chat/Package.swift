@@ -16,7 +16,7 @@ import PackageDescription
 // error. Components re-vends Core as a `.library` product for exactly this. Same
 // SDKRelease/knownSDKReleases/failManifest version gate as every other example here.
 //
-// Requires SDK 2.0.0-dev or later (MCP Apps support, per-server trust and approval are new in 2.0),
+// Requires SDK 2.0.0-GA or later (MCP Apps support, per-server trust and approval are new in 2.0),
 // macOS 27 + Xcode 27. No Metal Toolchain needed — the prebuilt Inference xcframework bundles the
 // compiled default.metallib.
 
@@ -31,12 +31,12 @@ struct SDKRelease {
 // The SDK release this example builds against with no setup. Build against another published
 // version: set LOCALLM_SDK_VERSION in your shell (works for `swift build` / CI, NOT inside Xcode),
 // or edit `defaultSDKVersion` here.
-let defaultSDKVersion = "2.0.0-dev"
+let defaultSDKVersion = "2.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "2.0.0-dev": SDKRelease(
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-dev/LocalLMLabSDKInference-2.0.0-dev.xcframework.zip",
-        inferenceChecksum: "79a393f494a9f865f3c039b1954eedbd7598bf77b3e50a786e83a297f1f6ed9e"
+    "2.0.0-GA": SDKRelease(
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKInference-2.0.0-GA.xcframework.zip",
+        inferenceChecksum: "fde8babbb0a8512b3d26e3d3bcc8139d02eb00375b2fbd6ed1e9157dfec55db8"
     ),
 ]
 

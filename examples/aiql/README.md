@@ -103,7 +103,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Skip it if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere). Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
-or add it to your `~/.zshrc`). `Package.swift` builds against SDK `2.0.0-dev` with no further
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `2.0.0-GA` with no further
 setup (AIQL needs it: it uses `lab.mcp.setFileBackedOutput`, new in 2.0) — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
 `LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
 `export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain

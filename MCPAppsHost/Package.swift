@@ -9,7 +9,7 @@ import PackageDescription
 // Core comes from Components, which declares the LocalLMLabSDKCore binary target and re-vends it
 // (two packages declaring that binary target is a hard SwiftPM error). So this package has no
 // SDK version or checksum of its own: it builds against whatever Components' `defaultSDKVersion`
-// / LOCALLM_SDK_VERSION selects. Requires SDK 2.0.0-dev or later.
+// / LOCALLM_SDK_VERSION selects. Requires SDK 2.0.0-GA or later.
 //
 // What is here: metadata parsing (`_meta.ui`) and the `ui://` resource loader (mime check, size,
 // SHA-256); `MCPAppsBridge`, the JSON-RPC state machine between a widget and the host, with an

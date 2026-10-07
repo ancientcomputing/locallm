@@ -9,7 +9,7 @@ swift build -c release
 ```
 
 Needs an Apple-silicon Mac, macOS 27 and Xcode 27 (Swift 6.4). `Package.swift` builds against SDK
-`2.0.0-dev` with no further setup (the decision API is new in 2.0): `LocalLMLabSDKCore`,
+`2.0.0-GA` with no further setup (the decision API is new in 2.0): `LocalLMLabSDKCore`,
 `LocalLMLabSDKRemote` and `LocalLMLabSDKInference` (the MLX runtime) come from that GitHub Release.
 No Metal Toolchain needed; the prebuilt Inference xcframework bundles the compiled shaders. To
 build against another release, set `LOCALLM_SDK_VERSION` (see [the README one folder up](../README.md)).

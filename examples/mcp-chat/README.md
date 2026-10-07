@@ -7,7 +7,7 @@ shows Todoist's task list under the call.
 
 Qwen3 8B through MLX by default; Apple's on-device model as an alternative (Settings).
 
-`Package.swift` builds against SDK `2.0.0-dev` with no further setup (MCP Apps support is new in
+`Package.swift` builds against SDK `2.0.0-GA` with no further setup (MCP Apps support is new in
 2.0): `LocalLMLabSDKCore` and `LocalLMLabSDKInference` (the MLX runtime) come from that GitHub
 Release, `Components` (`../../Components`) and `MCPAppsHost` (`../../MCPAppsHost`) from this repo as
 source. Needs macOS 27 and Xcode 27 (Swift 6.4). No Metal Toolchain needed — the prebuilt Inference
