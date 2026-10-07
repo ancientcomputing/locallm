@@ -34,7 +34,7 @@ built-in `ClockTool` cross-check.
 
 ## As a decider (OpenJev, `lab.decide`)
 
-Point-in-time too: **2026-10-03**, SDK `2.0.0-dev`, a 64 GB Apple-silicon Mac, the SDK's own
+Point-in-time too: **2026-10-03**, SDK `2.0.0-dev` (a pre-release build; not re-run on `2.0.0-GA`), a 64 GB Apple-silicon Mac, the SDK's own
 decision-question evaluation and JevDK's customer-support example. A decider answers typed
 questions from the probabilities of each option's label, with no generation
 ([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide)), so what matters is
