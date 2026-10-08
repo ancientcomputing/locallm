@@ -24,7 +24,7 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
-## 2.0.0 — unreleased
+## 2.0.0 — GA — 2026-10-07
 
 **A one-time breaking release.** From `2.0.0`, every 2.x release is source compatible with it
 (additive changes only, the same policy 1.x followed). Upgrading: [`docs/migrating-to-2.0.md`](docs/migrating-to-2.0.md).
