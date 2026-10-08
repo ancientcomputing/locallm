@@ -211,6 +211,11 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
 
 - **`contextBudget`** reported the whole session's cumulative usage as the last turn's, so `fractionUsed` grew
   every turn. It now reports the latest turn's last model call (the conversation as the model last read it).
+- **A streamed Anthropic Messages turn crashed the process** (`LocalLMLabSDKRemote`, `.anthropicMessages`).
+  Anthropic reports input tokens at the start of a reply and output tokens at the end; the second usage
+  update sent input as 0, and FoundationModels traps when a streamed turn's input count goes down — so
+  the process stopped right after the reply's text. A non-streamed turn didn't crash but reported 0 input
+  tokens. Input is now carried forward. The OpenAI dialects weren't affected. Also present in 1.0.0.
 
 ### Added — examples
 
@@ -228,7 +233,12 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
 
 ### Checksums (SHA-256)
 
-_Filled in at release._
+```
+LocalLMLabSDKCore-2.0.0-GA.xcframework.zip       faa92a02bc7e5b0c2de284507e730798042bc7154a51d361535a7ba801d54029
+LocalLMLabSDKClaude-2.0.0-GA.xcframework.zip     7afe7d79c63b67cc695d53a1378d5eee23fd508d2409908a717085622b86a771
+LocalLMLabSDKInference-2.0.0-GA.xcframework.zip  fde8babbb0a8512b3d26e3d3bcc8139d02eb00375b2fbd6ed1e9157dfec55db8
+LocalLMLabSDKRemote-2.0.0-GA.xcframework.zip     (re-published with the Anthropic fix above; filled in when published)
+```
 
 ---
 
