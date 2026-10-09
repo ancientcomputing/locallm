@@ -278,6 +278,12 @@ size-vs-memory preflight (weights ≤ 70% of physical RAM).
 ranges, a child-table join, a two-dataset `JOIN`, `GROUP BY … HAVING`. A bigger model mainly
 buys a touch more reliability on request→column matching. A 4B model usually works.
 
+`mlx-community/Qwen3.8-27B-4bit` (~15 GB) follows the pipeline more closely: in our runs it left
+`recordsAt` empty as told, ran every step, and kept every column the request named (the usage
+index as well as the automation percentage). It's about 2.5× slower than the 14B (about 37 s
+against 14 s for the walkthrough on an M5 Max) and needs a 24 GB Mac to clear the preflight —
+32 GB to be comfortable. Type it in the Model field.
+
 The session is built with `options: SessionOptions(effort: .off)` — the Qwen3 chat template's
 thinking toggle is turned off, so the model skips its `<think>…</think>` pass and answers
 faster. The pipeline is mechanical enough (pick a tool, name a table, write one `SELECT`) that
