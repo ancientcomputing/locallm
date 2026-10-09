@@ -24,7 +24,7 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
-## 2.0.0 — GA — 2026-10-07
+## 2.0.0 — GA — 2026-10-07 (binaries re-published 2026-10-08)
 
 **A one-time breaking release.** From `2.0.0`, every 2.x release is source compatible with it
 (additive changes only, the same policy 1.x followed). Upgrading: [`docs/migrating-to-2.0.md`](docs/migrating-to-2.0.md).
@@ -234,10 +234,10 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-2.0.0-GA.xcframework.zip       faa92a02bc7e5b0c2de284507e730798042bc7154a51d361535a7ba801d54029
-LocalLMLabSDKClaude-2.0.0-GA.xcframework.zip     7afe7d79c63b67cc695d53a1378d5eee23fd508d2409908a717085622b86a771
-LocalLMLabSDKInference-2.0.0-GA.xcframework.zip  fde8babbb0a8512b3d26e3d3bcc8139d02eb00375b2fbd6ed1e9157dfec55db8
-LocalLMLabSDKRemote-2.0.0-GA.xcframework.zip     (re-published with the Anthropic fix above; filled in when published)
+LocalLMLabSDKCore-2.0.0-GA.xcframework.zip       246bad16b8a39dc72e037778d7e7128fe2742ea7cb7b19dd2d456b94bae131b1
+LocalLMLabSDKClaude-2.0.0-GA.xcframework.zip     e1c50ad8f14550937d57766fcf3d13008f2e5487d64b0b0e52e9ae8b47d63562
+LocalLMLabSDKInference-2.0.0-GA.xcframework.zip  60d3f367338adb8093b705b776b68f2ca27fdec75f128b304d280c78f48c069c
+LocalLMLabSDKRemote-2.0.0-GA.xcframework.zip     901198d2b1080bbb8ef13bdb7aecca5f9374f88af8c5361ad9e61e8052d58489
 ```
 
 ---
