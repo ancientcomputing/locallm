@@ -211,6 +211,13 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
 
 - **`contextBudget`** reported the whole session's cumulative usage as the last turn's, so `fractionUsed` grew
   every turn. It now reports the latest turn's last model call (the conversation as the model last read it).
+- **`loadTable` let a model guess `recordsAt` until the tool-loop limit stopped it** (`LocalLMLabSDKCore`).
+  A `recordsAt` that isn't an array in the JSON was an error that didn't say which path would work, so a
+  small model guessed again (`"data"`, `"data.items"`, …). 2.0's 16-call limit on a local model's turn
+  then stopped about half the runs of the [`aiql`](examples/aiql/) walkthrough; without the limit (1.0)
+  they succeeded after 10–42 calls. `loadTable` now falls back to auto-detection when `recordsAt` misses
+  and says so in its reply; when that's ambiguous the error lists the candidate arrays. The walkthrough
+  now takes three model calls.
 - **A streamed Anthropic Messages turn crashed the process** (`LocalLMLabSDKRemote`, `.anthropicMessages`).
   Anthropic reports input tokens at the start of a reply and output tokens at the end; the second usage
   update sent input as 0, and FoundationModels traps when a streamed turn's input count goes down — so
