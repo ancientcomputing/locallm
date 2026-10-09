@@ -38,11 +38,11 @@ let defaultSDKVersion = "2.0.0-GA"
 let knownSDKReleases: [String: SDKRelease] = [
     "2.0.0-GA": SDKRelease(
         coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKCore-2.0.0-GA.xcframework.zip",
-        coreChecksum: "246bad16b8a39dc72e037778d7e7128fe2742ea7cb7b19dd2d456b94bae131b1",
+        coreChecksum: "5f9418a6879b22227afdf867cf474d426b93ae36d783d5a958efaae1e347681b",
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKRemote-2.0.0-GA.xcframework.zip",
-        remoteChecksum: "901198d2b1080bbb8ef13bdb7aecca5f9374f88af8c5361ad9e61e8052d58489",
+        remoteChecksum: "1e809cff19a7d232cd82fd36eb3ba7d79a93b55f71b6694041c9d9e3f6261be9",
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKInference-2.0.0-GA.xcframework.zip",
-        inferenceChecksum: "60d3f367338adb8093b705b776b68f2ca27fdec75f128b304d280c78f48c069c"
+        inferenceChecksum: "d2ed4a02686aceab0edf4231ede55c924ea3ab273c7c5cab0bb02f4bda40a185"
     ),
 ]
 

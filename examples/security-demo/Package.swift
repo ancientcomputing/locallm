@@ -38,7 +38,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     ),
     "2.0.0-GA": SDKRelease(
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKRemote-2.0.0-GA.xcframework.zip",
-        remoteChecksum: "901198d2b1080bbb8ef13bdb7aecca5f9374f88af8c5361ad9e61e8052d58489"
+        remoteChecksum: "1e809cff19a7d232cd82fd36eb3ba7d79a93b55f71b6694041c9d9e3f6261be9"
     ),
 ]
 
