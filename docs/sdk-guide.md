@@ -1737,14 +1737,18 @@ side-by-side output.
 ### `WorkspaceAccess` + the Workspace tools — let the model touch files
 
 > **Use it when** the model needs to read or edit files in a folder the user picked.
-> `WorkspaceAccess` owns the security-scoped-bookmark bracket; the ready-made tools
-> (`SearchWorkspaceTool`, `WorkspaceTreeTool`, `ReadWorkspaceFileTool`, `ReadFileRangeTool`,
-> `ListWorkspaceFilesTool`, `ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`,
-> `DeleteWorkspaceFileTool`) are FoundationModels `Tool`s you drop straight into `makeSession`.
+> Your app picks the folder and holds its security-scoped access open
+> ([§8](#8-filesystem-access-security-scoped-bookmarks-example-not-in-core)); `WorkspaceAccess`
+> keeps every read and write inside that folder. The ready-made tools (`SearchWorkspaceTool`,
+> `WorkspaceTreeTool`, `ReadWorkspaceFileTool`, `ReadFileRangeTool`, `ListWorkspaceFilesTool`,
+> `ApplyPatchTool`, `EditWorkspaceFileTool`, `WriteWorkspaceFileTool`, `DeleteWorkspaceFileTool`)
+> are part of Core, not Apple's: they conform to FoundationModels' `Tool` protocol, so you pass
+> them straight into `makeSession`.
 >
-> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) and
-> [`workspace-buddy`](../examples/workspace-buddy/) (the Core-only, no-MLX version) both use
-> these.
+> **Examples that use it:** [`code-buddy`](../examples/code-buddy/) offers seven of them (all but
+> `ApplyPatchTool` and `DeleteWorkspaceFileTool`); [`workspace-buddy`](../examples/workspace-buddy/)
+> (Core only, no MLX) and [`workspace-buddy-local`](../examples/workspace-buddy-local/) (a local MLX
+> model) offer four: list, read, write and edit.
 
 ## 6b. Online providers — GPT, Claude online, OpenRouter (`LocalLMLabSDKRemote`)
 
