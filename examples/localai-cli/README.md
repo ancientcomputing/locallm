@@ -32,9 +32,12 @@ the user picks which in the **AI Models** screen:
 On **macOS 26** only **Apple on-device** (`system`) is available — Private Cloud
 Compute, Claude, and open-weight (MLX) models need macOS 27.
 
-`localai-cli` reads that choice from the config file (below) — there is no
-`--model` flag. To change which model your scripts use, change the default
-in **AI Models**; the next `localai-cli` call picks it up.
+`localai-cli` always uses the model chosen in **AI Models** — the `default_model` in
+LocalLM Lab's own `~/Library/Application Support/LocalLM Lab/app-config.json`, even when
+you pass a different file with `--config`. There is no `--model` flag, and a `"model"`
+field in the request is ignored. To change which model your scripts use, change the
+default in **AI Models**; the next `localai-cli` call picks it up. Every response's
+`"model"` field says which model answered.
 
 ### How connector / MCP access works
 
@@ -64,13 +67,12 @@ for that one call, via `connectors` and `mcp_tools` fields:
    `localai-cli` only ever reads this file, never creates or edits it.
    Connector and MCP calls also run inside LocalLM Lab's own process (reached
    over a local socket), so the app must be **running**, not just installed.
-2. Get the `localai-toolkit-<version>-arm64.zip` — a release asset on
-   [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases)
-   for `1.0.0-beta.4` through `1.0.0-RC.1`, on this repo's own
-   [releases](https://github.com/ancientcomputing/locallm/releases) from
-   `1.0.0-GA` on, or [`../../toolkit/`](../../toolkit/) for older
-   versions (see that folder's README) — and unzip it. `localai-cli` and
-   `localai-playground-run` are a matched pair.
+2. Get the `localai-toolkit-<version>-arm64.zip` from this repo's
+   [releases](https://github.com/ancientcomputing/locallm/releases) (`1.0.0-GA` on) and
+   unzip it. `localai-cli` and `localai-playground-run` are a matched pair. Older
+   versions: `1.0.0-beta.4` through `1.0.0-RC.1` are on
+   [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases),
+   earlier ones in [`../../toolkit/`](../../toolkit/) (see that folder's README).
 3. Put both binaries in this folder (or point `LOCALAI_CLI_PATH` at wherever
    you put `localai-cli` — it looks for `localai-playground-run` in the same
    directory as itself by default).
