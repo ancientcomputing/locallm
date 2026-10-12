@@ -1,23 +1,40 @@
 # Annotated example source
 
-The full source of every reference app, with every line that actually touches the SDK marked
-`// ← SDK` (Core), `// ← SDK (Inference)` (the MLX runtime — `code-buddy`, `repo-qa-local`,
-`workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat`, `jevdk` and `jev-serve`), `// ← SDK (Remote)` (online providers —
-`model-switch`, `security-demo` and `jevdk`), `// ← SDK (MCPAppsHost)` (showing MCP servers' interactive views —
-`mcp-chat`), or `// ← Components` (`components-demo`, `components-updates-demo`, and `mcp-chat`). Everything else is ordinary SwiftUI/Foundation — the point
-of marking it this way is to make obvious just how little of each file is SDK-specific plumbing.
-`plate-today` and `plate-today-tools` are a matched pair — the same app twice, "Path B" (hand-
-written `Tool` adapters) vs. "Path A" (Core's ready-made ones, `// ← SDK (Path A)`) — meant to be
-read back to back; see §7a of `sdk-guide.md` for the framing. `repo-qa` is Path A again, but on
-its own, smaller and differently-shaped: a plain CLI tool showing `MCPTool` against a no-auth
-server, distinct from `plate-today-tools`' OAuth-gated Todoist case.
+The full source of every reference app, with each line that calls the SDK marked by a
+trailing comment. Everything unmarked is ordinary SwiftUI and Foundation, so the markers show
+how little of each app is SDK code.
 
-(GitHub-flavored Markdown doesn't apply bold/inline formatting inside fenced code blocks, so a
-trailing comment is used instead of `**bold**` — it survives being read as a comment in the real
-`.swift` file too, not just rendered here.)
+[`sdk-guide.md`](sdk-guide.md) explains the concepts step by step. This file is its companion:
+each app shown whole.
 
-See [`sdk-guide.md`](sdk-guide.md) for the prose walkthrough these annotate — this file is the
-companion "show me the whole thing at once" reference.
+### The markers
+
+| Marker | What it marks | Used in |
+|---|---|---|
+| `// ← SDK` | Core | every example |
+| `// ← SDK (Inference)` | the MLX runtime, for local open-weight models | `code-buddy`, `repo-qa-local`, `workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat`, `jevdk`, `jev-serve` |
+| `// ← SDK (Remote)` | online providers | `model-switch`, `security-demo`, `jevdk` |
+| `// ← SDK (MCPAppsHost)` | showing an MCP server's interactive views | `mcp-chat` |
+| `// ← Components` | the prebuilt SwiftUI views | `components-demo`, `components-updates-demo`, `mcp-chat` |
+| `// ← SDK (Path A)` | Core's ready-made tools | `plate-today-tools`, `repo-qa` |
+
+A few markers add a short note in brackets, such as `// ← SDK (type)` for a line that only names
+an SDK type.
+
+The markers are comments, not bold text, because GitHub doesn't format text inside code blocks.
+A comment also still makes sense in the real `.swift` file.
+
+### Two ways to give the model tools
+
+`plate-today` and `plate-today-tools` are the same app built two ways, so read them back to back:
+
+- **`plate-today` (Path B)** writes its own `Tool` adapters.
+- **`plate-today-tools` (Path A)** uses Core's ready-made tools.
+
+§7a of [`sdk-guide.md`](sdk-guide.md) explains the two paths.
+
+`repo-qa` is Path A on its own: a small command-line tool that uses `MCPTool` with an MCP server
+that needs no sign-in. Compare `plate-today-tools`, whose Todoist server needs an OAuth sign-in.
 
 ## How much code is this, really?
 
