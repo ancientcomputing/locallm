@@ -199,15 +199,15 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 }
                 defer { events.cancel() }
 
-                // Each snapshot is the whole answer so far. It's *usually* append-only, but a
+                // session.streamResponse (the session's own turn method) yields the whole answer so far. It's *usually* append-only, but a
                 // reasoning model drops its <think> block once the real answer starts, and the
                 // snapshot can reset across a tool call — so just show the latest non-empty one
                 // rather than diffing. (code-buddy does the careful append-only version, because
                 // stdout can't un-print.)
                 var text = ""
-                for try await snapshot in session.languageModelSession.streamResponse(to: request) {
-                    guard !snapshot.content.isEmpty else { continue }
-                    text = snapshot.content
+                for try await latest in session.streamResponse(to: request) {
+                    guard !latest.isEmpty else { continue }
+                    text = latest
                     self.activity = nil
                     self.state = .working(text)
                 }

@@ -191,11 +191,11 @@ final class AppModel {
                 DeleteCalendarEventTool(),
             ])
 
-            // Lever 2 — invocation. No authorizer at all when nothing is set to confirm.
+            // Lever 2 — invocation. Todoist's approval lives on its server in `lab.mcp`; the
+            // Calendar tools' on the authorizer. No authorizer at all when nothing is set to confirm.
+            lab.mcp.setToolApproval(policy.todoistApproval, server: MCPServerID(rawValue: todoistURL.absoluteString))
             let authorizer: (any ToolCallAuthorizer)? = policy.wantsConfirmation
-                ? ConfirmingToolAuthorizer(
-                    channel: presenter,
-                    requirement: { call in policy.requirement(for: call) })
+                ? ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)
                 : nil
 
             let session = try lab.makeSession(

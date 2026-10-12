@@ -1,0 +1,68 @@
+# XcodeGen spec for the "double-click, Run" variant of JevDK.
+#
+#   brew install xcodegen && xcodegen generate      # regenerates JevDK.xcodeproj
+#
+# The generated JevDK.xcodeproj IS committed — a fresh clone opens it and Runs.
+# Edit project.yml, not the .xcodeproj, then regenerate.
+#
+# Not sandboxed, like `swift build`: JevDK lists and verifies models in the shared Hugging Face
+# cache (~/.cache/huggingface/hub, or HF_HUB_CACHE / HF_HOME). Hosted-backend keys come from the
+# Keychain (saved in Backends), or OPENROUTER_API_KEY / FEATHERLESS_API_KEY in the environment
+# (Edit Scheme > Run > Environment Variables, kept out of this committed scheme).
+#
+# Info.plist is written by XcodeGen to xcodeproj/JevDK-Info.plist (committed) from the
+# `properties` below.
+name: JevDK
+options:
+  bundleIdPrefix: lab.locallm.sdk.reference
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+schemes:
+  JevDK:
+    build:
+      targets:
+        JevDK: all
+    run:
+      config: Debug
+packages:
+  JevDKPackage:
+    path: .
+targets:
+  JevDK:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/JevDK
+    info:
+      path: xcodeproj/JevDK-Info.plist
+      properties:
+        CFBundleDisplayName: JevDK
+        CFBundleName: JevDK
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "27.0"
+        NSHighResolutionCapable: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.locallm.sdk.reference.jevdk
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        # Ad-hoc, no sandbox, no hardened runtime — this-Mac only, the same tier as model-switch.
+        # Hardened runtime would reject the Team-signed SDK frameworks under an ad-hoc outer signature.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: JevDKPackage
+        product: OpenJevKit
+      - package: JevDKPackage
+        product: LocalLMLabSDKCore
+      - package: JevDKPackage
+        product: LocalLMLabSDKRemote
+      - package: JevDKPackage
+        product: LocalLMLabSDKInference

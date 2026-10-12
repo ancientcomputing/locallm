@@ -233,10 +233,10 @@ final class ControlRoomModel: ObservableObject {
             let start = Date()
             var firstChunkAt: Date?
             var wordCount = 0
-            for try await partial in session.languageModelSession.streamResponse(to: prompt) {
-                if firstChunkAt == nil, !partial.content.isEmpty { firstChunkAt = Date() }
-                lastOutput = partial.content
-                wordCount = partial.content.split(separator: " ").count
+            for try await partial in session.streamResponse(to: prompt) {
+                if firstChunkAt == nil, !partial.isEmpty { firstChunkAt = Date() }
+                lastOutput = partial
+                wordCount = partial.split(separator: " ").count
             }
             let elapsed = Date().timeIntervalSince(start)
             tokensPerSecond = elapsed > 0 ? Double(wordCount) / elapsed : nil

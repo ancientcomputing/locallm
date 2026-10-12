@@ -1,6 +1,6 @@
 ---
 name: locallmlab-swift-app
-description: Build, debug, or modify macOS Swift and SwiftUI apps that use the LocalLM Lab SDK, including Core connectors, MCP, Components, model providers, sandboxing, signing, and example-based integration patterns.
+description: Build, debug, or modify macOS Swift and SwiftUI apps that use the LocalLM Lab SDK, including Core connectors, MCP, Components, model providers, decision models (Jev, `lab.decide`), sandboxing, signing, and example-based integration patterns.
 ---
 
 # LocalLM Lab Swift App
@@ -15,7 +15,7 @@ Before editing SDK integration code, read the nearest maintained local reference
 - For choosing an example to copy or diff, use [references/example-selector.md](references/example-selector.md).
 - For app-bundle, TCC, OAuth, sandbox, and signing work, use [references/macos-integration-checklist.md](references/macos-integration-checklist.md).
 
-If the public API is uncertain, check `docs/api-surface.md` rather than guessing. If the task mentions migration from `0.8.x` or a prior beta, read `docs/migrating-to-1.0.md`.
+If the public API is uncertain, check `docs/api-surface.md` rather than guessing. If the task mentions migration from 1.x, read `docs/migrating-to-2.0.md`; from `0.8.x` or a 1.0 beta, `docs/migrating-to-1.0.md`.
 
 ## Default Decisions
 
@@ -25,6 +25,7 @@ If the public API is uncertain, check `docs/api-surface.md` rather than guessing
 - Treat Info.plist usage strings, entitlements, OAuth callback routing, App Sandbox settings, and final bundle signing as part of the implementation, not packaging afterthoughts.
 - For model-layer work, register macOS-27-only providers behind availability checks and link only the SDK modules the app actually uses.
 - For MLX/open-weight model work, validate and probe model capability instead of assuming a model can tool-call.
+- When the app needs a small, fixed decision about some text (route a request, pick a team, spot personal information, check an answer), use a decision model with `lab.decide` (`docs/sdk-guide.md` §6c) instead of asking a chat model and parsing its reply. Write typed questions (`.noul`, `.choice`, `.score`), put any context in the question or the input (there is no system prompt), and only ask what the input and general knowledge can answer, never current facts. Locally, use `OpenJevDecisionProvider` on a small dense MLX model (Qwen3-4B-4bit is the tested default; not a mixture-of-experts model) and `lab.models.pair(decision:generator:)` to keep it loaded next to the chat model. Don't threshold uncalibrated `.tokenScored` confidence. Have the developer test the questions on marked inputs in `examples/jevdk` and ship the exported `DecisionQuestionSet`, with `lab.evaluate` over its answer set as a regression test.
 
 ## Verification
 

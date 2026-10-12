@@ -35,6 +35,20 @@ Running a packaged build (`packaging/build-and-sign.sh`, below):
 4. **Switch models mid-conversation** — the picker changes which provider the *next* turn routes
    to; the transcript carries over.
 
+**Model ids.** The *Add model id* box wants the provider's API id, not the name it shows on its
+website. Each provider writes it differently:
+
+| Provider | Format | Example | Where to find it |
+|---|---|---|---|
+| OpenRouter | `vendor/model`, lowercase, hyphens | `openai/gpt-6.1-sol`, `anthropic/claude-sonnet-5` | the model's page on openrouter.ai — the id under its name, with a copy button |
+| OpenAI | the bare model id | `gpt-6-astra` | OpenAI's models page in its API docs |
+| Anthropic | the bare model id | `claude-sonnet-5` | Anthropic's models overview in its API docs |
+| Custom server | whatever it reports | — | `GET /v1/models` on the server |
+
+So for OpenRouter's "OpenAI: GPT-6.1 Sol", type `openai/gpt-6.1-sol` — not `GPT-6.1 Sol`, not
+`gpt-6.1 sol`, and not `gpt-6.1-sol` without the vendor. **Test connection** checks each id
+against the provider's list and says which one it doesn't know.
+
 **Prompts to try.** With only **system** configured (no key), any plain chat prompt works —
 `Explain the difference between a struct and a class in Swift` — but there's nothing to switch
 between and web search does nothing. The example only gets interesting once a provider with an

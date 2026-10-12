@@ -22,6 +22,9 @@ Code samples for LocalLM Lab, split by which feature they use.
 | [security-demo/](security-demo/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | Tool authorization: a "Security" panel whose two controls are `Sequence.limited(toMaxImpact:)` (which tools the model sees) and `ConfirmingToolAuthorizer` + `Components.ToolConfirmationPresenter` (whether a call runs or asks first). A frontier model against a real Calendar and a real Todoist MCP server. |
 | [vistanova/](vistanova/) | LocalLM Lab SDK (Core **+ Inference**) | A tiny local search engine: a SwiftUI app that runs web search through a Tavily MCP server on one local model and summarizes on another — by default a downloaded MLX model **shipped pinned to an exact commit** (`MLXModelProvider(pinnedRevisions:)`), so a new upstream version is never picked up silently. Also shows a hand-written `Tool` over an MCP tool, and the defenses a small model needs: verify from `session.events` that it really called the tool, probe `capabilityProbe` before trusting structured output. |
 | [aiql/](aiql/) | LocalLM Lab SDK (Core **+ Inference**) | "Ask your data": a SwiftUI app that pulls an MCP-fronted dataset and writes the spreadsheet you asked for — `FileBackedTool` + the data verbs (`jsonToCsv` / `filterRows` / `sortRows` / …, guide §8b) do every row-level step so a local MLX model can't fabricate a value. Sandboxed; MCP OAuth via the `aiql://` URL scheme. |
+| [jevdk/](jevdk/) | LocalLM Lab SDK (Core **+ Inference + Remote**), **2.0** | The decision API (Jev): a playground for the yes/no, choice and score questions an app asks a decision model. Runs them on a local MLX model (`OpenJevDecisionProvider`) and on hosted Jev (TypeSafe via OpenRouter, Featherless) side by side, scores a batch against your marked answers, fits calibration, appends runs to a results CSV for comparing models, and exports the tested questions for your app (`DecisionQuestionSet`). Comes with [a developer's guide](jevdk/GUIDE.md). |
+| [jev-serve/](jev-serve/) | LocalLM Lab SDK (Core **+ Inference**), **2.0** | Hosted Jev's HTTP API (OpenRouter's `/api/alpha/decisions`, Featherless's `/v1/classifier`) answered by OpenJev on a local MLX model: code that calls hosted Jev, in any language, switches to private on-device decisions by changing its base URL. Serves the setup tested in JevDK (model pinned to its version, system instructions, calibration) from JevDK's exported config; downloads the model if needed; loopback, optional token. |
+| [mcp-chat/](mcp-chat/) | LocalLM Lab SDK (Core **+ Inference** + `Components` + `MCPAppsHost`), **2.0** | MCP Apps in a chat: a local MLX model (or Apple's on-device model) whose tool calls show the server's interactive widget inline in the conversation — Todoist's task list, a system monitor. The widget's own calls go through the session, so they meet the same per-server trust / approval as the model's. Streaming replies, reasoning split out, conversations that survive relaunch. Sandboxed `.app`. |
 
 **Path A vs Path B**, for the four Core-based examples above: two ways to turn a connector or MCP
 server into something the on-device model can call as a tool. **Path A** drops in a ready-made
@@ -56,7 +59,7 @@ advanced model-layer features (Private Cloud Compute, open-weight/MLX, Claude, o
 need it — but it isn't universal: [`os-matrix/`](os-matrix/) is built and tested to run unchanged
 on **macOS 26** too (see its README).
 
-The examples on this `1.0.0-GA` branch build against SDK **`1.0.0-GA`**; the ones on `main`
+The examples on this `2.0.0-GA` branch build against SDK **`2.0.0-GA`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
 
 ### What each example needs
@@ -70,6 +73,9 @@ build against the latest stable release. No environment variable is needed for e
 | `mlx-control-room` | SwiftUI + App Sandbox (network only) | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); it keeps no security-scoped bookmark, so **Sign to Run Locally** works too | **any** identity — `packaging/build-and-sign.sh` |
 | `components-updates-demo` | SwiftUI, no system permissions, simulated data | ✅ via `Package.swift` / `swift run` (no `.xcodeproj`) | — (no `packaging/`) |
 | `workspace-buddy`, `workspace-buddy-local`, `aiql` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
+| `jevdk` | SwiftUI, no system permissions, no sandbox; hosted deciders optional (Featherless demo needs no key) | ✅ via the committed `.xcodeproj` — ad-hoc signed (*Sign to Run Locally*), not sandboxed, no account needed; or `swift build -c release` and run `.build/release/JevDK` | — (no `packaging/`) |
+| `jev-serve` | CLI (an HTTP server on this Mac) | ✅ `swift build -c release`, then `.build/release/jev-serve --config jev-serve.json` (from JevDK) or `--model <repo>` | — (no `packaging/`) |
+| `mcp-chat` | SwiftUI + App Sandbox (network) | Compile-only via `Package.swift` / `swift build` (no `.xcodeproj`) | **any** identity, or **none** (`APP_IDENTITY=-`) — `packaging/build-and-sign.sh` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
 **Xcode ▸ Settings ▸ Accounts**. No paid Apple Developer account, no Developer ID certificate.
@@ -165,13 +171,13 @@ previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these �
 dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
 
 ```swift
-let defaultSDKVersion = "1.0.0-GA"
+let defaultSDKVersion = "2.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-RC.1": SDKRelease(url: "…/v1.0.0-RC.1/LocalLMLabSDKCore-1.0.0-RC.1.xcframework.zip",
-                             checksum: "397e7b5f…"),
     "1.0.0-GA": SDKRelease(url: "…/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip",
                            checksum: "7d77a9c2…"),
+    "2.0.0-GA": SDKRelease(url: "…/v2.0.0-GA/LocalLMLabSDKCore-2.0.0-GA.xcframework.zip",
+                           checksum: "5f9418a6…"),
 ]
 ```
 
@@ -182,10 +188,10 @@ every module ships its own checksum (`Core`, `Inference`, `Remote`, and `Claude`
 distinct `.xcframework.zip.sha256`; don't reuse Core's for another module):
 
 ```bash
-curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip.sha256
-# → 7d77a9c2e37dfb2f7925f01ed011262ee5a2aebc561a3ae7a93524acc0285b3e
-curl -sL https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLMLabSDKClaude-1.0.0-GA.xcframework.zip.sha256
-# → 2c69c330c8a5e3929b9544fcb865738d0ec39abc7520462cae4f138214e6858f
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKCore-2.0.0-GA.xcframework.zip.sha256
+# → 5f9418a6879b22227afdf867cf474d426b93ae36d783d5a958efaae1e347681b
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKClaude-2.0.0-GA.xcframework.zip.sha256
+# → f235480fd4842e91c0c17b416eb4048b7abe6b3c2d41f332984c5e7af368092e
 ```
 
 Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass

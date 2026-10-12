@@ -368,6 +368,9 @@ final class AppModel {
 
         if supportsGuidedGeneration {
             do {
+                // Guided generation (`generating:`) has no SDK turn method, so this one call stays on
+                // Apple's session (`languageModelSession`, the escape hatch) — which also keeps the
+                // guardrail-recovery below reading Apple's own error.
                 let response = try await session.languageModelSession.respond(to: query, generating: SearchResults.self)
                 guard toolWasCalled else { throw SearchParseError.toolNotCalled }
                 return response.content.pages.map { SearchResultLink(title: $0.title, url: $0.url, snippet: $0.snippet) }
@@ -384,12 +387,12 @@ final class AppModel {
             }
         } else {
             // No structured-output support on this model (see searchCapability(_:)) — a plain
-            // response.content String, parsed leniently for (title, url) pairs rather than
+            // String reply (the session's own turn method), parsed leniently for (title, url) pairs rather than
             // relying on the model to hit an exact format every time.
-            let response = try await session.languageModelSession.respond(to: query)
-            let links = Self.parsePlainTextLinks(response.content)
+            let reply = try await session.respond(to: query)
+            let links = Self.parsePlainTextLinks(reply)
             guard toolWasCalled, !links.isEmpty else {
-                throw toolWasCalled ? SearchParseError.noResultsParsed(rawText: response.content) : SearchParseError.toolNotCalled
+                throw toolWasCalled ? SearchParseError.noResultsParsed(rawText: reply) : SearchParseError.toolNotCalled
             }
             return links
         }
@@ -509,9 +512,9 @@ final class AppModel {
                 route: "summary",
                 instructions: "Summarize the given web search results in 2-3 sentences, as one plain paragraph. No headers, no list, no commentary about the sources themselves.",
                 includeMCPTools: false)
-            let response = try await session.languageModelSession.respond(
+            let reply = try await session.respond(
                 to: "Search results for \"\(turn.searchQuery ?? turn.query)\":\n\(sources)")
-            threads[threadIdx].turns[turnIdx].summary = Self.stripThinkingBlock(response.content)
+            threads[threadIdx].turns[turnIdx].summary = Self.stripThinkingBlock(reply)
             HistoryStore.save(threads)
         } catch {
             lastError = await GenerationErrorDescription.describe(error)

@@ -24,6 +24,231 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.0.0 — GA — 2026-10-07 (binaries re-published 2026-10-08 and 2026-10-09)
+
+**A one-time breaking release.** From `2.0.0`, every 2.x release is source compatible with it
+(additive changes only, the same policy 1.x followed). Upgrading: [`docs/migrating-to-2.0.md`](docs/migrating-to-2.0.md).
+
+### Changed — breaking
+
+- **Tool authorization is decided per MCP server, by one authorizer.** `RuleBasedToolAuthorizer`
+  is removed; so are `ConfirmingToolAuthorizer.Requirement` and
+  `init(channel:timeout:requirement:)` — use `init(channel:policy:hostTools:timeout:)` with a
+  `ToolPolicy`. `MCPServerManager.setTrustsToolAnnotations(_:server:)` /
+  `trustsToolAnnotations(server:)` are replaced by `setTrust(_:server:)`. Mappings in the
+  migration guide §3.
+- **`WorkspaceAccess` operations are `async throws`** (`listFiles`, `readFile`, `writeFile`,
+  `editFile`, `deleteFile`, `search`, `tree`, `readFileRange`, `applyPatch`), not
+  `Result`-returning; they throw `WorkspaceError` or `CancellationError`. `search` returns
+  `SearchResult` (read `.matches`). The ready-made workspace tools are unchanged at the call site.
+  Migration guide §4a.
+- **New cases** on `MCPProtocolVersion` (`.v2026_07_28`) and `MCPConnectionMode`
+  (`.stateless(_:)`); a `switch` needs `@unknown default` (Swift 6 already requires it).
+- **`MCPServerState`** gained fields (`trust`, `toolApproval`, `trustedToolsDigest`,
+  `liveUpdates`, …): a state JSON encoded under 1.0 no longer decodes. Restore servers with
+  `restore(from:)`.
+- **Defaulted parameters added**: `SessionOptions.init` and `MLXModelProvider.init` gain
+  `maxModelCallsPerTurn:`; `LocalLMLabState.init` gains `decisionRoutes:` (usual call sites
+  compile unchanged; snapshots saved by 1.0 still decode, with no decision routes).
+- **One declaration each** where 1.x had kept two (usual call sites compile unchanged):
+  `makeSession` (now with `restoring:` and `mcpAppHints:`), `respond` / `streamResponse` (with
+  `options:` and `fromAppInstance:`), `LocalLMLab.Configuration.init` (with `mcp: MCPSettings`),
+  `PendingToolCall` / `PendingToolCallSummary` initializers (with `initiator:` and
+  `serverApproval:`).
+
+### Changed — behavior
+
+- A session's MCP tools follow `lab.mcp` between turns (1.0: fixed at `makeSession`). For a fixed
+  set, pass the tools in `tools:` with `includeMCPTools: false`.
+- A trusted server asks only before destructive tools by default (1.0 asked before every change).
+- MCP tools marked app-only (`_meta.ui.visibility` without `"model"`) are no longer given to
+  models; `ui://` resources are left out of model-facing resource lists.
+- `languageModelSession` is documented as the escape hatch: run turns with `respond` /
+  `streamResponse`.
+- **Workspace file access is hardened.** Files are reached by descriptor from the granted folder
+  and no symlink is followed out of it — including mid-operation (1.x `search` followed a symlink
+  inside the folder to a file outside it). Reads, searches and edits are bounded by
+  `WorkspaceLimits` and stream instead of loading whole files; `search` reports files it skipped.
+  `deleteFile` removes single files only (1.x deleted folders recursively) and deletes a symlink
+  itself, not its target. `editFile` keeps file permissions. Writes are temp-then-rename.
+- **`FileBackedTool` `saveAs` writes under `raw/` by default**, data-file extensions only, no
+  hidden paths (`SaveAsPolicy`; `.unrestricted` restores 1.x). The receipt gives the real path.
+- **Local (MLX) models report real usage**: input and output token counts are the model's own (input was always
+  0). `languageModelSession.usage` sums every model call in the session; one turn's figures are on its response's
+  `usage`, with `mlx.*` metadata (`MLXUsageMetadataKey`).
+- **An MLX turn stops after 16 model calls** — a model that keeps calling tools without answering — with an error
+  saying so. Raise or remove the limit with `MLXModelProvider(maxModelCallsPerTurn:)` or
+  `SessionOptions.maxModelCallsPerTurn` (`Int.max` = no limit).
+- **An MLX prompt too long for the model's context window, or for the GPU memory left, is refused before it runs**
+  (`LocalLMLabError.context`). `respond` / `streamResponse` treat it as a context overflow, so
+  `retryOnContextOverflow` compacts and retries.
+
+- MCP servers that only speak `2024-11-05`, or use the old HTTP+SSE transport, fail `addServer`
+  with `.protocolMismatch` (1.x connected to the former and failed on the latter with "HTTP 404").
+  `MCPProtocolVersion.v2024_11_05` is deprecated and kept so stored values decode.
+- Each connect first probes `server/discover` (`versionNegotiation: .auto`, the default) and falls
+  back to `initialize` when a server rejects it. `.legacy` skips the probe.
+- Elicitation is declared as `{"form":{},"url":{}}` from `2025-11-25` (was `{}`, which strict
+  servers read as form-only).
+- `MCP-Protocol-Version` is sent only when the negotiated revision is `2025-06-18` or later, and
+  an inbound `elicitation/create` is refused below `2025-06-18`.
+
+### Added — building a chat app (`LocalLMLabSDKCore`)
+
+- `LocalLMLabSession.hostTranscript` (`HostTranscript`): the conversation as a UI shows it — the
+  user's message at turn start, tool calls as live `ToolCallRecord`s with their full MCP result
+  and app link, the reply and the model's reasoning (an inline `<think>` block is split out), in
+  model order, never shortened by compaction; `replyInProgress` while streaming;
+  `archive()` / `restore(from:)`; a memory budget with spill to disk.
+- `streamResponse(to:options:fromAppInstance:)`; `turnContext` (host text sent with every turn,
+  e.g. the date); `makeSession(…, restoring:)` to continue a saved conversation.
+- `LocalLMLab.Configuration.mcp: MCPSettings` — how the lab sets up `lab.mcp`, the one MCP
+  manager.
+
+### Added — MCP Apps (`LocalLMLabSDKMCPAppsHost`, new, open source)
+
+- Shows an MCP server's interactive view (`ui://`, MCP Apps) when the model calls its tool:
+  `MCPAppViewController` / `MCPAppView` (sandboxed `WKWebView`), the host↔view bridge with an
+  explicit policy, `MCPAppsSessionBackend` (a view's tool calls go through the session's
+  authorizer, `ToolCallInitiator.app`), `MCPAppWidgetCache`, `MCPAppViewPool`,
+  `MCPAppRecreation`; `MCPClientHandlers.advertisingMCPApps()`.
+- Core MCP client: `_meta` on tool, resource and result types (`MCPToolDescriptor.meta`,
+  `MCPResourceDescriptor.meta`, `MCPToolResult.meta`), `MCPToolAnnotations`, and
+  `MCPResponseLimits.maxUIResourceBytes` (cap on a view's HTML, default 4 MB).
+- Core: `MCPAppLink`, `MCPAppVisibility`, `MCPToolDescriptor.app`, `isMCPAppResource`;
+  `LocalLMLabSession.callMCPTool(server:tool:arguments:initiator:)`,
+  `updateModelContext(_:fromAppInstance:)`; `makeSession(…, mcpAppHints:)`.
+- `ConfirmingToolAuthorizer` remembers a view's answer per tool (a polling dashboard asks once).
+
+### Added — per-server trust and tool approval
+
+- `MCPServerTrust`, `ToolApproval` (+ `default(for:)`), `ToolApprover`, `ToolPolicy`,
+  `ToolPolicyDecision`; `MCPServerManager.setTrust(_:server:)`, `setToolApproval(_:server:)`,
+  `toolApproval(server:)`; `MCPServerState.trust` / `toolApproval` / `toolsChangedSinceTrusted`.
+- `Components`: `MCPServerPickerView` shows each server's trust and approval, a notice when none of
+  a server's tools are on, and one when a trusted server's tools changed; the auth type is chosen
+  with a radio group.
+
+### Added — MCP protocol `2026-07-28`
+
+- The MCP client speaks `2026-07-28`, the current revision, and negotiates down to `2025-03-26`
+  (`MCPProtocolVersion.v2026_07_28`, `.statelessPreferred`, `.minimumSupported`, `.isStateless`).
+- **Stateless mode** (`MCPConnectionMode.stateless(_:)`): `server/discover` instead of
+  `initialize`, no session, the per-request `_meta` envelope, and `Mcp-Method` / `Mcp-Name` /
+  `Mcp-Param-*` headers. A tool whose `x-mcp-header` declarations break the rules (including one
+  on a `number` parameter; only `string` / `integer` / `boolean` are allowed) is left out.
+- **`MCPVersionNegotiation`** (`.auto` / `.legacy` / `.pin(_:)`), set with
+  `MCPSettings(versionNegotiation:)` or `MCPServerManager(versionNegotiation:)`.
+- **Multi-round-trip requests (MRTR).** A request that comes back `input_required` is answered
+  through the existing `MCPClientHandlers` (elicitation in form or URL mode, sampling, roots) and
+  re-sent with the answers, for up to 8 rounds. No handler API changes. A user's Cancel ends the
+  call without re-sending; after a Decline, a server that asks again is declined without
+  prompting the user a second time. Both come back as a `tools/call` tool error
+  (`isError`) the model can read, not a transport failure.
+- **Live updates** (`subscriptions/listen`). One stream per stateless server that announces list
+  changes; tools, prompts and resources are re-listed on change with enabled flags kept.
+  `MCPServerState.liveUpdates: MCPLiveUpdates?` (`.active` / `.reconnecting` / `.unavailable`).
+  Opt out with `MCPSettings(liveUpdates: false)` or `MCPServerManager(liveUpdates: false)`. Custom
+  transports: `MCPConnection.listen(filter:)` with `MCPSubscriptionFilter`, `MCPChangeEvent`,
+  `MCPListenEnd` (default implementation ends as refused).
+- `MCPProtocolVersion.supportsURLElicitation` and `.sendsProtocolVersionHeader` feature gates.
+- Diagnostics: the `server/discover` probe and fallback, live-update status, and MRTR rounds
+  (new category `MCP.mrtr`) are logged ([`docs/mcp-diagnostics.md`](docs/mcp-diagnostics.md)).
+- Authorization fixes found by the official MCP conformance suite: protected-resource metadata
+  at the path-suffixed then root well-known URL; `resource` must cover the server URL and is sent
+  exactly as the metadata publishes it (RFC 8707); metadata
+  `issuer` and redirect `iss` are checked (RFC 8414, RFC 9207); a changed authorization server
+  mid-connection drops the old credentials and signs in again.
+
+### Added — local (MLX) models: usage, speed and memory per turn (`LocalLMLabSDKInference`)
+
+- **`MLXUsageMetadataKey`**: real prompt and generated token counts, prompt (pp) and generation (tg) speed,
+  seconds, model calls, stop reason, speculative-decoding draft stats, and MLX memory (resident, turn peak, GPU
+  limit) — turn totals on the response's `usage.metadata`.
+- **`MLXPrefillMonitor` / `MLXPrefillActivity`**: the prompt a local model is reading right now — exact tokens,
+  which model call of the turn, since when — so an app can say why nothing has appeared yet.
+- **`maxModelCallsPerTurn`** on `MLXModelProvider` and `SessionOptions`: the tool-loop limit, 16 by default.
+
+### Added — decision models (Jev)
+
+A **decision model** answers a few typed questions about one input — yes / no, one of several
+options, a point on a scale — with a probability for every option, and writes no text. One API
+asks them of TypeSafe's Jev, Featherless's Simple Jev, or **OpenJev**, the SDK's own decider on a
+local MLX model. Introduction: [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html);
+API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdecide).
+
+- **Core:** `LocalLMLab.decide(route:state:questions:)`; questions in Jev's vocabulary
+  (`DecisionQuestion.noul` / `.choice` / `.score`, `DecisionState`, `DecisionRequest`,
+  `DecisionLimits` incl. `maxStateCharacters`); answers (`Decision`, `DecisionAnswer`,
+  `ChoiceAnswer`, `ScoreAnswer`, `DecisionFidelity`, `DecisionUsage`); `DecisionError`;
+  `DecisionProvider` for custom backends. Decision routes and providers are separate from chat:
+  `ModelRegistry.register(decision:)`, `replace(decision:)`, `removeDecisionProvider(scheme:)`,
+  `route(decision:to:)`, `modelID(forDecision:)`, `decisionProvider(for:)`,
+  `decisionAvailability(for:)`; saved by `lab.snapshot()`.
+- **A decider next to your chat model:** `ModelRegistry.pair(decision:generator:)` checks both
+  models fit the memory budget and keeps them loaded together (or shares one model);
+  `DecisionPairing`, `PairableDecisionProvider`, `DecisionError.pairing`.
+- **From testing to shipping:** `DecisionQuestionSet` (the tested questions as a JSON file, with
+  the model, revision, wrapper and calibration they were tested with); `DecisionAnswerSet`
+  (inputs with the correct answers, as CSV); `LocalLMLab.evaluate(route:questions:answerSet:)`
+  → `DecisionEvaluation` (accuracy per question, misses, confidence when right and wrong) for
+  regression tests in CI; `DecisionCalibration` (temperature scaling per question kind: `fit`,
+  `measure`, `apply`).
+- **`JevWire`** (Core): hosted Jev's JSON both ways (requests and responses, order kept), for
+  serving decisions over HTTP as well as calling hosted Jev; `JevDecisionProvider` is built on it.
+- **`LocalLMLabSDKInference` (macOS 27):** `OpenJevDecisionProvider` — answers each question in
+  one forward pass over the allowed labels' probabilities, no generation, the input read once for
+  all questions (about 150 ms for four questions on Qwen3 4B). `OpenJevWrapper` (+ `.default`),
+  `calibration:`, `init(mlx:tunedWith:)`, `tuningMismatch(for:)`, `warnings(for:)`
+  (`OpenJevWarning.mixtureOfExperts`: use a dense model as the decider),
+  `decideWithDiagnostics(_:using:)` (`OpenJevDiagnostics`: exact prompts, label mass, timing).
+- **`LocalLMLabSDKRemote`:** `JevDecisionProvider` with `JevProviderConfig.openRouter(key:)`
+  (TypeSafe's Jev via OpenRouter), `.featherless(key:)` and `.featherlessDemo()` (no key,
+  rate-limited); `validated()`, `requestBody(model:request:)`. Off until registered; the
+  questions and input are then sent to that service.
+
+### Fixed
+
+- **`contextBudget`** reported the whole session's cumulative usage as the last turn's, so `fractionUsed` grew
+  every turn. It now reports the latest turn's last model call (the conversation as the model last read it).
+- **`loadTable` let a model guess `recordsAt` until the tool-loop limit stopped it** (`LocalLMLabSDKCore`).
+  A `recordsAt` that isn't an array in the JSON was an error that didn't say which path would work, so a
+  small model guessed again (`"data"`, `"data.items"`, …). 2.0's 16-call limit on a local model's turn
+  then stopped about half the runs of the [`aiql`](examples/aiql/) walkthrough; without the limit (1.0)
+  they succeeded after 10–42 calls. `loadTable` now falls back to auto-detection when `recordsAt` misses
+  and says so in its reply; when that's ambiguous the error lists the candidate arrays. The walkthrough
+  now takes three model calls.
+- **A streamed Anthropic Messages turn crashed the process** (`LocalLMLabSDKRemote`, `.anthropicMessages`).
+  Anthropic reports input tokens at the start of a reply and output tokens at the end; the second usage
+  update sent input as 0, and FoundationModels traps when a streamed turn's input count goes down — so
+  the process stopped right after the reply's text. A non-streamed turn didn't crash but reported 0 input
+  tokens. Input is now carried forward. The OpenAI dialects weren't affected. Also present in 1.0.0.
+
+### Added — examples
+
+- [`jev-serve`](examples/jev-serve/): hosted Jev's HTTP API (`/api/alpha/decisions`,
+  `/v1/classifier`) answered by OpenJev on this Mac, from a config JevDK exports (**File → Export
+  Server Config…**: the model pinned to its tested version, the system instructions, the
+  calibration, an optional token). Downloads the model if needed; loopback by default.
+- [`jevdk`](examples/jevdk/): JevDK, a playground for decision-model questions — run them on a
+  local MLX model and on hosted Jev side by side, score a batch against your marked answers,
+  calibrate, compare models in a results CSV, and export the tested questions for your app. With a
+  plain-English [developer's guide](examples/jevdk/GUIDE.md) ([on the web](https://thisbrain.ai/locallm/jdk-guide.html)).
+- [`mcp-chat`](examples/mcp-chat/): a chat with a local model (Qwen3 8B via MLX, or Apple's
+  on-device model) that shows MCP Apps views inline, with streaming, per-server trust and
+  approval, the date every turn, and conversations that reopen.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-2.0.0-GA.xcframework.zip       5f9418a6879b22227afdf867cf474d426b93ae36d783d5a958efaae1e347681b
+LocalLMLabSDKClaude-2.0.0-GA.xcframework.zip     f235480fd4842e91c0c17b416eb4048b7abe6b3c2d41f332984c5e7af368092e
+LocalLMLabSDKInference-2.0.0-GA.xcframework.zip  d2ed4a02686aceab0edf4231ede55c924ea3ab273c7c5cab0bb02f4bda40a185
+LocalLMLabSDKRemote-2.0.0-GA.xcframework.zip     1e809cff19a7d232cd82fd36eb3ba7d79a93b55f71b6694041c9d9e3f6261be9
+```
+
+---
+
 ## 1.0.0 — GA — 2026-09-27
 
 Fixes only; no API change.

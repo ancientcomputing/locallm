@@ -25,9 +25,9 @@ Requires macOS 27+ on Apple Silicon (Xcode 27 to build). No permissions, no sign
 
 ## Getting the SDK
 
-This branch tracks `1.0.0-RC.1`. Nothing to download by hand — `Package.swift` depends on the sibling
+This branch tracks `2.0.0-GA`. Nothing to download by hand — `Package.swift` depends on the sibling
 [`Components`](../../Components/) package, which resolves `LocalLMLabSDKCore` as a binary dependency and builds
-against `1.0.0-RC.1` by default. Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published
+against `2.0.0-GA` by default. Set `LOCALLM_SDK_VERSION` in a shell (not Xcode) to pin another published
 release — see [`../README.md`](../README.md#building--running-an-sdk-example).
 
 ## Build and run
@@ -38,8 +38,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run UpdatesDemo
 
 Skip `DEVELOPER_DIR` if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere).
 There is no `.xcodeproj` and no `packaging/`; to run it from Xcode, open `Package.swift` and Run the
-**UpdatesDemo** scheme. Started with `swift run`, the window is not part of an app bundle, so if it doesn't
-come to the front, click it.
+**UpdatesDemo** scheme. Started with `swift run` there's no app bundle; the app makes itself a regular app
+and comes to the front at launch.
 
 ## What to try
 

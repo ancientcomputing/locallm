@@ -220,16 +220,16 @@ func run() async {
     let interrupt = Interrupt()
     let sigint = startSigintWatch(interrupt)
 
-    // One turn: stream the model's answer to stdout. streamResponse yields snapshots that
-    // are *usually* append-only — but not across a tool call, and not when a reasoning
+    // One turn: stream the model's answer to stdout, through the session's own turn method
+    // (not `languageModelSession`, the escape hatch that skips the SDK's turn handling).
+    // session.streamResponse yields the reply so far — *usually* append-only — but not across a tool call, and not when a reasoning
     // model drops its <think> block once the answer proper begins. So diff against what we
     // actually printed: extend it when the snapshot grows, and when a snapshot diverges
     // (new segment) print it whole rather than slicing off its head.
     func ask(_ prompt: String) async {
         do {
             var shown = ""
-            for try await partial in session.languageModelSession.streamResponse(to: prompt) {
-                let content = partial.content
+            for try await content in session.streamResponse(to: prompt) {
                 if content.isEmpty || content == shown { continue }
                 if content.hasPrefix(shown) {
                     print(content.dropFirst(shown.count), terminator: "")

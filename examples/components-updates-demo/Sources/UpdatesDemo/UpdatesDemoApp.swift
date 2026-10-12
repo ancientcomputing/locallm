@@ -1,3 +1,4 @@
+import AppKit
 import LocalLMLabSDKComponents
 import LocalLMLabSDKCore
 import SwiftUI
@@ -10,6 +11,17 @@ private let newerCommit = "ff1143e3a10547c9f2129e94ca37059b096b23f4"
 @main
 @available(macOS 27, *)
 struct UpdatesDemoApp: App {
+    init() {
+        // Launched with `swift run` there is no app bundle, so macOS starts this as a background-style
+        // process whose window can open behind the terminal. Claim regular-app status and come to the
+        // front — only when it isn't one already (re-setting it logs "Task policy set failed"). Same as
+        // mlx-control-room.
+        if NSApplication.shared.activationPolicy() != .regular {
+            NSApplication.shared.setActivationPolicy(.regular)
+        }
+        DispatchQueue.main.async { NSApplication.shared.activate() }
+    }
+
     var body: some Scene {
         WindowGroup("Components: onboarding, updates, versions") {
             DemoView().frame(minWidth: 640, minHeight: 720)
