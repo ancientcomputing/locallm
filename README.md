@@ -1,3 +1,5 @@
+Note: The 2.0.0-GA release branch is at https://github.com/ancientcomputing/locallm/tree/2.0.0-GA
+
 # LocalLM Lab
 
 **LocalLM Lab** is about running AI **on your own Mac** instead of renting it
