@@ -30,8 +30,8 @@ It's a single Dock app with five panels:
 It began local-only — hence the name — and 1.0 added the hosted providers behind
 the same interface, so "local" is now the default rather than the only option.
 On macOS 26 only Apple's on-device model runs; open-weight (MLX) models and the
-hosted providers need macOS 27. **Private Cloud Compute** is wired up but needs
-an Apple entitlement that is still pending, so it is currently inert.
+hosted providers need macOS 27. **Private Cloud Compute** works too: an app that
+uses it needs Apple's Private Cloud Compute entitlement.
 
 **Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
 get the app directly:
