@@ -706,6 +706,36 @@ policy allows them. Shared context reaches the model with the next `respond` / `
 turn — a turn run on `languageModelSession` doesn't send it ([Running a turn](#running-a-turn-and-when-to-use-languagemodelsession)). `ConfirmingToolAuthorizer` remembers the user's answer per view and tool, so a
 polling view asks once (destructive calls ask each time).
 
+**The sandbox, layer by layer.** A view is HTML and script from someone else's server, so
+`MCPAppViewController` contains it in layers, each of which holds even if the one above it failed:
+
+1. **CSP, declared ∩ allowed.** A server's `_meta.ui.csp` is a request, not a grant: the CSP
+   actually served on the view's document is each declared origin list intersected with your
+   `MCPAppsSandboxPolicy` (`allowedConnectOrigins`, `allowedResourceOrigins`,
+   `allowedFrameOrigins`), so a server update can never widen what your app lets a view reach.
+   With the default `.closed` policy that is `default-src 'none'`, `connect-src 'none'`,
+   `frame-src 'none'`, plus `base-uri`, `form-action` and `object-src 'none'`; inline script and
+   style run, nothing loads from the network. Server-supplied origins are validated strictly
+   (`https://` / `wss://`, a DNS host, optional port) before they go into the header, and
+   `baseUriDomains` is never granted. Read `controller.effectiveCSP` for what a view really got.
+2. **A network block under the CSP.** A `WKContentRuleList` on the whole web view blocks every
+   http(s), ws(s) and ftp load outside the effective origins — so even a mis-served CSP lets
+   nothing out.
+3. **A sandboxed iframe.** The view runs in an `<iframe sandbox="allow-scripts allow-forms">`
+   inside a small relay page — the spec's arrangement: the view sees a normal `window.parent`, but
+   runs in an opaque origin with no cookies or storage. `allowsSameOrigin: true` adds
+   `allow-same-origin` for a trusted view that needs `localStorage`; it is off by default.
+4. **Navigation pinned.** Every navigation — link click, redirect, frame — is cancelled unless it
+   is one of this view's own `mcpapp://<token>/` pages. Popups and `target=_blank`, file pickers,
+   camera and microphone, and `alert` / `confirm` / `prompt` are refused. A link the view wants
+   opened goes through `ui/open-link` and your bridge policy.
+5. **One message path.** The native side accepts messages only from the relay page, only
+   JSON-RPC, and every request goes through `MCPAppsBridgePolicy` (and, for tool calls, your
+   authorizer, as above).
+
+The web view uses a non-persistent data store, so no cookies, cache or storage outlive it.
+`isInspectable: true` makes it inspectable in Safari's Develop menu; use it in debug builds only.
+
 ## 4. Keychain storage — automatic isolation, native API, sandbox-safe
 
 > **You don't reach for this — you get it for free.** There is no "set up credential storage"
