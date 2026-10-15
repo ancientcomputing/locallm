@@ -20,16 +20,16 @@ struct SDKRelease {
 // edit `defaultSDKVersion` here. For a release not listed, add its entry — the URL follows the
 // pattern below and the checksum is the `.sha256` file next to the zip on that GitHub release —
 // or just replace the two strings in place.
-let defaultSDKVersion = "2.0.0-GA"
+let defaultSDKVersion = "2.1.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "1.0.0-GA": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v1.0.0-GA/LocalLMLabSDKCore-1.0.0-GA.xcframework.zip",
-        checksum: "7d77a9c2e37dfb2f7925f01ed011262ee5a2aebc561a3ae7a93524acc0285b3e"
-    ),
     "2.0.0-GA": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKCore-2.0.0-GA.xcframework.zip",
         checksum: "5f9418a6879b22227afdf867cf474d426b93ae36d783d5a958efaae1e347681b"
+    ),
+    "2.1.0-GA": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKCore-2.1.0-GA.xcframework.zip",
+        checksum: "8ca2eda6e62e605678d6d4cdb5791b9dc8ca7bc4a0845aa09cce3ec39b63ef55"
     ),
 ]
 

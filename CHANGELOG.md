@@ -24,6 +24,30 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.1.0 — GA — 2026-10-15
+
+Fixes only; no API change (the public surface is identical to 2.0.0's).
+
+### Fixed
+
+- **An app embedding `LocalLMLabSDKInference` was rejected by App Store Connect** (error 90277: not a
+  valid bundle identifier). The framework's bundle ID was `mlx-swift_Cmlx`, and bundle IDs can't contain
+  underscores. It is now `lab.locallm.sdk.inference`, like Core's `lab.locallm.sdk.core`. MLX still finds
+  its Metal library: it loads `Resources/default.metallib` next to the framework's own binary, in a
+  `swift build` executable and in an app Xcode embeds it in alike. An app that copied
+  `mlx-swift_Cmlx.bundle` into its own Resources to work around this can stop doing so.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-2.1.0-GA.xcframework.zip       8ca2eda6e62e605678d6d4cdb5791b9dc8ca7bc4a0845aa09cce3ec39b63ef55
+LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip     5dc5bc59780b5e7649389324784083cd775685c0fc400c7fa02153880a8e2001
+LocalLMLabSDKInference-2.1.0-GA.xcframework.zip  21ce035b3baca98c6f975110ed21537349d10cb1edcbb4a795677672881ae0c2
+LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip     99e6c24067ea5b0c4333d6dd167ee5e85bea12fca43931159f3906c2d0579997
+```
+
+---
+
 ## 2.0.0 — GA — 2026-10-07 (binaries re-published 2026-10-08 and 2026-10-09)
 
 **A one-time breaking release.** From `2.0.0`, every 2.x release is source compatible with it
