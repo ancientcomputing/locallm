@@ -1096,7 +1096,7 @@ relaunch.
 | Provider | Ships in | `scheme` | macOS | For |
 |---|---|---|---|---|
 | `SystemModelProvider` | Core | `system` | 26+ | Apple's on-device model — always there on an Apple-Intelligence Mac |
-| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model (Apple's own models, not your weights). Needs the PCC entitlement + App Store Small Business Program — there is no paid tier. Since `1.0.0-beta.3` the provider maps availability, quota, and typed errors cleanly, and adds `probe(timeout:)` — an async liveness check (`availability(for:)` alone can say `.available` while turns still throw on a build without the entitlement). |
+| `PCCModelProvider` | Core | `pcc` | 27 | Apple's Private Cloud Compute model (Apple's own models, not your weights). Needs Apple's managed PCC entitlement, which works only in your app's main executable, signed with a provisioning profile that grants it ([§10e](#10e-shipping-the-model-layer-through-app-store-connect)) — there is no paid tier. Since `1.0.0-beta.3` the provider maps availability, quota, and typed errors cleanly, and adds `probe(timeout:)` — an async liveness check (`availability(for:)` can say `.available` while turns still fail). Neither is a way to find out whether you have the entitlement: without it FoundationModels traps on the first PCC call, these included, so check your own entitlement first (§10e). |
 | `ClaudeModelProvider(auth:)` | **`LocalLMLabSDKClaude`** | `claude` | 27 | Claude, via a host-supplied API key or App Attest client id — the SDK stores neither |
 | `MLXModelProvider` | **Inference** | `mlx` | 27 | Locally-run open-weight models (Qwen, Llama, …) via MLX |
 | `try RemoteModelProvider(_:)` | **Remote** | *host-chosen* — set in `RemoteProviderConfig.scheme`, one instance per provider you configure | 27 | Hosted APIs — OpenAI, Anthropic's Messages API, OpenRouter, any OpenAI-compatible server. The one provider here that's data-driven rather than a fixed named type; details in [§6b](#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote) |
@@ -1189,6 +1189,19 @@ mlx.installed        // [InstalledModel] — what's on disk now
 mlx.storageUsed      // total bytes of weights
 try mlx.remove(id)   // delete weights
 ```
+
+**Tool calls on a local model.** The MLX runtime parses the model's tool-call markup into calls to
+your tools. Since 2.1, a call it can't accept fails the turn instead of reaching the user: an
+unparseable payload, a tool the session doesn't declare, or arguments that break the tool's schema
+throw `LocalLMLabError.generation(underlying:)`, whose message names the reason (for example
+`malformed_syntax`) and never includes the raw model output. Before 2.1 the call markup came back as
+the model's answer and nothing ran, so if you showed that text, or retried on it, catch the error
+instead; running the turn again is often enough for a small model. A call written inside the model's
+reasoning (`<think>…</think>`) stays inert, since a model rehearsing a call hasn't decided to make
+it. The exception is a `<think>` block that opens directly on the call and never closes, which
+Qwen3 sometimes writes: that call runs. 2.1's runtime also fixes Gemma 4's array and object
+arguments and adds gpt-oss (Harmony) and Muse Glimmer tool calls; the
+[CHANGELOG](../CHANGELOG.md) has the details.
 
 **Where the weights land** — a standard Hugging Face cache
 (`models--<org>--<name>/snapshots/<sha>/`, deduped `blobs/` underneath):
@@ -2744,8 +2757,10 @@ The following are deliberate boundaries, not gaps waiting on a future release:
 > [§10d](#10d-one-time-apple-developer-portal-setup-for-mas-signing) below for which is which.
 
 Core has been tested under App Sandbox — confirmed via a real sandboxed, Developer-ID-signed,
-notarized build (not just code review), not through the actual MAS submission pipeline itself yet.
-Here's exactly what's needed and what was actually verified.
+notarized build (not just code review). Since 2.1 two apps built on the SDK, LocalLM Lab (with
+Private Cloud Compute and local MLX models) and JevDK, have also gone through App Store Connect's
+upload validation into TestFlight; [§10e](#10e-shipping-the-model-layer-through-app-store-connect)
+has what that turned up. Here's exactly what's needed and what was actually verified.
 
 > **Related, for model downloads:** the sandbox is one half of the security story for an app that
 > fetches models at runtime. The other half is what it fetches: the trust policy, preflight, hash
@@ -2843,7 +2858,8 @@ submission of your own app needs your own bundle ID from the start.
 - Leave every Capability unchecked unless something you're using genuinely needs an App
   ID-level capability (iCloud, Push Notifications, etc.) — App Sandbox, network client, and the
   Calendar/Reminders/Contacts/Location entitlements are all declared directly in the entitlements
-  file (10a), not toggled here.
+  file (10a), not toggled here. The exception is Private Cloud Compute: once Apple grants it to
+  your account, turn it on here ([§10e](#10e-shipping-the-model-layer-through-app-store-connect)).
 
 **3. A Mac App Store distribution provisioning profile**, tying the App ID to the certificate.
 
@@ -2869,6 +2885,57 @@ submission of your own app needs your own bundle ID from the start.
 Apple-Distribution-signed, sandboxed `.pkg` build this setup enables — Developer ID signing +
 notarization is the other supported path (`build-and-sign.sh`), for distributing outside the Mac
 App Store.
+
+### 10e. Shipping the model layer through App Store Connect
+
+What uploading LocalLM Lab and JevDK to App Store Connect turned up. None of it needed an SDK API
+change.
+
+**Embedding `LocalLMLabSDKInference` (local MLX models).** Use SDK 2.1 or later. In 2.0 the
+framework's bundle ID was `mlx-swift_Cmlx`, and App Store Connect rejects an app containing a bundle
+ID with an underscore (error 90277: not a valid bundle identifier). Since 2.1 it is
+`lab.locallm.sdk.inference`, and the xcframework embeds as is: no renaming, and no copying
+`mlx-swift_Cmlx.bundle` into your app's Resources. If you did that for 2.0, remove it when you
+upgrade: the copy and the framework's own copy share the bundle ID `mlx-swift.Cmlx.resources`, and a
+duplicate bundle ID can fail validation too (90685). MLX loads its Metal library from the framework's
+own `Versions/A/Resources/default.metallib`, so don't strip the framework's Resources. Before an
+upload, check that every bundle ID in the app is only letters, digits, hyphens and dots:
+
+```bash
+find "MyApp.app" -name Info.plist -exec /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' {} \; 2>/dev/null \
+  | grep -vE '^[A-Za-z0-9.-]+$' || echo "all bundle IDs valid"
+```
+
+**Private Cloud Compute.** `com.apple.developer.private-cloud-compute` is a managed capability:
+
+- Apple grants it to your developer account ("Access to models on Private Cloud Compute"). Then turn
+  it on for your App ID ([§10d](#10d-one-time-apple-developer-portal-setup-for-mas-signing)) and
+  regenerate your provisioning profiles.
+- Sign the entitlement only when the embedded profile grants it. An entitlement the profile doesn't
+  cover stops the app from launching.
+- Run PCC in the profile-covered executable: your app's main executable. A helper tool your app
+  launches has no App ID or profile of its own, so the entitlement can't work there, and a sandboxed
+  helper signed with `com.apple.security.inherit` may carry no other entitlement. Register
+  `PCCModelProvider` in the app's own `LocalLMLab`, not in a spawned process.
+- Check the entitlement before touching PCC. Without it FoundationModels traps on the first PCC call,
+  `availability(for:)` and `probe(timeout:)` included, so read the running process's own entitlement
+  first and register the provider only when it's there:
+
+```swift
+import Security
+
+let pccEntitled: Bool = {
+    guard let task = SecTaskCreateFromSelf(nil),
+          let value = SecTaskCopyValueForEntitlement(
+              task, "com.apple.developer.private-cloud-compute" as CFString, nil) else { return false }
+    return (value as? Bool) ?? true
+}()
+if pccEntitled { providers.append(PCCModelProvider()) }
+```
+
+LocalLM Lab's own Developer ID build (the DMG) doesn't carry the PCC entitlement, so it has no PCC;
+its Mac App Store build does. Whether a Developer ID provisioning profile can grant it hasn't been
+tested.
 
 ## 11. Components: prebuilt SwiftUI (MCP servers + the model layer)
 
