@@ -36,6 +36,10 @@ Fixes and a newer MLX runtime; no API change (the public surface is identical to
   its Metal library: it loads `Resources/default.metallib` next to the framework's own binary, in a
   `swift build` executable and in an app Xcode embeds it in alike. An app that copied
   `mlx-swift_Cmlx.bundle` into its own Resources to work around this can stop doing so.
+- **Downloading a model whose Hugging Face repo has a subfolder failed** within seconds with
+  "Could not fetch metadata for 'optiq'": the downloader treated the folder itself as a file. This hit
+  every mlx-community OptiQ conversion (e.g. `gemma-4-12B-it-OptiQ-4bit`). Folders are now skipped and
+  the files inside them are downloaded, so the snapshot matches the repo.
 
 ### Changed
 
