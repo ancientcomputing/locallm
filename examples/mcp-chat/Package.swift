@@ -40,7 +40,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     ),
     "2.1.0-GA": SDKRelease(
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKInference-2.1.0-GA.xcframework.zip",
-        inferenceChecksum: "21ce035b3baca98c6f975110ed21537349d10cb1edcbb4a795677672881ae0c2"
+        inferenceChecksum: "db452ed4627191ee32439edb0e395c076476085e7e8a01fa67b5af50e75e993e"
     ),
 ]
 

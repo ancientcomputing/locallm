@@ -177,7 +177,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     "2.0.0-GA": SDKRelease(url: "…/v2.0.0-GA/LocalLMLabSDKCore-2.0.0-GA.xcframework.zip",
                            checksum: "5f9418a6…"),
     "2.1.0-GA": SDKRelease(url: "…/v2.1.0-GA/LocalLMLabSDKCore-2.1.0-GA.xcframework.zip",
-                           checksum: "8ca2eda6…"),
+                           checksum: "48c45168…"),
 ]
 ```
 
@@ -189,9 +189,9 @@ distinct `.xcframework.zip.sha256`; don't reuse Core's for another module):
 
 ```bash
 curl -sL https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKCore-2.1.0-GA.xcframework.zip.sha256
-# → 8ca2eda6e62e605678d6d4cdb5791b9dc8ca7bc4a0845aa09cce3ec39b63ef55
+# → 48c45168fbc736156519b08b4dcffbef9e7ed257dae8cf6be7a9da77a6a6d32c
 curl -sL https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip.sha256
-# → 5dc5bc59780b5e7649389324784083cd775685c0fc400c7fa02153880a8e2001
+# → 958592395420dc2cd7d287a016645dcccc6cc50ebf4dc8675aee683bc52b3c1c
 ```
 
 Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass

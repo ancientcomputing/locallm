@@ -40,8 +40,9 @@ Fixes and a newer MLX runtime; no API change (the public surface is identical to
 ### Changed
 
 - **`LocalLMLabSDKInference`'s MLX runtime moves to current `mlx-swift-lm`.** The pin goes from
-  `45693f6` (2026-07-27) to `8ec6a2c` (2026-10-15), and `mlx-swift` from 0.31.6 to 0.32.3. It's still
-  served from our mirror fork, `ancientcomputing/mlx-swift-lm`. The update fixes several tool-call problems:
+  `45693f6` (2026-07-27) to `30d755c`: upstream `8ec6a2c` (2026-10-15) plus one fix of ours, below.
+  `mlx-swift` goes from 0.31.6 to 0.32.3. It's still served from our mirror fork,
+  `ancientcomputing/mlx-swift-lm`. The update fixes several tool-call problems:
   - **Gemma 4** keeps array and object arguments intact. Before, a call such as `hub_repo_details`
     with a `repo_ids` list reached the tool garbled with `<|"|>` tokens.
   - **gpt-oss** tool calls work. The runtime now parses OpenAI's Harmony format; before, the call
@@ -51,18 +52,25 @@ Fixes and a newer MLX runtime; no API change (the public surface is identical to
   - **Older Mistral checkpoints** (`model_type` `mistral`) now get Mistral's tool-call parser, chosen
     from their chat template. Mistral 7B v0.3 still can't call tools: it writes the older
     `[TOOL_CALLS] [{…}]` list form, and the parser rejects it.
+  - **Qwen3 calls that open a `<think>` block run.** Qwen3 sometimes opens `<think>` and goes straight
+    to the call without closing the block. Upstream treats everything in a reasoning block as inert,
+    so the call came back as text and never ran. A `<think>` block whose first content is a tool call
+    and that never closes now dispatches the call. A call after any reasoning text, or inside a closed
+    block, stays inert.
 - **A malformed tool call now fails the turn instead of showing up as text.** This covers an
   unparseable payload, a call to a tool the session doesn't declare, and arguments that break the
   tool's schema. The error is `LocalLMLabError.generation(underlying:)`, and its message names the reason (for
   example `malformed_syntax`). The raw model output is never included. Before, the raw call markup came back as the model's answer, and nothing ran.
+  Generation finishes before the error is thrown, so nothing keeps running on the GPU after the turn
+  fails (a command-line tool that exited on the error could otherwise crash).
 
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-2.1.0-GA.xcframework.zip       8ca2eda6e62e605678d6d4cdb5791b9dc8ca7bc4a0845aa09cce3ec39b63ef55
-LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip     5dc5bc59780b5e7649389324784083cd775685c0fc400c7fa02153880a8e2001
-LocalLMLabSDKInference-2.1.0-GA.xcframework.zip  21ce035b3baca98c6f975110ed21537349d10cb1edcbb4a795677672881ae0c2
-LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip     99e6c24067ea5b0c4333d6dd167ee5e85bea12fca43931159f3906c2d0579997
+LocalLMLabSDKCore-2.1.0-GA.xcframework.zip       48c45168fbc736156519b08b4dcffbef9e7ed257dae8cf6be7a9da77a6a6d32c
+LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip     958592395420dc2cd7d287a016645dcccc6cc50ebf4dc8675aee683bc52b3c1c
+LocalLMLabSDKInference-2.1.0-GA.xcframework.zip  db452ed4627191ee32439edb0e395c076476085e7e8a01fa67b5af50e75e993e
+LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip     b07318d72d958c9f9c9a7180157d9967a9e7d54009012c920bb2f71318ea2074
 ```
 
 ---
