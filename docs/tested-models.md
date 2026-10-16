@@ -1,5 +1,10 @@
 # Tested open-weight (MLX) models
 
+> **Current list:** the maintained list of MLX models — newer Qwen, Gemma, Mistral, Granite and
+> other families, sized for a 24 GB MacBook Air and a 64 GB Mac Studio, with a test queue — is
+> [thisbrain.ai/locallm/mlx-models.html](https://thisbrain.ai/locallm/mlx-models.html). This page
+> stays as the SDK-side record (tool-calling run, deciders, capacity notes).
+
 > **Point-in-time, not maintained.** This is a snapshot of what we saw on our hardware,
 > our SDK build, and one specific tool-calling prompt, as of **2026-08-27** (SDK
 > `1.0.0-beta`, requires macOS 27). Model conversions, chat templates, and the MLX stack all

@@ -26,7 +26,7 @@ RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
 ## 2.1.0 — GA — 2026-10-15
 
-Fixes only; no API change (the public surface is identical to 2.0.0's).
+Fixes and a newer MLX runtime; no API change (the public surface is identical to 2.0.0's).
 
 ### Fixed
 
@@ -36,6 +36,25 @@ Fixes only; no API change (the public surface is identical to 2.0.0's).
   its Metal library: it loads `Resources/default.metallib` next to the framework's own binary, in a
   `swift build` executable and in an app Xcode embeds it in alike. An app that copied
   `mlx-swift_Cmlx.bundle` into its own Resources to work around this can stop doing so.
+
+### Changed
+
+- **`LocalLMLabSDKInference`'s MLX runtime moves to current `mlx-swift-lm`.** The pin goes from
+  `45693f6` (2026-07-27) to `8ec6a2c` (2026-10-15), and `mlx-swift` from 0.31.6 to 0.32.3. It's still
+  served from our mirror fork, `ancientcomputing/mlx-swift-lm`. The update fixes several tool-call problems:
+  - **Gemma 4** keeps array and object arguments intact. Before, a call such as `hub_repo_details`
+    with a `repo_ids` list reached the tool garbled with `<|"|>` tokens.
+  - **gpt-oss** tool calls work. The runtime now parses OpenAI's Harmony format; before, the call
+    came back as raw text.
+  - **Muse Glimmer** (`muse_glimmer`, with its ATEM tool-call format) loads and calls tools. Checked
+    with `mlx-community/Muse-Glimmer-30B-4bit`.
+  - **Older Mistral checkpoints** (`model_type` `mistral`) now get Mistral's tool-call parser, chosen
+    from their chat template. Mistral 7B v0.3 still can't call tools: it writes the older
+    `[TOOL_CALLS] [{…}]` list form, and the parser rejects it.
+- **A malformed tool call now fails the turn instead of showing up as text.** This covers an
+  unparseable payload, a call to a tool the session doesn't declare, and arguments that break the
+  tool's schema. The error is `LocalLMLabError.generation(underlying:)`, and its message names the reason (for
+  example `malformed_syntax`). The raw model output is never included. Before, the raw call markup came back as the model's answer, and nothing ran.
 
 ### Checksums (SHA-256)
 
