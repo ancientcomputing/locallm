@@ -24,12 +24,22 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
-## 2.1.1 — Unreleased
+## 2.1.0 — GA — 2026-10-15
 
-Fixes for open-weight (MLX) tool use; no API change.
+Fixes and a newer MLX runtime; no API change (the public surface is identical to 2.0.0's).
 
 ### Fixed
 
+- **An app embedding `LocalLMLabSDKInference` was rejected by App Store Connect** (error 90277: not a
+  valid bundle identifier). The framework's bundle ID was `mlx-swift_Cmlx`, and bundle IDs can't contain
+  underscores. It is now `lab.locallm.sdk.inference`, like Core's `lab.locallm.sdk.core`. MLX still finds
+  its Metal library: it loads `Resources/default.metallib` next to the framework's own binary, in a
+  `swift build` executable and in an app Xcode embeds it in alike. An app that copied
+  `mlx-swift_Cmlx.bundle` into its own Resources to work around this can stop doing so.
+- **Downloading a model whose Hugging Face repo has a subfolder failed** within seconds with
+  "Could not fetch metadata for 'optiq'": the downloader treated the folder itself as a file. This hit
+  every mlx-community OptiQ conversion (e.g. `gemma-4-12B-it-OptiQ-4bit`). Folders are now skipped and
+  the files inside them are downloaded, so the snapshot matches the repo.
 - **More MLX models can use tools.** Before each render, the SDK now fits the conversation to what
   the model's chat template can actually show. It decides from the template and the vocabulary, not
   from the model's name.
@@ -51,23 +61,6 @@ Fixes for open-weight (MLX) tool use; no API change.
   each check's output length and stops any check that runs over 3 minutes. A check that times out is
   listed in the report's `notes` and doesn't set `blocked`, so the model still gets added. Before,
   adding `Mistral-Small-3.2-24B-Instruct-2506-8bit` was still generating after 30 minutes.
-
-## 2.1.0 — GA — 2026-10-15
-
-Fixes and a newer MLX runtime; no API change (the public surface is identical to 2.0.0's).
-
-### Fixed
-
-- **An app embedding `LocalLMLabSDKInference` was rejected by App Store Connect** (error 90277: not a
-  valid bundle identifier). The framework's bundle ID was `mlx-swift_Cmlx`, and bundle IDs can't contain
-  underscores. It is now `lab.locallm.sdk.inference`, like Core's `lab.locallm.sdk.core`. MLX still finds
-  its Metal library: it loads `Resources/default.metallib` next to the framework's own binary, in a
-  `swift build` executable and in an app Xcode embeds it in alike. An app that copied
-  `mlx-swift_Cmlx.bundle` into its own Resources to work around this can stop doing so.
-- **Downloading a model whose Hugging Face repo has a subfolder failed** within seconds with
-  "Could not fetch metadata for 'optiq'": the downloader treated the folder itself as a file. This hit
-  every mlx-community OptiQ conversion (e.g. `gemma-4-12B-it-OptiQ-4bit`). Folders are now skipped and
-  the files inside them are downloaded, so the snapshot matches the repo.
 
 ### Changed
 
