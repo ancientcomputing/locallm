@@ -92,10 +92,10 @@ Fixes and a newer MLX runtime; no API change (the public surface is identical to
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-2.1.0-GA.xcframework.zip       48c45168fbc736156519b08b4dcffbef9e7ed257dae8cf6be7a9da77a6a6d32c
-LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip     958592395420dc2cd7d287a016645dcccc6cc50ebf4dc8675aee683bc52b3c1c
-LocalLMLabSDKInference-2.1.0-GA.xcframework.zip  db452ed4627191ee32439edb0e395c076476085e7e8a01fa67b5af50e75e993e
-LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip     b07318d72d958c9f9c9a7180157d9967a9e7d54009012c920bb2f71318ea2074
+LocalLMLabSDKCore-2.1.0-GA.xcframework.zip       8d541e06f81d1586c959d6159a259c759853c88b2c68385ab28de493af6c5776
+LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip     f54472c25063f7c6d6d5a49a91992beb1300d9b6d986ee83d41e682ac2a2c172
+LocalLMLabSDKInference-2.1.0-GA.xcframework.zip  77d3d1a1bae9df6de5955dfa945242c177cb129b4896c95befb81db6c923656f
+LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip     347257172a6da7104b7081602e9dbfc853ed5d038b5e30831aad8dfa2753ae92
 ```
 
 ---
