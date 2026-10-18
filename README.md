@@ -32,12 +32,13 @@ It's a single Dock app with five panels:
 It began local-only — hence the name — and 1.0 added the hosted providers behind
 the same interface, so "local" is now the default rather than the only option.
 On macOS 26 only Apple's on-device model runs; open-weight (MLX) models and the
-hosted providers need macOS 27. **Private Cloud Compute** works too: an app that
-uses it needs Apple's Private Cloud Compute entitlement.
+hosted providers need macOS 27. **Private Cloud Compute** will be in the Mac App
+Store version: it needs Apple's Private Cloud Compute entitlement, which the DMG
+doesn't carry.
 
 **Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
 get the app directly:
-[LocalLM Lab 2.0.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLM.Lab-2.0.0-GA-arm64.dmg).
+[LocalLM Lab 2.1.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLM.Lab-2.1.0-GA-arm64.dmg).
 
 ## LocalLM Lab SDK
 

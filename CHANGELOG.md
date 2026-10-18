@@ -24,6 +24,82 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.1.0 — GA — 2026-10-15
+
+Fixes and a newer MLX runtime; no API change (the public surface is identical to 2.0.0's).
+
+### Fixed
+
+- **An app embedding `LocalLMLabSDKInference` was rejected by App Store Connect** (error 90277: not a
+  valid bundle identifier). The framework's bundle ID was `mlx-swift_Cmlx`, and bundle IDs can't contain
+  underscores. It is now `lab.locallm.sdk.inference`, like Core's `lab.locallm.sdk.core`. MLX still finds
+  its Metal library: it loads `Resources/default.metallib` next to the framework's own binary, in a
+  `swift build` executable and in an app Xcode embeds it in alike. An app that copied
+  `mlx-swift_Cmlx.bundle` into its own Resources to work around this can stop doing so.
+- **Downloading a model whose Hugging Face repo has a subfolder failed** within seconds with
+  "Could not fetch metadata for 'optiq'": the downloader treated the folder itself as a file. This hit
+  every mlx-community OptiQ conversion (e.g. `gemma-4-12B-it-OptiQ-4bit`). Folders are now skipped and
+  the files inside them are downloaded, so the snapshot matches the repo.
+- **More MLX models can use tools.** Before each render, the SDK now fits the conversation to what
+  the model's chat template can actually show. It decides from the template and the vocabulary, not
+  from the model's name.
+  - **GLM-4-0414** (`GLM-4-9B-0414`, `GLM-4-32B-0414`) never saw a tool's result. Its template shows
+    results only under the `observation` role. The model kept repeating the same call (`echo` 3–4
+    times, `hub_repo_details` 4–5 times) and then answered without the result. Results now reach it,
+    and it answers from them.
+  - **Llama 3.1** failed a turn that made more than one tool call, with `Jinja.TemplateException`.
+    Its template allows only one call per assistant message. Such a turn is now replayed one call at a
+    time, each followed by its result. Llama 3.2 had the same problem.
+  - **Mistral-Small-3.2-24B-Instruct-2506** (mlx-community 4-bit and 8-bit) never called a tool. Its
+    conversions ship no chat template that renders tools, so when tools are requested the SDK now
+    uses a built-in one in Mistral's own format. The 4-bit passes all four of our tool tests; the
+    8-bit passes three and partly answers the fourth.
+  - When a model ships two chat templates and tools are requested, the one that renders tools is
+    used. Before, `chat_template.jinja` always won, even when only `tokenizer_config.json`'s template
+    supported tools.
+- **Adding a model could hang in its capability check.** `MLXModelProvider.capabilityProbe` now caps
+  each check's output length and stops any check that runs over 3 minutes. A check that times out is
+  listed in the report's `notes` and doesn't set `blocked`, so the model still gets added. Before,
+  adding `Mistral-Small-3.2-24B-Instruct-2506-8bit` was still generating after 30 minutes.
+
+### Changed
+
+- **`LocalLMLabSDKInference`'s MLX runtime moves to current `mlx-swift-lm`.** The pin goes from
+  `45693f6` (2026-07-27) to `30d755c`: upstream `8ec6a2c` (2026-10-15) plus one fix of ours, below.
+  `mlx-swift` goes from 0.31.6 to 0.32.3. It's still served from our mirror fork,
+  `ancientcomputing/mlx-swift-lm`. The update fixes several tool-call problems:
+  - **Gemma 4** keeps array and object arguments intact. Before, a call such as `hub_repo_details`
+    with a `repo_ids` list reached the tool garbled with `<|"|>` tokens.
+  - **gpt-oss** tool calls work. The runtime now parses OpenAI's Harmony format; before, the call
+    came back as raw text.
+  - **Muse Glimmer** (`muse_glimmer`, with its ATEM tool-call format) loads and calls tools. Checked
+    with `mlx-community/Muse-Glimmer-30B-4bit`.
+  - **Older Mistral checkpoints** (`model_type` `mistral`) now get Mistral's tool-call parser, chosen
+    from their chat template. Mistral 7B v0.3 still can't call tools: it writes the older
+    `[TOOL_CALLS] [{…}]` list form, and the parser rejects it.
+  - **Qwen3 calls that open a `<think>` block run.** Qwen3 sometimes opens `<think>` and goes straight
+    to the call without closing the block. Upstream treats everything in a reasoning block as inert,
+    so the call came back as text and never ran. A `<think>` block whose first content is a tool call
+    and that never closes now dispatches the call. A call after any reasoning text, or inside a closed
+    block, stays inert.
+- **A malformed tool call now fails the turn instead of showing up as text.** This covers an
+  unparseable payload, a call to a tool the session doesn't declare, and arguments that break the
+  tool's schema. The error is `LocalLMLabError.generation(underlying:)`, and its message names the reason (for
+  example `malformed_syntax`). The raw model output is never included. Before, the raw call markup came back as the model's answer, and nothing ran.
+  Generation finishes before the error is thrown, so nothing keeps running on the GPU after the turn
+  fails (a command-line tool that exited on the error could otherwise crash).
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-2.1.0-GA.xcframework.zip       8d541e06f81d1586c959d6159a259c759853c88b2c68385ab28de493af6c5776
+LocalLMLabSDKClaude-2.1.0-GA.xcframework.zip     f54472c25063f7c6d6d5a49a91992beb1300d9b6d986ee83d41e682ac2a2c172
+LocalLMLabSDKInference-2.1.0-GA.xcframework.zip  77d3d1a1bae9df6de5955dfa945242c177cb129b4896c95befb81db6c923656f
+LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip     347257172a6da7104b7081602e9dbfc853ed5d038b5e30831aad8dfa2753ae92
+```
+
+---
+
 ## 2.0.0 — GA — 2026-10-07 (binaries re-published 2026-10-08 and 2026-10-09)
 
 **A one-time breaking release.** From `2.0.0`, every 2.x release is source compatible with it

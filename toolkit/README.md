@@ -12,11 +12,10 @@ and [../examples/localai-cli-swift/](../examples/localai-cli-swift/) (Swift).
 
 ## Download
 
-`1.0.0-beta.4` through `1.0.0-RC.1` shipped the toolkit zip and its checksum as
+Starting with `1.0.0-beta.4`, the toolkit is shipped as
 release assets on
 **[github.com/ancientcomputing/locallm-releases](https://github.com/ancientcomputing/locallm-releases/releases)**,
-alongside the LocalLM Lab app DMG. From **`1.0.0-GA`** on, both ship as release
-assets on this repo instead, alongside the app DMG and the SDK xcframeworks.
+alongside the LocalLM Lab app DMG and the SDK xcframeworks.
 Latest (`2.0.0-GA`):
 
 ```bash
@@ -24,17 +23,6 @@ curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA
 curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/localai-toolkit-2.0.0-GA-arm64.zip.sha256
 ```
 
-(For `1.0.0-beta.4` through `1.0.0-RC.1`, replace the repo/tag above with
-`locallm-releases`/`<version>` with no leading `v`, e.g.
-`.../locallm-releases/releases/download/1.0.0-RC.1/localai-toolkit-1.0.0-RC.1-arm64.zip`.)
-
-Earlier releases (`0.6`–`1.0.0-beta.3`) stay checked into this folder — grab
-them by cloning the repo or downloading a single file raw, e.g.:
-
-```bash
-curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.3-arm64.zip
-curl -LO https://raw.githubusercontent.com/ancientcomputing/locallm/1.0.0-beta/toolkit/localai-toolkit-1.0.0-beta.3-arm64.zip.sha256
-```
 
 ## Verify
 
