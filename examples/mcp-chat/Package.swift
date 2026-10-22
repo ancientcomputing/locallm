@@ -31,16 +31,16 @@ struct SDKRelease {
 // The SDK release this example builds against with no setup. Build against another published
 // version: set LOCALLM_SDK_VERSION in your shell (works for `swift build` / CI, NOT inside Xcode),
 // or edit `defaultSDKVersion` here.
-let defaultSDKVersion = "2.1.0-GA"
+let defaultSDKVersion = "2.2.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "2.0.0-GA": SDKRelease(
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/LocalLMLabSDKInference-2.0.0-GA.xcframework.zip",
-        inferenceChecksum: "d2ed4a02686aceab0edf4231ede55c924ea3ab273c7c5cab0bb02f4bda40a185"
-    ),
     "2.1.0-GA": SDKRelease(
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKInference-2.1.0-GA.xcframework.zip",
         inferenceChecksum: "77d3d1a1bae9df6de5955dfa945242c177cb129b4896c95befb81db6c923656f"
+    ),
+    "2.2.0-GA": SDKRelease(
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLMLabSDKInference-2.2.0-GA.xcframework.zip",
+        inferenceChecksum: "afd427fb741a820f55bc0a384850ae6404608f5ad73d185a583a89e8f0d61a61"
     ),
 ]
 
