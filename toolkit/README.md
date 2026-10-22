@@ -14,26 +14,26 @@ and [../examples/localai-cli-swift/](../examples/localai-cli-swift/) (Swift).
 
 Starting with `1.0.0-beta.4`, the toolkit is shipped as
 release assets on
-**[github.com/ancientcomputing/locallm-releases](https://github.com/ancientcomputing/locallm-releases/releases)**,
+**[github.com/ancientcomputing/locallm](https://github.com/ancientcomputing/locallm/releases)**,
 alongside the LocalLM Lab app DMG and the SDK xcframeworks.
-Latest (`2.0.0-GA`):
+Latest (`2.2.0-GA`):
 
 ```bash
-curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/localai-toolkit-2.0.0-GA-arm64.zip
-curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.0.0-GA/localai-toolkit-2.0.0-GA-arm64.zip.sha256
+curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/localai-toolkit-2.2.0-GA-arm64.zip
+curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/localai-toolkit-2.2.0-GA-arm64.zip.sha256
 ```
 
 
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-2.0.0-GA-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-2.2.0-GA-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-2.0.0-GA-arm64.zip
+unzip localai-toolkit-2.2.0-GA-arm64.zip
 ```
 
 This produces `localai-cli`, `localai-playground-run` (macOS 27),
