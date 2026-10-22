@@ -9,7 +9,7 @@ below for the working reference apps this guide is drawn from.
 
 Requires macOS 26+ on Apple Silicon, Swift 6 tools.
 
-**Status note**: this guide describes the API as of `2.1.0`. `2.0.0` was a one-time breaking release;
+**Status note**: this guide describes the API as of `2.2.0`. `2.0.0` was a one-time breaking release;
 every 2.x release after it is source compatible with it (see [§9](#9-scope-and-boundaries-what-core-doesnt-do)
 for the compatibility policy). Coming from 1.x: [`migrating-to-2.0.md`](migrating-to-2.0.md); from
 `0.8.x`: [`migrating-to-1.0.md`](migrating-to-1.0.md) first. New in 2.0: per-server trust and tool
