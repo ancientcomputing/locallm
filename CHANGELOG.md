@@ -59,8 +59,7 @@ Nemotron 3.5 support in `LocalLMLabSDKInference`; no API change (the public surf
 
 - **`LocalLMLabSDKInference`'s MLX runtime pin moves from `30d755c` to `dea880a`**: 2.1.0's runtime plus
   two Nemotron 3.5 commits of ours, on the `nemotron-3.5-support` branch of our mirror fork,
-  `ancientcomputing/mlx-swift-lm` (tag `locallmlab-sdk-pin-dea880a`). Nothing else in the runtime
-  changes.
+  `ancientcomputing/mlx-swift-lm`. Nothing else in the runtime changes.
 
 ### Known issues
 
