@@ -24,6 +24,61 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.2.0 — GA — 2026-10-22
+
+Nemotron 3.5 support in `LocalLMLabSDKInference`; no API change (the public surface is identical to
+2.1.0's).
+
+### Added
+
+- **Nemotron 3.5 runs locally.** The MLX runtime reads Nemotron 3.5's configuration
+  (`layers_block_type` / `block_configs` instead of a `hybrid_override_pattern` string), adds its latent
+  MoE layers, registers `nemotron_h_puzzle` (the Bolt models), and skips the multi-token-prediction
+  weights it doesn't use. Before, `NVIDIA-Nemotron-3.5-Lightning-30B-A3B` failed to load. Tested with
+  tools, including the GitHub MCP server:
+  - `mlx-community/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit` and `-8bit`
+  - `rapid-mlx/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-MLX-3bit`
+  - `rapid-mlx/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-MLX-3bit` (text only, despite the name)
+
+  Bolt builds that take images (`nemotron_h_omni`, `nemotron_h_nano_omni`) still don't load, and
+  neither does a conversion with per-layer quantization settings (`hermitdave/…-mixed36`).
+
+### Fixed
+
+- **`SessionOptions(effort: .off)` turns Nemotron's thinking off.** Before, Nemotron ignored it and
+  always reasoned. The model now declares its reasoning toggle (`enable_thinking`), so
+  `ModelCapabilities.reasoningToggle` reports it too.
+- **A reply from a model whose prompt opens `<think>` now has a balanced reasoning block.** Nemotron
+  3.5's and Qwen3.5's chat templates open `<think>` in the prompt, so the model's reply streamed only
+  `…</think>answer`, and the reasoning landed in the answer. The SDK now detects this on each model
+  call from the end of the rendered prompt and restores the opening `<think>`, so `hostTranscript`
+  splits the reasoning from the reply with no model-specific handling. A tool call made while that
+  block is still open gets a `</think>` first. Tool-call parsing is unchanged.
+
+### Changed
+
+- **`LocalLMLabSDKInference`'s MLX runtime pin moves from `30d755c` to `dea880a`**: 2.1.0's runtime plus
+  two Nemotron 3.5 commits of ours, on the `nemotron-3.5-support` branch of our mirror fork,
+  `ancientcomputing/mlx-swift-lm` (tag `locallmlab-sdk-pin-dea880a`). Nothing else in the runtime
+  changes.
+
+### Known issues
+
+- **Qwen3.5-9B's tool calls are often rejected as malformed.** This predates 2.2.0.
+- **Nemotron 3.5 can run a tool call it writes inside its reasoning.** Seen only when the prompt asks
+  for call markup while thinking.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-2.2.0-GA.xcframework.zip       5efc40cae9f8a1bf53bfe03195c5365398bc9501b3e6b0feee3e5c67385537f4
+LocalLMLabSDKClaude-2.2.0-GA.xcframework.zip     07e2ff01accf582f71fecab254bdae2e8fb46acc8296ef6ab1c8d84cd9e97a04
+LocalLMLabSDKInference-2.2.0-GA.xcframework.zip  afd427fb741a820f55bc0a384850ae6404608f5ad73d185a583a89e8f0d61a61
+LocalLMLabSDKRemote-2.2.0-GA.xcframework.zip     1c9af025c700bc0c41c80387c1d6a59ba2f2ab6203eb8ffd8548d61c6ac1fe38
+```
+
+---
+
 ## 2.1.0 — GA — 2026-10-15
 
 Fixes and a newer MLX runtime; no API change (the public surface is identical to 2.0.0's).
