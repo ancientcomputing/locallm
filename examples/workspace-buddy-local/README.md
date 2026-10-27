@@ -146,9 +146,35 @@ swift-huggingface picks this path automatically for a sandboxed app (it keys off
 - It is **not shared** with `code-buddy` / `repo-qa-local` (those are unsandboxed and use
   `~/.cache/huggingface/hub/`) — each downloads its own copy.
 - To point somewhere else, pass `MLXModelProvider(cacheDirectory:)` or set `HF_HUB_CACHE`.
+- The container is named after the bundle ID, `lab.locallm.sdk.reference.workspacebuddylocal`.
+  The Xcode Run build and the packaged `.app` share it, so one download serves both.
+- To look at it in Finder: **Go ▸ Go to Folder…** (⇧⌘G) and paste the path. If macOS asks whether
+  Finder or Terminal may access another app's data, allow it.
 
 A non-sandboxed app or CLI using the same model layer stores it at `~/.cache/huggingface/hub/`
 instead. See [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
+
+### Removing the model
+
+Quit the app first, then delete the model's folder:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.sdk.reference.workspacebuddylocal/Data/Library/Caches/huggingface/hub/models--mlx-community--Qwen3-8B-4bit
+```
+
+The next run downloads it again, at the same version (the app pins it). If a download was
+interrupted, the folder may hold only the small files (config, tokenizer); removing it makes the
+next run start the download from scratch.
+
+To start completely fresh — the model and the remembered folder — quit the app and remove the whole
+container. macOS creates a new one on the next launch:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.sdk.reference.workspacebuddylocal
+```
+
+If `rm` says *Operation not permitted*, macOS is protecting the app's data: allow Terminal when it
+asks, or delete the folder in Finder instead.
 
 ## What the model layer adds (diff against `workspace-buddy`)
 

@@ -34,7 +34,7 @@ open "dist/MCP Chat.app"
 ```
 
 The first launch offers to download Qwen3 8B (about 4.6 GB, pinned to a reviewed revision) into the
-app's sandbox container.
+app's sandbox container — see [Where the model is stored](#where-the-model-is-stored).
 
 For development, a build without App Sandbox can use a model you already have instead:
 
@@ -42,6 +42,48 @@ For development, a build without App Sandbox can use a model you already have in
 CONFIG=debug SANDBOX=0 packaging/build-and-sign.sh
 open --env MCPCHAT_MODEL_CACHE=/path/to/huggingface/hub "dist/MCP Chat.app"
 ```
+
+## Where the model is stored
+
+The sandboxed build (Xcode Run, or `packaging/build-and-sign.sh` without `SANDBOX=0`) can't write
+outside its container, so swift-huggingface puts the Hugging Face cache there instead of
+`~/.cache/huggingface`:
+
+```
+~/Library/Containers/lab.locallm.mcpapps.chat/Data/Library/Caches/huggingface/hub/
+    models--mlx-community--Qwen3-8B-4bit/
+        snapshots/<commit-sha>/        # config.json, *.safetensors, tokenizer…
+        blobs/                          # the actual bytes (snapshot files symlink here)
+```
+
+- The container is named after the bundle ID, `lab.locallm.mcpapps.chat`. The Xcode Run build and
+  `dist/MCP Chat.app` share it, so one download serves both.
+- Nothing else shares it. A copy in `~/.cache/huggingface/hub` or in another example's container
+  isn't used (unless you point `MCPCHAT_MODEL_CACHE` at it from an unsandboxed build, above).
+- To look at it in Finder: **Go ▸ Go to Folder…** (⇧⌘G) and paste the path. If macOS asks whether
+  Finder or Terminal may access another app's data, allow it.
+
+### Removing the model
+
+Quit MCP Chat first, then delete the model's folder:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.mcpapps.chat/Data/Library/Caches/huggingface/hub/models--mlx-community--Qwen3-8B-4bit
+```
+
+The next launch offers the download again, at the same pinned revision. If a download was
+interrupted, the folder may hold only the small files (config, tokenizer); removing it makes the
+next download start from scratch.
+
+To start completely fresh — the model, the saved conversation and the app's settings — quit the app
+and remove the whole container. macOS creates a new one on the next launch:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.mcpapps.chat
+```
+
+If `rm` says *Operation not permitted*, macOS is protecting the app's data: allow Terminal when it
+asks, or delete the folder in Finder instead.
 
 ## Try it
 
