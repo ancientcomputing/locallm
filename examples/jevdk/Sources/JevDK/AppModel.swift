@@ -96,6 +96,8 @@ final class AppModel {
     var downloadRepo = ""
     var preflight: PreflightResult?
     var downloadProgress: Double?
+    /// The "model is ready, try it" notice after a download, cleared by the first run.
+    private var readyNotice: String?
 
     /// The SDK front door hosted runs go through.
     let lab = LocalLMLab()
@@ -184,7 +186,7 @@ final class AppModel {
             lab.models.replace(decision: JevDecisionProvider(b.config(key: b.needsKey ? apiKey(b) : nil)))
             let route = RouteName("hosted.\(b.rawValue)")
             lab.models.route(decision: route, to: id)
-            let body = (try? JevDecisionProvider.requestBody(model: model, request: request))
+            let body = (try? JevDecisionProvider.requestBody(model: model, request: request, wire: b.config(key: nil).wire))
                 .flatMap { try? JSONSerialization.jsonObject(with: $0) }
                 .flatMap { try? JSONSerialization.data(withJSONObject: $0, options: [.prettyPrinted]) }
                 .map { String(decoding: $0, as: UTF8.self) } ?? ""
@@ -272,6 +274,7 @@ final class AppModel {
         guard !isRunning else { return }
         if let problem = validationProblem() { errorMessage = problem; return }
         errorMessage = nil
+        if notice != nil && notice == readyNotice { notice = nil }   // it said what to do; done
         isRunning = true
         defer { isRunning = false }
         results = await runAll(input)
@@ -559,6 +562,10 @@ final class AppModel {
     // MARK: Models
 
     /// Text models tried as deciders or worth trying; all MLX 4-bit builds on Hugging Face.
+    /// The one GettingStarted offers to download: the tested default.
+    static let starterRepo = "mlx-community/Qwen3-4B-4bit"
+    static let starterSize = "2.3 GB"
+
     static let recommended: [(repo: String, note: String)] = [
         ("mlx-community/Qwen3-4B-4bit", "2.3 GB · tested as a decider: the current pick"),
         ("mlx-community/Qwen3-1.7B-4bit", "1.0 GB · tested: fast, but weaker on yes/no and answer checks"),
@@ -628,6 +635,10 @@ final class AppModel {
             selectedModelID = repo
             downloadRepo = ""
             preflight = nil
+            notice = samples.isEmpty
+                ? "\(repo) is ready. Click Ask to try it."
+                : "\(repo) is ready. Click a sample message above the input to try it."
+            readyNotice = notice
         } catch {
             errorMessage = "Download failed: \(error.localizedDescription)"
         }
@@ -710,7 +721,9 @@ final class AppModel {
     private func restoreWorkspace() {
         guard let data = UserDefaults.standard.data(forKey: Self.workspaceKey),
               let w = try? JSONDecoder().decode(Workspace.self, from: data) else {
-            samples = Presets.all.first { $0.set.name == set.name }?.samples ?? []
+            // First launch: Customer support, whose sample messages make a first answer one click
+            // away once a model is downloaded (GettingStarted).
+            loadPreset(Presets.all.first { $0.set.name == Presets.support.name } ?? Presets.all[0])
             return
         }
         restoring = true

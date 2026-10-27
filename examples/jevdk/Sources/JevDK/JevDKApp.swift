@@ -10,6 +10,9 @@ struct JevDKApp: App {
     @State private var model = AppModel()
 
     init() {
+        // Command-line modes for development and the DMG release script. Not in the Mac App Store
+        // build (guideline 2.5.19: no undocumented features; its icon is rendered by a non-MAS build).
+        #if !MAS_BUILD
         // Headless checks, both through `lab.decide` like the window:
         // `JevDK --check <preset name> <repo id>` runs a preset's batch on a local model the SDK
         // has downloaded and prints the answers, then exits.
@@ -31,6 +34,7 @@ struct JevDKApp: App {
         if let i = args.firstIndex(of: "--write-iconset"), args.count > i + 1 {
             AppIcon.writeIconset(to: URL(fileURLWithPath: args[i + 1]))
         }
+        #endif
 
         // Launched with `swift run` there is no app bundle, so macOS starts this as a
         // background-style process that never becomes active. Claim regular-app status
@@ -54,7 +58,20 @@ struct JevDKApp: App {
             // questions for your app (the SDK's DecisionQuestionSet), answers (CSV), and results (CSV).
             CommandGroup(replacing: .appInfo) {
                 Button("About JevDK") { AboutPanel.show() }
+                #if MAS_BUILD
+                // The Mac App Store build is sandboxed and can't put a command on the PATH, so it
+                // doesn't carry jev-serve; this opens its download page instead.
+                Button("Get jev-serve…") { NSWorkspace.shared.open(JevServeInstaller.downloadPage) }
+                #else
                 Button("Install jev-serve Command…") { JevServeInstaller.install() }
+                #endif
+            }
+            // Help: the guide, instead of macOS's "Help isn't available for JevDK".
+            CommandGroup(replacing: .help) {
+                Link("JevDK Guide", destination: AboutPanel.guidePage)
+                Link("Decision Models (Jev) in Your App", destination: AboutPanel.webPage)
+                Divider()
+                Link("Privacy Policy", destination: AboutPanel.privacyPage)
             }
             CommandGroup(replacing: .newItem) {
                 Section("Workspace") {
@@ -93,13 +110,20 @@ struct ContentView: View {
     @AppStorage("showQuestionsPanel") private var showEditor = true
 
     var body: some View {
-        HSplitView {
-            if showEditor {
-                EditorView(model: model)
-                    .frame(minWidth: 380, idealWidth: 460)
+        // The status bar goes below the split view, not in a bottom safe-area inset: HSplitView's
+        // panes don't respect the inset, so it covered the bottom of the batch grid (its last row
+        // and horizontal scroller).
+        VStack(spacing: 0) {
+            HSplitView {
+                if showEditor {
+                    EditorView(model: model)
+                        .frame(minWidth: 380, idealWidth: 460)
+                }
+                ResultsView(model: model, openModels: { showDownload = true }, openBackends: { showBackends = true })
+                    .frame(minWidth: 480)
             }
-            ResultsView(model: model)
-                .frame(minWidth: 480)
+            Divider()
+            statusBar
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -120,15 +144,16 @@ struct ContentView: View {
                 }
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                Picker("Model", selection: $model.selectedModelID) {
-                    if model.models.isEmpty { Text("No models found").tag(String?.none) }
-                    ForEach(model.models) { m in
-                        Text("\(m.displayName) · \(m.sizeText)\(m.isMoE ? " · MoE ⚠︎" : "")")
-                            .tag(Optional(m.id))
-                    }
+                // What a run uses: the local model (chosen in Models) and the hosted backends that
+                // are on (Backends). One label, not a second model picker.
+                Button {
+                    showBackends = true
+                } label: {
+                    Text(activeBackends)
+                        .lineLimit(1)
+                        .frame(maxWidth: 300)
                 }
-                .frame(width: 300)
-                .help(modelHelp)
+                .help(backendsHelp)
                 Button {
                     model.refreshModels()
                 } label: {
@@ -145,10 +170,9 @@ struct ContentView: View {
                 } label: {
                     Label("Backends", systemImage: "square.3.layers.3d")
                 }
-                .help("Compare the local model with hosted Jev (Featherless, OpenRouter · TypeSafe)")
+                .help("Compare the local model with hosted deciders (Featherless, OpenRouter · TypeSafe, OpenAI)")
             }
         }
-        .safeAreaInset(edge: .bottom) { statusBar }
         .sheet(isPresented: $showDownload) { ModelsSheet(model: model) }
         .confirmationDialog("Replace your current questions with “\(pendingPreset?.set.name ?? "")”?",
                             isPresented: Binding(get: { pendingPreset != nil }, set: { if !$0 { pendingPreset = nil } })) {
@@ -168,6 +192,22 @@ struct ContentView: View {
             model.persistNow()
         }
         .sheet(isPresented: $showBackends) { BackendsSheet(model: model) }
+    }
+
+    /// "Qwen3-4B-4bit + OpenRouter · TypeSafe + OpenAI", or "No backends on".
+    private var activeBackends: String {
+        var names: [String] = []
+        if model.useLocal {
+            names.append(model.selectedModel.map { "\($0.displayName)\($0.isMoE ? " ⚠︎" : "")" } ?? "No local model")
+        }
+        names += model.enabledHosted.map(\.displayName)
+        return names.isEmpty ? "No backends on" : names.joined(separator: " + ")
+    }
+
+    private var backendsHelp: String {
+        var lines = ["The deciders a run uses. Click to turn backends on or off; choose the local model in Models."]
+        if model.useLocal { lines.append(modelHelp) }
+        return lines.joined(separator: "\n\n")
     }
 
     private var modelHelp: String {
@@ -208,6 +248,7 @@ struct ContentView: View {
     }
 }
 
+#if !MAS_BUILD
 /// `--check` / `--check-remote`: a preset's batch through `lab.decide`, printed.
 @MainActor
 enum HeadlessCheck {
@@ -273,7 +314,8 @@ enum HeadlessCheck {
                                                 backend: info.model)
                     lines += ResultsCSV.rows(run: runInfo, backend: info, result: result, labels: [:],
                                              inputTokens: d.usage?.inputTokens, costUSD: d.usage?.cost)
-                    let cells = rows.map { "\($0.question.name)=\($0.answer) \(Int(($0.confidence * 100).rounded()))%" }
+                    let cells = rows.map { $0.refused ? "\($0.question.name)=refused"
+                                                      : "\($0.question.name)=\($0.answer) \(Int(($0.confidence * 100).rounded()))%" }
                     let ms = Double(d.latency.components.seconds) * 1000 + Double(d.latency.components.attoseconds) / 1e15
                     print(String(format: "%5.0f ms  ", ms) + line.prefix(60) + "\n          " + cells.joined(separator: "  ")
                           + (d.usage?.summary.map { "\n          [\($0)]" } ?? ""))
@@ -297,6 +339,7 @@ enum HeadlessCheck {
         exit(0)
     }
 }
+#endif
 
 struct BackendsSheet: View {
     @Bindable var model: AppModel
@@ -323,7 +366,8 @@ struct BackendsSheet: View {
             ForEach(HostedBackend.allCases) { b in
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle(isOn: Binding(get: { model.hostedEnabled[b] ?? false }, set: { model.hostedEnabled[b] = $0 })) {
+                        Toggle(isOn: Binding(get: { model.hostedEnabled[b] ?? false },
+                                             set: { on in if !on || AIDataConsent.ask(b) { model.hostedEnabled[b] = on } })) {
                             VStack(alignment: .leading) {
                                 Text(b.displayName).fontWeight(.medium)
                                 Text(b.blurb).font(.jCaption).foregroundStyle(.secondary)
@@ -383,6 +427,7 @@ struct BackendsSheet: View {
 /// administrator password; if that doesn't work, it shows the command to run instead.
 enum JevServeInstaller {
     static let target = "/usr/local/bin/jev-serve"
+    static let downloadPage = URL(string: "https://thisbrain.ai/locallm/jev-serve.html")!
 
     static func install() {
         guard let tool = Bundle.main.url(forAuxiliaryExecutable: "jev-serve")?.path,
@@ -442,6 +487,9 @@ enum JevServeInstaller {
 /// JevDK → About: the icon, the version, and where to read about decision models.
 enum AboutPanel {
     static let webPage = URL(string: "https://thisbrain.ai/locallm/jev.html")!
+    static let guidePage = URL(string: "https://thisbrain.ai/locallm/jdk-guide.html")!
+    /// Guideline 5.1.1(i): a privacy policy link inside the app (Help and About).
+    static let privacyPage = URL(string: "https://thisbrain.ai/locallm/privacy.html#jevdk")!
 
     /// The app's version when it runs as a built app (Xcode, or the DMG's), else "development build"
     /// (`swift run` has no bundle to carry one).
@@ -462,6 +510,10 @@ enum AboutPanel {
         credits.append(NSAttributedString(string: "Decision models (Jev) in your app", attributes: [
             .font: body, .link: webPage, .paragraphStyle: centered,
         ]))
+        credits.append(NSAttributedString(string: "\n", attributes: [.font: body, .paragraphStyle: centered]))
+        credits.append(NSAttributedString(string: "Privacy Policy", attributes: [
+            .font: body, .link: privacyPage, .paragraphStyle: centered,
+        ]))
         NSApplication.shared.orderFrontStandardAboutPanel(options: [
             .applicationIcon: AppIcon.image(),
             .applicationName: "JevDK",
@@ -479,6 +531,7 @@ enum AboutPanel {
 enum AppIcon {
     static let blue = NSColor(srgbRed: 0x2f / 255, green: 0x6f / 255, blue: 0xed / 255, alpha: 1)
 
+    #if !MAS_BUILD
     /// The `.iconset` folder `iconutil -c icns` turns into AppIcon.icns. Exits.
     static func writeIconset(to dir: URL) -> Never {
         do {
@@ -504,6 +557,7 @@ enum AppIcon {
             exit(1)
         }
     }
+    #endif
 
     static func image(size: CGFloat = 512) -> NSImage {
         NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in

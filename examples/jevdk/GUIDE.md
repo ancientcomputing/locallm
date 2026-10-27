@@ -175,6 +175,9 @@ Wording rules that held up in testing:
   careful wordings on a small model.
 - **One thing per question.** "Is the customer angry or threatening to leave?" mixes two; split
   it if they matter separately.
+- **Give the question a way out.** If the input might not say, add an option for that
+  ("unclear: the message doesn't say"). A decider has to pick one of your options, so without
+  one it puts its guess on the nearest real answer (see [Step 2](#step-2-try-single-inputs)).
 
 ### Step 2. Try single inputs
 
@@ -192,6 +195,29 @@ What to look at:
   as the model does.
 
 Use this step to shape questions. Use the next steps to trust them.
+
+**When the input can't answer the question.** Ask "Which religion does the author of this
+message follow?" (Hindu / Muslim / Christian / None) about "Hi, I'm Priya. Can you help me reset
+my password? Thanks!" Nothing in the message says, and deciders handle that differently:
+
+- **TypeSafe's Jev** picked **None**: 77% for None, 23% for Hindu, with a reported confidence of
+  69%. In code that reads exactly like "this person has no religion"; only the hedging hints
+  that it's a guess.
+- **OpenAI's Decisions API** **refused**: no answer and no probabilities. JevDK shows
+  **Refused**; in your app the question is in `Decision.refusals` and `d.isRefused("religion")`
+  is true. In the batch grid a refusal counts as a miss.
+- **A local decider** always picks one of your options, like TypeSafe.
+
+Don't count on a refusal: OpenAI declines some questions (such as guessing someone's religion
+from their name), and the other deciders never do. Ask only what the input can answer, give the
+question an "unclear" option when it might not, and treat a refusal and an unsure answer the
+same way in code:
+
+```swift
+if d.isRefused("team") || (d.choice("team")?.confidence ?? 0) < 0.8 {
+    // ask the user, escalate, or take the safe path
+}
+```
 
 ### Step 3. Build your answer set
 
@@ -254,8 +280,8 @@ set can tell you. JevDK doesn't keep a leaderboard on purpose.
 
 1. **Models** (toolbar): download a few candidates. Small dense instruct models suit deciding;
    mixture-of-experts models are flagged because their probabilities were unstable in testing.
-2. **Backends** (toolbar): optionally add a hosted decider (Featherless, or TypeSafe on
-   OpenRouter) as a reference point.
+2. **Backends** (toolbar): optionally add a hosted decider (Featherless, TypeSafe on
+   OpenRouter, or OpenAI) as a reference point.
 3. Run the batch with model A, then **Results CSV** (Batch toolbar) → append. Switch to model B, run, append.
 4. Open the CSV in Numbers or Excel. A pivot table of `correct` by `model` and `question` is
    per-question accuracy; `question_ms` and `decision_ms` are speed.
@@ -449,9 +475,11 @@ Sixteen messages are enough to show the method, not to choose a model. Use 50 or
 - **Model version:** the exact Hugging Face commit of a model (shown as e.g. `4dcb3d1`). Exports
   record it, so what ships is what you tested.
 - **Backend:** where the decider runs: locally (OpenJev on this Mac) or hosted (Featherless,
-  TypeSafe).
+  TypeSafe, OpenAI).
 - **System instructions / wrapper:** the text that frames every question for a local model.
 - **Calibration / temperature:** a per-question-type adjustment that makes confidence match how
   often the model is right.
+- **Refusal:** a question the decider declined to answer (only OpenAI's Decisions API does
+  this). No answer and no probabilities; your app sees it in `Decision.refusals`.
 - **Batch:** the same questions asked about many inputs at once.
 - **Results CSV:** the file JevDK appends each batch run to, for comparing models over time.

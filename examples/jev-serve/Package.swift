@@ -15,9 +15,9 @@ import PackageDescription
 // ../jevdk, which declares them as binaryTargets on a GitHub Release and vends them as products.
 // This manifest must NOT declare its own: two packages declaring a binary target of the same name
 // is a hard SwiftPM error. So jev-serve builds against whichever SDK version JevDK's
-// `defaultSDKVersion` / LOCALLM_SDK_VERSION selects (2.0 releases only).
+// `defaultSDKVersion` / LOCALLM_SDK_VERSION selects (2.3 and later, as JevDK's table lists).
 //
-// Requires SDK 2.0.0 or later, macOS 27 + Xcode 27. No Metal Toolchain needed — the prebuilt
+// Requires SDK 2.3.0 or later, macOS 27 + Xcode 27. No Metal Toolchain needed — the prebuilt
 // Inference xcframework bundles the compiled shaders.
 let package = Package(
     name: "JevServe",
