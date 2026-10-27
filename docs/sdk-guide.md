@@ -9,7 +9,7 @@ below for the working reference apps this guide is drawn from.
 
 Requires macOS 26+ on Apple Silicon, Swift 6 tools.
 
-**Status note**: this guide describes the API as of `2.2.0`. `2.0.0` was a one-time breaking release;
+**Status note**: this guide describes the API as of `2.3.0`. `2.0.0` was a one-time breaking release;
 every 2.x release after it is source compatible with it (see [§9](#9-scope-and-boundaries-what-core-doesnt-do)
 for the compatibility policy). Coming from 1.x: [`migrating-to-2.0.md`](migrating-to-2.0.md); from
 `0.8.x`: [`migrating-to-1.0.md`](migrating-to-1.0.md) first. New in 2.0: per-server trust and tool
@@ -1895,13 +1895,14 @@ is [`examples/model-switch`](../examples/model-switch/).*
 A **decision model** (a *decider*) takes one input and a few typed questions, and answers each
 with one of the options you allowed plus a probability for every option. It writes no text.
 TypeSafe's **Jev** is the original; the SDK uses Jev's vocabulary and asks the same questions of
-three backends:
+four backends:
 
 | Decider | Runs | Module | OS | `Decision.fidelity` |
 |---|---|---|---|---|
 | **OpenJev** (`OpenJevDecisionProvider`) | On the Mac, on an MLX model | Inference | macOS 27 | `.tokenScored(calibrated:)` |
 | **TypeSafe Jev** via OpenRouter (`JevDecisionProvider(.openRouter(key:))`) | Hosted | Remote | macOS 26+ | `.native` |
 | **Featherless Simple Jev** (`.featherless(key:)`, `.featherlessDemo()`) | Hosted | Remote | macOS 26+ | `.tokenScored(calibrated: false)` |
+| **OpenAI Decisions** (`JevDecisionProvider(.openAI(key:))`, `openai:gpt-6-luna`; SDK 2.3) | Hosted | Remote | macOS 26+ | `.native` |
 
 `lab.decide` and everything else in this section except OpenJev is in Core and works on macOS 26.
 
@@ -1945,7 +1946,12 @@ d.noul("refund")      // Double: probability of yes
 d.score("urgency")    // ScoreAnswer: .score 1.6 (expected level, 0-based), .level, .probabilities, .legend
 d.fidelity            // .native or .tokenScored(calibrated:)
 d.modelID, d.latency, d.usage   // usage: tokens and cost, from hosted backends
+d.isRefused("refund")  // true if the backend declined that question (OpenAI Decisions only)
 ```
+
+- **A backend can decline a question** (SDK 2.3). Only OpenAI's Decisions API does this today. A
+  refused id is in `d.refusals` and has no answer, so check `d.isRefused(id)` before reading it
+  and take the cautious path. `lab.evaluate` counts a refusal as a miss.
 
 - **Question kinds** use Jev's names: `noul` (yes / no; the answer is P(yes)), `choice` (one of
   several, each with an optional description), `score` (an ordered scale described in words).
