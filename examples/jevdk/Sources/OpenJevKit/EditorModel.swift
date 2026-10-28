@@ -197,9 +197,14 @@ public struct QuestionResult: Identifiable, Sendable {
     public let prompt: String
     public let milliseconds: Double
     public let fidelity: DecisionFidelity
+    /// The backend declined to answer (OpenAI's Decisions API can). Probabilities are all 0, and
+    /// `answer` is "refused", which never matches a marked answer.
+    public var refused: Bool = false
 
-    public var topIndex: Int { probabilities.indices.max { probabilities[$0] < probabilities[$1] } ?? 0 }
-    public var answer: String { keys[topIndex] }
+    /// The most likely option, or -1 for a refusal.
+    public var topIndex: Int { refused ? -1 : probabilities.indices.max { probabilities[$0] < probabilities[$1] } ?? 0 }
+    public var answer: String { refused ? Self.refusedAnswer : keys[topIndex] }
+    public static let refusedAnswer = "refused"
 
     /// This answer with `probabilities` shown instead (a calibration applied to the raw ones).
     public func showing(_ probabilities: [Double], calibrated: Bool) -> QuestionResult {
@@ -208,7 +213,7 @@ public struct QuestionResult: Identifiable, Sendable {
                               probabilities: probabilities, rawProbabilities: rawProbabilities,
                               confidence: probabilities.isEmpty ? 0 : probabilities[top], labelMass: labelMass,
                               prompt: prompt, milliseconds: milliseconds,
-                              fidelity: .tokenScored(calibrated: calibrated))
+                              fidelity: .tokenScored(calibrated: calibrated), refused: refused)
     }
 
     /// Build display rows from an SDK decision. `diagnostics` (local) supplies labels, prompts and
@@ -220,6 +225,7 @@ public struct QuestionResult: Identifiable, Sendable {
         return questions.compactMap { q in
             let diag = diagnostics[q.name]
             let keys: [String], descs: [String], probs: [Double], conf: Double
+            var refused = false
             switch d.answers[q.name] {
             case .noul(let p)?:
                 keys = ["Yes", "No"]; descs = ["", ""]; probs = [p, 1 - p]; conf = max(p, 1 - p)
@@ -230,6 +236,16 @@ public struct QuestionResult: Identifiable, Sendable {
                 probs = keys.map { c.probabilities[$0] ?? 0 }; conf = c.confidence
             case .score(let s)?:
                 keys = s.legend.indices.map(String.init); descs = s.legend; probs = s.probabilities; conf = s.confidence
+            case nil where d.isRefused(q.name):
+                // A row of its own, so batch columns stay aligned with the questions.
+                refused = true
+                switch q.sdkQuestion.kind {
+                case .noul: keys = ["Yes", "No"]; descs = ["", ""]
+                case .choice(let criteria): keys = criteria.map(\.key); descs = criteria.map { $0.description ?? "" }
+                case .score(let levels): keys = levels.indices.map(String.init); descs = levels
+                @unknown default: return nil
+                }
+                probs = keys.map { _ in 0 }; conf = 0
             default:
                 return nil
             }
@@ -239,7 +255,7 @@ public struct QuestionResult: Identifiable, Sendable {
             return QuestionResult(
                 question: q, keys: keys, labels: diag?.labels ?? positional, descriptions: descs, probabilities: probs,
                 rawProbabilities: probs, confidence: conf, labelMass: diag?.labelMass ?? 1, prompt: diag?.prompt ?? prompt,
-                milliseconds: diag?.milliseconds ?? perQuestionMS, fidelity: d.fidelity)
+                milliseconds: diag?.milliseconds ?? perQuestionMS, fidelity: d.fidelity, refused: refused)
         }
     }
 }

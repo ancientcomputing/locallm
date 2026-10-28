@@ -16,7 +16,7 @@ import PackageDescription
 // so it declares Core itself. Same SDKRelease/knownSDKReleases/failManifest version gate as every
 // other example here.
 //
-// Requires SDK 2.0.0-GA or later (the decision API is new in 2.0), macOS 27 + Xcode 27. No Metal
+// Requires SDK 2.3.0-GA or later (the OpenAI backend needs 2.3), macOS 27 + Xcode 27. No Metal
 // Toolchain needed — the prebuilt Inference xcframework bundles the compiled default.metallib.
 
 struct SDKRelease {
@@ -31,26 +31,20 @@ struct SDKRelease {
 // The SDK release this example builds against with no setup. Build against another published
 // version: set LOCALLM_SDK_VERSION in your shell (works for `swift build` / CI, NOT inside Xcode),
 // or edit `defaultSDKVersion` here. For a release not listed, add its entry (URL + the `.sha256`
-// next to each zip on the GitHub release) or just replace the strings in place. Only 2.0
-// releases: this app does not build against 1.0.
-let defaultSDKVersion = "2.2.0-GA"
+// next to each zip on the GitHub release) or just replace the strings in place. Only 2.3 and
+// later: the OpenAI backend doesn't build against 2.2 or earlier.
+let defaultSDKVersion = "2.3.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "2.1.0-GA": SDKRelease(
-        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKCore-2.1.0-GA.xcframework.zip",
-        coreChecksum: "8d541e06f81d1586c959d6159a259c759853c88b2c68385ab28de493af6c5776",
-        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKRemote-2.1.0-GA.xcframework.zip",
-        remoteChecksum: "347257172a6da7104b7081602e9dbfc853ed5d038b5e30831aad8dfa2753ae92",
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.1.0-GA/LocalLMLabSDKInference-2.1.0-GA.xcframework.zip",
-        inferenceChecksum: "77d3d1a1bae9df6de5955dfa945242c177cb129b4896c95befb81db6c923656f"
-    ),
-    "2.2.0-GA": SDKRelease(
-        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLMLabSDKCore-2.2.0-GA.xcframework.zip",
-        coreChecksum: "5efc40cae9f8a1bf53bfe03195c5365398bc9501b3e6b0feee3e5c67385537f4",
-        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLMLabSDKRemote-2.2.0-GA.xcframework.zip",
-        remoteChecksum: "1c9af025c700bc0c41c80387c1d6a59ba2f2ab6203eb8ffd8548d61c6ac1fe38",
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLMLabSDKInference-2.2.0-GA.xcframework.zip",
-        inferenceChecksum: "afd427fb741a820f55bc0a384850ae6404608f5ad73d185a583a89e8f0d61a61"
+    // 2.3.0-GA: OpenAI's Decisions API (JevProviderConfig.openAI) and Decision.refusals, which
+    // JevDK's OpenAI backend needs.
+    "2.3.0-GA": SDKRelease(
+        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKCore-2.3.0-GA.xcframework.zip",
+        coreChecksum: "7821197d0cf5b4c92e36af5c537295e594afbb55d60d2f98b0773a3625403575",
+        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKRemote-2.3.0-GA.xcframework.zip",
+        remoteChecksum: "dae65d45bea196f6cd2538328fad1a0e33eceae5fac5ee965183706ac942daaf",
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKInference-2.3.0-GA.xcframework.zip",
+        inferenceChecksum: "63dc8bcba5e91e1324809ca412a23ebb0b9e04386361436eacc0be9fe6d4a8e0"
     ),
 ]
 

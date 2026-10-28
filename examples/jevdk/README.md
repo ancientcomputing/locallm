@@ -9,7 +9,7 @@ swift build -c release
 ```
 
 Needs an Apple-silicon Mac, macOS 27 and Xcode 27 (Swift 6.4). `Package.swift` builds against SDK
-`2.2.0-GA` with no further setup (the decision API is new in 2.0): `LocalLMLabSDKCore`,
+`2.3.0-GA` with no further setup (the OpenAI backend needs 2.3): `LocalLMLabSDKCore`,
 `LocalLMLabSDKRemote` and `LocalLMLabSDKInference` (the MLX runtime) come from that GitHub Release.
 No Metal Toolchain needed; the prebuilt Inference xcframework bundles the compiled shaders. To
 build against another release, set `LOCALLM_SDK_VERSION` (see [the README one folder up](../README.md)).
@@ -108,7 +108,7 @@ the runs line up in one spreadsheet. The first click asks for a file; later clic
 | Columns | |
 |---|---|
 | Run | `run_id` (date and time the batch started, plus a short suffix), `saved_at`, `app`, `sdk_version`, `machine`, `question_set` |
-| Model | `backend` (local / featherlessDemo / featherless / openRouter), `model`, `model_revision`, `model_size_gb`, `moe`, `wrapper_label`, `wrapper_system`, `calibrated` |
+| Model | `backend` (local / featherlessDemo / featherless / openRouter / openAI), `model`, `model_revision`, `model_size_gb`, `moe`, `wrapper_label`, `wrapper_system`, `calibrated` |
 | Item | `input`, `question`, `question_kind`, `question_text` |
 | Result | `expected` (your marked answer), `answer`, `correct` (yes / no), `confidence`, `probabilities`, `label_mass` |
 | Cost | `question_ms`, `decision_ms`, `input_tokens`, `cost_usd` (hosted, per decision) |
@@ -184,7 +184,8 @@ From the SDK's own OpenJev evaluation (a labelled test set scored on several loc
 
 ## Choosing a decider
 
-- **Local** (toolbar picker; **Models** to change): MLX models the SDK has downloaded and
+- **Local** (chosen in **Models**; the toolbar lists it with the hosted backends that are on):
+  MLX models the SDK has downloaded and
   verified. **Models** has three tabs: **Installed** (use or remove), **Recommended** (small
   dense instruct models, which ones were tested as deciders) and **Search Hugging Face** (MLX
   models, most downloaded first). Select one, **Check** (the SDK confirms the repo is reachable,
@@ -193,8 +194,10 @@ From the SDK's own OpenJev evaluation (a labelled test set scored on several loc
   **Verify** instead. `Qwen3-4B-4bit` is the current pick: about 150 ms for four questions,
   2.6 GB. Mixture-of-experts models are flagged; use them for chat, not for deciding.
 - **Hosted** (Backends): the **Featherless demo** is free and needs no key (rate-limited);
-  **Featherless** and **OpenRouter · TypeSafe** take a key, stored in the Keychain. When any is
-  on, the status bar says where inputs are sent.
+  **Featherless**, **OpenRouter · TypeSafe** and **OpenAI** (GPT-6 Luna through OpenAI's
+  Decisions API) take a key, stored in the Keychain. When any is on, the status bar says where
+  inputs are sent. OpenAI can decline a question: the cell then says **refused**, which counts as
+  a miss against a marked answer.
 
 ## For SDK developers
 
@@ -218,7 +221,8 @@ Headless checks:
 ```
 
 `--check` needs a model the SDK has downloaded (or verified). `--check-remote` takes
-`featherlessDemo`, `featherless` or `openRouter`, using the key saved in **Backends** (the
-Keychain) or, for CI, the `OPENROUTER_API_KEY` / `FEATHERLESS_API_KEY` environment variable. Keys
+`featherlessDemo`, `featherless`, `openRouter` or `openAI`, using the key saved in **Backends**
+(the Keychain) or, for CI, the `OPENROUTER_API_KEY` / `FEATHERLESS_API_KEY` / `OPENAI_API_KEY`
+environment variable. Keys
 are never printed, and never read from a file. The window
 hasn't been driven by a test.

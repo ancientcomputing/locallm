@@ -24,6 +24,48 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.3.0 — GA — 2026-10-27
+
+OpenAI's Decisions API as a fourth decider, and refusals in `Decision`. Additive only: code that
+builds against 2.2.0 builds unchanged, and `LocalLMLabSDKInference` and `LocalLMLabSDKClaude` have
+no source changes.
+
+### Added
+
+- **OpenAI Decisions in `LocalLMLabSDKRemote`.** `JevDecisionProvider` now speaks OpenAI's
+  `/v1/decisions` as well as Jev's wire format, chosen by `JevProviderConfig`'s new `wire`
+  (`DecisionWireFormat`: `.jev`, `.openAIDecisions`). The `.openAI(key:)` preset registers
+  `openai:gpt-6-luna` (fidelity `.native`). `.openAICompatibleDecisions(baseURL:auth:models:…)` is for
+  any other server that speaks the same API, such as Fireworks, Vercel AI Gateway or LocalAI. For a
+  server that token-scores a general model, pass `fidelity: .tokenScored(calibrated: false)`.
+  `probe(for:timeout:)` checks the key and model with `GET /v1/models`.
+- **`OpenAIDecisionWire` in `LocalLMLabSDKCore`**, the codec for both directions, with OpenAI's
+  input limits (`DecisionLimits.openAIDecisions`) checked before anything is sent.
+- **Refusals.** A backend can now decline a question: `Decision.refusals` lists the refused ids, and
+  `isRefused(_:)` checks one. A refused id has no entry in `answers`. Only OpenAI's Decisions API
+  refuses today; every other backend leaves `refusals` empty. `lab.decide` accepts a decision in
+  which each question is either answered or refused. `lab.evaluate` counts a refusal as a miss
+  (`QuestionScore.refused`) that adds no calibration sample. The Jev wire carries refusals as
+  `{"type":"refusal"}`.
+
+### Changed
+
+- **`Decision`'s JSON** gains `refusals`. JSON written by 2.2 and earlier still decodes, and a
+  decision without refusals encodes exactly as it did before. The new `Decision` and
+  `JevProviderConfig` initializers are overloads, not added defaulted parameters, so the existing
+  initializers are unchanged.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-2.3.0-GA.xcframework.zip       7821197d0cf5b4c92e36af5c537295e594afbb55d60d2f98b0773a3625403575
+LocalLMLabSDKClaude-2.3.0-GA.xcframework.zip     80e143412d0bd0538091b59ea050015d28828855809203ea51c1cd49675e8449
+LocalLMLabSDKInference-2.3.0-GA.xcframework.zip  63dc8bcba5e91e1324809ca412a23ebb0b9e04386361436eacc0be9fe6d4a8e0
+LocalLMLabSDKRemote-2.3.0-GA.xcframework.zip     dae65d45bea196f6cd2538328fad1a0e33eceae5fac5ee965183706ac942daaf
+```
+
+---
+
 ## 2.2.0 — GA — 2026-10-22
 
 Nemotron 3.5 support in `LocalLMLabSDKInference`; no API change (the public surface is identical to

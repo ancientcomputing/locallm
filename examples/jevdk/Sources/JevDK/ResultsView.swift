@@ -1,3 +1,4 @@
+import AppKit
 import OpenJevKit
 import SwiftUI
 
@@ -5,6 +6,8 @@ import SwiftUI
 /// (local, Featherless, OpenRouter · TypeSafe) answers the same questions, shown together.
 struct ResultsView: View {
     @Bindable var model: AppModel
+    var openModels: () -> Void = {}
+    var openBackends: () -> Void = {}
     @State private var mode = Mode.single
     @State private var showCalibration = false
 
@@ -39,6 +42,11 @@ struct ResultsView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
+            }
+
+            if model.useLocal && model.models.isEmpty {
+                GettingStarted(model: model, openModels: openModels, openBackends: openBackends)
+                    .padding([.horizontal, .top])
             }
 
             switch mode {
@@ -260,12 +268,22 @@ struct BackendAnswer: View {
                 Text(label).font(.jCaption.weight(.semibold))
                 Text(fidelityText).font(.jCaption2).foregroundStyle(.secondary)
                 Spacer()
-                Text(result.answer).font(.jHeadline)
-                Text(percent(result.confidence))
-                    .font(.jHeadline.monospacedDigit())
-                    .foregroundStyle(confidenceColor(result.confidence))
+                if result.refused {
+                    Text("Refused").font(.jHeadline).foregroundStyle(.orange)
+                } else {
+                    Text(result.answer).font(.jHeadline)
+                    Text(percent(result.confidence))
+                        .font(.jHeadline.monospacedDigit())
+                        .foregroundStyle(confidenceColor(result.confidence))
+                }
             }
-            ForEach(result.keys.indices, id: \.self) { i in
+            if result.refused {
+                Label("The backend declined to answer this question, so there are no probabilities. In your app it's in Decision.refusals (d.isRefused(\"\(result.question.name)\")) and has no answer.",
+                      systemImage: "hand.raised")
+                    .font(.jCaption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(result.refused ? [] : Array(result.keys.indices), id: \.self) { i in
                 HStack(spacing: 8) {
                     Text(result.labels[i])
                         .font(.system(size: 12, design: .monospaced).weight(.bold))
@@ -379,6 +397,7 @@ struct BatchGrid: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .background(AlwaysVisibleScrollers())
             }
             .scrollIndicators(.visible)
         } else if let err = rows.first?.runs.first?.error {
@@ -397,13 +416,22 @@ struct BatchGrid: View {
         if let results = run.result?.results, results.indices.contains(qi) {
             let r = results[qi]
             let verdict = mark.map { $0 == r.answer ? "✓ " : "✗ " } ?? ""
-            Text("\(tag.map { $0 + " " } ?? "")\(verdict)\(r.answer) \(percent(r.confidence))")
-                .font(.jCaption.monospacedDigit())
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1)
-                .background(confidenceColor(r.confidence).opacity(0.18), in: RoundedRectangle(cornerRadius: 4))
-                .help("\(run.label)\(r.fidelity == .tokenScored(calibrated: true) ? " (calibrated)" : "")\n"
-                      + zip(r.keys, r.probabilities).map { "\($0): \(percent($1))" }.joined(separator: "\n"))
+            if r.refused {
+                Text("\(tag.map { $0 + " " } ?? "")\(verdict)refused")
+                    .font(.jCaption)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 4))
+                    .help("\(run.label) declined to answer this question.")
+            } else {
+                Text("\(tag.map { $0 + " " } ?? "")\(verdict)\(r.answer) \(percent(r.confidence))")
+                    .font(.jCaption.monospacedDigit())
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(confidenceColor(r.confidence).opacity(0.18), in: RoundedRectangle(cornerRadius: 4))
+                    .help("\(run.label)\(r.fidelity == .tokenScored(calibrated: true) ? " (calibrated)" : "")\n"
+                          + zip(r.keys, r.probabilities).map { "\($0): \(percent($1))" }.joined(separator: "\n"))
+            }
         } else {
             Text("\(tag.map { $0 + " " } ?? "")error").font(.jCaption).foregroundStyle(.orange).help(run.error ?? "")
         }
@@ -471,6 +499,91 @@ func percent(_ p: Double) -> String { "\(Int((p * 100).rounded()))%" }
 
 func confidenceColor(_ p: Double) -> Color {
     p >= 0.9 ? .green : p >= 0.6 ? .yellow : .orange
+}
+
+/// Gives the enclosing scroll view classic scrollbars that stay on screen whenever the content
+/// overflows. With macOS's default overlay scrollbars (Show scroll bars: Automatically), the batch
+/// grid's horizontal scroller only appeared mid-scroll, so nothing showed there were more question
+/// columns to the right, and a mouse wheel can't scroll sideways.
+struct AlwaysVisibleScrollers: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Probe() }
+    func updateNSView(_ view: NSView, context: Context) { (view as? Probe)?.apply() }
+
+    final class Probe: NSView {
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+            // macOS resets the style when the scroll bar preference or input device changes.
+            if observer == nil {
+                observer = NotificationCenter.default.addObserver(
+                    forName: NSScroller.preferredScrollerStyleDidChangeNotification, object: nil, queue: .main
+                ) { [weak self] _ in self?.apply() }
+            }
+        }
+
+        deinit { observer.map(NotificationCenter.default.removeObserver) }
+
+        func apply() {
+            DispatchQueue.main.async { [weak self] in
+                guard let scroll = self?.enclosingScrollView else { return }
+                scroll.scrollerStyle = .legacy
+                scroll.hasHorizontalScroller = true
+                scroll.hasVerticalScroller = true
+                scroll.autohidesScrollers = true   // only when the content doesn't fit
+            }
+        }
+    }
+}
+
+/// Shown while no local model is installed (first launch): one click to the tested default model,
+/// so the examples can answer.
+struct GettingStarted: View {
+    @Bindable var model: AppModel
+    var openModels: () -> Void
+    var openBackends: () -> Void
+
+    private var starterName: String { String(AppModel.starterRepo.split(separator: "/").last ?? "") }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Get started: download a model", systemImage: "arrow.down.circle")
+                .font(.jCallout.weight(.semibold))
+            Text("JevDK asks your questions to a model that runs on this Mac. The examples were tested with \(starterName), a \(AppModel.starterSize) download.")
+                .font(.jCallout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let p = model.downloadProgress {
+                ProgressView(value: p) {
+                    Text("Downloading \(starterName)… \(percent(p))").font(.jCaption)
+                }
+            } else {
+                Button {
+                    Task { await model.download(AppModel.starterRepo) }
+                } label: {
+                    Label("Download \(starterName)", systemImage: "arrow.down")
+                }
+                .buttonStyle(.borderedProminent)
+                HStack(spacing: 4) {
+                    Text("Or").foregroundStyle(.secondary)
+                    Button("choose another model", action: openModels).buttonStyle(.link)
+                    Text("or").foregroundStyle(.secondary)
+                    Button("use a hosted model", action: openBackends).buttonStyle(.link)
+                }
+                .font(.jCaption)
+                if !model.unverifiedRepos.isEmpty {
+                    Text("Models you already downloaded elsewhere are listed under Models in the toolbar, to verify.")
+                        .font(.jCaption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.tint.opacity(0.3)))
+    }
 }
 
 /// Shown before the first Ask: what a decider does, in three lines.

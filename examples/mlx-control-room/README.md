@@ -313,6 +313,42 @@ use.
   built-in models), *outside* the model cache on purpose: removing a model deletes its whole cache directory,
   and a pin kept there would be gone exactly when it's needed.
 
+The sandboxed `.app` (Xcode Run, or `packaging/build-and-sign.sh`) can't write outside its container, so
+swift-huggingface puts the Hugging Face cache there:
+
+```
+~/Library/Containers/lab.locallm.sdk.reference.mlxcontrolroom/Data/Library/Caches/huggingface/hub/
+    models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/   # one folder per model you've picked
+        snapshots/<commit-sha>/                       # one per version on disk
+        blobs/                                        # the actual bytes, shared between versions
+```
+
+The container is named after the bundle ID, `lab.locallm.sdk.reference.mlxcontrolroom`; the Xcode build and
+the packaged `.app` share it. It isn't shared with `~/.cache/huggingface/hub` (where `swift run` keeps its
+models) or with any other example's container. To look at it in Finder: **Go ▸ Go to Folder…** (⇧⌘G) and
+paste the path. If macOS asks whether Finder or Terminal may access another app's data, allow it.
+
+### Removing models
+
+To remove one old version, use **Versions on disk ▸ Remove** in the app: it frees only the files no other
+version uses and won't remove the version in use. To remove a model entirely, quit the app and delete its
+folder:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.sdk.reference.mlxcontrolroom/Data/Library/Caches/huggingface/hub/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit
+```
+
+Its pin stays, so picking it again downloads the same version. To start completely fresh — every model and
+both pin files — quit the app and remove the whole container. macOS creates a new one on the next launch:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.sdk.reference.mlxcontrolroom
+```
+
+If `rm` says *Operation not permitted*, macOS is protecting the app's data: allow Terminal when it asks, or
+delete the folder in Finder instead. For the `swift run` build, the same folders are under
+`~/.cache/huggingface/hub`, and its pins under `~/Library/Application Support/MLXControlRoom/LocalLMLab/`.
+
 ## Not production
 
 One window, one model at a time, no packaging beyond the sample `.app` — it's a harness for seeing what the

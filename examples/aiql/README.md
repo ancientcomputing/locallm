@@ -103,7 +103,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Skip it if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere). Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
-or add it to your `~/.zshrc`). `Package.swift` builds against SDK `2.2.0-GA` with no further
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `2.3.0-GA` with no further
 setup (AIQL needs it: it uses `lab.mcp.setFileBackedOutput`, new in 2.0) — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
 `LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
 `export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain
@@ -163,9 +163,51 @@ open dist/AIQL.app
 ```
 
 (`DEVELOPER_DIR` and `LOCALLM_SDK_VERSION` come from step 2.) The model download lands in the
-app's sandbox container at
-`~/Library/Containers/lab.locallm.sdk.reference.aiql/Data/Library/Caches/huggingface/` (not
-`~/.cache`) — swift-huggingface redirects it automatically for a sandboxed app.
+app's sandbox container, not `~/.cache` — see [Where the model is stored](#where-the-model-is-stored).
+
+## Where the model is stored
+
+AIQL is always App-Sandboxed, so swift-huggingface puts the Hugging Face cache in the app's own
+container instead of `~/.cache/huggingface`:
+
+```
+~/Library/Containers/lab.locallm.sdk.reference.aiql/Data/Library/Caches/huggingface/hub/
+    models--mlx-community--Qwen3-14B-4bit/
+        snapshots/<commit-sha>/        # config.json, *.safetensors, tokenizer…
+        blobs/                          # the actual bytes (snapshot files symlink here)
+```
+
+- The container is named after the bundle ID, `lab.locallm.sdk.reference.aiql`. The Xcode Run
+  build and `dist/AIQL.app` share it, so one download serves both.
+- Nothing else shares it. A copy in `~/.cache/huggingface/hub` (unsandboxed examples, `swift run`)
+  or in another example's container isn't used, so AIQL downloads its own (~8 GB for the default).
+- To look at it in Finder: **Go ▸ Go to Folder…** (⇧⌘G) and paste the path. If macOS asks whether
+  Finder or Terminal may access another app's data, allow it.
+
+### Removing the model
+
+Quit AIQL first, then delete the model's folder:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.sdk.reference.aiql/Data/Library/Caches/huggingface/hub/models--mlx-community--Qwen3-14B-4bit
+```
+
+The next Go downloads it again, at the same version: the default model is pinned in the app, and a
+model you typed is pinned in `mlx-pins.json`, kept outside the cache (in the container's
+`Data/Library/Application Support/lab.locallm.sdk.reference.aiql/LocalLMLab/`). Each model you
+typed has its own `models--…` folder next to the default one; remove it the same way. If a download
+was interrupted, the folder may hold only the small files (config, tokenizer); removing it makes the
+next run start the download from scratch.
+
+To start completely fresh — models, pins and the remembered output folder — quit the app and remove
+the whole container. macOS creates a new one on the next launch:
+
+```bash
+rm -rf ~/Library/Containers/lab.locallm.sdk.reference.aiql
+```
+
+If `rm` says *Operation not permitted*, macOS is protecting the app's data: allow Terminal when it
+asks, or delete the folder in Finder instead.
 
 ## Try it
 

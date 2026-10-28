@@ -40,7 +40,7 @@ doesn't carry.
 
 **Product page:** [thisbrain.ai/locallm](https://thisbrain.ai/locallm) — or
 get the app directly:
-[LocalLM Lab 2.2.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLM.Lab-2.2.0-GA-arm64.dmg).
+[LocalLM Lab 2.3.0-GA (arm64 DMG)](https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLM.Lab-2.3.0-GA-arm64.dmg).
 
 ## LocalLM Lab SDK
 
