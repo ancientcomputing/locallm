@@ -2037,6 +2037,26 @@ choice options keep your order on the wire, JSON `state` is sent as JSON, and `d
 the tokens and cost. Like other remote providers, it's off by default and your UI should say
 where inputs are sent.
 
+**OpenAI's Decisions API (SDK 2.3)** uses the same provider with a different wire format,
+`JevProviderConfig`'s `wire: .openAIDecisions` (the other presets use `.jev`):
+
+```swift
+try lab.models.register(decision: JevDecisionProvider(.openAI(key: key)))
+lab.models.route(decision: "support", to: ModelID("openai:gpt-6-luna")!)
+```
+
+- `.openAI(key:)` offers `openai:gpt-6-luna` only, with `.native` fidelity: the probabilities are
+  OpenAI's own. Its limits are `DecisionLimits.openAIDecisions` (400 questions, 255 choice
+  options, 10 score levels), checked before anything is sent.
+- `.openAICompatibleDecisions(baseURL:auth:models:)` is for any other server that speaks the same
+  API (Fireworks, Vercel AI Gateway, LocalAI): requests go to `baseURL` + `/decisions`. For a
+  server that token-scores a general model, pass `fidelity: .tokenScored(calibrated: false)`.
+- `probe(for:timeout:)` checks the key and model with one `GET …/models`, never a decision:
+  `.needsCredential` for a rejected key, `.unsupportedModel` for a model the server doesn't list,
+  `.providerError` when it's unreachable or slow (8 seconds by default). On the Jev wire it
+  returns the local check only.
+- It's the one backend that can decline a question: check `d.isRefused(id)` (above).
+
 ### A decider and your chat model: one model or two
 
 The pattern the SDK is built for is two models per feature: a decider for the typed choices (does
