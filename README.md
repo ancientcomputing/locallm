@@ -1,5 +1,5 @@
 Notes: 
-1. The 2.2.0-GA release branch is at [https://github.com/ancientcomputing/locallm/tree/2.2.0-GA](https://github.com/ancientcomputing/locallm/tree/2.2.0-GA)
+1. The 2.3.0-GA release branch is at [https://github.com/ancientcomputing/locallm/tree/2.3.0-GA](https://github.com/ancientcomputing/locallm/tree/2.3.0-GA)
 2. The project website is at [https://thisbrain.ai/locallm/](https://thisbrain.ai/locallm/)
 
 # LocalLM Lab
