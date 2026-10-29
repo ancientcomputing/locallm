@@ -5,14 +5,15 @@ import LocalLMLabSDKRemote
 
 /// The hosted backends JevDK offers, each an SDK `JevDecisionProvider` registered in the lab under
 /// its own decision scheme: hosted Jev (Featherless, TypeSafe on OpenRouter) and OpenAI's Decisions
-/// API (SDK 2.3, a different wire format behind the same provider). The Mac App Store build has no free Featherless demo: every
+/// API (SDK 2.3, a different wire format behind the same provider), plus a decisionformer server the
+/// developer runs (hosted Jev's wire on `/v1/systemone`, at a URL set in Backends). The Mac App Store build has no free Featherless demo: every
 /// hosted backend there runs on the user's own account and key, and the demo isn't in its binary
 /// at all (guideline 2.5.19: no dormant features).
 enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
     #if !MAS_BUILD
     case featherlessDemo
     #endif
-    case featherless, openRouter, openAI
+    case featherless, openRouter, openAI, decisionformer
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         case .featherless: "Featherless"
         case .openRouter: "OpenRouter · TypeSafe"
         case .openAI: "OpenAI"
+        case .decisionformer: "decisionformer"
         }
     }
 
@@ -35,6 +37,7 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         case .featherless: "featherless.ai key · token-scored like Local"
         case .openRouter: "OpenRouter key · TypeSafe's decision-trained Jev"
         case .openAI: "OpenAI key · GPT-6 Luna through OpenAI's Decisions API · may decline a question"
+        case .decisionformer: "Your own decisionformer serve · a fine-tuned decider · key only if started with one"
         }
     }
 
@@ -47,7 +50,14 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         #endif
     }
 
-    var needsKey: Bool { !isDemo }
+    var needsKey: Bool { !isDemo && self != .decisionformer }
+
+    /// A key field in Backends: required for the hosted services, optional for decisionformer
+    /// (sent only when its server was started with `--api-key-env`).
+    var acceptsKey: Bool { needsKey || self == .decisionformer }
+
+    /// Whether requests go to a URL the developer sets in Backends rather than a fixed service.
+    var hasEditableEndpoint: Bool { self == .decisionformer }
 
     /// Who receives the text a run sends, for the consent question (AIDataConsent).
     var dataRecipient: String {
@@ -58,6 +68,7 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         case .featherless: "Featherless (featherless.ai)"
         case .openRouter: "OpenRouter (openrouter.ai), which passes it to TypeSafe's Jev model"
         case .openAI: "OpenAI (openai.com)"
+        case .decisionformer: "your decisionformer server (\(Self.decisionformerEndpoint.host ?? "unknown host"))"
         }
     }
 
@@ -70,6 +81,7 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         case .featherless: "FEATHERLESS_API_KEY"
         case .openRouter: "OPENROUTER_API_KEY"
         case .openAI: "OPENAI_API_KEY"
+        case .decisionformer: "DECISIONFORMER_API_KEY"
         }
     }
     #endif
@@ -82,6 +94,9 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         case .featherless: "featherless-ai/Qwen3.8-27B-classifier"
         case .openRouter: "typesafe/jev-1.13"
         case .openAI: "gpt-6-luna"
+        // The server ignores the model field and answers with the one it loaded; Refresh list
+        // reads that one's name from its /v1/models.
+        case .decisionformer: "decisionformer"
         }
     }
 
@@ -96,6 +111,13 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
         case .featherless: c = .featherless(key: key ?? "")
         case .openRouter: c = .openRouter(key: key ?? "")
         case .openAI: c = .openAI(key: key ?? "")
+        case .decisionformer:
+            // `.native`: a decisionformer checkpoint is trained (and calibrated) to decide. Its
+            // server refuses what it can't fit with a 422 rather than truncating, so Jev's limits.
+            c = JevProviderConfig(scheme: "decisionformer", displayName: "decisionformer",
+                                  endpoint: Self.decisionformerEndpoint,
+                                  auth: key.map { $0.isEmpty ? .none : .apiKey($0) } ?? .none,
+                                  fidelity: .native)
         }
         c.scheme = rawValue.lowercased()
         return c
@@ -106,13 +128,69 @@ enum HostedBackend: String, CaseIterable, Identifiable, Sendable {
     /// The free demo is rate-limited; space batch inputs out when it's on.
     var minInterval: Duration { isDemo ? .milliseconds(600) : .zero }
 
-    /// The demo publishes a model list; the others don't have a Jev-specific one.
+    /// The demo and decisionformer publish a model list; the others don't have a Jev-specific one.
     var modelsURL: URL? {
+        if self == .decisionformer {
+            return Self.decisionformerEndpoint.deletingLastPathComponent().appendingPathComponent("models")
+        }
         #if MAS_BUILD
-        nil
+        return nil
         #else
-        isDemo ? URL(string: "https://simple-jev-demo-api.featherless.ai/v1/models") : nil
+        return isDemo ? URL(string: "https://simple-jev-demo-api.featherless.ai/v1/models") : nil
         #endif
+    }
+
+    // MARK: decisionformer's endpoint
+
+    static let decisionformerDefaultEndpoint = "http://127.0.0.1:8000/v1/systemone"
+    static let decisionformerEndpointKey = "remote.decisionformer.url"
+
+    /// Where decisionformer requests go: the URL saved in Backends, else (not in the Mac App Store
+    /// build) `DECISIONFORMER_URL` for headless runs, else `decisionformer serve`'s default.
+    static var decisionformerEndpointString: String {
+        if let s = UserDefaults.standard.string(forKey: decisionformerEndpointKey), !s.isEmpty { return s }
+        #if !MAS_BUILD
+        if let s = ProcessInfo.processInfo.environment["DECISIONFORMER_URL"], !s.isEmpty { return s }
+        #endif
+        return decisionformerDefaultEndpoint
+    }
+
+    static var decisionformerEndpoint: URL {
+        URL(string: decisionformerEndpointString) ?? URL(string: decisionformerDefaultEndpoint)!
+    }
+
+    /// Why the decisionformer URL can't be used, or nil: the SDK's own check (https, or plain http
+    /// only to localhost or a .local name), so a typo never sends text somewhere unexpected.
+    static func decisionformerEndpointProblem() -> String? {
+        guard let url = URL(string: decisionformerEndpointString), url.scheme != nil, url.host != nil else {
+            return "decisionformer: “\(decisionformerEndpointString)” isn't a URL. Set it in Backends."
+        }
+        do { _ = try HostedBackend.decisionformer.config(key: nil).validated(); return nil } catch {
+            return "decisionformer: \(url.absoluteString) can't be used: \((error as? LocalizedError)?.errorDescription ?? "\(error)")"
+        }
+    }
+
+    /// Why the decisionformer server isn't answering, or nil: one quick `GET /health` (next to
+    /// `/v1/systemone`) before a run. The SDK's session waits for connectivity, so a server that
+    /// isn't running would otherwise hold every input for minutes before failing.
+    static func decisionformerUnreachable() async -> String? {
+        let endpoint = decisionformerEndpoint
+        let health = endpoint.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("health")
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 3
+        config.timeoutIntervalForResource = 3
+        config.waitsForConnectivity = false
+        let session = URLSession(configuration: config)
+        defer { session.finishTasksAndInvalidate() }
+        do {
+            let (_, response) = try await session.data(from: health)
+            if let status = (response as? HTTPURLResponse)?.statusCode, !(200..<300).contains(status) {
+                return "decisionformer: \(health.absoluteString) answered \(status). Is this a decisionformer server?"
+            }
+            return nil
+        } catch {
+            return "decisionformer isn't answering at \(endpoint.absoluteString). Start it with `decisionformer serve <model>`, or fix the URL in Backends."
+        }
     }
 
     func listModels() async -> [String] {

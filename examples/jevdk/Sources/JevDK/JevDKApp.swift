@@ -20,9 +20,11 @@ struct JevDKApp: App {
         if let i = args.firstIndex(of: "--check"), args.count > i + 2 {
             HeadlessCheck.run(preset: args[i + 1], modelDir: args[i + 2])
         }
-        // `JevDK --check-remote <preset> <featherlessDemo|featherless|openRouter> [model]`: the
-        // same, against a hosted Jev. Keys come from the Keychain (saved in Backends) or the
-        // environment (FEATHERLESS_API_KEY / OPENROUTER_API_KEY) and are never printed.
+        // `JevDK --check-remote <preset> <featherlessDemo|featherless|openRouter|openAI|decisionformer> [model]`:
+        // the same, against a hosted Jev. Keys come from the Keychain (saved in Backends) or the
+        // environment (FEATHERLESS_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY /
+        // DECISIONFORMER_API_KEY) and are never printed. decisionformer's URL is the one saved in
+        // Backends, else DECISIONFORMER_URL, else http://127.0.0.1:8000/v1/systemone.
         if let i = args.firstIndex(of: "--check-remote"), args.count > i + 2 {
             HeadlessCheck.runRemote(preset: args[i + 1], provider: args[i + 2],
                                     model: args.count > i + 3 && !args[i + 3].hasPrefix("--") ? args[i + 3] : nil)
@@ -258,6 +260,10 @@ enum HeadlessCheck {
         }
         let key = APIKeys.key(for: backend)
         if backend.needsKey { print("key: \(key == nil ? "MISSING" : "found (\(key!.count) chars)")") }
+        if backend.hasEditableEndpoint {
+            if let problem = HostedBackend.decisionformerEndpointProblem() { print(problem); exit(1) }
+            print("endpoint: \(HostedBackend.decisionformerEndpoint.absoluteString)\(key == nil ? "" : " · key found")")
+        }
         let lab = LocalLMLab()
         try? lab.models.register(decision: JevDecisionProvider(backend.config(key: key)))
         let modelName = model ?? backend.defaultModel
@@ -265,7 +271,11 @@ enum HeadlessCheck {
         print(backend.label(model: modelName))
         run(lab: lab, preset: p, pause: backend.minInterval,
             info: .init(backend: backend.rawValue, model: modelName, revision: nil, sizeBytes: nil, isMoE: nil,
-                        wrapperLabel: nil, wrapperSystem: nil))
+                        wrapperLabel: nil, wrapperSystem: nil),
+            setup: {
+                guard backend.hasEditableEndpoint, let problem = await HostedBackend.decisionformerUnreachable() else { return }
+                print(problem); exit(1)
+            })
     }
 
     static func run(preset name: String, modelDir repo: String) -> Never {
@@ -390,10 +400,21 @@ struct BackendsSheet: View {
                             .menuStyle(.borderlessButton)
                             .fixedSize()
                         }
-                        if b.needsKey {
+                        if b.hasEditableEndpoint {
+                            HStack {
+                                Text("URL").font(.jCallout)
+                                TextField(HostedBackend.decisionformerDefaultEndpoint, text: $model.decisionformerURL)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+                            if (model.hostedEnabled[b] ?? false) || !model.decisionformerURL.isEmpty,
+                               let problem = HostedBackend.decisionformerEndpointProblem() {
+                                Text(problem).font(.jCaption).foregroundStyle(.red)
+                            }
+                        }
+                        if b.acceptsKey {
                             HStack {
                                 Text("API key").font(.jCallout)
-                                SecureField(model.apiKey(b) == nil ? "paste key" : "saved in Keychain",
+                                SecureField(model.apiKey(b) == nil ? (b.needsKey ? "paste key" : "optional") : "saved in Keychain",
                                             text: Binding(get: { keyDrafts[b] ?? "" }, set: { keyDrafts[b] = $0 }))
                                     .textFieldStyle(.roundedBorder)
                                 Button("Save") {

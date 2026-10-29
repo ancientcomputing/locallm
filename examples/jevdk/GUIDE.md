@@ -281,7 +281,8 @@ set can tell you. JevDK doesn't keep a leaderboard on purpose.
 1. **Models** (toolbar): download a few candidates. Small dense instruct models suit deciding;
    mixture-of-experts models are flagged because their probabilities were unstable in testing.
 2. **Backends** (toolbar): optionally add a hosted decider (Featherless, TypeSafe on
-   OpenRouter, or OpenAI) as a reference point.
+   OpenRouter, or OpenAI) as a reference point, or a model you fine-tuned with decisionformer
+   (**decisionformer**, pointed at your `decisionformer serve`).
 3. Run the batch with model A, then **Results CSV** (Batch toolbar) → append. Switch to model B, run, append.
 4. Open the CSV in Numbers or Excel. A pivot table of `correct` by `model` and `question` is
    per-question accuracy; `question_ms` and `decision_ms` are speed.

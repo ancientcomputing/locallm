@@ -84,6 +84,10 @@ final class AppModel {
     var hostedEnabled: [HostedBackend: Bool] = [:] { didSet { saveHostedSettings() } }
     var hostedModel: [HostedBackend: String] = [:] { didSet { saveHostedSettings() } }
     var hostedModelChoices: [HostedBackend: [String]] = [:]
+    /// Where the decisionformer backend sends requests (Backends); empty means the default.
+    var decisionformerURL = UserDefaults.standard.string(forKey: HostedBackend.decisionformerEndpointKey) ?? "" {
+        didSet { UserDefaults.standard.set(decisionformerURL, forKey: HostedBackend.decisionformerEndpointKey) }
+    }
 
     // Calibration (the developer's: fitted on answers they mark correct in the batch grid)
     /// Input → question name → the correct answer's key.
@@ -183,7 +187,7 @@ final class AppModel {
         enabledHosted.compactMap { b in
             let model = hostedModel[b] ?? b.defaultModel
             guard let id = b.modelID(model) else { return nil }
-            lab.models.replace(decision: JevDecisionProvider(b.config(key: b.needsKey ? apiKey(b) : nil)))
+            lab.models.replace(decision: JevDecisionProvider(b.config(key: b.acceptsKey ? apiKey(b) : nil)))
             let route = RouteName("hosted.\(b.rawValue)")
             lab.models.route(decision: route, to: id)
             let body = (try? JevDecisionProvider.requestBody(model: model, request: request, wire: b.config(key: nil).wire))
@@ -263,6 +267,7 @@ final class AppModel {
     private func validationProblem() -> String? {
         if activeBackendLabels.isEmpty { return "Turn on at least one backend." }
         if useLocal && selectedModel == nil { return "Pick a local model (Models in the toolbar), or turn Local off in Backends." }
+        if hostedEnabled[.decisionformer] == true, let problem = HostedBackend.decisionformerEndpointProblem() { return problem }
         if set.questions.isEmpty { return "Add at least one question." }
         if let q = set.questions.first(where: { !$0.problems.isEmpty }) {
             return "“\(q.name)”: \(q.problems.joined(separator: "; "))."
@@ -277,6 +282,9 @@ final class AppModel {
         if notice != nil && notice == readyNotice { notice = nil }   // it said what to do; done
         isRunning = true
         defer { isRunning = false }
+        if hostedEnabled[.decisionformer] == true, let problem = await HostedBackend.decisionformerUnreachable() {
+            errorMessage = problem; return
+        }
         results = await runAll(input)
     }
 
@@ -298,6 +306,9 @@ final class AppModel {
         batchTask = Task {
             isRunning = true
             defer { isRunning = false; batchProgress = nil }
+            if hostedEnabled[.decisionformer] == true, let problem = await HostedBackend.decisionformerUnreachable() {
+                errorMessage = problem; return
+            }
             batchProgress = (0, inputs.count)
             for (i, line) in inputs.enumerated() {
                 if Task.isCancelled { break }

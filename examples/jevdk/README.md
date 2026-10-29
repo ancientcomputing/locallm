@@ -108,7 +108,7 @@ the runs line up in one spreadsheet. The first click asks for a file; later clic
 | Columns | |
 |---|---|
 | Run | `run_id` (date and time the batch started, plus a short suffix), `saved_at`, `app`, `sdk_version`, `machine`, `question_set` |
-| Model | `backend` (local / featherlessDemo / featherless / openRouter / openAI), `model`, `model_revision`, `model_size_gb`, `moe`, `wrapper_label`, `wrapper_system`, `calibrated` |
+| Model | `backend` (local / featherlessDemo / featherless / openRouter / openAI / decisionformer), `model`, `model_revision`, `model_size_gb`, `moe`, `wrapper_label`, `wrapper_system`, `calibrated` |
 | Item | `input`, `question`, `question_kind`, `question_text` |
 | Result | `expected` (your marked answer), `answer`, `correct` (yes / no), `confidence`, `probabilities`, `label_mass` |
 | Cost | `question_ms`, `decision_ms`, `input_tokens`, `cost_usd` (hosted, per decision) |
@@ -198,6 +198,15 @@ From the SDK's own OpenJev evaluation (a labelled test set scored on several loc
   Decisions API) take a key, stored in the Keychain. When any is on, the status bar says where
   inputs are sent. OpenAI can decline a question: the cell then says **refused**, which counts as
   a miss against a marked answer.
+- **decisionformer** (Backends): a model you fine-tuned with
+  [decisionformer](https://github.com/FrontiersMindAI/decisionformer), answering from
+  `decisionformer serve` on your own machine. Its `/v1/systemone` API is hosted Jev's, so it sits
+  next to the others in the grid and the results CSV. Set **URL** if the server isn't at
+  `http://127.0.0.1:8000/v1/systemone` (https, or plain http only to localhost or a `.local`
+  name), and an **API key** only if you started it with `--api-key-env`. **Refresh list** reads
+  the served model's name from its `/v1/models`. Its confidence is decisionformer's own (1 minus
+  the normalized entropy of the probabilities, so near 0 for an even split), not the winning
+  option's probability; compare `probabilities` across backends, not `confidence`.
 
 ## For SDK developers
 
@@ -221,8 +230,9 @@ Headless checks:
 ```
 
 `--check` needs a model the SDK has downloaded (or verified). `--check-remote` takes
-`featherlessDemo`, `featherless`, `openRouter` or `openAI`, using the key saved in **Backends**
-(the Keychain) or, for CI, the `OPENROUTER_API_KEY` / `FEATHERLESS_API_KEY` / `OPENAI_API_KEY`
-environment variable. Keys
+`featherlessDemo`, `featherless`, `openRouter`, `openAI` or `decisionformer`, using the key saved
+in **Backends** (the Keychain) or, for CI, the `OPENROUTER_API_KEY` / `FEATHERLESS_API_KEY` /
+`OPENAI_API_KEY` / `DECISIONFORMER_API_KEY` environment variable. decisionformer's URL is the one
+saved in Backends, else `DECISIONFORMER_URL`, else `http://127.0.0.1:8000/v1/systemone`. Keys
 are never printed, and never read from a file. The window
 hasn't been driven by a test.
