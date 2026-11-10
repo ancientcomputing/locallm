@@ -25,20 +25,20 @@ struct SDKRelease {
 // its entry (URL + the `.sha256` next to the zip on the GitHub release) or just replace the strings in
 // place. Needs a release that includes the model pin / update / cleanup APIs (1.0.0-RC.1 as re-published
 // on 2026-09-18, or later).
-let defaultSDKVersion = "2.3.0-GA"
+let defaultSDKVersion = "2.3.1-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
-    "2.2.0-GA": SDKRelease(
-        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLMLabSDKCore-2.2.0-GA.xcframework.zip",
-        coreChecksum: "5efc40cae9f8a1bf53bfe03195c5365398bc9501b3e6b0feee3e5c67385537f4",
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.2.0-GA/LocalLMLabSDKInference-2.2.0-GA.xcframework.zip",
-        inferenceChecksum: "afd427fb741a820f55bc0a384850ae6404608f5ad73d185a583a89e8f0d61a61"
-    ),
     "2.3.0-GA": SDKRelease(
         coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKCore-2.3.0-GA.xcframework.zip",
         coreChecksum: "7821197d0cf5b4c92e36af5c537295e594afbb55d60d2f98b0773a3625403575",
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKInference-2.3.0-GA.xcframework.zip",
         inferenceChecksum: "63dc8bcba5e91e1324809ca412a23ebb0b9e04386361436eacc0be9fe6d4a8e0"
+    ),
+    "2.3.1-GA": SDKRelease(
+        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip",
+        coreChecksum: "0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c",
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKInference-2.3.1-GA.xcframework.zip",
+        inferenceChecksum: "7663074fc31919ba2970c99d7835fbad93415370b29ad828a32def0db73c7e8e"
     ),
 ]
 

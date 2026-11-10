@@ -33,7 +33,7 @@ struct SDKRelease {
 // or edit `defaultSDKVersion` here. For a release not listed, add its entry (URL + the `.sha256`
 // next to each zip on the GitHub release) or just replace the strings in place. Only 2.3 and
 // later: the OpenAI backend doesn't build against 2.2 or earlier.
-let defaultSDKVersion = "2.3.0-GA"
+let defaultSDKVersion = "2.3.1-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
     // 2.3.0-GA: OpenAI's Decisions API (JevProviderConfig.openAI) and Decision.refusals, which
@@ -45,6 +45,14 @@ let knownSDKReleases: [String: SDKRelease] = [
         remoteChecksum: "dae65d45bea196f6cd2538328fad1a0e33eceae5fac5ee965183706ac942daaf",
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKInference-2.3.0-GA.xcframework.zip",
         inferenceChecksum: "63dc8bcba5e91e1324809ca412a23ebb0b9e04386361436eacc0be9fe6d4a8e0"
+    ),
+    "2.3.1-GA": SDKRelease(
+        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip",
+        coreChecksum: "0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c",
+        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKRemote-2.3.1-GA.xcframework.zip",
+        remoteChecksum: "79247d567ad5dddecd14b0cc7662ab1ac61a322c3507029abd9fd4fb093d9ab6",
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKInference-2.3.1-GA.xcframework.zip",
+        inferenceChecksum: "7663074fc31919ba2970c99d7835fbad93415370b29ad828a32def0db73c7e8e"
     ),
 ]
 

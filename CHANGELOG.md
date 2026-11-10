@@ -24,6 +24,34 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
+## 2.3.1 — GA — 2026-11-10
+
+Fixes Private Cloud Compute (PCC) turns that stall. No API change: code that builds against 2.3.0
+builds unchanged. Only `LocalLMLabSDKCore` has a source change; `LocalLMLabSDKClaude`,
+`LocalLMLabSDKInference` and `LocalLMLabSDKRemote` are rebuilt for the version number only.
+
+### Fixed
+
+- **A new PCC session is no longer prewarmed.** `makeSession` prewarmed every session, and for PCC
+  the prewarm is a server request of its own, sent the moment the session is made. On macOS 27.2
+  the server often generates a few hundred tokens for it anyway and rejects them (a recitation
+  rejection, `ModelManagerServices.InferenceError` 2008). A turn started on the same session at the
+  same time then stalled for about 30 seconds and ended with no text and no error. An app that
+  makes a session and sends at once hit it, even for a prompt like "2+2" with no tools; one that
+  makes its session earlier (when a chat opens, say) usually didn't. The model runs in Apple's
+  cloud, so there is nothing local to warm. Sessions for other providers are prewarmed as before.
+
+### Checksums (SHA-256)
+
+```
+LocalLMLabSDKCore-2.3.1-GA.xcframework.zip       0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c
+LocalLMLabSDKClaude-2.3.1-GA.xcframework.zip     4b4989f288b70d7762d9151fe1c7745cc76234854dd97693a53bbc81569955e1
+LocalLMLabSDKInference-2.3.1-GA.xcframework.zip  7663074fc31919ba2970c99d7835fbad93415370b29ad828a32def0db73c7e8e
+LocalLMLabSDKRemote-2.3.1-GA.xcframework.zip     79247d567ad5dddecd14b0cc7662ab1ac61a322c3507029abd9fd4fb093d9ab6
+```
+
+---
+
 ## 2.3.0 — GA — 2026-10-27
 
 OpenAI's Decisions API as a fourth decider, and refusals in `Decision`. Additive only: code that
