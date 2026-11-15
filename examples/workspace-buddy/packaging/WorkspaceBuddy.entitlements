@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<!-- Unlike plate-today(-tools), sandboxing here is NOT a build-time opt-in — it's what makes
-	     the whole point of this example (docs/sdk-guide.md §8's security-scoped bookmark pattern)
+	     the whole point of this example (docs/sdk-guide.md ("Filesystem access")'s security-scoped bookmark pattern)
 	     actually necessary to demonstrate. Outside a sandbox, a plainly-remembered folder path
 	     would just keep working across relaunches and the bookmark dance would prove nothing. -->
 	<key>com.apple.security.app-sandbox</key>

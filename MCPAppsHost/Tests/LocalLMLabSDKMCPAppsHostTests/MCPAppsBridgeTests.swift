@@ -181,6 +181,15 @@ private struct Harness {
         #expect((result["_meta"] as? [String: Any])?["k"] as? String == "v")
     }
 
+    @Test func aViewsCallsAreRateLimited() async {  // security review 2026-10-28, C30
+        let h = Harness(configuration: MCPAppsBridgeConfiguration(hostName: "TestHost", hostVersion: "1.0", maxToolCallsPerMinute: 2))
+        await h.initialize()
+        for id in 2...4 { await h.request(id, "tools/call", ["name": "find-tasks"]) }
+        #expect(h.recorder.toolCalls.count == 2)
+        #expect(h.result(for: 3) != nil)
+        #expect(h.errorCode(for: 4) == -32000)
+    }
+
     @Test func unknownToolIsRefused() async {
         let h = Harness()
         await h.initialize()

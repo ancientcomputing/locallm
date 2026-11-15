@@ -19,7 +19,7 @@ permission prompts, a real browser OAuth round trip, real on-device inference. T
 [`plate-today-tools`](../plate-today-tools/) is the identical app rebuilt on the SDK's ready-made
 Tools ("Path A") — diff the two to see what changes. The blow-by-blow of where each permission
 prompt and the OAuth flow fire is in
-[`docs/sdk-guide.md` §5](../../docs/sdk-guide.md#5-walking-through-a-reference-apps-user-experience-step-by-step).
+[`docs/walkthrough-plate-today.md`, "The reference-app walkthrough"](../../docs/walkthrough-plate-today.md).
 
 ## What you'll see
 
@@ -126,7 +126,7 @@ NOTARIZE_APP=0 \
 | `DEVELOPER_DIR` | Yes (on macOS 27) | `/Applications/Xcode.app/Contents/Developer` | Must point at Xcode 27 (`xcode-select -p` is used if unset); an older Xcode fails with `'v27' is unavailable`. |
 | `PLATETODAY_INCLUDE_LOCATION_WEATHER` | No | `0` | Build-time opt-in for the Location + Weather tools. Off by default — Location Services can be flaky, and unlike Calendar/Reminders/Contacts, its TCC grant can't be cleanly reset with `tccutil reset Location <bundle-id>` (only `tccutil reset All` or a manual System Settings removal works). |
 | `PLATETODAY_INCLUDE_CONTACTS` | No | `0` | Build-time opt-in for the Contacts connector (on-demand enrichment, not part of the default daily-summary flow — avoids an extra TCC prompt by default). |
-| `PLATETODAY_APP_SANDBOX` | No | `0` | Build-time opt-in for an App Sandbox build (proof-of-concept for Mac App Store compatibility — see `docs/sdk-guide.md` §10 for what's confirmed working under sandbox). |
+| `PLATETODAY_APP_SANDBOX` | No | `0` | Build-time opt-in for an App Sandbox build (proof-of-concept for Mac App Store compatibility — see `docs/sdk-guide.md`, "App Sandbox" for what's confirmed working under sandbox). |
 
 ## Mac App Store build: `packaging/build-and-sign-mas.sh`
 
@@ -144,7 +144,7 @@ LOCALLM_SDK_VERSION=1.0.0-RC.1 VERSION=1.0.0-RC.1 ./packaging/build-and-sign-mas
 Mac Developer Installer"/"Mac Installer Distribution" identity — a genuinely different certificate
 type from Apple Distribution), and `PROVISIONING_PROFILE` are all auto-discovered from your
 keychain / `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` if not set explicitly. See
-`docs/sdk-guide.md` §10d for the one-time Apple Developer Portal setup this assumes (certificate,
+`docs/sdk-guide.md`, "Mac App Store signing setup" for the one-time Apple Developer Portal setup this assumes (certificate,
 App ID, provisioning profile). `PLATETODAY_INCLUDE_LOCATION_WEATHER`/`PLATETODAY_INCLUDE_CONTACTS`
 work the same as above; `PLATETODAY_INCLUDE_TODOIST` (default `1`, included) is the build-time
 opt-**out** if you want to build without a Todoist account.
@@ -201,7 +201,7 @@ you'll see no Contacts prompt — that's the expected on-demand behavior, not a 
   of SDK 0.7.1, the failure screen shows Core's `GenerationErrorDescription.describe(_:)` output
   instead of the raw error, so a retry that keeps failing will actually tell you which
   `GenerationError` case fired (guardrail violation, context window overflow, decoding failure,
-  etc.) — see `docs/sdk-guide.md` §6's "On reading `GenerationError` failures" for the full list.
+  etc.) — see `docs/mcp-guide.md`, "The MCP client API"'s "On reading `GenerationError` failures" for the full list.
 
 ## More
 

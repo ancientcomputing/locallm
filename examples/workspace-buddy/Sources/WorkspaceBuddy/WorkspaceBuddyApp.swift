@@ -13,7 +13,7 @@ import FoundationModels
 import LocalLMLabSDKCore
 import SwiftUI
 
-// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8)
+// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md ("Filesystem access"))
 
 // Verbatim from §8's documented pattern, with one real addition not covered there: an
 // async-aware access wrapper. §8's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —

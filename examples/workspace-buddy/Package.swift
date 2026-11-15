@@ -6,7 +6,7 @@ import PackageDescription
 // (LocalLMLabSDKCore.xcframework via a GitHub Release asset) — see plate-today's Package.swift.
 //
 // Same as plate-today-tools/repo-qa, same reason: this app's whole point is
-// WorkspaceAccess/WorkspaceTools (docs/sdk-guide.md §8a), which shipped starting with 0.8.0.
+// WorkspaceAccess/WorkspaceTools (docs/sdk-guide.md ("Workspace tools")), which shipped starting with 0.8.0.
 // Building against 0.7.0/0.7.1 fails to compile (`cannot find 'ListWorkspaceFilesTool' in
 // scope`), not run with reduced functionality.
 
@@ -21,16 +21,16 @@ struct SDKRelease {
 // `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
 // release not listed, add its entry (URL + the `.sha256` next to the zip on the
 // GitHub release) or just replace the strings in place.
-let defaultSDKVersion = "2.3.1-GA"
+let defaultSDKVersion = "3.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
     "2.3.0-GA": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKCore-2.3.0-GA.xcframework.zip",
         checksum: "7821197d0cf5b4c92e36af5c537295e594afbb55d60d2f98b0773a3625403575"
     ),
-    "2.3.1-GA": SDKRelease(
-        url: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip",
-        checksum: "0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c"
+    "3.0.0-GA": SDKRelease(
+        url: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
+        checksum: "c4b84b270e2a7131ce438ebdec6fca6488fc68800ea900f8b0b344799750fa07"
     ),
 ]
 

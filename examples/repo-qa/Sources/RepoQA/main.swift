@@ -5,7 +5,7 @@
 // TCC-gated: MCP network calls need no macOS permission, so a bare `swift run` binary works
 // end to end, no packaging/ directory, no code signing, no Info.plist. That's the point of this
 // example existing separately rather than as a third tool bolted onto plate-today-tools — it
-// shows Core's MCPTool (Path A — see docs/sdk-guide.md §7a) in its simplest possible setting.
+// shows Core's MCPTool (Path A — see docs/sdk-guide.md ("Two paths to tool-calling")) in its simplest possible setting.
 //
 // Narrative: ask a free-form question about any public GitHub repository's own documentation,
 // answered by Apple's on-device model calling Deepwiki's real hosted MCP server
@@ -68,7 +68,7 @@ func run() async {
     // call, ~20x this model's whole ~8,000-token context window. The on-device model has no way to
     // know that in advance from the tool's name/description alone, and picked it for a plain
     // "what is the plugin system?" question in real testing, hard-failing the whole session. This
-    // is exactly the risk docs/sdk-guide.md §3 already warns about ("don't naively pass all of
+    // is exactly the risk docs/mcp-guide.md ("Connecting to an MCP server") already warns about ("don't naively pass all of
     // them into a LanguageModelSession without picking the ones your prompt actually needs") —
     // MCPTool itself has no way to know a tool's real-world response size from its schema, since
     // JSON Schema describes shape, not payload size; that judgment call is the integrating app's

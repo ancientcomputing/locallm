@@ -122,6 +122,11 @@ paste one of these — the 8B model handles a bit more per request than Apple's 
 - `Read data.json and write a Markdown table of the same rows to data.md.`
 - `Find every file containing the string "deprecated" and add a "// TODO: remove" comment on that line.`
 
+**Each write or edit asks first.** An alert names the tool and what it will change; reads run
+without asking. Deny, and the model is told the call was refused and carries on. This is the
+session's authorizer (`ConfirmingToolAuthorizer`): since SDK 3.0, a session without one refuses
+every write, so a sample that writes has to say how writes are decided.
+
 Confirm the result with `git diff` — the files on disk are the source of truth, not the model's
 summary. Keep to one folder and one clearly-scoped change per request; open-ended "refactor this
 project" asks are still beyond a local 8B.
@@ -152,7 +157,7 @@ swift-huggingface picks this path automatically for a sandboxed app (it keys off
   Finder or Terminal may access another app's data, allow it.
 
 A non-sandboxed app or CLI using the same model layer stores it at `~/.cache/huggingface/hub/`
-instead. See [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
+instead. See [`docs/sdk-guide.md`, "The model layer"](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions).
 
 ### Removing the model
 
@@ -210,7 +215,7 @@ files) that a bare "Working…" spinner reads as *stuck*. So this version:
 
 `session.events` is the side-channel *around* generation (tool calls, context compaction,
 model-load progress); token text always comes from `streamResponse`. See
-[`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions),
+[`docs/sdk-guide.md`, "The model layer"](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions),
 the `LocalLMLabSession.events` subsection.
 
 > **The download UI is hand-rolled here on purpose.** The `.downloadingModel(fraction)` state and
@@ -218,7 +223,7 @@ the `LocalLMLabSession.events` subsection.
 > want the ready-made version — a model list with availability badges, on-disk sizes, the
 > progress bar, and an "Add from Hugging Face" field — `Components`' `ModelPickerView` binds
 > straight to `lab.models`; see
-> [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+> [`docs/sdk-guide.md`, "Components"](../../docs/sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer).
 
 ## Changing the model
 
@@ -229,7 +234,7 @@ The revision is the exact commit the app downloads (the repo's *Files ▸ histor
 a Hugging Face repo's owner can change what `main` points to at any time, and without a pin a
 fresh download would silently fetch different weights. A pin means the version you tried is the
 version users get; moving to a new one is a deliberate edit after you've reviewed it. See
-[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+[Pinning, updating and cleaning up model versions](../../docs/local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions).
 See [`docs/tested-models.md`](../../docs/tested-models.md) for which open-weight models tool-call
 reliably. `MLXModelProvider.validate` refuses a model whose weights exceed ~70% of this Mac's RAM.
 
@@ -241,7 +246,7 @@ reliably. `MLXModelProvider.validate` refuses a model whose weights exceed ~70% 
   Apple → open-weight swap, on `repo-qa`.
 - [`code-buddy`](../code-buddy) — the model layer end to end (two models, routing between them,
   an agent loop), a CLI.
-- [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) —
+- [`docs/sdk-guide.md`, "The model layer"](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions) —
   the model layer, in prose. §8a — `WorkspaceTools`. §10 — App Sandbox.
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
   every SDK touchpoint marked.

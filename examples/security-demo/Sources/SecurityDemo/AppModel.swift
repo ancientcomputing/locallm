@@ -192,11 +192,11 @@ final class AppModel {
             ])
 
             // Lever 2 — invocation. Todoist's approval lives on its server in `lab.mcp`; the
-            // Calendar tools' on the authorizer. No authorizer at all when nothing is set to confirm.
+            // Calendar tools' on the authorizer. Always pass one: with no authorizer, SDK 3.0 fails
+            // closed (reads run, every change and every untrusted MCP call is denied). With both
+            // toggles off, both approvals are `.allow`, so every call runs unasked.
             lab.mcp.setToolApproval(policy.todoistApproval, server: MCPServerID(rawValue: todoistURL.absoluteString))
-            let authorizer: (any ToolCallAuthorizer)? = policy.wantsConfirmation
-                ? ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)
-                : nil
+            let authorizer = ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)
 
             let session = try lab.makeSession(
                 route: "frontier",

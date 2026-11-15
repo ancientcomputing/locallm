@@ -15,7 +15,7 @@
 > original 15-round rig below.)
 
 Applies to the **model layer** only (`LocalLMLabSDKInference` + `MLXModelProvider` — see
-[`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions)). The
+[`sdk-guide.md`, "The model layer"](sdk-guide.md#the-model-layer-models-routing-and-sessions)). The
 example that exercises all of it is [`code-buddy`](../examples/code-buddy/), which defaults
 to `mlx-community/Qwen3-8B-4bit` for exactly the reasons below.
 
@@ -42,9 +42,9 @@ built-in `ClockTool` cross-check.
 Point-in-time too: **2026-10-03**, SDK `2.0.0-dev` (a pre-release build; not re-run on `2.0.0-GA`), a 64 GB Apple-silicon Mac, the SDK's own
 decision-question evaluation and JevDK's customer-support example. A decider answers typed
 questions from the probabilities of each option's label, with no generation
-([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide)), so what matters is
+([`decision-models.md`, "Decision models"](decision-models.md)), so what matters is
 different from tool calling. **Test your own questions on your own marked inputs in
-[JevDK](../examples/jevdk/); these rows only say where to start.**
+[JevDK](https://github.com/ancientcomputing/jevdk); these rows only say where to start.**
 
 | Model | As a decider | Notes |
 |---|---|---|

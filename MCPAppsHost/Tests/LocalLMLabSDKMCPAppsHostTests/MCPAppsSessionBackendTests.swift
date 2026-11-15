@@ -4,8 +4,8 @@ import Testing
 
 import LocalLMLabSDKMCPAppsHost
 
-// The session-backed adapter for model-present hosts. Public API only; the session behavior
-// itself is tested in the SDK.
+// The session-backed adapter for model-present hosts. Public API only; the
+// session behavior itself is tested in the Claude package's AppCallTests.
 
 @MainActor
 @Suite struct MCPAppsSessionBackendTests {

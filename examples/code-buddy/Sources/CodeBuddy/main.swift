@@ -167,7 +167,7 @@ func run() async {
         if case .success(let state) = result {
             // read_wiki_contents dumps an entire wiki unscoped — see repo-qa's note.
             for tool in state.tools where tool.name == "read_wiki_contents" {
-                lab.mcp.setToolEnabled(server: state.id, tool: tool.name, enabled: false)
+                lab.mcp.setToolEnabled(false, server: state.id, tool: tool.name)
             }
             note("  \(lab.mcp.toolsForSession().count) MCP tool(s)")
         } else {
@@ -200,7 +200,12 @@ func run() async {
 
     let session: LocalLMLabSession
     do {
-        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions)
+        // SDK 3.0: a session with no authorizer is fail-closed (reads run, anything that changes data is denied), and a
+        // coding agent's whole job is to edit files and run tests. This is a CLI the developer runs on their own
+        // repository with nobody at a prompt, so it says so: every call runs unasked, as it did before 3.0. An app
+        // with a UI would pass a ConfirmingToolAuthorizer here instead.
+        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions,
+                                      authorizer: AllowingToolAuthorizer())
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }

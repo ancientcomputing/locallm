@@ -205,7 +205,7 @@ final class AIQLModel: ObservableObject {
         let ranked = serverTools.sorted { lhs, rhs in Self.dataLikelihood(lhs.name) > Self.dataLikelihood(rhs.name) }
         let chosen = ranked.prefix(4).map(\.name)
         for tool in serverTools {
-            lab.mcp.setToolEnabled(server: serverID, tool: tool.name, enabled: chosen.contains(tool.name))
+            lab.mcp.setToolEnabled(chosen.contains(tool.name), server: serverID, tool: tool.name)
         }
         // File-backed: each data tool gets a `saveAs` argument that writes its raw result into the
         // chosen folder, so the dataset never enters the model's context. Only for this run —
@@ -254,8 +254,13 @@ final class AIQLModel: ObservableObject {
             // effort: .off — skip the model's <think> pass. The Qwen3 family has the
             // template toggle; the pipeline is mechanical (pick a tool, name a table, write
             // one SELECT) so the reasoning trace buys nothing but latency.
+            // SDK 3.0: with no authorizer a session is fail-closed, and the data server you connect here isn't marked
+            // trusted, so its tools count as changes and would be denied. AIQL only reads (one SELECT per question) on a
+            // server you added yourself, so it runs every call unasked, as before 3.0. An app that wants a prompt
+            // passes a ConfirmingToolAuthorizer instead.
             session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,
-                                          includeMCPTools: true, options: SessionOptions(effort: .off))
+                                          includeMCPTools: true, options: SessionOptions(effort: .off),
+                                          authorizer: AllowingToolAuthorizer())
         } catch LocalLMLabError.mcp {
             return .failed("Couldn't read that server's tools — its data format isn't supported yet.")
         } catch {

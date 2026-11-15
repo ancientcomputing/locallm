@@ -22,7 +22,7 @@ struct SDKRelease {
 // `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
 // release not listed, add its entry (URL + the `.sha256` next to the zip on the
 // GitHub release) or just replace the strings in place.
-let defaultSDKVersion = "2.3.1-GA"
+let defaultSDKVersion = "3.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
     "2.3.0-GA": SDKRelease(
@@ -31,11 +31,11 @@ let knownSDKReleases: [String: SDKRelease] = [
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKInference-2.3.0-GA.xcframework.zip",
         inferenceChecksum: "63dc8bcba5e91e1324809ca412a23ebb0b9e04386361436eacc0be9fe6d4a8e0"
     ),
-    "2.3.1-GA": SDKRelease(
-        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip",
-        coreChecksum: "0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c",
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKInference-2.3.1-GA.xcframework.zip",
-        inferenceChecksum: "7663074fc31919ba2970c99d7835fbad93415370b29ad828a32def0db73c7e8e"
+    "3.0.0-GA": SDKRelease(
+        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
+        coreChecksum: "c4b84b270e2a7131ce438ebdec6fca6488fc68800ea900f8b0b344799750fa07",
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKInference-3.0.0-GA.xcframework.zip",
+        inferenceChecksum: "f4c937ac18db0a67c1c5467f06c5aa674b1f34801f73fc7fa1c628ac206713d6"
     ),
 ]
 

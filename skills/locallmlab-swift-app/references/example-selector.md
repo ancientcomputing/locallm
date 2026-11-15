@@ -15,8 +15,7 @@ Pick the nearest reference app before inventing a new integration shape.
 - `examples/components-demo`: prebuilt Components UI for adding and managing MCP servers.
 - `examples/model-switch`: Core plus Remote plus Components for online providers, API keys, model selection, web search, and citations.
 - `examples/aiql`: SwiftUI "ask your data" app using MCP, `FileBackedTool`, data verbs, CSV output, sandboxing, and OAuth.
-- `examples/jev-serve` (2.0): a command-line HTTP server answering hosted Jev's API (OpenRouter, Featherless) with OpenJev on this Mac, from JevDK's exported config. The reference for serving decisions to other processes or languages, and for `JevWire` (the wire format) on the server side.
-- `examples/jevdk` (2.0): JevDK, a SwiftUI playground for decision models: `lab.decide` across local `OpenJevDecisionProvider` (Inference) and hosted `JevDecisionProvider` (Remote), batch scoring against marked answers, `DecisionCalibration`, and `DecisionQuestionSet` / `DecisionAnswerSet` export. The reference for any decision-model integration; its `GUIDE.md` is the workflow.
+- JevDK and jev-serve (their own project, https://github.com/ancientcomputing/jevdk; `examples/jevdk` and `examples/jev-serve` here only point there): JevDK is a SwiftUI playground for decision models (`lab.decide` across local `OpenJevDecisionProvider` (Inference) and hosted `JevDecisionProvider` (Remote), batch scoring against marked answers, `DecisionCalibration`, `DecisionQuestionSet` / `DecisionAnswerSet` export); jev-serve answers hosted Jev's API with OpenJev on this Mac and is the reference for `JevWire` on the server side. Use the JevDK repo for any decision-model integration; its guide is https://thisbrain.ai/locallm/jdk-guide.html.
 
 ## Toolkit Examples
 

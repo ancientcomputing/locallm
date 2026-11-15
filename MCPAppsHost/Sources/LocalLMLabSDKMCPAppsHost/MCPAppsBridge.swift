@@ -21,6 +21,10 @@ public struct MCPAppsBridgeConfiguration: Sendable {
     public var maxMessageBytes: Int
     /// How long `teardown` waits for the view to answer `ui/resource-teardown`.
     public var teardownTimeout: Duration
+    /// Most `tools/call` requests one view may make in a minute, and at once (security review
+    /// 2026-10-28, C30): a widget that polls stays within these; one past them is refused, not queued.
+    public var maxToolCallsPerMinute: Int
+    public var maxConcurrentToolCalls: Int
 
     public init(
         hostName: String, hostVersion: String,
@@ -29,8 +33,12 @@ public struct MCPAppsBridgeConfiguration: Sendable {
         effectivePermissions: MCPAppPermissions = MCPAppPermissions(),
         availableDisplayModes: [String] = ["inline"],
         maxMessageBytes: Int = 4 * 1024 * 1024,
-        teardownTimeout: Duration = .seconds(2)
+        teardownTimeout: Duration = .seconds(2),
+        maxToolCallsPerMinute: Int = 60,
+        maxConcurrentToolCalls: Int = 4
     ) {
+        self.maxToolCallsPerMinute = max(1, maxToolCallsPerMinute)
+        self.maxConcurrentToolCalls = max(1, maxConcurrentToolCalls)
         self.hostName = hostName
         self.hostVersion = hostVersion
         self.hostContext = hostContext
@@ -72,8 +80,8 @@ public struct MCPAppsHostActions {
 
 /// The JSON-RPC state machine between ONE view (a `ui://` widget) and the host — pure Swift, no
 /// WebKit. A web-view layer feeds it raw messages via `receive(_:)` and ships whatever it emits
-/// through `send`. A host with no model uses it as-is; a host with a model wires the opt-in
-/// policy methods.
+/// through `send`. Shape A (no model) uses it as-is; hosted-model shapes wire the opt-in policy
+/// methods.
 ///
 /// Guarantees (each covered by tests):
 /// - nothing is sent to the view before it sends `ui/notifications/initialized` (spec); host
@@ -116,6 +124,9 @@ public final class MCPAppsBridge {
     /// `host-context-changed` fields requested before the view is ready, merged into ONE
     /// notification (later values win) so a burst of resizes doesn't become a burst of messages.
     private var pendingContext: [String: MCPValue] = [:]
+    /// When the view's recent `tools/call` requests were made, and how many are running (C30).
+    private var toolCallTimes: [ContinuousClock.Instant] = []
+    private var toolCallsInFlight = 0
     private var teardownContinuation: CheckedContinuation<Void, Never>?
     private static let teardownRequestID = "host-teardown-1"
 
@@ -368,6 +379,18 @@ public final class MCPAppsBridge {
         if case .deny(let reason) = await policy.authorizeToolCall(name: name, arguments: arguments) {
             return fail(id, method, .server(reason), detail: name, outcome: .denied)
         }
+        // A view's call rate (C30): refused past the configured number per minute or at once.
+        let now = ContinuousClock.now
+        toolCallTimes.removeAll { now - $0 > .seconds(60) }
+        guard toolCallTimes.count < configuration.maxToolCallsPerMinute else {
+            return fail(id, method, .server("Too many calls: at most \(configuration.maxToolCallsPerMinute) per minute"), detail: name, outcome: .denied)
+        }
+        guard toolCallsInFlight < configuration.maxConcurrentToolCalls else {
+            return fail(id, method, .server("Too many calls at once: at most \(configuration.maxConcurrentToolCalls)"), detail: name, outcome: .denied)
+        }
+        toolCallTimes.append(now)
+        toolCallsInFlight += 1
+        defer { toolCallsInFlight -= 1 }
         switch await backend.callTool(name: name, arguments: arguments) {
         case .success(let result):
             reply(id, method, result: Self.resultObject(result), detail: name)

@@ -11,7 +11,7 @@ Mac, and the model can only touch the one folder you chose.
 - **Giving a model safe, scoped access to files.** Core's `WorkspaceTools` — list, read, create,
   and edit files — are ready-made tools you drop into the model's tool array; you write no file
   I/O and no per-tool code. Every path they touch is confined to the folder the user picked
-  ("Path A" — see [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
+  ("Path A" — see [`docs/sdk-guide.md`, "Workspace tools"](../../docs/sdk-guide.md#workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)).
 - **A user-picked folder that survives relaunch, under App Sandbox.** The app is always sandboxed
   (the Mac App Store requires it). A sandboxed app can't simply reopen a folder the user chose
   last time — it has to save a *security-scoped bookmark*. This app shows that pattern end to
@@ -57,7 +57,7 @@ source of truth, the files on disk are.
 
 For more capability while staying local, [`workspace-buddy-local`](../workspace-buddy-local) is
 this same app running a downloadable open-weight model (e.g. an 8B). The SDK can also route to
-Claude if a cloud model is acceptable — see [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions).
+Claude if a cloud model is acceptable — see [`docs/sdk-guide.md`, "The model layer"](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions).
 
 ## Getting the SDK & toolchain
 
@@ -179,7 +179,7 @@ worked, and a follow-up read reflected the earlier edit — no stale-cache issue
   open-weight model** (e.g. an 8B) instead of Apple's, inside App Sandbox.
 - [`plate-today-tools`](../plate-today-tools) — another Path-A app (ready-made Tools), also
   sandbox-capable, also a GUI.
-- [`docs/sdk-guide.md` §8a](../../docs/sdk-guide.md#8a-workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) —
+- [`docs/sdk-guide.md`, "Workspace tools"](../../docs/sdk-guide.md#workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) —
   `WorkspaceAccess` / `WorkspaceTools`, and why `editFile` is search-and-replace, not a diff
   format. §10 — App Sandbox.
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with

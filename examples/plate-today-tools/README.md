@@ -31,7 +31,7 @@ otherwise identical, you can diff
 against [`plate-today`'s `PlateTodayApp.swift`](../plate-today/Sources/PlateToday/PlateTodayApp.swift)
 and see exactly what Path A saves and what it costs — every difference is marked with a
 `DIFF FROM plate-today:` comment. The longer prose version is
-[`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own);
+[`docs/sdk-guide.md`, "Two paths to tool-calling"](../../docs/sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own);
 [`docs/annotated-examples.md`](../../docs/annotated-examples.md) walks both apps' full source.
 
 ## What you'll see
@@ -162,7 +162,7 @@ NOTARIZE_APP=0 PLATETODAYTOOLS_INCLUDE_CONTACTS=1 \
 ## Mac App Store build: `packaging/build-and-sign-mas.sh`
 
 Same Apple Distribution + provisioning profile path as `plate-today`'s — see that example's README
-and `docs/sdk-guide.md` §10d for the one-time Apple Developer Portal setup this assumes.
+and `docs/sdk-guide.md`, "Mac App Store signing setup" for the one-time Apple Developer Portal setup this assumes.
 
 ## What actually changes between this app and plate-today
 
@@ -184,7 +184,7 @@ but in short:
 
 ## More
 
-- [`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own) —
+- [`docs/sdk-guide.md`, "Two paths to tool-calling"](../../docs/sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own) —
   the prose version of the Path A vs Path B framing this pair of examples demonstrates.
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
   every SDK touchpoint marked, alongside plate-today's.

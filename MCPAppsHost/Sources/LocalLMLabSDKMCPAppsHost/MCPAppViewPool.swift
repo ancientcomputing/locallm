@@ -4,8 +4,8 @@ import WebKit
 
 /// Keeps at most `limit` widgets live.
 ///
-/// Each live widget is a `WKWebView` with its own WebContent process — about 105 MB each, as
-/// measured in a chat host. Past the limit the least recently used widget is snapshotted, closed and
+/// Each live widget is a `WKWebView` with its own WebContent process — about 105 MB each in the
+/// Shape B prototype (P2). Past the limit the least recently used widget is snapshotted, closed and
 /// **released** (`close()` alone does not end its process; dropping the view does), and the host
 /// shows `snapshot(for:)` in its place until the user scrolls back or taps it, when the host asks
 /// for the view again and it is re-created.

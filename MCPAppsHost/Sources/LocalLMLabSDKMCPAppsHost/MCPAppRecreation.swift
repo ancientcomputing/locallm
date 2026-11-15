@@ -34,7 +34,7 @@ public enum MCPAppRecreation {
         public var widgetChanged: Bool
     }
 
-    /// Decides what to show. Rules:
+    /// Decides what to show. Rules (P3):
     /// - server reachable, same version → the current widget;
     /// - server reachable, newer version, tool output schema unchanged → the current widget (it
     ///   carries the vendor's fixes) with the stored result;

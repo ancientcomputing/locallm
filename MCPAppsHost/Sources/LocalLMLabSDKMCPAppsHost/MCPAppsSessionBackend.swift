@@ -1,10 +1,10 @@
 import Foundation
 import LocalLMLabSDKCore
 
-// For hosts with a model in the loop: route a
+// For hosts with a model in the loop (Shape B/C): route a
 // widget's calls and messages through the LocalLMLabSession, so they pass the session's
 // ToolCallAuthorizer (which sees `initiator: .app(instance:)`) and land in its HostTranscript.
-// Model-less hosts (a widget browser, say) keep using MCPServerManagerBackend and the bridge policy.
+// Model-less hosts (Shape A, the browser) keep using MCPServerManagerBackend and the bridge policy.
 
 /// An `MCPAppsBackend` whose `tools/call` goes through `session.callMCPTool(…, initiator: .app)`.
 ///

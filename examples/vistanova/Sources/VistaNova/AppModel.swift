@@ -328,8 +328,21 @@ final class AppModel {
     /// `capabilityProbe(_:)` is available if a caller needs to know ahead of time whether `.off`
     /// will actually take effect — not needed here since we only use it best-effort.)
     private func makeSessionSuppressingThinking(route: RouteName, tools: [any Tool] = [], instructions: String, includeMCPTools: Bool) throws -> LocalLMLabSession {
-        try lab.makeSession(route: route, tools: tools, instructions: instructions, includeMCPTools: includeMCPTools, options: .init(effort: .off))
+        try lab.makeSession(route: route, tools: tools, instructions: instructions, includeMCPTools: includeMCPTools,
+                            options: .init(effort: .off), authorizer: Self.searchOnly)
     }
+
+    /// Who decides whether a tool call runs. `TavilySearchTool` is unrated, so the SDK counts it as
+    /// a change (it sends the query out), and since SDK 3.0 a session with no authorizer denies
+    /// those: every search would come back `DENIED`. Typing a query is the user asking for exactly
+    /// that search, so the policy allows `tavily_search` without asking, and denies anything else.
+    private static let searchOnly = ConfirmingToolAuthorizer(
+        channel: nil,
+        policy: { call in
+            call.origin == .host && call.toolName == "tavily_search"
+                ? .allow : .deny(reason: "VistaNova only runs tavily_search")
+        },
+        hostTools: .ask(atOrAbove: .read, by: .policy))
 
     /// Up to 2 full attempts, each running to completion (including cancelling its own event
     /// watcher) before the next starts — deliberately a loop, not recursion, so two attempts

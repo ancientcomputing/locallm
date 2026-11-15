@@ -83,7 +83,7 @@ Only this one model is pinned. VistaNova never downloads any other MLX model its
 pickers list what is already on disk), so there is no first download to capture a pin from and
 no `MLXFilePinStore`. For the full pin / update / roll-back / clean-up flow, see
 [`mlx-control-room`](../mlx-control-room/) and the SDK guide's
-[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+[Pinning, updating and cleaning up model versions](../../docs/local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions).
 
 **Search is user-refined, not AI-refined.** Type a topic, get 5 links plus the actual query the
 model sent to `tavily_search` (shown as a subtitle — it can legitimately differ from what you
@@ -105,11 +105,15 @@ Links are plain `Link`s — clicking one opens your default browser.
 - The app connects to Tavily's MCP server (`https://mcp.tavily.com/mcp/`) with `authType:
   .pat` — a static Bearer API key, no OAuth round-trip.
 - `VistaNova` uses a hand-written `TavilySearchTool` (Path B — see
-  [`sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)),
+  [`sdk-guide.md`, "Two paths to tool-calling"](../../docs/sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)),
   not the SDK's auto-assembled `MCPTool` — this pins `max_results`/`search_depth` in Swift (the
   model only ever chooses `query`) and lets an actor (`SearchQueryCapture`) record the query
   argument actually used. (Since 1.0.0-RC.1, `session.events`' `.toolCallStarted` also carries the
   call's `arguments`, so that recording could now be read from the event stream instead.)
+- Every session passes an authorizer (`searchOnly` in `AppModel.swift`): a `ConfirmingToolAuthorizer`
+  whose policy allows `tavily_search` and denies anything else. Since SDK 3.0 a session with no
+  authorizer denies any tool that may change data or send it out, and an unrated tool like
+  `TavilySearchTool` counts as one, so without it every search came back `DENIED`.
 - Output is structured (`@Generable SearchResults`) when the model supports guided generation;
   otherwise a plain-text fallback parses `(title, url)` pairs out of unstructured output —
   verified via `searchCapability(_:)`, since not every MLX model supports either guided

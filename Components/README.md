@@ -1,16 +1,18 @@
 # LocalLMLabSDKComponents
 
-Reusable SwiftUI pieces for the two things a LocalLM Lab app usually needs a settings screen for
-— **MCP servers** and **the model layer** — built entirely on `LocalLMLabSDKCore`'s public API,
-no private access to Core's internals. Apache 2.0 licensed, same as the rest of this repo.
+Reusable SwiftUI pieces for what a LocalLM Lab app usually builds screens for — **MCP servers**,
+**the model layer**, and, new in 3.0, **a chat** (transcript, message box, chat list, cards,
+Markdown) — built entirely on `LocalLMLabSDKCore`'s public API, no private access to Core's
+internals. Apache 2.0 licensed, same as the rest of this repo.
 
 ### MCP-server views
 
 | File | What it provides |
 |---|---|
 | `MCPServerManagerObservable.swift` | An `ObservableObject` wrapper around Core's `MCPServerManager`, so SwiftUI views can observe connection/tool state changes. Also adds `LocalizedError` conformance to Core's `MCPServerError` — human-readable error text is a UI concern Core deliberately doesn't own. |
-| `MCPServerPickerView.swift` | The main "add/list/reconnect/disconnect/remove" screen, all three MCP auth types (none, personal access token, OAuth). Lists each server's tools and resources with enable/disable checkboxes, prompts read-only, plus a "Save As…" export (`NSSavePanel` — the one AppKit-specific piece, kept out of Core) built on Core's `MCPServerState.exportSummary()`. |
+| `MCPServerPickerView.swift` | The main "add/list/check/remove" screen, all three MCP auth types (none, personal access token, OAuth). In 3.0 it is the **Tool Sources** sheet: each server's Tools, Content and Prompts sections (collapsible, in everyday words), enable/disable checkboxes, a **Check connection** action, pending-drift rows with an Accept button, and a "Save As…" export (`NSSavePanel` — the one AppKit-specific piece, kept out of Core) built on Core's `MCPServerState.exportSummary()`. Paste a server's JSON setup (Claude Desktop's `mcpServers`, VS Code's `servers`, one entry, or a bare `command`/`args`) into the address field and it fills the form. Init options: `toolsMode` (`.static`, or `.dynamic` for `makeSession(dynamicTools:)`), `allowsLocalPrograms` (offers **Local program** beside **Web address** where `ExternalPrograms.isSupported`, so never in a sandboxed build), and `detail` (`ChatToolDetail.plain` or `.detailed`). |
 | `MCPOAuthWaitingView.swift` | A waiting/spinner view shown while an OAuth sign-in is in flight in the system browser. |
+| `MCPElicitationPresenter.swift`, `ToolConfirmationPresenter.swift` | The single-process SwiftUI implementations of Core's `MCPElicitationHandler` (a server asking the user for input) and `ToolConfirmationChannel` (the user approving a tool call). Install once, render with `.mcpElicitationSheet(_:)` / the confirmation sheet, hand to Core. In 3.0 the confirmation sheet's note follows the call's impact, and a call that must be checked offers no "Always Allow". |
 | `MCPResourcesPromptsView.swift` | Read-only browsing of a session's enabled resources/resource templates/prompts, with an "Attach"/"Use" action per item that calls Core's `readResource`/`getPrompt` and hands the raw result to a host-supplied callback — no opinion on what "attach" means, same no-persistence-of-its-own precedent as the server picker. Exports `MCPResourcesView` and `MCPPromptsView`. |
 
 ### Model-layer views
@@ -30,6 +32,50 @@ state, and live download progress are observable properties, never polled.
 
 `ModelPickerView` (local models + MLX download) and `AIModelsSettingsView` (online providers) are
 separate surfaces today — a full "AI Models" panel composes both. Unifying them is on the list.
+
+### Chat views (new in 3.0)
+
+The parts of a chat app that every SDK chat app writes the same way. They sit over Core's `ChatController`
+(a conversation: the turn loop, tool selection, cards, compaction) and `ConversationStore`; what an app does
+differently comes in through slots — an empty chat, a banner above the message box, a row under it, extra
+controls under a reply, the app's own cards, and the inline widget for an MCP App's view.
+
+| File | What it provides |
+|---|---|
+| `ChatTranscriptView.swift` | **`ChatTranscriptView`** — the transcript: replies, reasoning, tool calls with their source and impact, the inline cards a turn can end with, files the tools wrote, the "why these tools" chip, Copy / Retry / Edit, and links from content confirmed before they open. `ChatToolDetail` (`.plain`: tool calls as everyday steps; `.detailed`: names, arguments, ratings), `ChatStarterView`, `ChatReplyActionButton`, `ChatReplyContext`. The widget slot takes `LocalLMLabSDKMCPAppsHost`'s `MCPAppWidgetSlot`, which Components doesn't link. |
+| `ChatComposer.swift` | **`ChatComposer`** — the message box: text, attachments (picked, dropped, pasted, imported from an iPhone), editing the last message, Send and Stop; a long paste becomes an attachment (`ChatPastedAttachments`). Slots for a banner above and a row under the box (`ChatModelLabel`, status lights). |
+| `ChatCards.swift` | The inline cards for a turn that can't start until the user acts, each taking what it shows and what its buttons do: `ClarifyCardView` ("Which one?"), `SignInCardView`, `PermissionCardView`, `ToolChangesCardView` (a server's tools changed), `AddToolSourceCardView`, `AddWorkspaceCardView`, `PastedKeyCardView`, `EmptyReplyCardView`, plus `ChatNoticeView`, `ChatWarningView` and the `ChatCardFrame` they sit in. Their text is fixed; nothing the model wrote appears in them. |
+| `ChatSidebar.swift` | **`ChatSidebar`** — the chat list: search, rename, delete, and a footer slot; `ChatEmptyStateView`. |
+| `ChatPromptPicker.swift`, `ChatSharedContentPicker.swift` | MCP prompts from a `/` menu or "Use a Prompt…" (arguments in a small form, the source's suggestions offered, the result put in the box to read and edit; the model never picks prompts), and "Attach Shared Content…" in the paperclip menu (content the user's servers share, searchable; what is attached is what the model sees). |
+| `ToolChoiceChip.swift` | **`ToolChoiceChip`** — "why these tools" under each reply: which sources were picked, how sure the matcher was, how long it took; tapped, the whole record (`TurnInfo`). |
+| `WorkspaceSettingsRow.swift` | `WorkspaceAccessPicker` (read-only / ask before changes / read and write, worded as the user reads them), `WorkspaceSettingsRow` and `WorkspaceSettingsActions` for a Settings screen. |
+| `Markdown.swift` | **`MarkdownView`** — a chat reply's Markdown, block by block: headings, lists, quotes, fenced code with Copy (`MarkdownCodeBlock`), pipe tables (`MarkdownTableBlock`); inline syntax through `AttributedString`. `MarkdownParser`, `MarkdownBlock`, `MarkdownStyle`. Streaming text re-parses on each update. |
+
+The shape of a chat window, from a reference chat app built on these (the app supplies the controller, its
+status row and its own settings):
+
+```swift
+NavigationSplitView {
+    ChatSidebar(store: library, selection: currentID, open: { open($0) }, delete: { delete($0) },
+                responding: isResponding, notice: busyNote)
+} detail: {
+    VStack(spacing: 0) {
+        ChatTranscriptView(controller: controller, toolDetail: .plain,
+                           addWorkspace: { addWorkspace(from: $0, path: $1, access: $2) }) {
+            ChatStarterView(message: "Ask anything.", suggestions: [...]) { send($0, attachments: []) }
+        } replyExtras: { _ in EmptyView() }
+        ChatComposer(controller: controller, isEnabled: hasModel,
+                     send: { send($0, attachments: $1) }, addSource: { showAddSource() }) {
+            EmptyView()          // a banner above the box
+        } leading: {
+            EmptyView()          // the row under it: the model's name, status lights
+        }
+    }
+}
+```
+
+Core's `ChatSetup` and `ChatConfiguration.standard(lab:setup:dynamicTools:reportError:)` give the standard
+wiring of a chat to a `LocalLMLab` with dynamic tools.
 
 ### Onboarding, updating and cleaning up a model
 
@@ -110,15 +156,18 @@ extension ModelVersionsModel {
 
 **Requires an SDK build that has these APIs.** `ModelOnboardingView`'s Pin step reads
 `InstalledModel.resolvedRevision`, and the adapter above uses `MLXModelProvider`'s pin-update and snapshot
-APIs. The `1.0.0-RC.1` release **as re-published on 2026-09-18** includes them; an earlier copy of RC.1 does
-not. If a build fails with a checksum mismatch or reads like old SDK code, the release assets were replaced in
-place — run `scripts/flush-sdk-cache.sh` (SwiftPM caches binary artifacts by URL, not by content).
+APIs; every release from `1.0.0-RC.1` (as re-published on 2026-09-18) on has them. If a build fails with a
+checksum mismatch or reads like old SDK code, the release assets were replaced in place — run
+`scripts/flush-sdk-cache.sh` (SwiftPM caches binary artifacts by URL, not by content).
+
+**Loading never downloads (3.0).** `ModelOnboardingView` is the download step: a model that isn't downloaded
+fails to load with `.modelUnavailable`, so run the onboarding stepper (or your own `validate` → `download`) first.
 
 None of these views persist anything themselves. MCP state goes through the
 `MCPServerManagerObservable` you own (`manager.core.restore(from:)` at launch); model-layer state
 goes through `lab.snapshot()` / `lab.restore(from:)` plus your own Keychain for provider keys.
 
-See [`docs/sdk-guide.md` §11](../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)
+See [`docs/sdk-guide.md`, "Components"](../docs/sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)
 for the narrative walkthrough, [`examples/components-demo/`](../examples/components-demo/) for the
 MCP views in a full app, and [`examples/model-switch/`](../examples/model-switch/) for
 `AIModelsSettingsView`.
@@ -126,7 +175,8 @@ MCP views in a full app, and [`examples/model-switch/`](../examples/model-switch
 ## Building
 
 This is a library, not an app — there's nothing to sign or package, just `swift build`/`swift
-test`. `Package.swift` builds against SDK `1.0.0-RC.1` by default, same as the example apps:
+test`. `Package.swift` builds against the SDK release named by its `defaultSDKVersion` (3.0.0-GA for
+this release), same as the example apps:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
