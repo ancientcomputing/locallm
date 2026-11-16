@@ -178,6 +178,17 @@ sent as an object.
   Hadamard-rotated basis, with the activations rotated using stock MLX ops. `prism-ml/Ternary-Bonsai-2-27B-mlx-2bit`
   (8.6 GB) passes `capabilityProbe` and the prompt-cache self-test. Text only.
 - Apple's model-service failures read in plain words, name the app's model, and a failed turn is marked unanswered.
+- **Tools named in a chat's custom instructions are offered** (binaries re-published 2026-11-14).
+  `ToolSelectionRequest.standingInstructions`, set from `LocalLMLabSession` and `ChatSetup.standingInstructions`, is
+  what the user asks for on every message. An MCP server named there is offered on every message, whole up to
+  `ToolMatchingOptions.wholeNamedServerLimit` (12) tools (`offersServersNamedInInstructions`, on by default), with
+  the new reason `ToolSelectionExplanation.Reason.namedInInstructions`; a `switch` over `Reason` needs
+  `@unknown default`. A reply saying a tool is missing, when the model didn't call `requestTools`, makes the session
+  ask for it and run the turn again with what it finds (once a turn, with `requestsTools` on).
+- **Saved workspaces stay available after a restart** (binaries re-published 2026-11-14). A workspace's identity is
+  its volume's UUID and inode; it was the device number, which macOS assigns at each mount, so after a restart every
+  saved workspace was refused. A list saved before matches by inode and is rewritten.
+  `SavedWorkspace.sameFolder(saved:now:)` compares two identities.
 - **Examples say how tool calls are decided.** Every example whose tools write, or call an MCP server's tools,
   passes an authorizer, since a 3.0 session without one refuses those calls: `AllowingToolAuthorizer()` in
   `code-buddy`, `repo-qa-local` and `aiql`; a `ConfirmingToolAuthorizer` in `workspace-buddy-local` (an alert before
