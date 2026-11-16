@@ -16,7 +16,8 @@ the user lets the assistant use. The *host app* is the app built on the SDK. A *
 own servers, and *Private Cloud Compute* is Apple's cloud service for running its models. The [glossary](glossary.md)
 defines the rest.
 
-*Written 2026-11-08 for 3.0.0. The evidence is dated; §9 says how current each part is.*
+*Written 2026-11-08 for 3.0.0, updated 2026-11-16 for the re-published binaries. The evidence is dated; §9 says how
+current each part is.*
 
 > **Status, in short.** Four review passes found and fixed problems; passes 3 and 4 were done by AI models, and
 > there has been no third-party review. About 70 commits (45 Core files, including the wrapper around every tool
@@ -314,6 +315,18 @@ tool could be asked about again in the same turn, and that refusal was shown as 
 | The entrance tests | 15 tests passed |
 | MCPAppsHost | 91 tests passed |
 | Claude package (Live tests skipped) | 71 tests in 3 suites passed |
+
+**The binaries were re-published on 2026-11-14 and 2026-11-15, after this evidence.** The checks above and the injection
+evaluation were not repeated on them. What changed in the SDK after 2026-11-08:
+
+- The tool picker offers an MCP server named in the user's custom instructions on every message, and a reply that says
+  a tool is missing makes the session ask for it. This changes which tools are offered, not whether a call may run:
+  every call still passes the authorizer.
+- A saved workspace's identity is its volume's UUID and inode, instead of the device number, which macOS assigns at
+  each mount. A list saved before matches by inode and is rewritten.
+- Sessions on Private Cloud Compute are no longer prewarmed.
+- The MLX runtime pin moved twice, to load LFM3 and PrismML Bonsai 2 models. The second pin includes an upstream change
+  (mlx-swift-lm PR #630) that upstream hasn't merged yet.
 
 **Not part of this evidence.** The Live tests that need a model or the network. The Components tests. The injection
 evaluation, last run 2026-11-01.
