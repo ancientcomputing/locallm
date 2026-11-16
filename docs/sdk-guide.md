@@ -301,7 +301,8 @@ for try await partial in session.streamResponse(to: task) { … }
 ```
 
 `session.route` / `session.modelID` tell you what actually backs it. `makeSession` is one
-function, `makeSession(route:tools:instructions:restoring:includeMCPTools:mcpAppHints:options:authorizer:)`:
+function, `makeSession(route:tools:instructions:restoring:includeMCPTools:includePlugins:dynamicTools:mcpAppHints:options:authorizer:)`
+(`includePlugins:` and `dynamicTools:` are new in 3.0: see [Tools: available, not attached](#tools-available-not-attached-30)):
 
 - **MCP tools follow `lab.mcp`.** With `includeMCPTools` (the default) the session offers the
   enabled MCP tools and keeps following `lab.mcp`: turn a tool on or off, add a server, or change
@@ -613,6 +614,10 @@ instead of 15.
   model whose memory can't be saved and rewound is reported as not supported and runs normally.
 - **It doesn't change answer quality.** A restore is bit-identical to a fresh read. Against a cache-off run, wording
   can differ slightly by rounding.
+- **It keeps memory in check.** It caps the memory MLX keeps for reuse, reads an oversized prompt in smaller pieces
+  before refusing it, and gives back its own memory before it would cause a refusal.
+- **Smaller entries, if you want them.** `storage: .compact(bits: 8)` (or `4`) stores the saved state quantized, so
+  more fits in the budget; answers can then differ slightly. The default, `.exact`, keeps it as read.
 - **It fails safe.** A damaged, missing or half-written cache file means no reuse this time, never a wrong answer.
 
 ```swift
@@ -623,8 +628,8 @@ let persistent = MLXModelProvider(promptCache: .tiered())  // opt in: also keep 
 let status = provider.promptCacheStatus(for: modelID)      // a state and a plain sentence to show your users
 ```
 
-The disk tier is encrypted (the key is in the Keychain), excluded from backups and wiped by `MLXPromptCacheDisk.clear()`;
-`storedBytes` says how much it holds. It holds a model's working state from your users' conversations, so offer a way
+The disk tier is encrypted (the key is in the Keychain), excluded from backups and wiped by `clear()` on its
+`MLXPromptCacheDisk` (or `MLXModelProvider.clearPromptCache()`); the disk's `storedBytes` says how much it holds. It holds a model's working state from your users' conversations, so offer a way
 to clear it. `MLXPromptCacheStats` and `MLXMemoryPressure` report what the cache did.
 
 **In a chat app.** A turn gets slower, though never different, when the app uses a speed-helper model (it turns the
@@ -653,7 +658,7 @@ A session needs a picker to do this; there is no default. Three come ready-made,
 | Picker | How it chooses | Cost |
 |---|---|---|
 | `SystemToolMatcher` | Apple's on-device model lists which sources and tools fit the message | Two small generations a turn; nothing to download. About 1.6 s at the median in ChatAgain (see [Choosing tools per turn](https://thisbrain.ai/locallm/tool-picker.html#chatagain)) |
-| `DecisionToolMatcher` | A decision model, through `lab.decide` (for example OpenJev on Qwen3-4B). A hosted decider works, but then the message and your tool descriptions go to that provider | About half a second a turn |
+| `DecisionToolMatcher` | A decision model, through `lab.decide` (for example OpenJev on Qwen3-4B). A hosted decider works, but then the message and your tool descriptions go to that provider | About half a second a turn with a small local decider, in our turns evaluation |
 | `KeywordToolMatcher` | No model: words in the message against server names, keywords and tool names | Fast and predictable; misses paraphrases |
 
 ```swift

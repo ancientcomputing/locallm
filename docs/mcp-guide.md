@@ -193,7 +193,7 @@ support, and your code is the same either way.
   way `callTool` returns `.success` with `isError == true` and a sentence the model can read.
 - **Live updates.** A stateless server that advertises `listChanged` gets one
   `subscriptions/listen` stream. When its tools, prompts or resources change, the manager
-  re-lists them on its own (enabled flags are kept; a new tool arrives disabled) and
+  re-lists them on its own (enabled flags are kept; a new tool stays off until the user accepts it, as [drift review](security-guide-for-hosts.md#4-servers-trust-approval-and-drift) describes) and
   `serverChanges` fires. No Reconnect needed.
 
 What the negotiated revision changes is how much a server *can* hand you:

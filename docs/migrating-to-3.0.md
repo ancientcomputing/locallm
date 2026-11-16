@@ -1,8 +1,8 @@
 # Migrating to the LocalLM SDK 3.0
 
-3.0 is a **breaking release in behavior, not in source**. Nothing you compiled against 2.3 stops compiling:
-every changed signature gained only parameters with defaults, and the one type whose coding changed
-(`ToolImpact`) is still `Codable`. What changes is what the SDK does when you call it the same way. Three of
+3.0 is a **breaking release in behavior, almost never in source**. Nearly everything you compiled against 2.3
+still compiles; the one exception is code that assigns a connector store (§6). Every changed signature gained only
+parameters with defaults, and the one type whose coding changed (`ToolImpact`) is still `Codable`. What changes is what the SDK does when you call it the same way. Three of
 those changes can stop an app that worked: a session with no authorizer now refuses anything that writes (§3),
 loading a model no longer downloads it (§4), and MCP tools reach the model under new names (§5). Every 3.x
 release after 3.0 is source compatible with `3.0.0`.
@@ -128,7 +128,8 @@ Full detail: [`sdk-guide.md`, "The model layer"](sdk-guide.md).
 
 ## 6. Source changes
 
-None are required, but you may notice these. Every changed signature only gained parameters with defaults:
+One is required, and only if you assign a connector store (below). Every changed signature only gained parameters
+with defaults:
 
 | Where | Gained |
 |---|---|
@@ -143,6 +144,10 @@ None are required, but you may notice these. Every changed signature only gained
 `makeSession(route:…)` with `includePlugins: true` offers the tools of every plug-in that's on in `lab.tools`.
 The catalog starts empty, so an app that adds no plug-in sees no change. `MCPTool` is now an `OriginTaggedTool` and
 `MCPResourceContent` is `Equatable`. `docs/api-surface.md` has the full list.
+
+**The connector stores are read-only.** `CalendarAccess.store`, `RemindersAccess.store` and `ContactsAccess.store`
+can still be read, but code that assigns one no longer compiles. Only the SDK replaces a store (after a fresh grant),
+so the ready-made tools and your code always share one. Delete the assignment and use the SDK's store.
 
 ## 7. What's new (opt in when you want it)
 
@@ -169,7 +174,7 @@ The [CHANGELOG](../CHANGELOG.md) has every addition by module.
 
 ## 8. A checklist
 
-1. Build with `LOCALLM_SDK_VERSION=3.0.0-GA`; fix nothing, expect it to compile.
+1. Build with `LOCALLM_SDK_VERSION=3.0.0-GA`; expect it to compile, unless you assign a connector store (§6).
 2. Search for `makeSession(` without `authorizer:`. Give each an authorizer, or `AllowingToolAuthorizer()` where no
    one is there to ask.
 3. Find every place a local model first loads. Put `availability`, `validate` and `download` ahead of it, and show

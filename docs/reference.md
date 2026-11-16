@@ -909,8 +909,8 @@ struct MLXPromptCacheDisk: Sendable, Equatable {   // the SSD tier
 }
 ```
 
-The disk tier holds working state from your users' conversations: offer a way to clear it (`MLXPromptCacheDisk.clear()`
-or `MLXModelProvider.clearPromptCache()`).
+The disk tier holds working state from your users' conversations: offer a way to clear it (`clear()` on the
+`MLXPromptCacheDisk` you passed, or `MLXModelProvider.clearPromptCache()`).
 
 ### Per-model status and capacity
 

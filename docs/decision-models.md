@@ -140,7 +140,7 @@ how sure it says it is.
   *"You answer questions about a piece of text…"*, the input labelled `Text`), chosen with the
   SDK's evaluation set. You can pass your own `OpenJevWrapper`, but the wording moves answers as
   much as your questions do, so change it only with your answer set to check against.
-- **Which model.** A small **dense** instruct model: Qwen3-4B-4bit is the tested default (2.6 GB).
+- **Which model.** A small **dense** instruct model: Qwen3-4B-4bit is the tested default (2.3 GB).
   Qwen3-1.7B is too weak. **Not a mixture-of-experts model**: an MoE model's probabilities
   shifted with how the prompt was split. `openjev.warnings(for:)` returns
   `.mixtureOfExperts` for one (a warning, not a block).

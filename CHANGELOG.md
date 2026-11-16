@@ -166,9 +166,8 @@ hasn't seen.
 call fails with that reason; tool input is sent whole and a call with no arguments sends `{}`; every tool schema is
 sent as an object.
 
-**Examples and tools:** `examples/chatbot` (ChatAgain), `examples/mlx-cache-lab`, `examples/tool-matcher-eval`,
-`qualify/` (the pre-release harness: scenarios, a soak run, robustness and leak checks) and
-`scripts/chat-cache-replay`.
+**Testing:** a pre-release harness (scenarios, a soak run, robustness and leak checks) qualified this release. It
+and the internal evaluation tools behind the measurements aren't published.
 
 ### Changed
 
