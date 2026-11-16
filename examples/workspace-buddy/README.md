@@ -181,6 +181,6 @@ worked, and a follow-up read reflected the earlier edit — no stale-cache issue
   sandbox-capable, also a GUI.
 - [`docs/sdk-guide.md`, "Workspace tools"](../../docs/sdk-guide.md#workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) —
   `WorkspaceAccess` / `WorkspaceTools`, and why `editFile` is search-and-replace, not a diff
-  format. §10 — App Sandbox.
+  format. Also: [App Sandbox](../../docs/sdk-guide.md#app-sandbox--building-for-the-mac-app-store).
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
   every SDK touchpoint marked.

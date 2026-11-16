@@ -15,7 +15,7 @@ and only the answer's shape (column names, row count) comes back. So the model c
 invent a single value.
 
 This is the SwiftUI counterpart to the pipeline in
-[`docs/sdk-guide.md`, "File-backed tools"](../../docs/sdk-guide.md).
+[`sdk-guide.md`, "`FileBackedTool` + the AIQL data verbs"](../../docs/sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline).
 
 ## What Go does
 
@@ -77,7 +77,7 @@ Three existing examples stitched together, plus the SQL tools:
 | [`workspace-buddy-local`](../workspace-buddy-local) | SwiftUI + App Sandbox + `MLXModelProvider` download + `NSOpenPanel` folder picker + security-scoped bookmark |
 | [`plate-today`](../plate-today) | the MCP client + the OAuth redirect wired through `AppDelegate` (not SwiftUI's `.onOpenURL`) + `CFBundleURLTypes`. AIQL uses `LocalLMLab`, so its server goes into `lab.mcp`, the lab's manager — never an `MCPServerManager` of its own |
 | [`repo-qa`](../repo-qa) | tools built from a live MCP schema — here by `makeSession` from `lab.mcp`: `setToolEnabled` for the chosen data tools (a new server's tools start disabled), and `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)` so each one is offered as a `FileBackedTool` with `saveAs` |
-| SDK §8b | `loadTable` + `sqlQuery` — JSON records → an ephemeral SQLite table → one read-only `SELECT` → CSV. `describeJson` / `csvInfo` for discovery/verification |
+| [SDK guide, "`FileBackedTool` + the AIQL data verbs"](../../docs/sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline) | `loadTable` + `sqlQuery` — JSON records → an ephemeral SQLite table → one read-only `SELECT` → CSV. `describeJson` / `csvInfo` for discovery/verification |
 
 Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
 
@@ -354,8 +354,8 @@ availability badges, on-disk sizes, and an "Add from Hugging Face" field — use
 
 ## More
 
-- [`docs/sdk-guide.md`, "File-backed tools"](../../docs/sdk-guide.md) — `loadTable` + `sqlQuery` and the "AIQL"
-  data verbs, in prose. §6a — the model layer. §8 — App Sandbox + the folder picker.
+- [`sdk-guide.md`, "`FileBackedTool` + the AIQL data verbs"](../../docs/sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline) — `loadTable` + `sqlQuery` and the "AIQL"
+  data verbs, in prose. Also: [the model layer](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions); [App Sandbox](../../docs/sdk-guide.md#app-sandbox--building-for-the-mac-app-store); [Filesystem access](../../docs/sdk-guide.md#filesystem-access-security-scoped-bookmarks-example-not-in-core) (the folder picker).
 - [`workspace-buddy-local`](../workspace-buddy-local) — the sandbox + MLX + folder-picker base
   this builds on.
 - [`plate-today`](../plate-today) — the MCP + OAuth-redirect base.

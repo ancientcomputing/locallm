@@ -247,6 +247,6 @@ reliably. `MLXModelProvider.validate` refuses a model whose weights exceed ~70% 
 - [`code-buddy`](../code-buddy) — the model layer end to end (two models, routing between them,
   an agent loop), a CLI.
 - [`docs/sdk-guide.md`, "The model layer"](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions) —
-  the model layer, in prose. §8a — `WorkspaceTools`. §10 — App Sandbox.
+  the model layer, in prose. Also: [Workspace tools](../../docs/sdk-guide.md#workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url), [App Sandbox](../../docs/sdk-guide.md#app-sandbox--building-for-the-mac-app-store).
 - [`docs/annotated-examples.md`](../../docs/annotated-examples.md) — this app's full source with
   every SDK touchpoint marked.

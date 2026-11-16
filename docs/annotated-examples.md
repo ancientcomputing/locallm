@@ -2619,7 +2619,7 @@ verbatim from `workspace-buddy-local` (`sdk-guide.md`, "Filesystem access") and 
 //
 // The model only writes the SQL — the host runs it read-only and the rows never enter the
 // model's context, so there is nothing to fabricate. loadTable + sqlQuery are Core tools; see
-// docs/sdk-guide.md ("File-backed tools").
+// docs/sdk-guide.md ("`FileBackedTool` + the AIQL data verbs").
 //
 // Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
 // picker + security-scoped bookmark), plate-today (MCP client + OAuth redirect via AppDelegate),

@@ -9,7 +9,7 @@
 //
 // The model only writes the SQL — the host runs it read-only and the rows never enter the
 // model's context, so there is nothing to fabricate. loadTable + sqlQuery are Core tools; see
-// docs/sdk-guide.md §8b.
+// docs/sdk-guide.md ("`FileBackedTool` + the AIQL data verbs").
 //
 // Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
 // picker + security-scoped bookmark), plate-today (MCP client + OAuth redirect via AppDelegate),
@@ -22,7 +22,7 @@ import LocalLMLabSDKCore
 import LocalLMLabSDKInference
 import SwiftUI
 
-// MARK: - Folder picker + security-scoped bookmark (docs/sdk-guide.md §8) — verbatim from workspace-buddy-local
+// MARK: - Folder picker + security-scoped bookmark (docs/sdk-guide.md ("Filesystem access")) — verbatim from workspace-buddy-local
 
 enum FolderAccess {
     private static let bookmarkKey = "aiqlOutputFolderBookmark"

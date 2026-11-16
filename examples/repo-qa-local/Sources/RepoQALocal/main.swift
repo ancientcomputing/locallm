@@ -93,7 +93,7 @@ func run() async {
     // host opts in), so enable the ones this example uses. `read_wiki_contents` stays off: it dumps
     // a repo's entire wiki unscoped (~165K tokens for anthropics/claude-code in one call), which
     // `MCPTool` can't know from the schema — that curation is the app's job (see
-    // docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal (makeSession
+    // docs/mcp-guide.md ("Connecting to an MCP server")). A tool whose schema doesn't build is skipped, not fatal (makeSession
     // would otherwise fail on it).
     var enabled: [String] = []
     for descriptor in state.tools {
