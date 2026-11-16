@@ -31,10 +31,29 @@ A comment also still makes sense in the real `.swift` file.
 - **`plate-today` (Path B)** writes its own `Tool` adapters.
 - **`plate-today-tools` (Path A)** uses Core's ready-made tools.
 
-§7a of [`sdk-guide.md`](sdk-guide.md) explains the two paths.
+[`sdk-guide.md`, "Two paths to tool-calling"](sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
+explains the two paths.
 
 `repo-qa` is Path A on its own: a small command-line tool that uses `MCPTool` with an MCP server
 that needs no sign-in. Compare `plate-today-tools`, whose Todoist server needs an OAuth sign-in.
+
+### Who decides whether a tool call runs (SDK 3.0)
+
+Since 3.0, a session made with `lab.makeSession` and no `authorizer:` fails closed: reads run, and anything that may
+change data or send it out is refused (`DENIED: …`, which the model reads). Every example whose tools write, or call an
+MCP server's tools (unrated, so they count as changes), says how calls are decided:
+
+| Example | Authorizer | Why |
+|---|---|---|
+| `code-buddy`, `repo-qa-local`, `aiql` | `AllowingToolAuthorizer()` | a command-line tool or a fixed pipeline, with no one to ask |
+| `workspace-buddy-local` | `ConfirmingToolAuthorizer` with a small alert channel | writes and edits ask first; reads run |
+| `security-demo` | `ConfirmingToolAuthorizer` with Components' `ToolConfirmationPresenter` | the Security panel decides which calls ask; with nothing set to confirm, every call runs |
+| `mcp-chat` | `ConfirmingToolAuthorizer` with `ToolConfirmationPresenter` | per-server trust and approval; a changed MCP App widget is asked about again |
+| `vistanova` | `ConfirmingToolAuthorizer` whose policy allows only `tavily_search` | the user typing a query is the consent; any other tool is refused |
+
+`os-matrix`, `model-switch` and `mlx-control-room` pass none: their tools only read, or they have none. `plate-today`,
+`plate-today-tools`, `repo-qa` and `workspace-buddy` build Apple's `LanguageModelSession(tools:)` directly, so the SDK's
+authorizer isn't involved. [The tool authorizer](tool-authorizer.md) explains the three ready-made authorizers.
 
 ## How much code is this, really?
 
@@ -46,20 +65,20 @@ non-comment lines; these examples are commented far more heavily than production
 |---|--:|--:|---|
 | [`repo-qa`](#examplesrepo-qa) | 66 | 115 | Apple's on-device model calling a real MCP server's tools, built from its live schema — no `Arguments` structs |
 | [`os-matrix`](#examplesos-matrix) | 74 | 97 | one binary that runs on macOS 26 **and** 27, model families gated by OS at registration |
-| [`repo-qa-local`](#examplesrepo-qa-local) | 96 | 129 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
+| [`repo-qa-local`](#examplesrepo-qa-local) | 97 | 144 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
 | [`components-demo`](#examplescomponents-demo) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-tools) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
 | [`workspace-buddy`](#examplesworkspace-buddy) | 173 | 227 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
-| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 256 | 333 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 270 | 353 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-today) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
-| [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
-| [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
-| [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
-| [`aiql`](#examplesaiql) | 402 | 459 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
-| [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
-| [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
-| [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
-| [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
+| [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (4 files) |
+| [`security-demo`](#examplessecurity-demo) | 432 | 588 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (7 files) |
+| [`code-buddy`](#examplescode-buddy) | 315 | 418 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
+| [`aiql`](#examplesaiql) | 403 | 515 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
+| [`vistanova`](#examplesvistanova) | 939 | 1,309 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
+| [`mcp-chat`](#examplesmcp-chat) | 948 | 1,149 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
+| [`components-updates-demo`](#examplescomponents-updates-demo) | 158 | 182 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
+| [`mlx-control-room`](#examplesmlx-control-room) | 1,431 | 1,806 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
 The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most
 (`mcp-chat`, whose conversation UI *is* the SDK's chat history, is the exception), and each
@@ -70,15 +89,15 @@ argument parsing.
 
 *`Sources/PlateToday/PlateTodayApp.swift` — 216 lines of code (359 with comments).*
 
-Demonstrates `Core` directly: Calendar/Reminders connectors, the MCP client, Keychain-backed OAuth
+Demonstrates `Core` directly: Calendar/Reminders connectors (plus opt-in Location and Contacts tools), the MCP client, Keychain-backed OAuth
 — no `Components` involved. This is "Path B" — a hand-written `Tool` adapter per connector; see
 [`plate-today-tools`](#examplesplate-today-tools)
 below for the same app rebuilt on Core's ready-made "Path A" `Tool`s instead.
 
 ```swift
 // "What's on my plate today" — v1: Todoist (via Core's MCP client) + Calendar + Reminders (also
-// via Core, through CalendarAccess/RemindersAccess — see below). Linear is intentionally out of
-// scope for this example — it demonstrates Calendar/Reminders/Todoist only.
+// via Core, through CalendarAccess/RemindersAccess — see below). Linear is a planned v2 addition,
+// deliberately deferred.
 //
 // SwiftUI app shape (not a bare CLI): launch -> request Calendar/Reminders/Todoist access on
 // first run -> pull + synthesize -> show result -> Done closes the app. Packaged as a real signed
@@ -175,6 +194,42 @@ struct TodaysLocationTool: Tool {
         // actively misleading; telling the model the margin lets it hedge appropriately
         // ("approximately") instead of stating a wrong city as fact.
         return "\(place) (±\(Int(location.horizontalAccuracyMeters))m accuracy — this is a network-based estimate, not GPS, and may be inaccurate on a desktop Mac)"
+    }
+}
+#endif
+
+// MARK: - Contacts tool (via Core's ContactsAccess connector)
+
+#if PLATETODAY_INCLUDE_CONTACTS
+// Permission-gated like TodaysLocationTool, so it lives in the app rather than in Core. Mirrors
+// LocalLM Lab's own SearchContactsTool: same name, description, and read-only guarantee.
+//
+// Build-time opt-in, default off: contacts aren't part of a daily summary, so this is an
+// on-demand lookup the model uses when a person's name comes up, and the default build avoids
+// an extra Contacts permission prompt.
+struct SearchContactsTool: Tool {
+    let name = "searchContacts"
+    let description = "Searches the user's Contacts by name and returns matching contacts — name, organization, phone numbers, and email addresses. Only call this when the user is explicitly asking to look up, find, or search for a person in their Contacts, or when enriching a calendar/reminder item that names a specific person. Read-only; cannot create, modify, or delete contacts."
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The name (or partial name) to search for, e.g. \"Jane\" or \"Jane Smith\".")
+        var query: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        let access = await Connectors.requestAccess(.contacts)        // ← SDK
+        guard access.granted else { return access.error ?? "Contacts access not granted." }
+
+        let matches = ContactsAccess.search(query: arguments.query, limit: 10)  // ← SDK
+        if matches.isEmpty { return "No contacts found matching \"\(arguments.query)\"." }
+        return matches.map { contact in
+            var line = "- \(contact.name)"
+            if let org = contact.organization, !org.isEmpty { line += " (\(org))" }
+            if !contact.phoneNumbers.isEmpty { line += " — phone: \(contact.phoneNumbers.joined(separator: ", "))" }
+            if !contact.emails.isEmpty { line += " — email: \(contact.emails.joined(separator: ", "))" }
+            return line
+        }.joined(separator: "\n")
     }
 }
 #endif
@@ -277,6 +332,10 @@ final class PlateTodayModel: ObservableObject {
         tools.append(WeatherTool())                                   // ← SDK
         checks.append("the user's current location and today's weather there (getCurrentLocation, then getWeather with that place)")
         summarizeNote = ", including the weather"
+        #endif
+        #if PLATETODAY_INCLUDE_CONTACTS
+        // Not added to `checks`: it's an on-demand lookup, not something to check every run.
+        tools.append(SearchContactsTool())
         #endif
         let prompt = """
         What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
@@ -387,16 +446,16 @@ struct PlateTodayApp: App {
 }
 ```
 
-**Tally**: of ~230 lines of actual code (excluding comments/blank lines), 18 touch the SDK directly
+**Tally**: of 216 lines of actual code (excluding comments/blank lines), 21 touch the SDK directly
 (marked above) — everything else is ordinary SwiftUI state/view code and FoundationModels session
 setup that would look the same regardless of where the tools' data comes from.
 
 ## `examples/plate-today-tools`
 
-*`Sources/PlateTodayTools/PlateTodayToolsApp.swift` — 149 lines of code (235 with comments) — ~130 fewer than `plate-today` for the same app.*
+*`Sources/PlateTodayTools/PlateTodayToolsApp.swift` — 149 lines of code (235 with comments) — 67 fewer lines of code than `plate-today` for the same app.*
 
 The Path A twin of plate-today above — same app, same UI, same connectors, rebuilt on Core's
-ready-made FoundationModels Tools (§7a of `sdk-guide.md`) instead of hand-writing a `Tool` struct
+ready-made FoundationModels Tools ([`sdk-guide.md`, "Two paths to tool-calling"](sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)) instead of hand-writing a `Tool` struct
 per connector. Marked the same way, plus `// ← SDK (Path A)` specifically on lines that only exist
 *because* a ready-made Tool replaces what used to be a whole hand-written struct — diff this
 against the section above to see the two approaches side by side.
@@ -406,8 +465,8 @@ against the section above to see the two approaches side by side.
 // UI, same prompt, same connectors), rebuilt on Core's ready-made FoundationModels Tools instead
 // of hand-writing a Tool struct per connector. Diff this file against plate-today's
 // PlateTodayApp.swift to see the "Path A vs Path B" difference described in
-// docs/sdk-guide.md ("Two paths to tool-calling") in actual code, not just prose — every place the two files diverge is
-// called out below with a `DIFF FROM plate-today:` comment.
+// docs/sdk-guide.md ("Two paths to tool-calling") in actual code, not just prose — every place the two files
+// diverge is called out below with a `DIFF FROM plate-today:` comment.
 
 import Foundation
 import FoundationModels
@@ -539,8 +598,8 @@ final class PlateTodayToolsModel: ObservableObject {
 // "platetoday", so both apps' OAuth callbacks can coexist on the same Mac)
 ```
 
-**Tally**: essentially the same line count as plate-today for UI/plumbing, but roughly 130 fewer
-lines overall — every hand-written `Tool` struct plate-today needed for Calendar/Reminders/
+**Tally**: essentially the same line count as plate-today for UI/plumbing, but 124 fewer
+lines overall (67 fewer lines of code) — every hand-written `Tool` struct plate-today needed for Calendar/Reminders/
 Location/Contacts is gone, replaced by a single `Core` type each. The MCP integration keeps the
 same line count either way (`MCPTool(descriptor:manager:)` vs. a hand-written `TodoistTasksTool`
 struct), but trades pinned arguments for a raw, server-defined tool surface — see the
@@ -690,8 +749,8 @@ generally.
 
 A fourth shape again: the first reference app that writes to disk, and the first sandboxed by
 default. Pick a folder, describe a change, the on-device model reads/creates/edits files in it via
-`WorkspaceTools` (Path A). The folder-picker/bookmark code (`FolderAccess`) is §8's own documented
-pattern, extended with one real addition — see the `// ← SDK` markers below and the inline comment
+`WorkspaceTools` (Path A). The folder-picker/bookmark code (`FolderAccess`) is the documented pattern from
+[`sdk-guide.md`'s "Filesystem access" section](sdk-guide.md#filesystem-access-security-scoped-bookmarks-example-not-in-core), extended with one real addition — see the `// ← SDK` markers below and the inline comment
 on `withFolderAccessAsync`.
 
 ```swift
@@ -706,8 +765,9 @@ import SwiftUI
 
 // MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md ("Filesystem access"))
 
-// Verbatim from §8's documented pattern, with one real addition not covered there: an
-// async-aware access wrapper. §8's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —
+// Verbatim from the guide's "Filesystem access" pattern, with one real addition not covered
+// there: an async-aware access wrapper. The guide's withFolderAccess<T>(_:) brackets a
+// SYNCHRONOUS body —
 // fine for a single read, but this app's actual file access happens inside
 // LanguageModelSession.respond(to:), which can invoke several tool calls over one async call.
 // The security-scoped access window has to stay open for that whole call, not just a synchronous
@@ -750,8 +810,8 @@ enum FolderAccess {
         return url
     }
 
-    // DIFF FROM §8's synchronous withFolderAccess<T>(_:): brackets an ASYNC body, so the access
-    // window stays open for a whole LanguageModelSession.respond(to:) call.
+    // DIFF FROM the guide's synchronous withFolderAccess<T>(_:): brackets an ASYNC body, so the
+    // access window stays open for a whole LanguageModelSession.respond(to:) call.
     @MainActor
     static func withFolderAccessAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T? {
         guard let url = resolveBookmarkedFolder() else { return nil }
@@ -766,12 +826,19 @@ enum FolderAccess {
 @available(macOS 26.0, *)
 @MainActor
 final class WorkspaceBuddyModel: ObservableObject {
-    enum State { case idle, working, ready(String), failed(String) }
+    enum State {
+        case idle
+        case working
+        case ready(String)
+        case failed(String)
+    }
 
     @Published private(set) var folderURL: URL?
     @Published private(set) var state: State = .idle
 
-    init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
+    init() {
+        folderURL = FolderAccess.resolveBookmarkedFolder()
+    }
 
     func chooseFolder() {
         guard let url = FolderAccess.pickFolder() else { return }
@@ -832,10 +899,10 @@ final class WorkspaceBuddyModel: ObservableObject {
 // MARK: - UI (ordinary SwiftUI — folder path display, a text field, a Go button, a result view)
 ```
 
-**Tally**: of ~150 lines of actual code (excluding the UI section, which is plain SwiftUI with no
+**Tally**: of 109 lines of actual code (excluding the UI section, which is plain SwiftUI with no
 SDK touchpoints), five lines touch the SDK directly — four Tool instantiations and one error
-formatter. The folder-picker/bookmark machinery is entirely `FolderAccess`, §8's own documented
-pattern rather than Core code — the point being made here isn't "look how much SDK code this
+formatter. The folder-picker/bookmark machinery is entirely `FolderAccess`, the guide's documented
+"Filesystem access" pattern rather than Core code — the point being made here isn't "look how much SDK code this
 needs," it's the opposite: given a resolved URL, actually reading/writing files safely inside a
 sandbox is four one-line Tool instantiations, not a filesystem library to write yourself.
 
@@ -1058,12 +1125,15 @@ get a `>>` loop over one persistent session, and it downloads an open-weight MLX
 run (pinned to the exact commit the example was tried against, so a fresh download never silently
 picks up whatever `main` has become), then drives Core's Workspace tools + host `Process` tools + (auto) MCP tools through a routed
 `LocalLMLabSession`. Ctrl-C cancels the running turn — reaching the `Process` tools so a child
-`swift test` is terminated, not orphaned — and quits from an idle prompt. See
+`swift test` is terminated, not orphaned — and quits from an idle prompt. Because a coding agent's
+tools change files, and SDK 3.0 denies those when a session has no authorizer, `makeSession` passes
+`authorizer: AllowingToolAuthorizer()`: a CLI with nobody at a prompt runs every call unasked (an app
+with a UI would pass a `ConfirmingToolAuthorizer`). See
 [`sdk-guide.md`, "The model layer"](sdk-guide.md#the-model-layer-models-routing-and-sessions) for the prose.
 
 ### `Sources/CodeBuddy/main.swift`
 
-*220 lines of code (290 with comments).*
+*220 lines of code (295 with comments).*
 
 ```swift
 import Foundation
@@ -1132,7 +1202,10 @@ func startSigintWatch(_ interrupt: Interrupt) -> any DispatchSourceSignal {
     signal(SIGINT, SIG_IGN)
     let src = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
     src.setEventHandler {
-        if interrupt.fire() { note("\nquitting…"); exit(130) }   // process exit; no explicit session.cancel() here
+        if interrupt.fire() {
+            note("\nquitting…")
+            exit(130)                       // process exit; no explicit session.cancel() here
+        }
         note("\n^C  interrupting this turn — Ctrl-C again to quit")
     }
     src.resume()
@@ -1150,7 +1223,9 @@ final class Interrupt: @unchecked Sendable {
     func fire() -> Bool {   // → true means "quit now"
         lock.lock(); defer { lock.unlock() }
         guard let turn, !armed else { return true }
-        turn.cancel(); armed = true; return false
+        turn.cancel()
+        armed = true
+        return false
     }
 }
 
@@ -1214,8 +1289,9 @@ func run() async {
         note("connecting DeepWiki (docs lookup)…")
         let result = await lab.mcp.addServer(url: URL(string: "https://mcp.deepwiki.com/mcp")!, displayName: "DeepWiki")   // ← SDK
         if case .success(let state) = result {
+            // read_wiki_contents dumps an entire wiki unscoped, so it stays off.
             for tool in state.tools where tool.name == "read_wiki_contents" {
-                lab.mcp.setToolEnabled(server: state.id, tool: tool.name, enabled: false)   // ← SDK
+                lab.mcp.setToolEnabled(false, server: state.id, tool: tool.name)   // ← SDK
             }
             note("  \(lab.mcp.toolsForSession().count) MCP tool(s)")   // ← SDK
         } else {
@@ -1238,7 +1314,11 @@ func run() async {
     // One call: a session on the chosen route, with these tools AND the enabled MCP tools merged.
     let session: LocalLMLabSession                                   // ← SDK
     do {
-        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions)   // ← SDK
+        // SDK 3.0: with no authorizer a session denies anything that changes data, and a coding
+        // agent's job is to edit files and run tests. This CLI runs with nobody at a prompt, so
+        // every call runs unasked. An app with a UI would pass a ConfirmingToolAuthorizer instead.
+        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions,   // ← SDK
+                                      authorizer: AllowingToolAuthorizer())   // ← SDK
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }
@@ -1269,23 +1349,34 @@ func run() async {
             var shown = ""
             for try await content in session.streamResponse(to: prompt) {   // ← SDK
                 if content.isEmpty || content == shown { continue }
-                if content.hasPrefix(shown) { print(content.dropFirst(shown.count), terminator: "") }
-                else if shown.hasPrefix(content) { continue }   // snapshot shrank; already shown
-                else { print(shown.isEmpty ? content : "\n" + content, terminator: "") }
-                shown = content; fflush(stdout)
+                if content.hasPrefix(shown) {
+                    print(content.dropFirst(shown.count), terminator: "")
+                } else if shown.hasPrefix(content) {
+                    continue                        // snapshot shrank; already shown
+                } else {
+                    print(shown.isEmpty ? content : "\n" + content, terminator: "")
+                }
+                shown = content
+                fflush(stdout)
             }
             print()
         } catch is CancellationError {
             note("\n(interrupted — nothing further will run)")
         } catch {
-            note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+            if Task.isCancelled {                // a cancelled turn can surface as another error
+                note("\n(interrupted — nothing further will run)")
+            } else {
+                note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+            }
         }
     }
 
     // Run a turn as a cancellable child Task the Ctrl-C handler can reach.
     func turn(_ prompt: String) async {
         let t = Task { await ask(prompt) }
-        interrupt.begin(t); await t.value; interrupt.end()
+        interrupt.begin(t)
+        await t.value
+        interrupt.end()
     }
 
     if !opts.task.isEmpty {
@@ -1294,12 +1385,15 @@ func run() async {
     } else {
         note("\ncode-buddy — interactive. Type a request; `quit`, Ctrl-D, or Ctrl-C at the prompt to exit.\n")
         while true {
-            print(">> ", terminator: ""); fflush(stdout)
+            print(">> ", terminator: "")
+            fflush(stdout)
             guard let line = readLine() else { note(""); break }     // EOF / Ctrl-D
             let task = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if task.isEmpty { continue }
             if task == "quit" || task == "exit" { break }
-            print(); await turn(task); print()
+            print()
+            await turn(task)
+            print()
         }
     }
 
@@ -1312,9 +1406,9 @@ func run() async {
 await run()
 ```
 
-**Tally**: of the file's 220 non-comment/non-blank lines, 31 touch the SDK directly (marked
-above) — and that 31 is the *entire* model layer: pick providers, name routes, preflight/download,
-make a session, stream it, watch `.events`, plus the seven ready-made Workspace `Tool`s and the
+**Tally**: of the file's 220 non-comment/non-blank lines, 32 touch the SDK directly (marked
+above) — and that 32 is the *entire* model layer: pick providers, name routes, preflight/download,
+make a session (with its `AllowingToolAuthorizer`), stream it, watch `.events`, plus the seven ready-made Workspace `Tool`s and the
 MCP add-server/tool-disable calls. Everything MLX-specific is a handful of lines (`MLXModelProvider` with its `pinnedRevisions:` /
 `pinStore:` pin, `validate`, `download`, `effectivePin(for:)`, and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude`
 instead (a macOS-27 target — see `sdk-guide.md`, "Targeting macOS 26 and 27") and the rest of the file is unchanged.
@@ -1347,8 +1441,11 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
     let pipe = Pipe()
     process.standardOutput = pipe
     process.standardError = pipe
-    do { try process.run() }
-    catch { return "Failed to launch \(exe): \(error.localizedDescription)" }
+    do {
+        try process.run()
+    } catch {
+        return "Failed to launch \(exe): \(error.localizedDescription)"
+    }
 
     let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
     DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
@@ -1362,7 +1459,9 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
                 cont.resume(returning: d)
             }
         }
-    } onCancel: { if process.isRunning { process.terminate() } }
+    } onCancel: {
+        if process.isRunning { process.terminate() }
+    }
     deadline.cancel()
 
     var output = String(decoding: data, as: UTF8.self)
@@ -1371,7 +1470,9 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
         output = String(output.prefix(cap)) + "\n…[truncated, \(output.count) chars total]"
     }
     let status = process.terminationStatus
-    return output.isEmpty ? "(no output; exit \(status))" : "\(output)\n[exit \(status)]"
+    return output.isEmpty
+        ? "(no output; exit \(status))"
+        : "\(output)\n[exit \(status)]"
 }
 
 /// Read-only git. Mutating subcommands are refused — the host's policy, not the SDK's.
@@ -1392,7 +1493,8 @@ struct GitTool: Tool {
     func call(arguments: Arguments) async throws -> String {
         try Task.checkCancellation()   // a tool call queued after a Ctrl-C never launches
         let parts = arguments.command
-            .split(whereSeparator: { $0 == " " || $0 == "\n" }).map(String.init)
+            .split(whereSeparator: { $0 == " " || $0 == "\n" })
+            .map(String.init)
         guard let sub = parts.first else { return "No git subcommand given." }
         guard Self.readOnlySubcommands.contains(sub) else {
             return "Refused: '\(sub)' is not an allowed read-only git subcommand."
@@ -1417,7 +1519,9 @@ struct RunTestsTool: Tool {
         try Task.checkCancellation()
         guard let exe = command.first else { return "No test command configured." }
         var args = Array(command.dropFirst())
-        if let filter = arguments.filter, !filter.isEmpty { args += ["--filter", filter] }
+        if let filter = arguments.filter, !filter.isEmpty {
+            args += ["--filter", filter]
+        }
         let resolved = exe.hasPrefix("/") ? exe : (which(exe) ?? "/usr/bin/env")
         let finalArgs = resolved == "/usr/bin/env" ? [exe] + args : args
         return await runProcess(resolved, finalArgs, cwd: root)
@@ -1441,7 +1545,7 @@ make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it
 
 ## `examples/repo-qa-local`
 
-*`Sources/RepoQALocal/main.swift` — 96 lines of code (129 with comments).*
+*`Sources/RepoQALocal/main.swift` — 97 lines of code (144 with comments).*
 
 The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qa) above, with Apple's
 on-device model swapped for an open-weight MLX model you download and run locally — including the
@@ -1452,7 +1556,10 @@ on-device model swapped for an open-weight MLX model you download and run locall
 **`lab.mcp`** — the lab's one MCP manager — and `makeSession` offers its enabled tools
 (`includeMCPTools`), instead of the example building `MCPTool`s itself. A new server's tools start
 off, so the example turns on the ones it wants (`MCPTool(descriptor:manager:)` is used only to skip
-a tool whose schema doesn't build). The turn runs on the session's own `respond(to:)`. One of
+a tool whose schema doesn't build). Because DeepWiki isn't marked trusted, SDK 3.0 counts its tools
+as changes and denies them in a session with no authorizer; this CLI has nobody at a prompt, so
+`makeSession` passes `authorizer: AllowingToolAuthorizer()` (an app with a UI would pass a
+`ConfirmingToolAuthorizer`). The turn runs on the session's own `respond(to:)`. One of
 several examples linking `LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as
 elsewhere.
 
@@ -1562,7 +1669,7 @@ func run() async {
         }
         do { _ = try MCPTool(descriptor: descriptor, manager: lab.mcp) }  // ← SDK
         catch { note("Skipping \(descriptor.name): \(error)"); continue }
-        lab.mcp.setToolEnabled(server: state.id, tool: descriptor.name, enabled: true)  // ← SDK
+        lab.mcp.setToolEnabled(true, server: state.id, tool: descriptor.name)  // ← SDK
         enabled.append(descriptor.name)
     }
     guard !enabled.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
@@ -1574,7 +1681,11 @@ func run() async {
     let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     let session: LocalLMLabSession                                   // ← SDK
     do {
-        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true)  // ← SDK
+        // SDK 3.0: with no authorizer, an untrusted server's tools count as changes and are denied.
+        // This CLI only asks read-only documentation questions, with nobody at a prompt, so every
+        // call runs unasked. (An app with a UI passes a ConfirmingToolAuthorizer.)
+        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true,  // ← SDK
+                                      authorizer: AllowingToolAuthorizer())  // ← SDK
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }
@@ -1599,18 +1710,18 @@ if #available(macOS 26.0, *) {
 }
 ```
 
-**Tally**: of the file's 96 non-comment/non-blank lines, 19 touch the SDK directly (marked above).
+**Tally**: of the file's 97 non-comment/non-blank lines, 20 touch the SDK directly (marked above).
 The model layer is ~8 lines (`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` /
 `availability` / `validate` / `download`, plus the diagnostic `note(...)` line that reads
 `LocalLMLabSDKVersion.current`); pinning adds the `shippedPins` dictionary, the `pinStore:` argument
 and an `effectivePin(for:)` call that reports which version is in use and where the pin came from
 (`.shipped` vs `.captured`). The MCP half is `lab.mcp.addServer`, a `setToolEnabled` per tool, and
-`makeSession(includeMCPTools: true)`; `--apple` proves the same route can point at Apple's on-device
+`makeSession(includeMCPTools: true, authorizer: AllowingToolAuthorizer())`; `--apple` proves the same route can point at Apple's on-device
 model with no other change.
 
 ## `examples/workspace-buddy-local`
 
-*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 256 lines of code (333 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 270 lines of code (353 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddy) above —
@@ -1623,6 +1734,11 @@ commit the app was tried against (`pinnedRevisions:`), so a fresh download alway
 than whatever `main` has become. One of several examples linking
 `LocalLMLabSDKInference`. The `FolderAccess` enum is verbatim from `workspace-buddy` and is
 elided here — see that section above.
+
+Unlike `workspace-buddy`, which uses Apple's `LanguageModelSession` directly, this app goes through
+`makeSession`, and since 3.0 a session with no `authorizer:` refuses writes. So it passes a
+`ConfirmingToolAuthorizer` that asks the user, through a small `NSAlert`-based
+`AlertConfirmationChannel`, before any write or edit; reads run without asking.
 
 Where `workspace-buddy` awaits `respond(to:)` whole behind a spinner, this one **streams**: an
 8B model on the GPU is slow enough that a bare spinner reads as stuck, so the answer renders as
@@ -1743,8 +1859,12 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 Explain what you changed and why, briefly.
                 """
             do {
+                // Writes and edits ask the user first (an alert here; a real app uses Components'
+                // ToolConfirmationPresenter). With no authorizer a session refuses writes.
                 let session = try self.lab.makeSession(              // ← SDK
-                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false
+                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false,
+                    authorizer: ConfirmingToolAuthorizer(channel: AlertConfirmationChannel(),   // ← SDK
+                                                         hostTools: .ask(atOrAbove: .mutate, by: .user))   // ← SDK
                 )
 
                 // .events is the side-channel around generation — here, the tool running during
@@ -1752,9 +1872,12 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 let events = Task { @MainActor in
                     for await event in session.events {             // ← SDK
                         switch event {
-                        case .toolCallStarted(_, let name, _): self.activity = Self.activityLabel(for: name)
-                        case .toolCallFinished:                self.activity = nil
-                        default: break
+                        case .toolCallStarted(_, let name, _):
+                            self.activity = Self.activityLabel(for: name)
+                        case .toolCallFinished:
+                            self.activity = nil
+                        default:
+                            break
                         }
                     }
                 }
@@ -1794,20 +1917,39 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
 @main
 struct WorkspaceBuddyLocalApp: App {
     @StateObject private var model = WorkspaceBuddyLocalModel()
+
     var body: some Scene {
-        WindowGroup { ContentView(model: model) }
-            .windowResizability(.contentMinSize)
+        WindowGroup {
+            ContentView(model: model)
+        }
+        .windowResizability(.contentMinSize)
+    }
+}
+
+/// Asks the user with an alert before a tool that changes the folder runs. The smallest possible
+/// `ToolConfirmationChannel`; Components' `ToolConfirmationPresenter` is the one for a real app.
+struct AlertConfirmationChannel: ToolConfirmationChannel {                 // ← SDK
+    func requestDecision(for call: PendingToolCall) async -> Bool {        // ← SDK (type)
+        await MainActor.run {
+            let alert = NSAlert()
+            alert.messageText = "Allow \(call.toolName)?"
+            alert.informativeText = (call.impactReason.map { $0 + "\n\n" } ?? "") + call.argumentsDescription
+            alert.addButton(withTitle: "Allow")
+            alert.addButton(withTitle: "Deny")
+            return alert.runModal() == .alertFirstButtonReturn
+        }
     }
 }
 ```
 
-**Tally**: of ~110 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
-UI section both elided), 17 touch the SDK (marked above). Against `workspace-buddy`'s five (four
+**Tally**: of 149 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
+UI section both elided), 21 touch the SDK (marked above). Against `workspace-buddy`'s five (four
 Tool instantiations + one error formatter), the delta is the model layer (provider/lab/route setup
-and the `pinnedRevisions:` pin, the first-run `availability` check, the `validate` + `download` progress loop) plus the streaming
-turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond`.
-The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
-sandbox changes nothing in the code, only the entitlements.
+and the `pinnedRevisions:` pin, the first-run `availability` check, the `validate` + `download` progress loop), the streaming
+turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond` — and
+the write gate: the `ConfirmingToolAuthorizer` passed to `makeSession` and the `AlertConfirmationChannel`
+it asks through. The four `WorkspaceTools` are identical to `workspace-buddy`'s — the sandbox
+changes nothing in the code, only the entitlements.
 
 ## `examples/os-matrix`
 
@@ -1937,8 +2079,8 @@ independently re-verified in this pass.
 *328 lines of code across the app's four files — `AppModel.swift`, `ProviderGlue.swift`,
 `ModelSwitchApp.swift` (all below) and `Keychain.swift` (a 33-line generic-password wrapper, not shown).*
 
-The **online / remote providers** example (`sdk-guide.md`
-[§6b](remote-providers.md)): a chat
+The **online / remote providers** example
+([Online providers](remote-providers.md)): a chat
 window that talks to Apple's on-device model, PCC, Claude-via-Foundation-Models, and any number of
 HTTP providers (GPT, Claude online, OpenRouter, OpenAI-compatible) from one `lab.makeSession`
 call, with provider-run web search. This is the only example linking a **fourth** binary,
@@ -2261,7 +2403,7 @@ seam that keeps `Components` free of any dependency on `Remote`.
 
 ## `examples/security-demo`
 
-*~250 lines of code across 6 files; the SDK surface is two of them — `DemoSecurity.swift` and `AppModel.swift` (both below). The three view files (`SecurityPane`, `RunPane`, `ContentView`) and `SecurityDemoApp` are ordinary SwiftUI, elided; `Keychain.swift` is ~30 lines of `SecItem*` with no SDK in it (a credential belongs in the Keychain, not `UserDefaults` — that's the only reason it exists).*
+*432 lines of code across 7 files (588 with comments); the SDK surface is two of them — `DemoSecurity.swift` and `AppModel.swift` (both below). The three view files (`SecurityPane`, `RunPane`, `ContentView`) and `SecurityDemoApp` are ordinary SwiftUI, elided — except `ContentView`'s one `.toolConfirmationSheet(model.presenter)` line, which is the whole confirmation UI; `Keychain.swift` is 33 lines of `SecItem*` with no SDK in it (a credential belongs in the Keychain, not `UserDefaults` — that's the only reason it exists).*
 
 ### `Sources/SecurityDemo/DemoSecurity.swift`
 
@@ -2278,6 +2420,7 @@ enum ConnectorLevel: String, CaseIterable, Identifiable, Sendable {
     case readOnly = "Read-only"
     case changes  = "Changes"
     case full     = "Full"
+
     var id: String { rawValue }
 
     // A connector "level" is just a ToolImpact ceiling.
@@ -2290,14 +2433,17 @@ enum ConnectorLevel: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-@MainActor @Observable
+@MainActor
+@Observable
 final class DemoSecurity {
     var calendarLevel: ConnectorLevel = .changes
     var calendarConfirm = true
-    var todoistConfirm  = true
+    var todoistConfirm = true
 
     func snapshot() -> DemoPolicy {
-        DemoPolicy(calendarLevel: calendarLevel, calendarConfirm: calendarConfirm, todoistConfirm: todoistConfirm)
+        DemoPolicy(calendarLevel: calendarLevel,
+                   calendarConfirm: calendarConfirm,
+                   todoistConfirm: todoistConfirm)
     }
 }
 
@@ -2305,9 +2451,6 @@ struct DemoPolicy: Sendable {
     var calendarLevel: ConnectorLevel
     var calendarConfirm: Bool
     var todoistConfirm: Bool
-
-    // No confirmation wanted anywhere ⇒ makeSession gets no authorizer, runs like a bare session.
-    var wantsConfirmation: Bool { calendarConfirm || todoistConfirm }
 
     // Lever 1 — selection. Drop every Calendar tool above the level's ceiling.
     func limitedCalendarTools(_ tools: [any Tool]) -> [any Tool] {
@@ -2330,14 +2473,15 @@ struct DemoPolicy: Sendable {
 
 ### `Sources/SecurityDemo/AppModel.swift`
 
-*About 130 lines of code (230 with comments).* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`.
+*159 lines of code (230 with comments); excerpted below.* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`. The run **always** passes a `ConfirmingToolAuthorizer`: since SDK 3.0 a session with no authorizer fails closed (reads run, every change and every untrusted MCP call is denied). With both confirm toggles off, both approvals are `.allow`, so every call runs unasked.
 
 ```swift
 import LocalLMLabSDKComponents                                        // ← Components
 import LocalLMLabSDKCore                                              // ← SDK
 import LocalLMLabSDKRemote                                            // ← SDK (Remote)
 
-@MainActor @Observable
+@MainActor
+@Observable
 final class AppModel {
     let security = DemoSecurity()
     @ObservationIgnored let presenter = ToolConfirmationPresenter()    // ← Components  — the ToolConfirmationChannel
@@ -2345,10 +2489,23 @@ final class AppModel {
 
     // MARK: bootstrap  (a real app has UI for all of this)
 
+    // A pasted API key: persist to the Keychain, register the provider now — no relaunch.
+    private func registerProvider(_ p: FrontierProvider, key: String) {
+        var cfg = p == .anthropic
+            ? RemoteProviderConfig.anthropic(apiKey: key)             // ← SDK (Remote) (preset)
+            : RemoteProviderConfig.openAI(apiKey: key)                // ← SDK (Remote) (preset)
+        cfg.allowArbitraryModelIDs = true                            // ← SDK (Remote)
+        do {
+            lab.models.replace(try RemoteModelProvider(cfg))          // ← SDK  — register-or-swap by scheme
+        } catch {
+            providerNote = "Couldn't use that key: \(error.localizedDescription)"
+        }
+    }
+
     private func bootstrap() async {
         lab = LocalLMLab()                                            // ← SDK  — empty; a pasted key is registered live
         for p in FrontierProvider.allCases where hasKey(for: p) {
-            registerProvider(p, key: storedKey(for: p))               // ← SDK (Remote)  — see below
+            registerProvider(p, key: storedKey(for: p))               // ← SDK (Remote)  — see above
             availableProviders.append(p)
         }
 
@@ -2367,19 +2524,6 @@ final class AppModel {
         }
     }
 
-    // A pasted API key: persist to the Keychain, register the provider now — no relaunch.
-    private func registerProvider(_ p: FrontierProvider, key: String) {
-        var cfg = p == .anthropic
-            ? RemoteProviderConfig.anthropic(apiKey: key)             // ← SDK (Remote) (preset)
-            : RemoteProviderConfig.openAI(apiKey: key)                // ← SDK (Remote) (preset)
-        cfg.allowArbitraryModelIDs = true                            // ← SDK (Remote)
-        do {
-            lab.models.replace(try RemoteModelProvider(cfg))          // ← SDK  — register-or-swap by scheme
-        } catch {
-            providerNote = "Couldn't use that key: \(error.localizedDescription)"
-        }
-    }
-
     // MARK: run — DemoPolicy → SDK
 
     func run() async {
@@ -2392,17 +2536,17 @@ final class AppModel {
 
             // Lever 1 — selection. ClockTool is always on (a .read; the model needs "today").
             let hostTools: [any Tool] = [ClockTool()] + policy.limitedCalendarTools([   // ← SDK  — Core's EventKit tools
-                GetUpcomingEventsTool(), AddCalendarEventTool(),
-                UpdateCalendarEventTool(), DeleteCalendarEventTool(),
+                GetUpcomingEventsTool(),
+                AddCalendarEventTool(),
+                UpdateCalendarEventTool(),
+                DeleteCalendarEventTool(),
             ])
 
             // Lever 2 — invocation. Todoist's approval lives on its server in lab.mcp; the Calendar
-            // tools' on the authorizer. nil when the panel asks for no confirmation.
-            lab.mcp.setToolApproval(policy.todoistApproval,               // ← SDK  — per-server approval
-                                    server: MCPServerID(rawValue: todoistURL.absoluteString))
-            let authorizer: (any ToolCallAuthorizer)? = policy.wantsConfirmation   // ← SDK (type)
-                ? ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)   // ← SDK
-                : nil
+            // tools' on the authorizer. Always pass one: with no authorizer, 3.0 fails closed.
+            // With both toggles off, both approvals are .allow, so every call runs unasked.
+            lab.mcp.setToolApproval(policy.todoistApproval, server: MCPServerID(rawValue: todoistURL.absoluteString))   // ← SDK  — per-server approval
+            let authorizer = ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)   // ← SDK
 
             let session = try lab.makeSession(                        // ← SDK
                 route: "frontier",
@@ -2411,9 +2555,12 @@ final class AppModel {
                 includeMCPTools: true,      // pulls the enabled Todoist tools, tagged .mcp origin
                 authorizer: authorizer)
 
-            for await ev in session.events {                          // ← SDK  — toolCallStarted / toolCallFinished → the "Tool calls" list
-                // …append to model.toolLog…
+            let events = Task { [weak self] in
+                for await ev in session.events {                      // ← SDK  — toolCallStarted / toolCallFinished → the "Tool calls" list
+                    // …append to toolLog…
+                }
             }
+            defer { events.cancel() }
 
             output = try await session.respond(to: prompt)           // ← SDK
         } catch {
@@ -2423,24 +2570,24 @@ final class AppModel {
 }
 ```
 
-**Tally**: of the file's ~130 non-comment/non-blank lines, 22 touch the SDK directly (marked
+**Tally**: of the file's 159 non-comment/non-blank lines, 21 touch the SDK directly (marked
 above, plus 2 more marked `← Components`) — and every SDK one is either setup (`LocalLMLab()`,
 `registerProvider`, `addServer` + `setToolEnabled`,
 `CalendarAccess.requestAccess`) or the one `run()` call site: `route` → build `hostTools` with
 `limited(toMaxImpact:)` → set Todoist's approval with `setToolApproval` → a
 `ConfirmingToolAuthorizer` carrying Calendar's approval → `makeSession(authorizer:)` →
-`respond`. `DemoSecurity.swift` adds 4 more, all in `DemoPolicy` — the two levers themselves.
+`respond`. `DemoSecurity.swift` adds 6 more: the import, `maxImpact`'s `ToolImpact`, and 4 in `DemoPolicy` — the two levers themselves.
 The `ToolConfirmationPresenter` + `.toolConfirmationSheet(_:)` (in `ContentView`, one line) is
 the entire confirmation UI. Nothing in the three panel views touches the SDK — they bind to
 `DemoSecurity`, and the snapshot does the rest.
 
 ## `examples/aiql`
 
-*`Sources/AIQL/AIQLApp.swift` — 402 lines of code (459 with comments) — one file: view model +
+*`Sources/AIQL/AIQLApp.swift` — 403 lines of code (515 with comments) — one file: view model +
 pipeline + SwiftUI UI. The `FolderAccess` enum and the `ContentView` UI are elided below.*
 
-The **file-backed MCP tools + `loadTable` + `sqlQuery`** showcase (`sdk-guide.md`
-[§8b](sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
+The **file-backed MCP tools + `loadTable` + `sqlQuery`** showcase
+([`sdk-guide.md`, "`FileBackedTool` + the AIQL data verbs"](sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
 type a local model, an MCP data source, and a plain-English request; the app pulls the dataset
 into a file (so the raw payload never enters the model's context), `loadTable`s it into an
 ephemeral SQLite table, and has the model write **one read-only `SELECT`** to a CSV. The model
@@ -2449,7 +2596,11 @@ there's only ever one query call. `WHERE` / `BETWEEN` / `ORDER BY … LIMIT` / `
 SQLite. In 2.0 the data tools come from **`lab.mcp`**: the app adds the server there, turns on its
 four most data-like tools, and sets `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)`
 for the run's folder, so `makeSession(includeMCPTools: true)` offers each with a `saveAs` argument
-that writes its result to a file — under `raw/`, data-file types only (the default `SaveAsPolicy`). Links `LocalLMLabSDKInference` for the MLX model. Because the model
+that writes its result to a file — under `raw/`, data-file types only (the default `SaveAsPolicy`).
+The server you add isn't marked trusted, so SDK 3.0 counts its tools as changes and denies them in a
+session with no authorizer; AIQL only reads (one `SELECT` per question) from a server the user added,
+so `makeSession` passes `authorizer: AllowingToolAuthorizer()` (an app that wants a prompt would pass
+a `ConfirmingToolAuthorizer`). Links `LocalLMLabSDKInference` for the MLX model. Because the model
 field is free text, the app can't pin everything ahead of time, so it layers three supply-chain
 controls: the default model is **pinned** to a reviewed commit (`pinnedRevisions:`), any other model
 is pinned on first download (`MLXFilePinStore`), and a **trust policy** (`MlxCommunityOnly`) limits
@@ -2630,7 +2781,7 @@ final class AIQLModel: ObservableObject {
         let ranked = serverTools.sorted { lhs, rhs in Self.dataLikelihood(lhs.name) > Self.dataLikelihood(rhs.name) }
         let chosen = ranked.prefix(4).map(\.name)
         for tool in serverTools {
-            lab.mcp.setToolEnabled(server: serverID, tool: tool.name, enabled: chosen.contains(tool.name))  // ← SDK
+            lab.mcp.setToolEnabled(chosen.contains(tool.name), server: serverID, tool: tool.name)  // ← SDK
         }
         // File-backed: each data tool gets a `saveAs` argument that writes its raw result into the
         // chosen folder, so the dataset never enters the model's context. Only for this run —
@@ -2679,8 +2830,12 @@ final class AIQLModel: ObservableObject {
             // effort: .off — skip the model's <think> pass. The Qwen3 family has the
             // template toggle; the pipeline is mechanical (pick a tool, name a table, write
             // one SELECT) so the reasoning trace buys nothing but latency.
+            // SDK 3.0: with no authorizer, an untrusted server's tools count as changes and are
+            // denied. AIQL only reads, from a server you added yourself, so every call runs unasked.
+            // An app that wants a prompt passes a ConfirmingToolAuthorizer instead.
             session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,  // ← SDK
-                                          includeMCPTools: true, options: SessionOptions(effort: .off))  // ← SDK
+                                          includeMCPTools: true, options: SessionOptions(effort: .off),  // ← SDK
+                                          authorizer: AllowingToolAuthorizer())  // ← SDK
         } catch LocalLMLabError.mcp {                                // ← SDK
             return .failed("Couldn't read that server's tools — its data format isn't supported yet.")
         } catch {
@@ -2811,9 +2966,9 @@ struct AIQLApp: App {
 }
 ```
 
-**Tally**: 42 lines carry a marker (32 Core, 10 Inference). The model layer is the same ~7 lines as
+**Tally**: 43 lines carry a marker (33 Core, 10 Inference). The model layer is the same ~7 lines as
 `repo-qa-local` (`MLXModelProvider` / `LocalLMLab` / `route` / `availability` / `validate` /
-`download` / `makeSession`), plus the supply-chain controls above: an `MLXModelTrustPolicy`
+`download` / `makeSession`, here with an `AllowingToolAuthorizer`), plus the supply-chain controls above: an `MLXModelTrustPolicy`
 conformance (~5 lines), the `pinnedRevisions:` / `supplyChainPolicy:` / `pinStore:` arguments on
 `MLXModelProvider`, and an `effectivePin(for:)` call that tells the user which version they got. The
 MCP side is `lab.mcp.addServer`, `setToolEnabled` for the chosen four, and one
@@ -2826,9 +2981,9 @@ doing the orchestration is the real work of this example; `WorkspaceAccess` read
 
 ## `examples/vistanova`
 
-*`Sources/VistaNova/AppModel.swift`, `TavilySearchTool.swift`, and `ModelStateStore` from
-`Persistence.swift` — the app's SDK-facing code, 931 lines of code in the whole app (1,294 with
-comments), of which `AppModel` is 361. The SwiftUI views, theme, settings screen
+*The app's SDK-facing code: `TavilySearchTool.swift`, `ModelStateStore` from `Persistence.swift`,
+and `AppModel.swift` — 939 lines of code in the whole app (1,309 with comments), of which
+`AppModel` is 369. The SwiftUI views, theme, settings screen
 are plain SwiftUI/Foundation and omitted; elisions are marked
 `// …`.*
 
@@ -2838,15 +2993,21 @@ risk: *search* needs a model that reliably calls a tool (Apple's on-device model
 `mlx-community/Qwen3-4B-4bit`, **shipped pinned to an exact commit** (`sdk-guide.md`
 [Pinning, updating and cleaning up model versions](local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions)).
 The search runs through Tavily's hosted MCP server with a static API key (`authType: .pat`), via a
-hand-written Path B `Tool`. Most of the interesting code is defensive: it never trusts a small
+hand-written Path B `Tool`. Every session passes `authorizer: Self.searchOnly`, a
+`ConfirmingToolAuthorizer` whose policy allows `tavily_search` and denies anything else:
+`TavilySearchTool` is unrated, so the SDK counts it as a change, and since SDK 3.0 a session with
+no authorizer would deny every search. Most of the interesting code is defensive: it never trusts a small
 model to have actually called the tool, or to have produced a usable shape. Links both
 `LocalLMLabSDKCore` and `LocalLMLabSDKInference`. Sandbox-free, ad-hoc signed (no entitlements).
+
+*`Sources/VistaNova/TavilySearchTool.swift` — the whole file, 33 lines of code (49 with comments).*
 
 ```swift
 // TavilySearchTool.swift — Path B: a hand-written Tool over one MCP tool, instead of Core's
 // auto-assembled MCPTool. Two things Path A can't give: max_results/search_depth pinned in
 // Swift (the model only ever chooses `query`), and the query the model actually sent.
 
+import Foundation
 import FoundationModels
 import LocalLMLabSDKCore                                              // ← SDK
 
@@ -2889,6 +3050,8 @@ struct TavilySearchTool: Tool {                                       // Foundat
 }
 ```
 
+*`Sources/VistaNova/Persistence.swift` — excerpt: only `ModelStateStore`.*
+
 ```swift
 // Persistence.swift — the SDK's own snapshot type is Codable: routes, residency and installed
 // records round-trip through one JSON file. The app keeps no model-choice setting of its own.
@@ -2906,6 +3069,8 @@ enum ModelStateStore {
     // …
 }
 ```
+
+*`Sources/VistaNova/AppModel.swift` — excerpt; 369 lines of code (591 with comments).*
 
 ```swift
 // AppModel.swift
@@ -2934,19 +3099,17 @@ final class AppModel {
         AppModel.summaryModelRepo: AppModel.summaryModelRevision,
     ])
 
-    static let summaryModelRepo = "mlx-community/Qwen3-4B-4bit"
-    static let summaryModelRevision = "4dcb3d101c2a062e5c1d4bb173588c54ea6c4d25"   // full commit hash, not a branch
-    static let defaultSummaryModel = ModelID(scheme: "mlx", rest: summaryModelRepo)!   // ← SDK
-
     // Two independent model choices — two routes, not one model: search needs reliable
     // tool-calling, summarize doesn't.
     var searchModel: ModelID = .system                                // ← SDK
     var summaryModel: ModelID = AppModel.defaultSummaryModel
+    static let summaryModelRepo = "mlx-community/Qwen3-4B-4bit"
+    static let summaryModelRevision = "4dcb3d101c2a062e5c1d4bb173588c54ea6c4d25"   // full commit hash, not a branch
+    static let defaultSummaryModel = ModelID(scheme: "mlx", rest: summaryModelRepo)!   // ← SDK
 
     init() {
         // …
-        lab = LocalLMLab(configuration: .init(                        // ← SDK
-            providers: [SystemModelProvider(), mlxProvider]))         // ← SDK / ← SDK (Inference)
+        lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider(), mlxProvider]))   // ← SDK / ← SDK (Inference)
         if let modelState = ModelStateStore.load() {
             lab.restore(from: modelState)                             // ← SDK — routes + installed records back
         }
@@ -3013,9 +3176,20 @@ final class AppModel {
     // `effort: .off` suppresses a Qwen3-family model's <think> block (a documented no-throw
     // preference: a model that always reasons just keeps reasoning instead of failing the turn).
     private func makeSessionSuppressingThinking(route: RouteName, tools: [any Tool] = [], instructions: String, includeMCPTools: Bool) throws -> LocalLMLabSession {
-        try lab.makeSession(route: route, tools: tools, instructions: instructions,   // ← SDK
-                            includeMCPTools: includeMCPTools, options: .init(effort: .off))   // ← SDK
+        try lab.makeSession(route: route, tools: tools, instructions: instructions, includeMCPTools: includeMCPTools,   // ← SDK
+                            options: .init(effort: .off), authorizer: Self.searchOnly)   // ← SDK  — every session gets the authorizer below
     }
+
+    // TavilySearchTool is unrated, so the SDK counts it as a change (it sends the query out), and
+    // since SDK 3.0 a session with no authorizer denies those: every search would come back DENIED.
+    // Typing a query is the user asking for that search, so allow tavily_search, deny anything else.
+    private static let searchOnly = ConfirmingToolAuthorizer(        // ← SDK
+        channel: nil,
+        policy: { call in
+            call.origin == .host && call.toolName == "tavily_search"   // ← SDK  — the call's origin and name
+                ? .allow : .deny(reason: "VistaNova only runs tavily_search")   // ← SDK
+        },
+        hostTools: .ask(atOrAbove: .read, by: .policy))               // ← SDK  — every host call goes to the policy
 
     private func attemptSearch(query: String, using session: LocalLMLabSession, supportsGuidedGeneration: Bool) async throws -> [SearchResultLink] {
         // A plausible-looking answer proves nothing: a model can answer from its own training data
@@ -3035,8 +3209,7 @@ final class AppModel {
                 // Guided generation (`generating:`) has no SDK turn method, so this one call stays on
                 // Apple's session — the escape hatch — which also keeps the recovery below reading
                 // Apple's own error.
-                let response = try await session.languageModelSession.respond(   // ← SDK — a plain FoundationModels session
-                    to: query, generating: SearchResults.self)
+                let response = try await session.languageModelSession.respond(to: query, generating: SearchResults.self)   // ← SDK — a plain FoundationModels session
                 guard toolWasCalled else { throw SearchParseError.toolNotCalled }
                 return response.content.pages.map { /* … */ }
             } catch {
@@ -3065,8 +3238,7 @@ final class AppModel {
         // of metadata is on disk and `installed` already lists the repo), so the app also keeps its
         // own record of "the last attempt didn't finish" and always re-runs the tracked download.
         if summaryModel.scheme == "mlx",
-           !mlxProvider.installed.contains(where: { $0.id == summaryModel })   // ← SDK (Inference)
-            || incompleteDownloadRepoIDs.contains(summaryModel.rest) {
+           !mlxProvider.installed.contains(where: { $0.id == summaryModel }) || incompleteDownloadRepoIDs.contains(summaryModel.rest) {   // ← SDK (Inference)
             guard await downloadSummaryModel() else { return }
         }
         // …
@@ -3092,7 +3264,7 @@ final class AppModel {
 }
 ```
 
-**Tally**: of `AppModel`'s 361 lines of code, 34 touch the SDK directly (marked above; another 8 in
+**Tally**: of `AppModel`'s 369 lines of code, 37 touch the SDK directly (marked above; another 8 in
 `TavilySearchTool` and `ModelStateStore`) — the rest is search-result parsing, thread bookkeeping
 and state. **The pin is one parameter**
 (`pinnedRevisions:` on `MLXModelProvider`) **plus two constants** — everything downstream
@@ -3108,7 +3280,7 @@ pinned `max_results` and the captured query.
 
 ## `examples/components-updates-demo`
 
-*`Sources/UpdatesDemo/UpdatesDemoApp.swift` — 151 lines of code (170 with comments) — the whole file is shown below.*
+*`Sources/UpdatesDemo/UpdatesDemoApp.swift` — 158 lines of code (182 with comments) — the whole file is shown below.*
 
 The `LocalLMLabSDKComponents` views for **onboarding, updating and cleaning up** a downloaded model
 ([`sdk-guide.md`, "Components"](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)), driven by
@@ -3127,6 +3299,7 @@ the work; in a real host they call `MLXModelProvider` — `validate`, `download`
 `Components/README.md` has the ~40-line adapter.
 
 ```swift
+import AppKit
 import LocalLMLabSDKComponents                                    // ← Components
 import LocalLMLabSDKCore                                          // ← SDK
 import SwiftUI
@@ -3139,6 +3312,15 @@ private let newerCommit = "ff1143e3a10547c9f2129e94ca37059b096b23f4"
 @main
 @available(macOS 27, *)
 struct UpdatesDemoApp: App {
+    init() {
+        // Under `swift run` there is no app bundle, so the window can open behind the terminal.
+        // Become a regular app (only if not one already) and come to the front.
+        if NSApplication.shared.activationPolicy() != .regular {
+            NSApplication.shared.setActivationPolicy(.regular)
+        }
+        DispatchQueue.main.async { NSApplication.shared.activate() }
+    }
+
     var body: some Scene {
         WindowGroup("Components: onboarding, updates, versions") {
             DemoView().frame(minWidth: 640, minHeight: 720)
@@ -3299,7 +3481,7 @@ private struct DemoView: View {
 }
 ```
 
-**Tally**: of the file's 151 non-comment/non-blank lines, 38 touch the SDK (marked above), and every one of them is a
+**Tally**: of the file's 158 non-comment/non-blank lines, 38 touch the SDK (marked above), and every one of them is a
 `Components` type or a Core value type handed to one. Almost all of the rest is the *simulation* — the sleeps, the
 fault switches, the state for each demo section. The seams to notice:
 
@@ -3324,8 +3506,8 @@ fault switches, the state for each demo section. The seams to notice:
 ## `examples/mlx-control-room`
 
 *`Sources/MLXControlRoom/MLXControlRoomApp.swift` — the view-model half (`ControlRoomModel` and the constants above
-it), excerpted: 1,434 lines of code in the whole file (1,812 with comments), of which the SwiftUI views (`// MARK: - UI`,
-about 863 lines) are plain SwiftUI and omitted. Elisions are marked `// …`.*
+it), excerpted: 1,431 lines of code in the whole file (1,806 with comments), of which the SwiftUI views (`// MARK: - UI`,
+about 857 lines) are plain SwiftUI and omitted. Elisions are marked `// …`.*
 
 The example that shows how a host app can **deploy models from Hugging Face without a "just download anything"
 approach**, and exposes the MLX knobs with a gauge beside each. Read it as one tour of `MLXModelProvider`'s
@@ -3494,6 +3676,14 @@ final class ControlRoomModel: ObservableObject {
     private let managedPinStore = MLXFileManagedPinStore()        // ← SDK (Inference)
 
     // …
+    /// The `beforeSwitch` hook: the SDK has downloaded and verified the new version and is about to
+    /// move the pin. Stop new runs, let the one in flight finish, then return.
+    private func pauseInferenceForSwitch() async throws {
+        inferencePaused = true
+        onboardingLogLine("update downloaded and verified — pausing inference to switch")
+        while state == .working { try await Task.sleep(for: .milliseconds(100)) }
+    }
+
     /// Which kind of pin the active single model is on, if it can be updated here at all:
     /// - `.captured` — the user's own choice; the user decides, and the target is whatever `main` is now;
     /// - `.shipped` — a built-in model **the developer's feed vouches for**: the target is the commit
@@ -3518,14 +3708,6 @@ final class ControlRoomModel: ObservableObject {
     var activeBuildTimeRevision: String? {
         guard case .single(let repo) = activeLaunch else { return nil }
         return mlx?.buildTimePin(for: repo)                       // ← SDK (Inference)
-    }
-
-    /// The `beforeSwitch` hook: the SDK has downloaded and verified the new version and is about to
-    /// move the pin. Stop new runs, let the one in flight finish, then return.
-    private func pauseInferenceForSwitch() async throws {
-        inferencePaused = true
-        onboardingLogLine("update downloaded and verified — pausing inference to switch")
-        while state == .working { try await Task.sleep(for: .milliseconds(100)) }
     }
 
     func checkForPinUpdate() {
@@ -3799,7 +3981,7 @@ because a curated adapter lives in a different namespace.
 
 ## `examples/mcp-chat`
 
-*938 lines of code across 4 files (1,026 with comments). `ChatModel.swift`, `WidgetSlot.swift`
+*948 lines of code across 4 files (1,149 with comments). `ChatModel.swift`, `WidgetSlot.swift`
 and `MCPChatApp.swift` are below in full; from `ChatViews.swift` the views that read the SDK are
 shown and the plain-SwiftUI ones (bubbles, composer, settings, the first-run screen) are elided,
 marked `// …`.*
@@ -3832,6 +4014,11 @@ isn't here: no tool list is rebuilt when the user turns a tool on (a session fol
 its own), no approval policy (each server's trust and approval live on `lab.mcp`, set from the
 server list), no `<think>` parsing (`hostTranscript` splits it). A new session is made only when
 the user switches models — carrying both the model's memory and the transcript over.
+
+SDK 3.0 sessions without an `authorizer:` fail closed, so every session gets one
+`ConfirmingToolAuthorizer`: it follows each server's trust and approval and asks the user through
+the approval sheet. The saved server list is the SDK's own `MCPServerSnapshot` per server
+(`manager.snapshot()` / `manager.restore(from:)`), with the older `servers.v1` list migrated once.
 
 ```swift
 import AppKit
@@ -4173,57 +4360,66 @@ final class ChatModel: ObservableObject {
 
     // MARK: servers (saved list; quiet reconnect)
 
+    /// The SDK's snapshot (cached tools with the user's on/off choices, trust, approvals, drift),
+    /// plus whether the server needed no credential when last connected.
     private struct SavedServer: Codable {
+        var snapshot: MCPServerSnapshot   // ← SDK
+        var noAuth: Bool
+    }
+
+    /// The list saved before snapshots (servers.v1), read once to migrate.
+    private struct SavedServerV1: Codable {
         var url: URL
         var name: String
         var authType: MCPAuthType   // ← SDK
         var manualClientID: String?
         var noAuth: Bool
-        /// The server's tools as last seen, with the user's on/off choice for each. New tools from
-        /// a server start off (the SDK's default); restoring these keeps the user's choices.
         var tools: [MCPToolDescriptor]?   // ← SDK
-        /// The user's trust and tool approval for the server (server list). The manager doesn't
-        /// persist them; they are set again after restore.
         var trust: MCPServerTrust?   // ← SDK
         var toolApproval: ToolApproval?   // ← SDK
     }
 
-    private let savedServersKey = "servers.v1"
+    private let savedServersKey = "servers.v2"
+    private let savedServersV1Key = "servers.v1"
+
+    private func loadSavedServers() -> [SavedServer] {
+        if let data = UserDefaults.standard.data(forKey: savedServersKey),
+           let saved = try? JSONDecoder().decode([SavedServer].self, from: data) {
+            return saved
+        }
+        let v1 = (UserDefaults.standard.data(forKey: savedServersV1Key)
+            .flatMap { try? JSONDecoder().decode([SavedServerV1].self, from: $0) }) ?? []
+        return v1.map {
+            SavedServer(snapshot: MCPServerSnapshot(id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name,   // ← SDK
+                                                    authType: $0.authType, manualClientID: $0.manualClientID, tools: $0.tools ?? [],
+                                                    trust: $0.trust ?? .untrusted, toolApproval: $0.toolApproval),
+                        noAuth: $0.noAuth)
+        }
+    }
 
     private func restoreServers() async {
-        let saved = (UserDefaults.standard.data(forKey: savedServersKey)
-            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
-        manager.restore(from: saved.map {   // ← SDK
-            (id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name, tools: $0.tools ?? [], estimatedTokens: 0,   // ← SDK
-             enabled: true, authType: $0.authType, manualClientID: $0.manualClientID, resources: [])
-        })
-        // Trust before reconnecting: trusting records the saved tool list, so a server whose tools
-        // changed while the app was closed shows "tools changed since trusted".
-        for server in saved {
-            let id = MCPServerID(rawValue: server.url.absoluteString)   // ← SDK
-            if let trust = server.trust { manager.setTrust(trust, server: id) }   // ← SDK
-            manager.setToolApproval(server.toolApproval, server: id)   // ← SDK
-        }
+        let saved = loadSavedServers()
+        // Restored with trust and the list it trusted, so a server whose tools changed while the app
+        // was closed shows "tools changed since trusted" once reconnected.
+        manager.restore(from: saved.map(\.snapshot))   // ← SDK
         // Only servers that need no sign-in, or have a stored credential, reconnect at launch: this
         // app never opens a browser unprompted.
-        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.url) != nil {   // ← SDK
-            _ = await manager.reconnect(MCPServerID(rawValue: server.url.absoluteString))   // ← SDK
+        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.snapshot.url) != nil {   // ← SDK
+            _ = await manager.reconnect(server.snapshot.id)   // ← SDK
         }
         servers.$servers.dropFirst().sink { [weak self] in self?.persist($0) }.store(in: &cancellables)   // ← Components
     }
 
     private func persist(_ states: [MCPServerID: MCPServerState]) {   // ← SDK
-        let previous = (UserDefaults.standard.data(forKey: savedServersKey)
-            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
-        let saved = states.values.map { state in
-            SavedServer(url: state.url, name: state.displayName, authType: state.authType, manualClientID: state.manualClientID,
-                        noAuth: state.connectionStatus == .connected
-                            ? MCPCredentialProbe.storedKind(for: state.url) == nil   // ← SDK
-                            : previous.first { $0.url == state.url }?.noAuth ?? false,
-                        tools: state.tools.isEmpty ? previous.first { $0.url == state.url }?.tools : state.tools,
-                        trust: state.trust, toolApproval: state.toolApproval)
+        let previous = loadSavedServers()
+        let saved = manager.snapshot().map { snapshot in   // ← SDK
+            SavedServer(snapshot: snapshot,
+                        noAuth: states[snapshot.id]?.connectionStatus == .connected
+                            ? MCPCredentialProbe.storedKind(for: snapshot.url) == nil   // ← SDK
+                            : previous.first { $0.snapshot.id == snapshot.id }?.noAuth ?? false)
         }
         if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data, forKey: savedServersKey) }
+        UserDefaults.standard.removeObject(forKey: savedServersV1Key)
     }
 
     /// The MCP tools the model is given on its next turn.
@@ -4299,7 +4495,9 @@ struct ConversationStore {
 One tool call's view. First showing: fetch the server's view, cache it by hash, bind it to the
 call. Later (scrolled back past the live limit, after a relaunch, after a session switch):
 `MCPAppRecreation.revalidate` decides whether the stored result still fits the server's current
-view. The view's own calls go through `MCPAppsSessionBackend` → the session's authorizer.
+view. The view's own calls go through `MCPAppsSessionBackend` → the session's authorizer. A view
+whose content changed since it was approved gets a new instance ID, so the authorizer asks again,
+and each showing is recorded in the audit log.
 
 ```swift
 import AppKit
@@ -4439,7 +4637,10 @@ struct WidgetSlot: View {
             }
         }
 
-        let instance = record.id
+        // A changed widget is a new instance, so the authorizer asks it again.
+        let instance = MCPAppWidgetSlot.instanceID(record: record.id, widget: resource.sha256, bound: chat.widgetCache.sha256(forRecord: record.id))   // ← SDK (MCPAppsHost)
+        chat.manager.audit.record(.widgetShown(instance: instance, server: server, sha256: resource.sha256,   // ← SDK
+                                               changedSinceApproved: instance != record.id))
         let controller = pool.controller(for: instance) {   // ← SDK (MCPAppsHost)
             var actions = MCPAppsHostActions.session(session, instance: instance, openLink: { NSWorkspace.shared.open($0) })   // ← SDK (MCPAppsHost)
             // Route widget messages through the chat so the turn shows as running and is saved.
@@ -4842,9 +5043,9 @@ struct MCPChatApp: App {
 }
 ```
 
-**Tally**: 139 lines carry a marker — more than any other example, because this one is mostly SDK
+**Tally**: 140 lines carry a marker — more than any other example, because this one is mostly SDK
 surface: 86 `← SDK` (setup, sessions, the transcript the UI draws, saving and restoring servers
-and conversations), 39 `← SDK (MCPAppsHost)` (rendering, the pool, the cache, re-creation, the
+and conversations), 40 `← SDK (MCPAppsHost)` (rendering, the pool, the cache, re-creation, the
 bridge policy), 4 `← SDK (Inference)` (the pinned Qwen3 provider and its download), 10
 `← Components` (the server list, the approval sheet, the observable server state). What the app writes itself is the chat look,
 the settings, where conversations and servers are saved, and the policy a view runs under
