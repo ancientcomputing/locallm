@@ -2,6 +2,13 @@
 
 Use this checklist for native `.app` work involving LocalLM Lab SDK permissions, MCP OAuth, sandboxing, or distribution.
 
+## Tool Authorization
+
+- Every `lab.makeSession` with tools passes an `authorizer:`. With none, 3.0 refuses anything that may change data or send it out, silently (`DENIED: …` to the model, no error).
+- An app with a UI: `ConfirmingToolAuthorizer(channel: presenter, hostTools: .ask(atOrAbove: .mutate, by: .user))` with a Components `ToolConfirmationPresenter`, and `.toolConfirmationSheet(presenter)` on the root view so the question can appear.
+- MCP servers start untrusted: their tools count as changes until the user trusts the server (`lab.mcp.setTrust`); per-server approval is `lab.mcp.setToolApproval`.
+- Test by running a turn that calls a writing tool and checking the result.
+
 ## Permissions And TCC
 
 - Add every required Info.plist usage-description key for the connectors the app uses.

@@ -20,7 +20,9 @@ app. It is one Dock app with six panels:
 - **MCP Servers**: connect Model Context Protocol servers, choose their tools, and review a server that changes
   its tools.
 - **Security**: decide how much each tool can do without asking, and try the SDK's injection defenses on and off to
-  see what each one changes.
+  see what each one changes. **API Lab: tool access** (Everything, Reads and changes, Reads only) sets what runs when
+  no one is there to approve a call: in API Lab and in the `localai-cli` toolkit. At Reads only, every MCP tool call is
+  refused.
 - **API Lab**: an OpenAI-compatible `/v1` endpoint served by the app (localhost, plus optional LAN HTTPS with a
   self-signed certificate), so other apps and scripts can call the model you picked.
 
@@ -40,6 +42,8 @@ On macOS 26 only Apple's on-device model runs; open-weight (MLX) models and host
   [`ancientcomputing/locallm-releases`](https://github.com/ancientcomputing/locallm-releases/releases); from
   `1.0.0-GA` on it ships as a release asset on this repo, alongside the app DMG. See that folder's README to
   download and verify; the full CLI reference is at [thisbrain.ai/locallm/cli.html](https://thisbrain.ai/locallm/cli.html).
+  Toolkit calls follow the Security panel's API Lab tool access. A 3.0.0-GA toolkit downloaded before November 16, 2026
+  ignores that setting; download it again.
 - **[examples/api-lab/](examples/api-lab/)**: scripts and a chat app for the OpenAI-compatible endpoint, and
   **[examples/localai-cli/](examples/localai-cli/)** / **[localai-cli-swift/](examples/localai-cli-swift/)**: calling the
   `localai-cli` toolkit directly. None of these link the SDK.
