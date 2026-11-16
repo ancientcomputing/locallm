@@ -1,4 +1,4 @@
-# Migrating to the LocalLM Lab SDK 3.0
+# Migrating to the LocalLM SDK 3.0
 
 3.0 is a **breaking release in behavior, not in source**. Nothing you compiled against 2.3 stops compiling:
 every changed signature gained only parameters with defaults, and the one type whose coding changed

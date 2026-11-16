@@ -1,11 +1,11 @@
 ---
-name: locallmlab-swift-app
-description: Build, debug, or modify macOS Swift and SwiftUI apps that use the LocalLM Lab SDK, including Core connectors, MCP, Components, model providers, decision models (Jev, `lab.decide`), sandboxing, signing, and example-based integration patterns.
+name: locallm-swift-app
+description: Build, debug, or modify macOS Swift and SwiftUI apps that use the LocalLM SDK, including Core connectors, MCP, Components, model providers, decision models (Jev, `lab.decide`), sandboxing, signing, and example-based integration patterns.
 ---
 
-# LocalLM Lab Swift App
+# LocalLM Swift App
 
-Use this skill when helping a developer build a native macOS app with the LocalLM Lab SDK. Prefer the repo's own docs and examples over recalled API details or invented Swift patterns.
+Use this skill when helping a developer build a native macOS app with the LocalLM SDK. Prefer the repo's own docs and examples over recalled API details or invented Swift patterns.
 
 ## Start With The Right Source
 

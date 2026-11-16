@@ -4,7 +4,7 @@
 open-weight model — downloaded once from Hugging Face — reads and edits files in a project
 directory you point it at. No cloud service, no API key, nothing leaves the machine.
 
-It exists as a **reference example for the LocalLM Lab SDK**. If you're thinking about building
+It exists as a **reference example for the LocalLM SDK**. If you're thinking about building
 your own Mac app where a local model does real work — not just chat, but calling tools, editing
 files, running commands — this is that whole pattern end to end, in a few hundred lines of Swift
 you can read in one sitting. Concretely it shows:

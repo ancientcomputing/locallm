@@ -1141,7 +1141,7 @@ import FoundationModels
 import LocalLMLabSDKCore                                              // ← SDK
 import LocalLMLabSDKInference                                         // ← SDK (Inference)
 
-// code-buddy — a minimal coding agent on the LocalLM Lab SDK.
+// code-buddy — a minimal coding agent on the LocalLM SDK.
 //   code-buddy [--route heavy|light] [--heavy <repo>] [--light <repo>]
 //              [--test-cmd "<cmd>"] [--no-mcp] [--no-verbose] <workspace-dir> [task...]
 // With a task: run it and stop. Without: a >> loop over one session until `quit` / Ctrl-D.

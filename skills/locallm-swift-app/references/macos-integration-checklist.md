@@ -1,6 +1,6 @@
 # macOS Integration Checklist
 
-Use this checklist for native `.app` work involving LocalLM Lab SDK permissions, MCP OAuth, sandboxing, or distribution.
+Use this checklist for native `.app` work involving LocalLM SDK permissions, MCP OAuth, sandboxing, or distribution.
 
 ## Tool Authorization
 

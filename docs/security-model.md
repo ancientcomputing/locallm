@@ -1,4 +1,4 @@
-# The security model and assurance case for the LocalLM Lab SDK 3.0
+# The security model and assurance case for the LocalLM SDK 3.0
 
 For security engineers and reviewers deciding how far to rely on the SDK. It says what is claimed, how each claim is
 backed, who checked it and how, what has changed since, and what is not covered. If you are building an app on the

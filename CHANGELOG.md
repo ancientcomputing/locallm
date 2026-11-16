@@ -1,4 +1,4 @@
-# Changelog — LocalLM Lab SDK
+# Changelog — LocalLM SDK
 
 This tracks the **public SDK surface** (`LocalLMLabSDKCore`, `LocalLMLabSDKClaude`,
 `LocalLMLabSDKInference`, `LocalLMLabSDKRemote`, `LocalLMLabSDKComponents`) as consumed from
@@ -37,6 +37,10 @@ A major release. Four things change how an app uses the SDK:
 - **Downloading is its own step.** Loading a model reads only the disk.
 
 3.0 also folds in everything from 2.2.0, 2.3.0 and the unreleased 2.4.0 line (see the last section).
+
+**A new name:** from 3.0 the SDK is the **LocalLM SDK** (it was the LocalLM Lab SDK; LocalLM Lab is the Mac app). The
+modules, products, release files and API keep their names, so nothing in your code changes. Entries below 3.0 keep
+the old name.
 
 ### Changed — breaking
 

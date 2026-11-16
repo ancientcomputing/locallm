@@ -1,4 +1,4 @@
-# LocalLM Lab SDK Doc Map
+# LocalLM SDK Doc Map
 
 Use these local files as the source of truth while working in this repository.
 

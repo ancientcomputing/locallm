@@ -1,0 +1,5 @@
+interface:
+  display_name: "LocalLM Swift App"
+  short_description: "Build macOS apps with the LocalLM SDK"
+  brand_color: "#2563EB"
+  default_prompt: "Use $locallm-swift-app to build or debug my macOS Swift app using the LocalLM SDK."

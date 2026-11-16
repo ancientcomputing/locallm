@@ -1,4 +1,4 @@
-# Security in the LocalLM Lab SDK: the short version
+# Security in the LocalLM SDK: the short version
 
 For anyone deciding whether to build an AI app on the SDK, and for anyone reviewing how it is kept safe. It takes
 about five minutes and needs no background in AI or security.

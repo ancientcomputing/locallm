@@ -23,7 +23,7 @@ reply on stdout.
 
 This is the *quick* way to reach the local model. If you're building a
 native macOS app and want the model layer, connectors, and MCP client linked
-directly into your binary, use the **LocalLM Lab SDK** instead (see
+directly into your binary, use the **LocalLM SDK** instead (see
 [`examples/plate-today`](../plate-today/) and the others).
 
 ### Which model answers

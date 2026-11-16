@@ -1,4 +1,4 @@
-# Migrating to the LocalLM Lab SDK 1.0
+# Migrating to the LocalLM SDK 1.0
 
 1.0 (`1.0.0-beta.N`, `1.0.0` at GA) has a **macOS 26 deployment floor** as of `1.0.0-beta.2`.
 One app runs on macOS 26 and macOS 27 from a single build — Private Cloud Compute, Claude, and

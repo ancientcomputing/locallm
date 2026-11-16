@@ -1,4 +1,4 @@
-# Using the LocalLM Lab SDK
+# Using the LocalLM SDK
 
 For a Swift developer adding an AI assistant that can use tools to their own macOS app. This guide covers the
 model layer (which model answers and how a conversation runs), tools (system connectors, files, MCP servers),

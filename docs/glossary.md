@@ -1,6 +1,6 @@
 # Glossary
 
-Plain meanings for the words used in the LocalLM Lab SDK's security and tools documentation. If you are new to
+Plain meanings for the words used in the LocalLM SDK's security and tools documentation. If you are new to
 AI apps, read ["Background: five ideas in plain words"](security-guide-for-hosts.md#background-five-ideas-in-plain-words)
 first.
 
@@ -54,7 +54,7 @@ first.
 
 | Term | What it means |
 |---|---|
-| **SDK** | A software development kit: code a developer adds to their own app. Here, the LocalLM Lab SDK. |
+| **SDK** | A software development kit: code a developer adds to their own app. Here, the LocalLM SDK (called the LocalLM Lab SDK before 3.0). Its modules keep the older prefix: `LocalLMLabSDKCore`, `LocalLMLabSDKInference` and so on. |
 | **Host app** | The app a developer builds on the SDK. The host app decides who the user is, what they will accept, and what to keep. |
 | **Session** | One running conversation with a model, with its tools. |
 | **Snapshot** | A saved copy of the user's server list and settings, so they survive a relaunch. |

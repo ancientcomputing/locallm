@@ -1,4 +1,4 @@
-# Security in the LocalLM Lab SDK 3.0: what the SDK does, what your app does
+# Security in the LocalLM SDK 3.0: what the SDK does, what your app does
 
 For developers building an app on the SDK. If you are reviewing the SDK's security rather than building on it,
 start with [the security model and assurance document](security-model.md): the threat model, the controls, the

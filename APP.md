@@ -2,7 +2,7 @@
 
 **LocalLM Lab** is a Mac app for trying models, tools, MCP servers and prompts before you build with them. Pick a model, give
 it the tools you want it to have, and watch exactly what it does: every call, tool result and raw response is visible,
-not hidden behind a chat bubble. It is built on the [LocalLM Lab SDK](README.md), and it is where we test what the SDK
+not hidden behind a chat bubble. It is built on the [LocalLM SDK](README.md), and it is where we test what the SDK
 does.
 
 It is a lab, not a chat app. If you want a chat, [ChatAgain](https://thisbrain.ai/locallm/) (coming soon to the Mac App

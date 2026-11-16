@@ -1,4 +1,4 @@
-# Migrating to the LocalLM Lab SDK 2.0
+# Migrating to the LocalLM SDK 2.0
 
 2.0 is a **one-time breaking release**: every 2.x release after it is source compatible with
 `2.0.0`, additive changes only until 3.0. It breaks for two reasons. Several APIs had grown a

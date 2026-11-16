@@ -1,9 +1,13 @@
-# LocalLM Lab SDK
+# LocalLM SDK
 
 Add a chat assistant that can use tools to your own Mac app, with the model running on the Mac: Apple's
 on-device model or an open-weight model, or a hosted model when you want one. No per-token bill for local models,
 and no data leaving the machine unless you choose. The SDK is free. Release notes are in the [CHANGELOG](CHANGELOG.md),
 and the project site is [thisbrain.ai/locallm](https://thisbrain.ai/locallm/).
+
+> **A new name.** From 3.0 this is the **LocalLM SDK**; it was the LocalLM Lab SDK. LocalLM Lab is the Mac app built on it.
+> Nothing in your code changes: the modules, products and release files keep their names (`LocalLMLabSDKCore`,
+> `LocalLMLabSDKInference`, …), and so does the API (`LocalLMLab`, `lab.makeSession`).
 
 > **Looking for the LocalLM Lab app** (a Mac app for trying models, tools, MCP servers and prompts before you build with
 > them)? That is [a separate page](APP.md). This page is for developers.
@@ -62,7 +66,7 @@ Upgrading? 3.0 is a breaking release: read **[docs/migrating-to-3.0.md](docs/mig
 - [API surface](docs/api-surface.md) (machine-generated) and [CHANGELOG](CHANGELOG.md)
 - Decision models (Jev): [in your app](https://thisbrain.ai/locallm/jev.html). The tools for them, JevDK and
   jev-serve, are their own project: [ancientcomputing/jevdk](https://github.com/ancientcomputing/jevdk).
-- An [Agent Skill](skills/locallmlab-swift-app/) for building SDK apps with Claude Code or Codex.
+- An [Agent Skill](skills/locallm-swift-app/) for building SDK apps with Claude Code or Codex.
 - Want to try models, tools, MCP servers and prompts before you write code? See [LocalLM Lab, the app](APP.md): the
   download, its panels, and the `localai-cli` toolkit.
 
