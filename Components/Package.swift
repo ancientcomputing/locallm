@@ -33,7 +33,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     ),
     "3.0.0-GA": SDKRelease(
         url: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
-        checksum: "c4b84b270e2a7131ce438ebdec6fca6488fc68800ea900f8b0b344799750fa07"
+        checksum: "2b286cfecae1f6596c64255d72550a30f6f3cfe8323e4aa2a5176a4275699451"
     ),
 ]
 

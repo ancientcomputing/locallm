@@ -1581,7 +1581,7 @@ session runs them for you; the types are public so a tool of yours can apply the
 
 ```swift
 struct ToolCallContext: Sendable {           // the conversation, for the duration of one call the model makes
-    @TaskLocal static var current: ToolCallContext?   // nil when a tool is called outside a session
+    static var current: ToolCallContext? { get }   // nil when a tool is called outside a session; only the session sets it
     let userText: String                     // the user's messages (with context the app sent with them)
     let toolResultText: String               // earlier tool results, and the text inside images sent to the model
     let imageText: String                    // the images' text alone (also in toolResultText)
@@ -2595,7 +2595,7 @@ than an opaque token.
 
 ```swift
 enum CalendarAccess {
-    nonisolated(unsafe) static var store: EKEventStore   // the raw EventKit store, for anything below doesn't cover; renewed after a fresh grant
+    nonisolated(unsafe) static var store: EKEventStore { get }   // the raw EventKit store, for anything below doesn't cover; renewed after a fresh grant
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -2637,7 +2637,7 @@ date when several share the title. 3.0 adds open versus completed listings and a
 
 ```swift
 enum RemindersAccess {
-    nonisolated(unsafe) static var store: EKEventStore
+    nonisolated(unsafe) static var store: EKEventStore { get }
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -2689,7 +2689,7 @@ so those are the ones changed even if another card with the name appeared while 
 
 ```swift
 enum ContactsAccess {
-    nonisolated(unsafe) static var store: CNContactStore   // the raw Contacts store; renewed after a fresh grant
+    nonisolated(unsafe) static var store: CNContactStore { get }   // the raw Contacts store; renewed after a fresh grant
     static var authorizationStatus: CNAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -5571,9 +5571,6 @@ struct ChatReplyContext {   // what the reply-extras slot gets for one turn
 struct ChatStarterView: View {   // an empty chat: icon, heading, what the app can do, messages to try
     init(systemImage: String? = "bubble.left.and.text.bubble.right", title: String = "What can I help with?",
          message: String, suggestions: [String], send: @escaping (String) -> Void)
-}
-struct ChatReplyActionButton: View {   // an icon-only action under a reply, with its tooltip
-    init(systemImage: String, help: String, action: @escaping () -> Void)
 }
 
 struct ChatComposer<Banner: View, Leading: View, ModelLabel: View>: View {

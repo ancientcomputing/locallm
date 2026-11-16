@@ -422,7 +422,6 @@ private struct ChatTurnFooter<Extras: View>: View {
     }
 }
 
-/// An icon-only action under a reply, with its tooltip.
 /// The note under a reply whose links came only from content the assistant read. Hosts once each;
 /// past two, a general sentence: a list of models on hf.co named the host once per link (2026-10-25).
 enum ContentLinksNote {
@@ -433,18 +432,19 @@ enum ContentLinksNote {
     }
 }
 
-public struct ChatReplyActionButton: View {
+/// An icon-only action under a reply, with its tooltip.
+struct ChatReplyActionButton: View {
     let systemImage: String
     let help: String
     let action: () -> Void
 
-    public init(systemImage: String, help: String, action: @escaping () -> Void) {
+    init(systemImage: String, help: String, action: @escaping () -> Void) {
         self.systemImage = systemImage
         self.help = help
         self.action = action
     }
 
-    public var body: some View {
+    var body: some View {
         Button(action: action) { Image(systemName: systemImage).font(.system(size: 13)) }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)

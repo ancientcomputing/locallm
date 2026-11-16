@@ -24,7 +24,7 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
-## 3.0.0 — GA — 2026-11-09 (binaries re-published 2026-11-14 and 2026-11-15)
+## 3.0.0 — GA — 2026-11-09 (binaries re-published 2026-11-14, 2026-11-15 and 2026-11-16)
 
 A major release. Four things change how an app uses the SDK:
 
@@ -81,6 +81,9 @@ Code that builds against 2.3.0 may need edits for these.
 - **Wording and ratings.** Several built-in tools changed their descriptions, argument names or ratings, which can
   change what a model does with them: `writeFile` takes `contents`; `readImageText` is rated a read; a tool's
   description is sent once; two tools never share a name.
+- **The connector stores are read-only** (binaries re-published 2026-11-16). `CalendarAccess.store`, `RemindersAccess.store` and `ContactsAccess.store`
+  can still be read, but only the SDK replaces them (after a fresh grant), so the ready-made tools and your code always
+  share one store.
 
 ### Added
 
@@ -213,10 +216,10 @@ sent as an object.
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-3.0.0-GA.xcframework.zip       c4b84b270e2a7131ce438ebdec6fca6488fc68800ea900f8b0b344799750fa07
-LocalLMLabSDKClaude-3.0.0-GA.xcframework.zip     073847b37116b991d66ce25b545efd074c98eb5c37a33a00b4c31ce7fe300788
-LocalLMLabSDKInference-3.0.0-GA.xcframework.zip  f4c937ac18db0a67c1c5467f06c5aa674b1f34801f73fc7fa1c628ac206713d6
-LocalLMLabSDKRemote-3.0.0-GA.xcframework.zip     c617f8120f0c94e4be3f620ce1f093f9bf9326f93f94a44467d1a928136d4fb7
+LocalLMLabSDKCore-3.0.0-GA.xcframework.zip       2b286cfecae1f6596c64255d72550a30f6f3cfe8323e4aa2a5176a4275699451
+LocalLMLabSDKClaude-3.0.0-GA.xcframework.zip     d610c8e5c82402ed2e898eb239ef8af02983c459b73ec531e84781d478a6d159
+LocalLMLabSDKInference-3.0.0-GA.xcframework.zip  e89336700bba35a546967a66eb34e3fb59e44a8150758da44ec95a104047bd54
+LocalLMLabSDKRemote-3.0.0-GA.xcframework.zip     54ca50806e65d96a80ef928b56952bf9b827ba959bcb466c25088b3cb2995507
 ```
 
 ---

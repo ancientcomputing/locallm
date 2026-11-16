@@ -316,7 +316,7 @@ tool could be asked about again in the same turn, and that refusal was shown as 
 | MCPAppsHost | 91 tests passed |
 | Claude package (Live tests skipped) | 71 tests in 3 suites passed |
 
-**The binaries were re-published on 2026-11-14 and 2026-11-15, after this evidence.** The checks above and the injection
+**The binaries were re-published on 2026-11-14, 2026-11-15 and 2026-11-16, after this evidence.** The checks above and the injection
 evaluation were not repeated on them. What changed in the SDK after 2026-11-08:
 
 - The tool picker offers an MCP server named in the user's custom instructions on every message, and a reply that says
@@ -325,6 +325,10 @@ evaluation were not repeated on them. What changed in the SDK after 2026-11-08:
 - A saved workspace's identity is its volume's UUID and inode, instead of the device number, which macOS assigns at
   each mount. A list saved before matches by inode and is rewritten.
 - Sessions on Private Cloud Compute are no longer prewarmed.
+- Three public APIs were narrowed. `ToolCallContext.current` can be read, but only the session sets it: before, a caller
+  could bind its own context and make a URL look sourced to the Web plug-in's check on sending data out. The connector
+  stores (`CalendarAccess.store`, `RemindersAccess.store`, `ContactsAccess.store`) can be read, but only the SDK
+  replaces them. `ChatReplyActionButton` in Components is no longer public.
 - The MLX runtime pin moved twice, to load LFM3 and PrismML Bonsai 2 models. The second pin includes an upstream change
   (mlx-swift-lm PR #630) that upstream hasn't merged yet.
 

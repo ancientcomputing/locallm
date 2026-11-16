@@ -176,7 +176,7 @@ let knownSDKReleases: [String: SDKRelease] = [
     "2.3.0-GA": SDKRelease(url: "…/v2.3.0-GA/LocalLMLabSDKCore-2.3.0-GA.xcframework.zip",
                            checksum: "7821197d…"),
     "3.0.0-GA": SDKRelease(url: "…/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
-                           checksum: "c4b84b27…"),
+                           checksum: "2b286cfe…"),
 ]
 ```
 
@@ -188,9 +188,9 @@ distinct `.xcframework.zip.sha256`; don't reuse Core's for another module):
 
 ```bash
 curl -sL https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip.sha256
-# → c4b84b270e2a7131ce438ebdec6fca6488fc68800ea900f8b0b344799750fa07
+# → 2b286cfecae1f6596c64255d72550a30f6f3cfe8323e4aa2a5176a4275699451
 curl -sL https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKClaude-3.0.0-GA.xcframework.zip.sha256
-# → 073847b37116b991d66ce25b545efd074c98eb5c37a33a00b4c31ce7fe300788
+# → d610c8e5c82402ed2e898eb239ef8af02983c459b73ec531e84781d478a6d159
 ```
 
 Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass
@@ -208,6 +208,7 @@ is refused and the products it would have provided go "missing". The manifest is
 stale copy is local.
 
 ```bash
+swift package purge-cache                                  # SwiftPM's shared cache keeps the old zip by URL
 rm -rf examples/<name>/.build                              # swift build
 rm -rf ~/Library/Developer/Xcode/DerivedData/<Name>-*      # Xcode (or: File ▸ Packages ▸ Reset Package Caches)
 ```
