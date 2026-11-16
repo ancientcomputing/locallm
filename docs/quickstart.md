@@ -155,7 +155,7 @@ authorizer:
 let confirmations = ToolConfirmationPresenter()          // from LocalLMLabSDKComponents
 let authorizer = ConfirmingToolAuthorizer(channel: confirmations,
                                           hostTools: .ask(atOrAbove: .mutate, by: .user))
-session = try lab.makeSession(route: .chat, tools: tools, authorizer: authorizer)
+session = try lab.makeSession(route: .chat, tools: [ClockTool()], authorizer: authorizer)   // plus your tools that change things
 // and in your root view: .toolConfirmationSheet(confirmations)
 ```
 

@@ -24,9 +24,10 @@ four backends:
 | **OpenJev** (`OpenJevDecisionProvider`) | On the Mac, on an MLX model | Inference | macOS 27 | `.tokenScored(calibrated:)` |
 | **TypeSafe Jev** via OpenRouter (`JevDecisionProvider(.openRouter(key:))`) | Hosted | Remote | macOS 26+ | `.native` |
 | **Featherless Simple Jev** (`.featherless(key:)`, `.featherlessDemo()`) | Hosted | Remote | macOS 26+ | `.tokenScored(calibrated: false)` |
-| **OpenAI Decisions** (`JevDecisionProvider(.openAI(key:))`, `openai:gpt-6-luna`; SDK 2.3) | Hosted | Remote | macOS 26+ | `.native` |
+| **OpenAI Decisions** (`JevDecisionProvider(.openAI(key:))`, `openai:gpt-6-luna`; since SDK 2.3) | Hosted | Remote | macOS 26+ | `.native` |
 
-`lab.decide` and everything else in this section except OpenJev is in Core and works on macOS 26.
+`lab.decide` and the decision types are in Core and work on macOS 26. The deciders live where the
+table says: OpenJev in Inference, the hosted ones in Remote.
 
 ## Register a decider and route to it
 
@@ -71,7 +72,7 @@ d.modelID, d.latency, d.usage   // usage: tokens and cost, from hosted backends
 d.isRefused("refund")  // true if the backend declined that question (OpenAI Decisions only)
 ```
 
-- **A backend can decline a question** (SDK 2.3). Only OpenAI's Decisions API does this today. A
+- **A backend can decline a question** (since SDK 2.3). Only OpenAI's Decisions API does this today. A
   refused id is in `d.refusals` and has no answer, so check `d.isRefused(id)` before reading it
   and take the cautious path. `lab.evaluate` counts a refusal as a miss.
 
@@ -159,7 +160,7 @@ choice options keep your order on the wire, JSON `state` is sent as JSON, and `d
 the tokens and cost. Like other remote providers, it's off by default and your UI should say
 where inputs are sent.
 
-**OpenAI's Decisions API (SDK 2.3)** uses the same provider with a different wire format,
+**OpenAI's Decisions API (since SDK 2.3)** uses the same provider with a different wire format,
 `JevProviderConfig`'s `wire: .openAIDecisions` (the other presets use `.jev`):
 
 ```swift
@@ -267,7 +268,7 @@ those, or stay in your code:
   product knowledge in each option's description, and map component → team with an ordinary table.
   Ownership changes then touch the table, not the questions or the calibration.
 - **Knowledge in the options:** describe each team by what it owns (`"payments": "billing,
-  invoices, the Checkout module"`). Up to 26 options locally, 255 hosted.
+  invoices, the Checkout module"`). Up to 26 options locally; hosted limits vary by backend (255 on OpenAI's Decisions API).
 - **Knowledge in the input:** send the context your app already has as JSON alongside the input,
   `try .encoding(Ticket(report:screen:stackTraceModules:))`. Keep it short (`maxStateCharacters`
   on hosted backends; longer inputs are slower locally).

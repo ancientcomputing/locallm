@@ -9,13 +9,13 @@ A step-by-step account of what a reference app does when it runs, from the user 
 > reference.
 >
 > **Examples that use it:** [`plate-today`](../examples/plate-today/) is the app this walkthrough
-> traces line by line; see [`annotated-examples.md`](annotated-examples.md) for its full source
+> traces line by line; see [the annotated examples](annotated-examples.md) for its full source
 > with every SDK touchpoint marked, if you'd rather see it all at once than in prose.
 
 This section traces `examples/plate-today`'s "what's on my plate today" flow end to end — launch →
 request Calendar/Reminders/MCP-server access → fetch and synthesize via an on-device model → show
 the result → clean up. Use this as the template for wiring your own app; the shape is generic, only
-the tools differ. The actual source is right there in this repo if you want to read or run it
+the tools differ. The actual source is in [examples/plate-today on GitHub](../examples/plate-today/) if you want to read or run it
 directly rather than following along in prose.
 
 > **This is your first look at tools + connectors — and there's a shortcut.** Core gives a model
@@ -91,7 +91,7 @@ let access = await Connectors.requestAccess(.calendar)
 Core's `Connectors.requestAccess` (see [Connectors](sdk-guide.md#connectors-calendar-reminders-contacts-location)) handles the no-Info.plist-key and
 previously-denied cases with clearer errors than calling EventKit directly yourself. The system
 prompt macOS shows here is only possible because of the entitlement + Info.plist usage string from
-[Info.plist strings](sdk-guide.md#infoplist-usage-description-strings-if-using-calendarreminders)/2b; without those, this call fails silently rather than prompting (see [Setup for Calendar and Reminders](sdk-guide.md#setup-for-calendar-and-reminders)'s
+[Info.plist strings](sdk-guide.md#infoplist-usage-description-strings-if-using-calendarreminders) and [Entitlements](sdk-guide.md#entitlements-if-using-calendarreminders) setup; without those, this call fails silently rather than prompting (see [Setup for Calendar and Reminders](sdk-guide.md#setup-for-calendar-and-reminders)'s
 failure-sequence writeup). If the user denies, a well-behaved tool returns a plain string like
 `"Calendar access not granted."` — not an error/throw — so the model receives that as the tool's
 result and can reason about it in its final summary, rather than the whole request failing. A
@@ -106,7 +106,7 @@ let connectResult = await manager.addServer(url: serverURL, displayName: "My Ser
 ```
 
 This single call does capability negotiation *and* auth. If the server has no valid cached token
-for this app (see [Keychain storage](mcp-guide.md#keychain-storage--automatic-isolation-native-api-sandbox-safe), Keychain storage — checked under `Bundle.main.bundleIdentifier`-scoped
+for this app (see [Keychain storage](mcp-guide.md#keychain-storage--automatic-isolation-native-api-sandbox-safe) — tokens are checked under `Bundle.main.bundleIdentifier`-scoped
 storage), `addServer` internally triggers the OAuth authorize flow, which opens the system browser
 — this is the moment a real browser window appears on the user's screen. The call suspends until
 either the user completes sign-in (the browser redirects back to your app's own scheme, which your

@@ -99,8 +99,8 @@ decided. Without it, the trail says only "authorizer".
 
 ## Where to read more
 
-- [Security in the SDK 3.0: the guide for host apps](security-guide-for-hosts.md), section 3 for the gate and section 4 for
-  servers, trust and drift.
+- [The security guide for host apps](security-guide-for-hosts.md): its sections "The gate" and "Servers: trust,
+  approval and drift".
 - [The SDK guide, Tool authorization](sdk-guide.md#tool-authorization-two-levers--which-tools-and-whether-they-ask-first)
   for the settings tables.
 - [The assurance case](security-model.md) for what we tested and what we did not.

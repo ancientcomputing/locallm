@@ -49,7 +49,7 @@ Upgrading from 2.x? [Migrating to 3.0](migrating-to-3.0.md) lists what to change
 > [`model-switch`](../examples/model-switch/) show the multi-binary shapes below.
 
 `LocalLMLabSDKCore` ships as a `Core.xcframework` binary, published as a GitHub Release asset on
-this repo. Add it to your own `Package.swift` as a `binaryTarget`, pointing at the exact release
+the [locallm GitHub repo](https://github.com/ancientcomputing/locallm). Add it to your own `Package.swift` as a `binaryTarget`, pointing at the exact release
 you want:
 
 ```swift
@@ -73,7 +73,7 @@ let package = Package(
 )
 ```
 
-Get the exact `url` and `checksum` for the version you want from this repo's
+Get the exact `url` and `checksum` for the version you want from the locallm GitHub repo's
 [Releases page](https://github.com/ancientcomputing/locallm/releases) — each release's assets include both the `.xcframework.zip`
 and a matching `.sha256` file. `examples/plate-today/Package.swift` is a real, working example of
 this same pattern if you want something to copy from directly.
@@ -86,11 +86,12 @@ If you also want the prebuilt SwiftUI pieces (MCP server picker, OAuth waiting v
 prompt browsing, model picker, AI Models settings panel), add `Components` the same way — see
 [`examples/components-demo`](../examples/components-demo) for a working example of using it.
 
-The release carries **four xcframeworks** plus `Components` as source, all keyed off the same
+The release carries **four xcframeworks** plus `Components` and `MCPAppsHost` as source, all keyed off the same
 `LOCALLM_SDK_VERSION`; link only the ones you use: **`Core`** (always), **`Claude`** (Claude via
 Foundation Models — forces a macOS 27 target), **`Inference`** (local open-weight / MLX models),
 **`Remote`** (online providers — GPT / Claude online / OpenRouter, see [Online providers](remote-providers.md)), and **`Components`**
-(SwiftUI, consumed as source, not an xcframework). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
+(SwiftUI, consumed as source, not an xcframework), and **`MCPAppsHost`** (a server's own interactive
+views shown in a chat, also source). `examples/code-buddy` (Core + Inference) and `examples/model-switch`
 (Remote + Components) are the multi-binary manifest shapes to copy from.
 
 ### Targeting macOS 26 and macOS 27 from one build
@@ -166,7 +167,7 @@ let answer = try await session.respond(to: prompt)
 > `.contextCompacted` earn their place). Each subsection below names which example uses that
 > specific piece.
 
-Everything above is the MCP client — usable on its own with Apple's
+The MCP client ([MCP servers](#mcp-servers), below) is usable on its own with Apple's
 `SystemLanguageModel` and nothing else. The model layer builds on a **macOS 26** floor; Private
 Cloud Compute and open-weight (MLX) models need macOS 27, and Claude needs a macOS-27 target
 (see [Targeting macOS 26 and 27](#targeting-macos-26-and-macos-27-from-one-build)).
@@ -188,10 +189,10 @@ let lab = LocalLMLab(configuration: .init(providers: [
     MLXModelProvider(),                                      // from LocalLMLabSDKInference — see below
 ]))
 // To also run on macOS 26, register only SystemModelProvider() unconditionally and the
-// rest inside `if #available(macOS 27, *)` — see [Targeting macOS 26 and 27](#targeting-macos-26-and-macos-27-from-one-build).
+// rest inside `if #available(macOS 27, *)` — see Targeting macOS 26 and 27, below.
 
 lab.models      // the @Observable ModelRegistry — providers, routes, residency, downloads
-lab.mcp         // the app's one MCPServerManager — set up via Configuration(…, mcp: MCPSettings(…)), [MCP revisions](mcp-guide.md#which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care)
+lab.mcp         // the app's one MCPServerManager — set up via Configuration(…, mcp: MCPSettings(…)); see the MCP guide's revisions section
 lab.workspace   // security-scoped workspace access + ready-made tools
 lab.connectors  // Calendar / Reminders / Contacts / Location
 ```
@@ -263,7 +264,7 @@ protocol.
 ### `RouteName` + routing — pick a model without hardcoding one
 
 > **Use routes when** you don't want `"mlx:mlx-community/Qwen3-8B-4bit"` sprinkled through your
-> code. A `RouteName` (`.heavy`, `.light`, `.draft`, or any string you like) is a name your app
+> code. A `RouteName` (`.heavy`, `.light`, `.local`, or any string you like) is a name your app
 > maps to a `ModelID`; you pick a route per session. **The SDK owns model residency, never
 > routing policy** — your app decides which route a given task uses.
 >
@@ -502,7 +503,7 @@ for await event in session.events {
     case .contextCompacted(let removed):       toast("Trimmed \(removed) old messages")
     case .modelLoadProgress(let fraction):     updateBar(fraction)   // with a local model
     case .routeSwitched(let modelID):          statusLine = "Now on \(modelID)"
-    case .serverToolCall(let activity):        showActivity(activity)   // provider-run web search — [Online providers](remote-providers.md)
+    case .serverToolCall(let activity):        showActivity(activity)   // provider-run web search — see Online providers
     @unknown default: break
     }
 }
@@ -714,7 +715,7 @@ failure (a silent TCC denial, or a crash on a missing entitlement) rather than a
 > **Examples that use it:** [`plate-today`](../examples/plate-today/) /
 > [`plate-today-tools`](../examples/plate-today-tools/).
 
-For every connector you use (Calendar/Reminders shown here — see [Connectors](#connectors-calendar-reminders-contacts-location) (Connectors) for the full connector
+For every connector you use (Calendar/Reminders shown here — see [Connectors](#connectors-calendar-reminders-contacts-location) for the full connector
 list and its Info.plist/entitlement requirements):
 
 ```xml
@@ -727,7 +728,7 @@ list and its Info.plist/entitlement requirements):
 ### Entitlements (if using Calendar/Reminders)
 
 > **Reach for this when** you're preparing your app's entitlements file for the first
-> Calendar/Reminders build — required alongside [2a](#infoplist-usage-description-strings-if-using-calendarreminders), not instead of it.
+> Calendar/Reminders build — required alongside the [Info.plist strings](#infoplist-usage-description-strings-if-using-calendarreminders), not instead of them.
 >
 > **Examples that use it:** [`plate-today`](../examples/plate-today/) /
 > [`plate-today-tools`](../examples/plate-today-tools/).
@@ -745,7 +746,7 @@ and the TCC prompt itself are Reminders-specific. A
 validation (Transporter upload) rejects it outright with "Invalid Code Signing Entitlements."
 Confirmed live, 2026-08-14.
 
-**Both 2a and 2b are required together, on your final signed bundle, or TCC fails in confusing
+**The Info.plist strings and the entitlement are required together, on your final signed bundle, or TCC fails in confusing
 ways.** The specific failure sequence (confirmed live, more than once):
 1. Entitlement missing → "Policy disallows prompt" (no dialog appears at all).
 2. Entitlement present, Info.plist key missing → "Refusing authorization request ... without
@@ -805,7 +806,7 @@ may have no due date at all, unlike an event's date, which is required). `Contac
 addContact` creates a new contact; `.updateContact`/`.deleteContact` locate an existing one by
 given name, with an optional current family name to disambiguate. `newPhoneNumbers`/`newEmails`
 on `updateContact`, when provided, replace that contact's entire existing list rather than adding
-to it. Full signatures are in [The reference](reference.md) (the full function/type reference) below.
+to it. Full signatures are in [the SDK reference](reference.md).
 
 **Why name-based lookup, not an identifier** (`EventSummary`/`ReminderSummary`/`ContactSummary`
 still carry `eventIdentifier`/`calendarItemIdentifier`/`identifier` for any consumer that wants
@@ -838,7 +839,7 @@ your own confirmation UI, restricted by your own app-level setting — is entire
 decision as the integrating developer.
 
 Each connector requires its own Info.plist usage-description key and entitlement, same pattern as
-[Info.plist strings](#infoplist-usage-description-strings-if-using-calendarreminders)/2b — see there for Calendar/Reminders; Contacts needs
+[Info.plist strings](#infoplist-usage-description-strings-if-using-calendarreminders) and [Entitlements](#entitlements-if-using-calendarreminders) — see there for Calendar/Reminders; Contacts needs
 `NSContactsUsageDescription` + `com.apple.security.personal-information.addressbook`, Location
 needs `NSLocationUsageDescription` + `com.apple.security.personal-information.location`.
 `examples/plate-today`'s `SearchContactsTool` and (build-time opt-in) location/weather tools are
@@ -989,7 +990,7 @@ tool whose schema doesn't build, rather than letting one malformed tool take dow
 Unlike the four connectors above, filesystem access to a user-picked file or folder is **not**
 part of Core, and isn't planned to be. The reason is structural, not an oversight: the actual
 picker UI (`NSOpenPanel`) has to live in your app — Core has no UI of its own, by design, same as
-the MCP server connect/auth UI in [Connecting to an MCP server](mcp-guide.md#connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them) (MCP auth options). There's no meaningful "unified API" to offer here the
+the MCP server connect/auth UI in [Connecting to an MCP server](mcp-guide.md#connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them). There's no meaningful "unified API" to offer here the
 way there is for the four TCC-gated connectors, since the picker itself is host-app UI, not
 something a library call can produce.
 
@@ -1081,7 +1082,7 @@ reads and writes inside it: `listFiles`/`readFile`/`writeFile`/`editFile`/`delet
 `search`, `tree`, `readFileRange`, `applyPatch`). No `requestAccess()` here — there's no OS dialog
 for this, the picker *is* the consent, entirely on your side.
 
-Every operation is `async throws` (2.0): it throws `WorkspaceAccess.WorkspaceError` (its `message`
+Every operation is `async throws` (since 2.0): it throws `WorkspaceAccess.WorkspaceError` (its `message`
 is written for the model) or `CancellationError`, and runs off your actor, so calling it from the
 main actor doesn't block the UI:
 
@@ -1263,14 +1264,14 @@ how you offer a "Read-only / Changes / Full" choice per capability. Every ready-
 declares its impact (`ImpactRatedTool`).
 
 **Lever 2 — invocation.** Whether an in-list tool actually *runs* this call. (A short version of this lever, with the 3.0 change, is [The tool authorizer](tool-authorizer.md).) `ToolCallAuthorizer`
-is the checkpoint between "the model chose to call this" and "the side effect happens." It's
-what answers it: with no `authorizer:`, `makeSession` (3.0) installs `FailClosedToolAuthorizer`.
+is the checkpoint between "the model chose to call this" and "the side effect happens." If you
+pass no `authorizer:`, `makeSession` installs `FailClosedToolAuthorizer` (since 3.0).
 Reads run; anything that could change data or send it out is denied, with no confirmation. Pass a
 `ConfirmingToolAuthorizer` to ask the user, or `AllowingToolAuthorizer()` to say on purpose that every
 call may run. Before 3.0 a session with no authorizer ran every call immediately, so a 2.x app
 that relied on that must now pass one (see [migrating to 3.0](migrating-to-3.0.md)).
 
-The SDK's one authorizer is **`ConfirmingToolAuthorizer`**. You say **who may approve what**
+The authorizer for apps with a UI is **`ConfirmingToolAuthorizer`**. You say **who may approve what**
 where the tools come from — per MCP server on `lab.mcp`, and for your own tools on the
 authorizer — and it applies that on every call:
 
@@ -1289,7 +1290,7 @@ let session = try lab.makeSession(
         hostTools: .ask(atOrAbove: .mutate, by: .user)))  // your own tools' approval (the default)
 ```
 
-**The settings at a glance** (per server in 2.0; a tool has only on/off for now):
+**The settings at a glance** (per server, with per-tool overrides):
 
 | Level | Setting | Options | What it decides |
 |---|---|---|---|
@@ -1326,8 +1327,9 @@ let session = try lab.makeSession(
   turn failing. A policy denial reads `"denied by policy: <reason>"`.
 
 The authorizer is a floor, not a ceiling: it can't grant access to a tool that isn't in the
-list, and it doesn't restrain your own code calling `CalendarAccess.deleteEvent(...)` directly.
-It gates model- and view-initiated calls only.
+list, and it doesn't restrain your own code calling `CalendarAccess.deleteEvent(...)` or
+`lab.mcp.callTool(...)` directly. It gates every call that goes through the session: the model's,
+an MCP App view's, and your own `session.callMCPTool(...)`.
 
 **Across processes.** If your app runs the session in a headless helper and the UI in another
 process, implement `ToolConfirmationChannel` with your transport — that's the *only* security
@@ -1347,8 +1349,8 @@ approval applies. A host that builds its own MCP-backed `Tool` type (e.g. one pr
 connection in another process) conforms it to `OriginTaggedTool` to keep that origin.
 
 **Coming from 1.x.** `RuleBasedToolAuthorizer`, `ConfirmingToolAuthorizer`'s `requirement:`
-closure and `setTrustsToolAnnotations` are gone — see
-[migrating-to-2.0.md](migrating-to-2.0.md) [Connecting to an MCP server](mcp-guide.md#connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them) for the mapping.
+closure and `setTrustsToolAnnotations` were removed in 2.0 — see
+[Migrating to 2.0](migrating-to-2.0.md) for the mapping.
 
 ### What 3.0 adds to tool safety
 
@@ -1398,11 +1400,11 @@ are in [the MCP client guide](mcp-guide.md). For a safe first setup, see [MCP in
 
 ## Scope and boundaries: what Core doesn't do
 
-**Source compatibility is guaranteed from `1.0.0` GA on.** Every 1.x release keeps existing
+**Source compatibility holds within a major version.** Every 3.x release keeps existing
 code compiling unmodified against a later one. New capability shows up as additive surface
 (new optional/defaulted parameters, new protocol methods with a default implementation, new
 enum cases per the `@unknown default` point below); anything that would force you to edit
-working code just to keep building waits for 2.0. If you hit "X is inaccessible due to
+working code just to keep building waits for the next major version. If you hit "X is inaccessible due to
 internal protection level" on something that looks like it should be public, file it — that's
 a bug against the guarantee, not expected churn. This covers source compatibility, not binary
 — you rebuild against whatever version you pin, there's no supported "drop in a newer
@@ -1411,12 +1413,11 @@ xcframework without recompiling" path.
 The following are deliberate boundaries, not gaps waiting on a future release:
 
 - **No filesystem picker/bookmark UI in Core** — a folder picker is host-app
-  UI and Core ships no UI at all. But you're not writing it from scratch: [Filesystem access](#filesystem-access-security-scoped-bookmarks-example-not-in-core) (Filesystem
-  access — security-scoped bookmarks) has a complete, copy-pasteable `FolderAccess`
+  UI and Core ships no UI at all. But you're not writing it from scratch: [Filesystem access](#filesystem-access-security-scoped-bookmarks-example-not-in-core) has a complete, copy-pasteable `FolderAccess`
   (`NSOpenPanel` + security-scoped bookmark persistence + the async-aware access window a
   `LanguageModelSession` needs), and
   [`workspace-buddy`](../examples/workspace-buddy/) is a full reference app that does exactly
-  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` ([Workspace tools](#workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url) — Workspace tools) — the read/write/edit logic
+  this. What *is* in Core: `WorkspaceAccess`/`WorkspaceTools` ([Workspace tools](#workspaceaccessworkspacetools-what-core-gives-you-once-you-have-that-url)) — the read/write/edit logic
   for once you have a resolved folder URL.
 - **`ModelAvailability` is a non-frozen `enum`.** If you `switch` over it exhaustively you need
   an `@unknown default` — new cases can land in a minor version. (Same for `ResidencyEvent` /
@@ -1425,7 +1426,8 @@ The following are deliberate boundaries, not gaps waiting on a future release:
   ([MCP diagnostics](mcp-guide.md#diagnostics-when-a-user-reports-an-mcp-problem)) for connection / auth / stream troubleshooting — `os.Logger` plus an opt-in event buffer
   — but it is strictly off-content (never prompt or response text; tokens redacted). Core writes
   no persisted trace of what the model saw or said. If your app wants that, you build and own it
-  — the model layer's `session.events` is what you hang it off.
+  on two streams the SDK gives you: the session's `session.events` and the security audit stream
+  `lab.audit.events()` (each request, decision and outcome as a `SecurityAuditEntry`).
 
 ## App Sandbox — building for the Mac App Store
 
@@ -1477,9 +1479,10 @@ specific connector).
   pre-existing grant carried over from testing an unsandboxed build under the same bundle ID —
   see the caution below).
 - **The MCP client, end-to-end**, including OAuth: connect, sign in via the system browser,
-  redirect back into the app, tool calls. No entitlement needed beyond `network.client` — the
-  OAuth redirect is a URL-scheme handoff ([the OAuth redirect/callback setup](mcp-guide.md#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth)), not a local HTTP listener, so
-  `com.apple.security.network.server` is not needed for this.
+  redirect back into the app, tool calls. The usual OAuth redirect is a URL-scheme handoff
+  ([the OAuth redirect/callback setup](mcp-guide.md#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth)), not a local HTTP listener, so it needs nothing beyond
+  `network.client`. Only the loopback fallback (since 3.0, for a server that refuses your app's URL scheme)
+  listens on `127.0.0.1`, and for that a sandboxed app also needs `com.apple.security.network.server`.
 - **Keychain token storage** (`MCPOAuthTokenStore`/`MCPPATStore`, [Keychain storage](mcp-guide.md#keychain-storage--automatic-isolation-native-api-sandbox-safe)) — round-tripped
   correctly under the sandboxed per-app-container Keychain access group.
 
@@ -1499,7 +1502,7 @@ no prompt" result while testing a newly-sandboxed build, reset first:
 tccutil reset Calendar <your-bundle-id>
 tccutil reset Reminders <your-bundle-id>
 tccutil reset AddressBook <your-bundle-id>
-tccutil reset All <your-bundle-id>   # Location can't be reset individually, see [Connectors](#connectors-calendar-reminders-contacts-location) (Connectors)
+tccutil reset All <your-bundle-id>   # Location can't be reset individually (see Connectors)
 ```
 
 ### One-time Apple Developer Portal setup for MAS signing
@@ -1540,7 +1543,7 @@ submission of your own app needs your own bundle ID from the start.
 - Leave every Capability unchecked unless something you're using genuinely needs an App
   ID-level capability (iCloud, Push Notifications, etc.) — App Sandbox, network client, and the
   Calendar/Reminders/Contacts/Location entitlements are all declared directly in the entitlements
-  file (10a), not toggled here. The exception is Private Cloud Compute: once Apple grants it to
+  file (see [Entitlements](#entitlements), above), not toggled here. The exception is Private Cloud Compute: once Apple grants it to
   your account, turn it on here ([Shipping the model layer](#shipping-the-model-layer-through-app-store-connect)).
 
 **3. A Mac App Store distribution provisioning profile**, tying the App ID to the certificate.
@@ -1573,10 +1576,9 @@ App Store.
 What uploading LocalLM Lab and JevDK to App Store Connect turned up. None of it needed an SDK API
 change.
 
-**Embedding `LocalLMLabSDKInference` (local MLX models).** Use SDK 2.1 or later. In 2.0 the
-framework's bundle ID was `mlx-swift_Cmlx`, and App Store Connect rejects an app containing a bundle
-ID with an underscore (error 90277: not a valid bundle identifier). Since 2.1 it is
-`lab.locallm.sdk.inference`, and the xcframework embeds as is: no renaming, and no copying
+**Embedding `LocalLMLabSDKInference` (local MLX models).** Since 2.1 the framework's bundle ID is
+`lab.locallm.sdk.inference` (in 2.0 it was `mlx-swift_Cmlx`, and App Store Connect rejects a bundle
+ID with an underscore: error 90277, not a valid bundle identifier), and the xcframework embeds as is: no renaming, and no copying
 `mlx-swift_Cmlx.bundle` into your app's Resources. If you did that for 2.0, remove it when you
 upgrade: the copy and the framework's own copy share the bundle ID `mlx-swift.Cmlx.resources`, and a
 duplicate bundle ID can fail validation too (90685). MLX loads its Metal library from the framework's
@@ -1636,7 +1638,7 @@ tested.
 > the model onboarding, update and cleanup views, driven from simulated data (and
 > [`mlx-control-room`](../examples/mlx-control-room/) runs the same flows against a real `MLXModelProvider`).
 
-See [`annotated-examples.md`](annotated-examples.md) for both apps' full source with every
+See [the annotated examples](annotated-examples.md) for both apps' full source with every
 `Components`/`Core` touchpoint marked.
 
 Everything above is `Core` — a plain Swift engine with no UI dependency. `Components` is a

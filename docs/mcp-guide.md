@@ -5,7 +5,7 @@ The MCP client in depth: connecting to a server, signing in, what a tool call re
 
 > **What changed in 3.0:** resources and prompts in chat, richer tool results, paste-a-setup, per-app sign-in names, a
 > 20,000-character cap on what the model sees of a result, and tools reaching the model as `<prefix>_<tool>`. The short
-> list is in [the SDK guide](sdk-guide.md#mcp-servers); the sections below are the 2.x text, updated where 3.0 changed it.
+> list is in [the SDK guide](sdk-guide.md#mcp-servers); the sections below cover 3.0.
 > Trust and review of servers is in [MCP security in your app](https://thisbrain.ai/locallm/mcp-security.html).
 
 ## Connecting to an MCP server: three auth options, and how to pick between them
@@ -24,12 +24,12 @@ The MCP client in depth: connecting to a server, signing in, what a tool call re
 > `Components`' `MCPServerPickerView`).
 
 Adding an MCP server involves one of three auth types, exposed as `MCPAuthType`. `Components`'
-`MCPServerPickerView` (see [Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer), the Components package) already builds a UI over all three if you'd rather not build
+`MCPServerPickerView` (see [Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)) already builds a UI over all three if you'd rather not build
 your own — this section explains what each requires, either way.
 
 | `MCPAuthType` | Real-world example | What your UI must collect |
 |---|---|---|
-| `.none` | Notion, Todoist, Linear-shaped servers | Nothing — just the server URL |
+| `.none` | Notion, Todoist, Linear-shaped servers | Nothing up front — just the server URL; if the server uses OAuth with Dynamic Client Registration, the client detects it and runs the sign-in itself |
 | `.pat` | Static-bearer-token servers (e.g. GitHub-shaped) | A text field for the user's token |
 | `.oauthManual` | Servers with no Dynamic Client Registration (e.g. Slack-shaped) | A text field for a pre-registered OAuth client ID |
 
@@ -177,7 +177,7 @@ first sends `server/discover`, the `2026-07-28` way of asking a server which rev
 A server on the current revision answers, and the connection is **stateless**. Any older server
 rejects that unknown method, and the client falls back to the `initialize` handshake, offering
 `MCPProtocolVersion.clientPreferred` (`2025-11-25`). The two meet at the newest revision both
-support. Nothing you wrote against the 1.x client changes.
+support, and your code is the same either way.
 
 `2026-07-28` reworks the wire protocol, and the SDK absorbs all of it:
 
@@ -213,8 +213,7 @@ otherwise. You rarely read either. The point of the table is that newer fields o
 server. They are not errors to guard.
 
 **Servers the client refuses.** A `2024-11-05` server, or one on the old two-endpoint HTTP+SSE
-transport, fails `addServer` with `.protocolMismatch`. Both were accepted in 1.x. This is the
-one behaviour change in this area (see `migrating-to-2.0.md`).
+transport, fails `addServer` with `.protocolMismatch` (since 2.0; see [Migrating to 2.0](migrating-to-2.0.md)).
 
 **Two knobs on `MCPSettings`, both rarely needed:**
 
@@ -370,7 +369,7 @@ consent screen.
 > need them to send you something actionable — not something to wire up proactively for every app.
 >
 > **Examples that use it:** none of the SDK's example apps enable the diagnostics buffer; see
-> [`mcp-diagnostics.md`](mcp-diagnostics.md) for the full support-flow writeup this section
+> [the MCP diagnostics doc](mcp-diagnostics.md) for the full support-flow writeup this section
 > summarizes.
 
 Two logging layers, both strictly off-content (never prompt/response text; bearer tokens and
@@ -392,7 +391,7 @@ to `.debug` over a support channel; put a "Copy MCP diagnostics" button somewher
 
 Full detail — every log category, what `MCPDiagnostics.observer` gives you, the redaction
 guarantees, and the end-to-end support flow — is in
-[`mcp-diagnostics.md`](mcp-diagnostics.md).
+[the MCP diagnostics doc](mcp-diagnostics.md).
 
 ### MCP Apps: showing a server's interactive views
 
@@ -503,7 +502,7 @@ Both stores also use the native Keychain Services API (`SecItemAdd`/`SecItemCopy
 directly, not a shell-out to a system command-line tool — safe to use from a sandboxed app
 (including one distributed through the Mac App Store), where shelling out to system binaries is
 unreliable or outright unavailable. Confirmed live under App Sandbox, not just by code review —
-see [App Sandbox](sdk-guide.md#app-sandbox--building-for-the-mac-app-store) (App Sandbox — building for the Mac App Store).
+see [App Sandbox](sdk-guide.md#app-sandbox--building-for-the-mac-app-store).
 
 The one thing to know: if `Bundle.main.bundleIdentifier` is `nil` (an unbundled CLI/test target,
 not a real `.app`), storage falls back to a fixed, non-isolating string — this is expected and fine
@@ -541,7 +540,7 @@ case .failure(let error):
     // MCPServerError for the full set and what each implies about whether retrying makes sense.
 }
 
-// Call a tool -> Result<MCPToolResult, MCPServerError> ([MCP tool results](#what-a-tool-call-gives-you-back-mcptoolresult)). A tool that ran but failed is
+// Call a tool -> Result<MCPToolResult, MCPServerError> (MCP tool results). A tool that ran but failed is
 // .success with isError == true, not .failure.
 let callResult = await manager.callTool(
     server: state.id, tool: "find-tasks-by-date",
@@ -556,7 +555,7 @@ for await servers in manager.serverChanges {
 }
 
 // Or, if you're in a SwiftUI app and want @Published-style reactivity, Components already ships
-// this wrapper — MCPServerManagerObservable, see [Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer) (Components) — so you don't need to write it
+// this wrapper — MCPServerManagerObservable, see Components in the SDK guide — so you don't need to write it
 // yourself unless you want to.
 
 // Post-use
@@ -565,18 +564,21 @@ manager.removeServer(state.id) // forget it entirely, clear its Keychain entries
 ```
 
 **On tool selection**: `manager.addServer` returns everything the server exposes; deciding which
-tools to actually pass to your AI engine (context-budget management) is entirely up to you — the
-SDK doesn't filter this for you. Real servers can expose 40+ tools; don't naively pass all of them
+tools to actually pass to your AI engine (context-budget management) is up to you in a static
+session: the tools you enable are the tools the model sees. With `dynamicTools:` (3.0), a picker
+chooses the tools for each message instead (see [Tools: available, not attached](sdk-guide.md#tools-available-not-attached-30)). Real servers can expose 40+ tools; don't naively pass all of them
 into a `LanguageModelSession` without picking the ones your prompt actually needs. See
 `MCPToolDescriptor.estimatedTokens` if you want to reason about this quantitatively, or use
-`Components`' `MCPServerPickerView` ([Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer) — Components), which already builds a per-tool enable/disable UI
+`Components`' `MCPServerPickerView` ([Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)), which already builds a per-tool enable/disable UI
 over exactly this.
 
-**On tool-calling from FoundationModels**: Core's tools are plain data (`MCPToolDescriptor`,
-`callTool`), not FoundationModels `Tool`-conforming types — you write a thin adapter per tool, same
-as step 5 above walks through. This is a design choice, not a limitation: it means your app decides
+**On tool-calling from FoundationModels**: `MCPServerManager` itself hands you plain data
+(`MCPToolDescriptor`, `callTool`). To give a tool to a model, either let `makeSession` add the
+enabled MCP tools for you (each wrapped as `MCPTool`, a FoundationModels `Tool`), wrap a descriptor
+yourself with `MCPTool(descriptor:manager:)`, or write your own thin adapter per tool, as
+[the reference-app walkthrough](walkthrough-plate-today.md) does in Step 5. An adapter of your own decides
 exactly which MCP tool maps to which FoundationModels `Tool`, with whatever argument-shaping logic
-that tool's real schema needs — always inspect `MCPToolDescriptor.rawSchema` for a tool before
+that tool's real schema needs. Either way, always inspect `MCPToolDescriptor.rawSchema` for a tool before
 assuming its parameters.
 
 **A real gotcha when writing a `Tool` that takes no meaningful input**: an empty, zero-property
@@ -614,5 +616,5 @@ above to find out which real `GenerationError` case is actually firing.
 content, e.g. a document or dataset) and **prompts** (server-defined templates). `manager.
 resourcesForSession()`/`.promptsForSession()` list what's currently enabled;
 `manager.readResource(server:uri:)`/`manager.getPrompt(server:name:arguments:)` fetch the real
-content. `Components`' `MCPResourcesView`/`MCPPromptsView` ([Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer) — Components) already build a UI over
+content. `Components`' `MCPResourcesView`/`MCPPromptsView` ([Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)) already build a UI over
 both if you don't want to write your own.

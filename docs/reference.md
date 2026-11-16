@@ -9,9 +9,11 @@ topic guides go deeper ([MCP](mcp-guide.md), [open-weight models](local-models-m
 **You don't need to read this in order.** Jump to the area you need and check the signature.
 
 > The machine-checked source of truth is [`api-surface.md`](api-surface.md), regenerated from the compiled
-> `.swiftinterface`s of each release. If this file and that one disagree, that one is right: please file an issue.
+> `.swiftinterface`s of each release. If this page and `api-surface.md` disagree, `api-surface.md` is right: please file an issue.
 
-**Which example shows each area** (source you can read + run):
+**Which example shows each area** (source you can read + run). The Path column is how the example gives tools to the
+model: **A**, the SDK's ready-made `Tool`s; **B**, your own `Tool` adapters over the same calls (see
+[Two paths to tool-calling](sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)):
 
 | API area | Example | Path |
 |---|---|---|
@@ -35,7 +37,7 @@ topic guides go deeper ([MCP](mcp-guide.md), [open-weight models](local-models-m
 The front door, the model registry, the providers and the session, as types. Everything here is in
 `LocalLMLabSDKCore` unless a subsection names another module: `MLXModelProvider` and its supply-chain types are in
 **`LocalLMLabSDKInference`**, `ClaudeModelProvider` in **`LocalLMLabSDKClaude`**, and `RemoteModelProvider` in
-**`LocalLMLabSDKRemote`** (each a separate xcframework on the same release —
+**`LocalLMLabSDKRemote`** (each a separate xcframework on the same release; which ones need macOS 27 is in
 [Targeting macOS 26 and 27](sdk-guide.md#targeting-macos-26-and-macos-27-from-one-build)). The walkthrough is
 [The model layer](sdk-guide.md#the-model-layer-models-routing-and-sessions). The prompt cache has its own section,
 [Prompt cache and memory](#prompt-cache-and-memory-locallmlabsdkinference).
@@ -61,9 +63,9 @@ connector and workspace facades. Every type behind it is usable without it.
     }
     init(configuration: LocalLMLab.Configuration = .init())
     let models: ModelRegistry                 // the observable model surface (below)
-    let mcp: MCPServerManager                 // the one MCP manager, made from Configuration.mcp — [MCP client](#mcp-client)
+    let mcp: MCPServerManager                 // the one MCP manager, made from Configuration.mcp — see MCP client
     let audit: SecurityAudit                  // every tool call at the gate, trust and approval changes, drift
-    let tools: ToolCatalog                    // the app's plug-ins and tool sources — [Dynamic tools](#dynamic-tools-dynamictools-plug-ins-the-tool-picker)
+    let tools: ToolCatalog                    // the app's plug-ins and tool sources — see Dynamic tools
     let connectors: ConnectorsFacade          // Calendar / Reminders / Contacts / Location permission lifecycle
     let workspace: WorkspaceFacade
     let externalPrograms: ExternalProgramsSwitch   // shared by everything that runs a program
@@ -76,13 +78,13 @@ connector and workspace facades. Every type behind it is usable without it.
     func makeSession(route: RouteName, tools: [any Tool] = [], instructions: String? = nil,
                      restoring transcript: Transcript? = nil,  // continue a saved conversation (instructions nil)
                      includeMCPTools: Bool = true,              // offer lab.mcp's enabled tools, and keep following it
-                     includePlugins: Bool = true,               // offer every on plug-in's tools — [Dynamic tools](#dynamic-tools-dynamictools-plug-ins-the-tool-picker)
-                     dynamicTools: DynamicTools? = nil,         // nil: static tools; else picked per message — [Dynamic tools](#dynamic-tools-dynamictools-plug-ins-the-tool-picker)
-                     mcpAppHints: Bool = false,                 // [MCP Apps](mcp-guide.md#mcp-apps-showing-a-servers-interactive-views)
+                     includePlugins: Bool = true,               // offer every on plug-in's tools — see Dynamic tools
+                     dynamicTools: DynamicTools? = nil,         // nil: static tools; else picked per message — see Dynamic tools
+                     mcpAppHints: Bool = false,                 // see MCP Apps in the MCP guide
                      options: SessionOptions = .init(),         // merged onto the provider's defaults
                      authorizer: (any ToolCallAuthorizer)? = nil) throws -> LocalLMLabSession
                      // authorizer nil = FailClosedToolAuthorizer: .read calls run, the rest are denied —
-                     // [Tool authorization](sdk-guide.md#tool-authorization-two-levers--which-tools-and-whether-they-ask-first)
+                     // see Tool authorization in the SDK guide
 }
 
 struct MCPSettings {                    // how the lab sets up lab.mcp — MCPServerManager's own defaults
@@ -345,7 +347,7 @@ Guide: [Online providers](remote-providers.md).
 ```swift
 @available(macOS 27, *)
 struct RemoteModelProvider: ModelProvider {
-    init(_ config: RemoteProviderConfig) throws          // runs config.validated() — the only unchecked-free spelling
+    init(_ config: RemoteProviderConfig) throws          // runs config.validated() — the checked initializer; use this one unless you wrote the config yourself
     init(unchecked config: RemoteProviderConfig)         // explicit bypass, for configs your own code wrote
     var scheme: String { get }                           // config.scheme
     var advertisedModels: [ModelID] { get }              // config.models
@@ -445,7 +447,7 @@ struct MLXModelProvider: DownloadableModelProvider {
          pinStore: (any MLXPinStore)? = nil,               // captured pins (trust on first use); MLXFilePinStore()
          managedPinStore: (any MLXManagedPinStore)? = nil, // runtime advances of shipped pins; MLXFileManagedPinStore()
          maxModelCallsPerTurn: Int = MLXModelProvider.defaultMaxModelCallsPerTurn,   // runaway tool-loop stop
-         promptCache: MLXPromptCache = .automatic)         // [Prompt cache and memory](#prompt-cache-and-memory-locallmlabsdkinference)
+         promptCache: MLXPromptCache = .automatic)         // see Prompt cache and memory
     let maxModelCallsPerTurn: Int         // Int.max: no limit; below 1 counts as 1; SessionOptions can override
     static let defaultMaxModelCallsPerTurn: Int   // 16: the first call plus 15 rounds after tool calls
     let promptCache: MLXPromptCache
@@ -473,7 +475,7 @@ struct MLXModelProvider: DownloadableModelProvider {
     func unloadResident(_ id: ModelID, reason: String = "idleTimeout") async   // frees memory, keeps the download
     func unloadAllResident(reason: String = "idleTimeout") async
     static func stopGenerating() async    // stops every MLX reply in the process and returns once the GPU is idle —
-                                          // call it before quitting mid-reply ([Stopping a reply](sdk-guide.md#stopping-a-reply-30))
+                                          // call it before quitting mid-reply (Stopping a reply in the SDK guide)
     static var bufferCacheLimitBytes: Int64?       // cap on freed GPU buffers MLX keeps, process-wide; nil = MLX's default
     static let defaultBufferCacheLimitBytes: Int64 // 2 GB
 
@@ -481,7 +483,7 @@ struct MLXModelProvider: DownloadableModelProvider {
     func pairDraftModel(_ spec: SpeculativeDecodingSpec?, with baseRepoID: String)   // speed helper; nil clears
     func pairAdapter(_ spec: AdapterSpec?, with baseRepoID: String)                  // specialization patch; nil clears
 
-    // pins, updates, cleanup — [Pinning, updating and cleaning up](local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions)
+    // pins, updates, cleanup — see Pinning, updating and cleaning up in the MLX guide
     func effectivePin(for repoID: String) -> MLXPin?          // the pin a download would use now, and its source; nil = tracks main
     func buildTimePin(for repoID: String) -> String?          // what this build shipped in pinnedRevisions
     func checkPinUpdate(_ repoID: String, to revision: String? = nil) async throws -> MLXPinUpdateCheck   // downloads nothing
@@ -730,7 +732,7 @@ struct LocalLMLabSession: Sendable {
             case appContext(instance: String, text: String)
         }
     }
-    struct ReplyInProgress: Sendable, Equatable { var reasoning: String?; var text: String; var isReasoning: Bool }   // init: [Chat core](#chat-core-chatcontroller-chatsetup-conversations)
+    struct ReplyInProgress: Sendable, Equatable { var reasoning: String?; var text: String; var isReasoning: Bool }   // init: see Chat core
     enum ArchiveError: Error, Equatable { case notEmpty, unsupportedFormat(String) }
 }
 struct ToolCallRecord: Identifiable, Sendable {
@@ -745,7 +747,7 @@ struct ToolCallRecord: Identifiable, Sendable {
     let app: MCPAppLink?                 // the tool's MCP App view, if any
     let toolDescriptor: MCPToolDescriptor?
     let startedAt: Date; var finishedAt: Date?
-    // + stillRunningSeconds, sourceName, impact, serverTrusted — see [Chat core](#chat-core-chatcontroller-chatsetup-conversations)
+    // + stillRunningSeconds, sourceName, impact, serverTrusted — see Chat core
 }
 enum ToolReference: Sendable, Equatable {
     case mcp(server: MCPServerID, tool: String)
@@ -762,7 +764,7 @@ enum SessionEvent: Sendable {            // what's around generation; tokens sta
     case contextCompacted(removedEntries: Int)
     case toolCallStarted(id: String, name: String, arguments: String)   // arguments: a best-effort rendering
     case toolCallFinished(id: String, name: String, failed: Bool, resultSummary: String?)   // failed: threw or denied
-    case serverToolCall(ServerToolActivity)         // provider-run web search/fetch — [Online providers](remote-providers.md)
+    case serverToolCall(ServerToolActivity)         // provider-run web search/fetch — see Online providers
     case toolCallStillRunning(id: String, name: String, seconds: Int)   // at 15 s, then every 15 s: "still waiting on Orders…"
     case emptyReply(EmptyReply, retrying: Bool)   // retrying: the session runs the turn once more; its outcome follows (EmptyReply: Chat core)
     case toolsRequested(ToolRequest)              // the model asked for tools and the picker found some: the turn runs again with them
@@ -774,7 +776,7 @@ struct RetryPolicy: Sendable {
     init(maxRetries: Int = 0, compact: (@Sendable (Transcript) -> Transcript)? = nil)
     static let disabled: RetryPolicy
 }
-struct ContextBudget: Sendable, Equatable {   // a best-effort gauge — [ContextBudget + RetryPolicy](sdk-guide.md#contextbudget--retrypolicy--surviving-a-long-session)
+struct ContextBudget: Sendable, Equatable {   // a best-effort gauge — see ContextBudget + RetryPolicy in the SDK guide
     let windowTokens: Int?          // nil when the SDK has no estimate (arbitrary downloaded weights)
     let lastInputTokens: Int        // the latest turn's last model call; 0 before the first turn
     let lastOutputTokens: Int
@@ -912,8 +914,8 @@ or `MLXModelProvider.clearPromptCache()`).
 
 ### Per-model status and capacity
 
-Whether the cache works with a given model, and how long a prompt the model can take on this Mac. Both status calls
-on `MLXModelProvider` are instant except `checkPromptCache`, which loads the model to run the self-test.
+Whether the cache works with a given model, and how long a prompt the model can take on this Mac. Every call
+here on `MLXModelProvider` is instant except `checkPromptCache`, which loads the model to run the self-test.
 
 ```swift
 extension MLXModelProvider {
@@ -1028,7 +1030,7 @@ probabilities, instead of writing text. Reach for it to route, triage or gate. W
 ### Asking
 
 `lab.decide` validates the request against the provider's `limits`, calls it, and checks every question got an
-answer of its kind. [Ask](decision-models.md#ask).
+answer of its kind. Guide: [Ask](decision-models.md#ask).
 
 ```swift
 extension LocalLMLab {
@@ -1158,7 +1160,7 @@ extension ModelRegistry {
         // checks the pair fits, makes room and loads both; throws .noRoute / .pairing and changes nothing then
 }
 struct DecisionPairing: Sendable, Equatable {   // what pair(decision:generator:) set up —
-                                                // [One model or two](decision-models.md#a-decider-and-your-chat-model-one-model-or-two)
+                                                // see One model or two in the decision-models guide
     var decider: ModelID
     var generator: ModelID
     var deciderBytes: Int64?       // the decider's weights, when it runs on this Mac
@@ -1175,7 +1177,7 @@ struct DecisionPairing: Sendable, Equatable {   // what pair(decision:generator:
 
 Runs a decision on a downloaded MLX model by scoring the answer labels' next-token probabilities. `openjev:X` is
 available exactly when `mlx:X` is; downloads and pins are `mlx`'s.
-[OpenJev](decision-models.md#openjev-the-local-decider).
+Guide: [OpenJev](decision-models.md#openjev-the-local-decider).
 
 ```swift
 struct OpenJevDecisionProvider: PairableDecisionProvider {   // scheme "openjev"; limits 64 questions, 26 options, 10 levels
@@ -1216,7 +1218,7 @@ struct OpenJevDiagnostics: Sendable {   // for playgrounds and debugging, not ap
 ### Hosted deciders (`LocalLMLabSDKRemote`)
 
 TypeSafe's Jev on OpenRouter, Featherless, OpenAI's Decisions API, and any server that copies it.
-[Hosted Jev](decision-models.md#hosted-jev).
+Guide: [Hosted Jev](decision-models.md#hosted-jev).
 
 ```swift
 struct JevDecisionProvider: DecisionProvider {
@@ -1306,7 +1308,7 @@ enum OpenAIDecisionWire {   // .noul is "predicate", a question id is "name", a 
 
 Fit a correction for token-scored probabilities on your own questions, load a question set exported from JevDK, and
 measure a decider against labelled examples.
-[From JevDK to your app](decision-models.md#from-jevdk-to-your-app-question-sets-answer-sets-labevaluate).
+Guide: [From JevDK to your app](decision-models.md#from-jevdk-to-your-app-question-sets-answer-sets-labevaluate).
 
 ```swift
 struct DecisionCalibration: Sendable, Hashable, Codable {   // a temperature per question kind
@@ -1380,8 +1382,8 @@ struct DecisionEvaluation: Sendable {   // lab.evaluate's result; a refusal coun
 
 The security runtime around tool calls: which tools a session may see, the gate every call passes before it runs, how
 the user or a policy is asked, how outside content is kept as data, how changed MCP tools are held for review, and the
-audit stream that records all of it. Start with [The tool authorizer](tool-authorizer.md) (the 3.0 change in one page)
-and [Security in the SDK 3.0: the guide for host apps](security-guide-for-hosts.md); the settings tables are in
+audit stream that records all of it. Start with [The tool authorizer](tool-authorizer.md), the 3.0 change in one page,
+and [the security guide for host apps](security-guide-for-hosts.md); the settings tables are in
 [Tool authorization](sdk-guide.md#tool-authorization-two-levers--which-tools-and-whether-they-ask-first).
 Everything here is in `LocalLMLabSDKCore` except the confirmation sheet, in `LocalLMLabSDKComponents`.
 
@@ -1771,8 +1773,8 @@ extension ChatSetup {
 ```
 
 ```swift
-let session = try lab.makeSession(route: .chat, dynamicTools: .matching(SystemToolMatcher()),
-                                  authorizer: authorizer)
+var session = try lab.makeSession(route: "chat", dynamicTools: .matching(SystemToolMatcher()),
+                                  authorizer: authorizer)   // a struct: var, to set its properties
 session.toolContext = { $0.heldBackNote }   // tell the model what it wasn't given, so it asks instead of guessing
 ```
 
@@ -2070,7 +2072,7 @@ struct SystemDecisionProvider: DecisionProvider {          // scheme "system"; o
     let limits: DecisionLimits
     init(batching: Batching = .combined, limits: DecisionLimits = .system)
 }
-extension DecisionLimits { static let system: DecisionLimits }   // state kept to about a third of the context
+// limits default to DecisionLimits.system (64 / 26 / 10, state ≤ 4,000 characters), declared under Asking
 
 try lab.models.register(decision: SystemDecisionProvider())
 lab.models.route(decision: "tools", to: .system)
@@ -2246,7 +2248,7 @@ enum ToolGate: Error, Sendable, Equatable, CustomStringConvertible {
 
 enum PermissionAsking: Sendable, Equatable {               // LocalLMLabSession.permissionAsking
     case onCall              // default: only when the model calls a tool missing a permission; the gate comes after the turn (gatesAfterTurn)
-    case bestMatch           // before the message, for the plug-ins it is about; a paired-in plug-in is left out (withoutPermission)
+    case bestMatch           // before the message, for the plug-ins it is about; another chosen plug-in that lacks a permission is left out, not asked about (withoutPermission)
     case everyChosenPlugin   // before the message, for every chosen plug-in (the 2.x behaviour)
 }
 
@@ -2560,7 +2562,7 @@ call them. Setup (usage strings, entitlements) and the permission flow are in
 
 ### The permission facade: `Connectors`, `lab.connectors`
 
-The same three calls for all four connectors. `restricted` (new in 3.0) means the Mac's administrator or Screen Time
+The same three calls for every connector. `restricted` (new in 3.0) means the Mac's administrator or Screen Time
 turned the access off: the user can't turn it on in System Settings, so don't send them there.
 
 ```swift
@@ -2595,7 +2597,7 @@ than an opaque token.
 
 ```swift
 enum CalendarAccess {
-    nonisolated(unsafe) static var store: EKEventStore { get }   // the raw EventKit store, for anything below doesn't cover; renewed after a fresh grant
+    nonisolated(unsafe) static var store: EKEventStore { get }   // the raw EventKit store, for anything the calls below don't cover; renewed after a fresh grant
     static var authorizationStatus: EKAuthorizationStatus { get }
     static var isAuthorized: Bool { get }
     struct AccessResult { var granted: Bool; var error: String?; var needsSystemSettings: Bool }
@@ -3879,8 +3881,8 @@ user.
 
 ```swift
 // LocalLMLabSDKCore
-struct RefusedToolCall: Error {          // a provider refused a call; the session treats a call to a tool it has
-    let toolName: String                 // as a request for it and reruns the turn
+struct RefusedToolCall: Error {          // a provider refused a call to a tool the app has but didn't offer this turn;
+    let toolName: String                 // the session treats it as a request for that tool and reruns the turn
     let underlying: any Error
     init(toolName: String, underlying: any Error)
     static func find(in error: any Error) -> RefusedToolCall?   // through LocalLMLabError and NSError wrapping
@@ -4236,7 +4238,7 @@ struct ConversationMeta: Codable, Identifiable, Equatable, Sendable {   // meta.
 }
 
 struct TurnInfo: Codable, Equatable, Sendable {   // what preparing one turn's tools did, for the "why these tools" chip
-    var matcher: String                    // "keyword" or "decider (Qwen3-4B-4bit)"
+    var matcher: String                    // "keyword" or "decision (Qwen3-4B-4bit)"
     var milliseconds: Double
     var sources: [Scored]                  // sources the matcher scored highest, best first
     var offered: [String]                  // "Source › tool"
@@ -4314,12 +4316,12 @@ extension LocalLMLabSession {
     func streamResponse(to prompt: String, attachments: [URL] = [], options: SessionOptions = SessionOptions(),
                         fromAppInstance instance: String? = nil) -> AsyncThrowingStream<String, any Error>
 
-    var retriesEmptyReply: Bool                        // false: an EmptyReply turn is run again up to emptyReplyRetries times
+    var retriesEmptyReply: Bool                        // default false; when true, an EmptyReply turn is run again up to emptyReplyRetries times
     static let emptyReplyRetries: Int                  // 2
-    var trimsOldResults: Bool                          // false: past half the window (or 64,000 tokens), older long results become notes, last 3 exchanges whole
-    var sendsImagesToModel: Bool                       // false: image attachments go in the prompt (vision models only; others throw)
-    var framesUntrustedContent: Bool                   // false: outside content reaches the model framed as data (ContentFrame)
-    var asksBeforeSendingReadContent: Bool             // false: a call sending out text the assistant read asks even on a trusted server
+    var trimsOldResults: Bool                          // default false; when true, past half the window (or 64,000 tokens) older long results become notes, last 3 exchanges whole
+    var sendsImagesToModel: Bool                       // default false; when true, image attachments go in the prompt (vision models only; others throw)
+    var framesUntrustedContent: Bool                   // default false; when true, outside content reaches the model framed as data (ContentFrame)
+    var asksBeforeSendingReadContent: Bool             // default false; when true, a call sending out text the assistant read asks even on a trusted server
     var auditConversation: String?                     // the conversation audit entries name; ChatController sets its chat's ID
 
     func linkSources(in text: String) async -> [(url: URL, source: LinkSource)]   // each link in a reply and where it came from; reads images (≤1 s each)
@@ -4366,7 +4368,7 @@ One manager per app (it is not a singleton). Servers are connected only when nee
 of its tools. The manager saves nothing to disk: save `snapshot()` and pass it to `restore(from:)` at the next launch.
 Trust, approval and drift types (`MCPServerTrust`, `ToolApproval`, `DriftPolicy`, `DriftAction`, `DriftCause`,
 `ToolDrift`, `SecurityAudit`) are in [Tool authority](#tool-authority-toolcallauthorizer-toolimpact-confirmation), the
-kinds of tool change (`ToolChange`) under [Dynamic tools](#dynamic-tools-dynamictools-plug-ins-the-tool-picker), and
+kinds of tool change (`ToolChange`) under [Tool drift](#tool-drift), and
 `ExternalProgramsSwitch`, `MCPStdioLaunch` and `MCPLocalServerStart` under
 [Local programs](#local-programs-direct-download-builds-only).
 
@@ -4827,7 +4829,7 @@ struct MCPServerConfigEntry: Sendable, Equatable {
 
 ### Protocol revisions and live updates
 
-([MCP revisions](mcp-guide.md#which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care))
+Guide: [MCP revisions](mcp-guide.md#which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care).
 
 ```swift
 enum MCPProtocolVersion: String, CaseIterable, Comparable, Sendable, Codable {   // Comparable in release order
@@ -4869,7 +4871,7 @@ struct MCPSubscriptionFilter: Sendable, Codable, Equatable {   // what to ask fo
 
 ### Server-initiated requests
 
-([Server-initiated requests](mcp-guide.md#server-initiated-requests-elicitation-and-the-sampling--roots-seams)) All
+Guide: [Server-initiated requests](mcp-guide.md#server-initiated-requests-elicitation-and-the-sampling--roots-seams). All
 optional; a capability is advertised to a server only when its handler is non-nil. Components ships
 `MCPElicitationPresenter`, a ready-made elicitation handler.
 
@@ -4939,7 +4941,7 @@ struct MCPLogMessage: Sendable, Equatable { var level: String; var logger: Strin
 
 ### Diagnostics
 
-([MCP diagnostics](mcp-guide.md#diagnostics-when-a-user-reports-an-mcp-problem), [mcp-diagnostics.md](mcp-diagnostics.md))
+Guide: [MCP diagnostics](mcp-guide.md#diagnostics-when-a-user-reports-an-mcp-problem), and [the MCP diagnostics doc](mcp-diagnostics.md).
 Off-content (never prompt or response text), secrets redacted.
 
 ```swift
@@ -4967,14 +4969,14 @@ struct MCPDiagnosticEvent: Sendable, Codable {
 
 ### OAuth setup
 
-([the OAuth redirect URI + AppDelegate wiring sections](mcp-guide.md#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth))
+Guide: [OAuth redirect URI](mcp-guide.md#oauth-redirect-uri--must-set-this-yourself-if-your-server-uses-oauth), with the AppDelegate wiring after it.
 Set these once at startup, before any `addServer` call.
 
 ```swift
 enum MCPOAuthFlow {
     static var redirectURI: String { get set }       // MUST be your own scheme (default "locallmlab://oauth/callback")
     static var clientName: String { get set }        // the name a sign-in page shows; default: the app's display name
-    static var clientMetadataURL: URL? { get set }   // optional — CIMD instead of DCR ([Client ID Metadata Documents](mcp-guide.md#cimd-skipping-dynamic-client-registration))
+    static var clientMetadataURL: URL? { get set }   // optional — CIMD instead of DCR (Client ID Metadata Documents in the MCP guide)
     // Why a server may refuse uri as a redirect, or nil: a private-use scheme should be your reverse domain
     // ("com.example.app:/oauth/callback"); https and loopback http are fine.
     static func redirectProblem(_ uri: String) -> String?
@@ -5580,7 +5582,7 @@ struct ChatComposer<Banner: View, Leading: View, ModelLabel: View>: View {
     init(controller: ChatController, isEnabled: Bool = true,   // isEnabled: sending allowed now, besides a turn running
          acceptedTypes: [UTType] = Self.standardTypes,
          send: ((String, [URL]) -> Void)? = nil,               // the app's send (it may start a chat first); controller.send by default
-         addSource: (() -> Void)? = nil,                       // no longer used; kept so existing callers build
+         addSource: (() -> Void)? = nil,                       // ignored; kept so existing callers build
          @ViewBuilder banner: @escaping () -> Banner,          // above the box
          @ViewBuilder leading: @escaping () -> Leading,        // under the box, on the left
          @ViewBuilder modelLabel: @escaping () -> ModelLabel)  // under the box, on the right (ChatModelLabel)
@@ -5881,14 +5883,14 @@ struct ModelVersionRow: Sendable, Equatable, Identifiable {   // one cached vers
     init(list: @escaping @Sendable () async -> [ModelVersionRow],
          remove: @escaping @Sendable (ModelVersionRow) async throws -> Int64)   // returns bytes freed; must refuse the current version
     private(set) var versions: [ModelVersionRow]; private(set) var isLoading: Bool
-    private(set) var message: String?   // the last outcome ("Freed 1.6 KB", or why a removal failed)
+    private(set) var message: String?   // the last outcome ("Freed 1.6 GB", or why a removal failed)
     func refresh() async; func remove(_ row: ModelVersionRow) async
 }
 struct ModelVersionsView: View { init(model: ModelVersionsModel) }
 
 // Online providers — the "AI Models" settings panel. Host owns [RemoteProviderDraft]
 // (keys → Keychain) and maps a draft → RemoteProviderConfig in the closures. Components does not
-// link LocalLMLabSDKRemote; see [Online providers](remote-providers.md) and examples/model-switch/ProviderGlue.swift.
+// link LocalLMLabSDKRemote; see Online providers and examples/model-switch/ProviderGlue.swift.
 struct AIModelsSettingsView: View {
     init(registry: ModelRegistry, providers: Binding<[RemoteProviderDraft]>,
          onSave: @escaping (RemoteProviderDraft) -> Void,

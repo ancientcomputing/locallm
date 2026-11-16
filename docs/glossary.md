@@ -38,7 +38,7 @@ first.
 | **Tool call** | The model's written request to use a tool ("please read `notes.md`"). The model does not run the tool: the app does, and returns the result. |
 | **MCP** (Model Context Protocol) | A standard way for an AI app to connect to a **server** that offers tools, and also documents it shares and ready-made prompts. |
 | **Tool picker** (a *matcher* or *selector*) | The part that chooses which few tools a message needs from all those available, so only those are sent to the model. The SDK has no default picker: you choose a system, decision-model or keyword picker. |
-| **Contact on use** | A server is connected only when a tool from it is chosen, not when the app starts. Idle servers disconnect. |
+| **Connect on use** | A server is connected only when a tool from it is chosen, not when the app starts. Idle servers disconnect. |
 | **MCP server** | A program or web service, usually written by someone else, that offers tools through MCP. A calendar service or a code host might each run one. |
 | **Plug-in** | A bundle of built-in tools shipped with the SDK, such as Calendar, Reminders, Web or Files. |
 | **Workspace** | A folder the user lets the assistant use, with an access level (read only, ask before changes, or read and write). |
@@ -54,7 +54,7 @@ first.
 
 | Term | What it means |
 |---|---|
-| **SDK** | A software development kit: code a developer adds to their own app. Here, the LocalLM SDK (called the LocalLM Lab SDK before 3.0). Its modules keep the older prefix: `LocalLMLabSDKCore`, `LocalLMLabSDKInference` and so on. |
+| **SDK** | A software development kit: code a developer adds to their own app. Here, the LocalLM SDK (called the LocalLM Lab SDK until November 2026). Its modules keep the older prefix: `LocalLMLabSDKCore`, `LocalLMLabSDKInference` and so on. |
 | **Host app** | The app a developer builds on the SDK. The host app decides who the user is, what they will accept, and what to keep. |
 | **Session** | One running conversation with a model, with its tools. |
 | **Snapshot** | A saved copy of the user's server list and settings, so they survive a relaunch. |

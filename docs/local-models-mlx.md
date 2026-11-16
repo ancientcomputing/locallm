@@ -41,7 +41,7 @@ let report = await mlx.capabilityProbe(installed.id)   // ModelCapabilityReport
 // report.capabilities: .toolCalling, .guidedGeneration (respond(to:generating:) — run on
 // languageModelSession, see "Running a turn"), .reasoningToggle
 // This is authoritative. For a starting shortlist of what tool-calls and what doesn't,
-// see docs/tested-models.md — but always confirm your own model with capabilityProbe.
+// see the tested-models list — but always confirm your own model with capabilityProbe.
 
 mlx.installed        // [InstalledModel] — what's on disk now
 mlx.storageUsed      // total bytes of weights
@@ -57,8 +57,8 @@ the model's answer and nothing ran, so if you showed that text, or retried on it
 instead; running the turn again is often enough for a small model. A call written inside the model's
 reasoning (`<think>…</think>`) stays inert, since a model rehearsing a call hasn't decided to make
 it. The exception is a `<think>` block that opens directly on the call and never closes, which
-Qwen3 sometimes writes: that call runs. 2.1's runtime also fixes Gemma 4's array and object
-arguments and adds gpt-oss (Harmony) and Muse Glimmer tool calls; the
+Qwen3 sometimes writes: that call runs. Since 2.1 the runtime also handles Gemma 4's array and object
+arguments and gpt-oss (Harmony) and Muse Glimmer tool calls; the
 [CHANGELOG](../CHANGELOG.md) has the details.
 
 **Where the weights land** — a standard Hugging Face cache
@@ -152,7 +152,9 @@ pass it back in `pinnedRevisions` before redownloading.
 
 **Usage and speed, per turn.** Each turn's response carries the model's real token counts and an
 `mlx.*` metadata dictionary of turn totals — read it from the response's `usage`, or the last stream
-snapshot's:
+snapshot's. `session.streamResponse` yields only the reply text, so to read `usage` run the turn on
+`languageModelSession` directly (which skips the SDK's retry and tool refresh; see
+[Running a turn](sdk-guide.md#running-a-turn-and-when-to-use-languagemodelsession)):
 
 ```swift
 var last: LanguageModelSession.Usage?
@@ -325,7 +327,7 @@ mlx.pairDraftModel(nil, with: "mlx-community/Qwen3-8B-4bit")
   a much smaller size. The combined base+draft weight size is checked against the same
   `preflightLimits.maxWeightFractionOfRAM` (70% by default) the single-model download warning
   already uses. **`numDraftTokens` matters more than you'd expect, so measure.** It is how many
-  words the draft model proposes per round (default **2**). A small draft only agrees with the big
+  tokens the draft model proposes per round (default **2**). A small draft only agrees with the big
   model for a token or two at a time, so a long draft mostly wastes work. Measured on one Mac with
   a `Qwen3-0.6B` draft (release build, warmed up, greedy, thinking off, one prompt — treat as
   directional): 1–2 draft tokens were **27–39% faster** than the base model alone on `Qwen3-8B` and
