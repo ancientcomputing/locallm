@@ -192,7 +192,7 @@ sent as an object.
 - **Saved workspaces stay available after a restart** (binaries re-published 2026-11-14). A workspace's identity is
   its volume's UUID and inode; it was the device number, which macOS assigns at each mount, so after a restart every
   saved workspace was refused. A list saved before matches by inode and is rewritten.
-  `SavedWorkspace.sameFolder(saved:now:)` compares two identities.
+  `SavedWorkspaces.sameFolder(saved:now:)` (a static) compares two identities.
 - **Examples say how tool calls are decided.** Every example whose tools write, or call an MCP server's tools,
   passes an authorizer, since a 3.0 session without one refuses those calls: `AllowingToolAuthorizer()` in
   `code-buddy`, `repo-qa-local` and `aiql`; a `ConfirmingToolAuthorizer` in `workspace-buddy-local` (an alert before
