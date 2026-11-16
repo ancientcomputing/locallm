@@ -1,17 +1,15 @@
 # Full function/type reference
 
-The narrative function and type reference. [api-surface.md](api-surface.md) is the machine-generated list of everything public; this is the same ground with explanations.
+The LocalLM SDK's function and type reference: everything public in `LocalLMLabSDKCore`, `LocalLMLabSDKInference`,
+`LocalLMLabSDKRemote`, `LocalLMLabSDKClaude`, `LocalLMLabSDKComponents` and `LocalLMLabSDKMCPAppsHost`, grouped by area,
+with what each piece is for. The [SDK guide](sdk-guide.md) is the narrative version, with context and gotchas; the
+topic guides go deeper ([MCP](mcp-guide.md), [open-weight models](local-models-mlx.md),
+[online providers](remote-providers.md), [decision models](decision-models.md), [the tool authorizer](tool-authorizer.md)).
 
+**You don't need to read this in order.** Jump to the area you need and check the signature.
 
-Everything public in `LocalLMLabSDKCore`, `LocalLMLabSDKClaude`, `LocalLMLabSDKInference`,
-`LocalLMLabSDKRemote`, and `LocalLMLabSDKComponents`, grouped by area. This is the flat list;
-sections 1–11 above are the narrative version with context and gotchas.
-
-**You don't need to read this section in order.** Jump straight to the area you need and check
-the signature; the numbered sections above are the intended learning path.
-
-> The machine-checked source of truth is [`api-surface.md`](api-surface.md) (regenerated from the
-> compiled `.swiftinterface`s). If this section and that one disagree, that one is right — file it.
+> The machine-checked source of truth is [`api-surface.md`](api-surface.md), regenerated from the compiled
+> `.swiftinterface`s of each release. If this file and that one disagree, that one is right: please file an issue.
 
 **Which example shows each area** (source you can read + run):
 
@@ -25,6 +23,12 @@ the signature; the numbered sections above are the intended learning path.
 | `MCPTool` built from a live server schema (no hand-written `Arguments`) | [`repo-qa`](../examples/repo-qa/) · [`repo-qa-local`](../examples/repo-qa-local/) | A |
 | `Components` — `MCPServerPickerView` / `MCPServerManagerObservable` / resources / prompts | [`components-demo`](../examples/components-demo/) | — |
 | `Components` — model layer (`ModelPickerView` / `AIModelsSettingsView` / `ProviderSettingsSection`) | [`model-switch`](../examples/model-switch/) (`AIModelsSettingsView`) | — |
+| Tool authorization — `ConfirmingToolAuthorizer`, `ToolConfirmationPresenter`, `limited(toMaxImpact:)`, per-server trust and approval | [`security-demo`](../examples/security-demo/) · [`mcp-chat`](../examples/mcp-chat/) | — |
+| A chat with MCP servers and MCP Apps — `hostTranscript`, `MCPAppWidgetSlot`, the confirmation sheet | [`mcp-chat`](../examples/mcp-chat/) | — |
+| `FileBackedTool` and the data verbs (`loadTable`, `sqlQuery`) | [`aiql`](../examples/aiql/) | A |
+| MLX pins, downloads, validation, updates and the prompt cache | [`mlx-control-room`](../examples/mlx-control-room/) | — |
+| `Components` — model onboarding, update and versions views | [`components-updates-demo`](../examples/components-updates-demo/) | — |
+| Online providers, web search and citations (`LocalLMLabSDKRemote`) | [`model-switch`](../examples/model-switch/) | — |
 
 ## The model layer (`LocalLMLab`, routing, providers, sessions)
 
@@ -1081,14 +1085,17 @@ final class MCPServerManager {
     // drops every in-memory server without touching Keychain tokens — pair with restore(from:)
     // for a config-profile Load, where removeServer's per-server credential clear is the wrong call
     func removeAllKeepingCredentials()
-    func restore(from persisted: [(id: MCPServerID, url: URL, displayName: String, tools: [MCPToolDescriptor], estimatedTokens: Int, enabled: Bool, authType: MCPAuthType, manualClientID: String?, resources: [(uri: String, name: String, enabled: Bool)])])
+    func acceptDrift(server: MCPServerID)   // the server's current tools become the accepted list; held tools are offered again
+    func snapshot() -> [MCPServerSnapshot]   // every server, to save (Codable): cached tools, trust, approvals, exclusions, drift
+    func restore(from snapshots: [MCPServerSnapshot])   // at the next launch, as disconnected entries with those settings; an ID already present is left alone
 
     func toolsForSession() -> [MCPToolDescriptor]
-    func setToolEnabled(server: MCPServerID, tool: String, enabled: Bool)
+    func setToolEnabled(_ enabled: Bool, server: MCPServerID, tool: String)
     // Per-server trust and approval ([Tool authorization](sdk-guide.md#tool-authorization-two-levers--which-tools-and-whether-they-ask-first), new in 2.0).
     // Kept across reconnects, cleared by removeServer; not persisted — save the state's trust / toolApproval and set them again after restore.
     func setTrust(_ trust: MCPServerTrust, server: MCPServerID)                // .trusted ⇒ its annotations set each tool's impact
     func setToolApproval(_ approval: ToolApproval?, server: MCPServerID)       // nil ⇒ ToolApproval.default(for: trust)
+    func setToolApproval(_ approval: ToolApproval?, server: MCPServerID, tool: String)  // one tool, over the server's approval; nil ⇒ the server's
     func toolApproval(server: MCPServerID) -> ToolApproval                     // the effective approval, read on every call
     // -> MCPToolResult ([MCP tool results](mcp-guide.md#what-a-tool-call-gives-you-back-mcptoolresult)), not a String. A tool that ran but failed is .success with isError == true.
     // allowElicitation: false on a code path that can't show a prompt (headless / background).
@@ -1128,7 +1135,7 @@ struct MCPServerState: Codable, Sendable {
     var trust: MCPServerTrust                             // setTrust (default .untrusted)
     var toolApproval: ToolApproval?                       // setToolApproval's value; nil = default for the trust level
     var trustedToolsDigest: String?                       // the tool list when last trusted
-    var toolsChangedSinceTrusted: Bool { get }            // a trusted, connected server whose tools changed — show it for review
+    var pendingDrift: ToolDrift?                          // tool changes since the accepted list that the drift policy didn't accept — show for review, then acceptDrift(server:)
     func exportSummary() -> String      // plain-text listing of tools/resources/prompts, enabled state, token cost
 }
 

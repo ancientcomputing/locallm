@@ -2518,7 +2518,7 @@ final class AppModel {
                                        authType: auth.type, patToken: auth.token) {
         case .success(let state):
             for tool in todoistTools where state.tools.contains(where: { $0.name == tool }) {
-                lab.mcp.setToolEnabled(server: state.id, tool: tool, enabled: true)   // ← SDK
+                lab.mcp.setToolEnabled(true, server: state.id, tool: tool)   // ← SDK
             }
         case .failure(let error): appendSetup("Couldn't connect Todoist MCP: \(error)…")
         }
@@ -3138,10 +3138,8 @@ final class AppModel {
     }
 
     private func reconnectTavily(shape: PersistedTavilyServer) async {
-        lab.mcp.restore(from: [(                                      // ← SDK — no network, no key prompt
-            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName,
-            tools: [], estimatedTokens: shape.estimatedTokens, enabled: true,
-            authType: .pat, manualClientID: nil, resources: []
+        lab.mcp.restore(from: [MCPServerSnapshot(                     // ← SDK — no network, no key prompt
+            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName, authType: .pat
         )])
         let result = await lab.mcp.reconnect(tavilyServerID)          // ← SDK — pulls the key from the Keychain
         // …

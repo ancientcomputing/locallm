@@ -671,7 +671,15 @@ Without `dynamicTools:` a session is static, as in 2.x: it offers the tools you 
   answers that it is gone; a tool that fails three times is stopped for the turn. `ToolSelectionExplanation` says what
   was chosen and why, and `suggested` names a held-back server worth offering after the reply.
 - **The model is told what is missing** (`DynamicTools.missingToolGuidance`, `heldBackNote`), so it says so instead of
-  guessing.
+  guessing. With `requestsTools` on (the default in `ChatSetup`), each turn also offers `requestTools`; and a reply that
+  says a tool is missing, when the model didn't call it, makes the session ask for that tool and run the turn again
+  with what it finds (once a turn).
+- **A server named in the user's custom instructions is offered on every message.** The picker reads only the
+  message, so "Use exa to search the web" in a chat's custom instructions would otherwise be forgotten on a message
+  that doesn't mention it. Set `LocalLMLabSession.standingInstructions` (or `ChatSetup.standingInstructions`) to a
+  closure that returns those instructions: a server they name is offered whatever the message says, whole if it has at
+  most `ToolMatchingOptions.wholeNamedServerLimit` (12) tools, otherwise as if the message had named it. The
+  explanation's reason is `.namedInInstructions`; `offersServersNamedInInstructions = false` turns it off.
 - **A tool reaches the model as `<prefix>_<tool>`** (`github_list_issues`), so two servers never clash.
   `MCPServerManager.snapshot()` and `restore(from:)` keep the cached tools, trust, approvals and the accepted list across a relaunch.
 - In the Tool Sources sheet and `MCPServerPickerView`, `toolsMode: .dynamic` shows servers as available; the tool
@@ -1288,13 +1296,13 @@ let session = try lab.makeSession(
 | Server | **Trust** — `setTrust(_:server:)` | `.untrusted` (default) · `.trusted` | Whether the server's own labels (`readOnlyHint`, `destructiveHint`) are believed. Untrusted: every tool counts as one that may change data (`.mutate`). |
 | Server | **Approval** — `setToolApproval(_:server:)` | `.allow` — nothing asks<br>`.ask(atOrAbove: .mutate, …)` — reads run, changes and deletions ask<br>`.ask(atOrAbove: .destructive, …)` — only deletions ask<br>`.ask(atOrAbove: .read, …)` — every call asks<br>`nil` — the default for the trust level: untrusted asks before changes, trusted before deletions | Which calls need authorization before they run. |
 | Server | ↳ **who answers** an ask — the `by:` of `.ask` | `.user` — the confirmation channel · `.policy` — your `ToolPolicy` (allow / deny / ask the user) | Who authorizes the calls that need it. |
-| Tool | **On / Off** — `setToolEnabled(server:tool:enabled:)` | on · off (new tools start off in a static session; with `dynamicTools:` all are available) | Whether the model is offered the tool at all. |
-| Tool | **Approval** — *a later release* | its own `.allow` / `.ask`, overriding the server's | e.g. allow `find-tasks` on an untrusted server, or always ask before `delete-object` on a trusted one. |
+| Tool | **On / Off** — `setToolEnabled(_:server:tool:)` | on · off (new tools start off in a static session; with `dynamicTools:` all are available) | Whether the model is offered the tool at all. |
+| Tool | **Approval** — `setToolApproval(_:server:tool:)` | its own `.allow` / `.ask`, overriding the server's; `nil` goes back to the server's | e.g. allow `find-tasks` on an untrusted server, or always ask before `delete-object` on a trusted one. |
 
 - **Trust is only ever yours or the user's to give** — never anything the server says.
-  `MCPServerState.toolsChangedSinceTrusted` turns true when a trusted server's tools change, so
-  the user can review and re-confirm (`setTrust(.trusted, …)` again); trust isn't dropped
-  automatically.
+  When a server's tools change against the list the user accepted, trusted or not, the changes the
+  drift policy doesn't accept wait in `MCPServerState.pendingDrift` and the changed tools are held;
+  the user reviews them and the app calls `acceptDrift(server:)`. Trust isn't dropped automatically.
 - **The policy** (`ToolPolicy`) is your external authorization function — a policy service, an
   IT rule set, a rule over the arguments. It returns `.allow`, `.deny(reason:)` or `.askUser`.
   Use it for anything the per-server settings can't say (a per-tool allow list, a

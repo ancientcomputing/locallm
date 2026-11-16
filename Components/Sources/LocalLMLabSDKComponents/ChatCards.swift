@@ -183,8 +183,7 @@ public struct ToolChangesCardView: View {
             ForEach(Array(drift.changes.enumerated()), id: \.offset) { _, change in
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(change.kind.rawValue).font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text(change.tool.map { "\($0): " } ?? "").font(.caption.monospaced())
-                        + Text(change.detail).font(.caption)
+                    Text("\(Text(change.tool.map { "\($0): " } ?? "").font(.caption.monospaced()))\(Text(change.detail).font(.caption))")
                 }
             }
         }

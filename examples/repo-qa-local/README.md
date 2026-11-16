@@ -166,7 +166,7 @@ differences:
 | `SystemLanguageModel.default` availability check | `MLXModelProvider` + `LocalLMLab` + `lab.models.route(.local, to: …)` |
 | — | `mlx.validate` → `mlx.download` (streamed) if the weights aren't local yet |
 | `let manager = MCPServerManager()` → `manager.addServer(…)` | `lab.mcp.addServer(…)` — the lab's manager; never a second one |
-| an `MCPTool(descriptor:manager:)` per tool | `lab.mcp.setToolEnabled(server:tool:enabled: true)` per tool — a new server's tools start **disabled** (security default), so without this the model gets no tools |
+| an `MCPTool(descriptor:manager:)` per tool | `lab.mcp.setToolEnabled(true, server:tool:)` per tool — a new server's tools start **disabled** (security default), so without this the model gets no tools |
 | `LanguageModelSession(tools: tools) { instructions }` | `lab.makeSession(route: .local, instructions:, includeMCPTools: true)` — builds the `MCPTool`s from `lab.mcp`'s enabled tools |
 | `session.respond(to:)` (a `LanguageModelSession`) | `session.respond(to:)` (a `LocalLMLabSession`) — same FoundationModels session underneath, plus the SDK's context-overflow retry and per-turn MCP tool refresh |
 

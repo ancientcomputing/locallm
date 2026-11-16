@@ -140,7 +140,7 @@ final class AppModel {
                                        authType: auth.type, patToken: auth.token) {
         case .success(let state):
             for tool in todoistTools where state.tools.contains(where: { $0.name == tool }) {
-                lab.mcp.setToolEnabled(server: state.id, tool: tool, enabled: true)
+                lab.mcp.setToolEnabled(true, server: state.id, tool: tool)
             }
             let missing = todoistTools.filter { name in !state.tools.contains { $0.name == name } }
             if !missing.isEmpty { appendSetup("Todoist server is missing expected tools: \(missing.joined(separator: ", "))") }

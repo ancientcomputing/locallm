@@ -199,10 +199,8 @@ final class AppModel {
     }
 
     private func reconnectTavily(shape: PersistedTavilyServer) async {
-        lab.mcp.restore(from: [(
-            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName,
-            tools: [], estimatedTokens: shape.estimatedTokens, enabled: true,
-            authType: .pat, manualClientID: nil, resources: []
+        lab.mcp.restore(from: [MCPServerSnapshot(
+            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName, authType: .pat
         )])
         let result = await lab.mcp.reconnect(tavilyServerID)
         if case .success = result {
