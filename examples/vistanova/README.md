@@ -2,6 +2,10 @@
 
 *The new AltaVista. A brighter web ahead.*
 
+> VistaNova has its own project: **[github.com/ancientcomputing/vistanova](https://github.com/ancientcomputing/vistanova)**,
+> with its releases (a downloadable DMG) and the `WebSearch` command-line tool. This folder is the copy kept here as
+> an SDK example, built against this SDK release.
+
 A tiny local-first search engine, built on the [LocalLM Lab SDK](../../README.md). Give it a topic,
 get back 5 web pages about it, and refine it yourself — no AI guessing at your intent. As an SDK
 example it shows how to build something useful with **local models and an MCP client**: web search
