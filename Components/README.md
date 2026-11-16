@@ -52,7 +52,7 @@ controls under a reply, the app's own cards, and the inline widget for an MCP Ap
 | `Markdown.swift` | **`MarkdownView`** — a chat reply's Markdown, block by block: headings, lists, quotes, fenced code with Copy (`MarkdownCodeBlock`), pipe tables (`MarkdownTableBlock`); inline syntax through `AttributedString`. `MarkdownParser`, `MarkdownBlock`, `MarkdownStyle`. Streaming text re-parses on each update. |
 
 The shape of a chat window, from a reference chat app built on these (the app supplies the controller, its
-status row and its own settings):
+status row and its own settings). `ChatTranscriptView` always takes the four slots below; the empty ones are `EmptyView()`:
 
 ```swift
 NavigationSplitView {
@@ -62,13 +62,21 @@ NavigationSplitView {
     VStack(spacing: 0) {
         ChatTranscriptView(controller: controller, toolDetail: .plain,
                            addWorkspace: { addWorkspace(from: $0, path: $1, access: $2) }) {
-            ChatStarterView(message: "Ask anything.", suggestions: [...]) { send($0, attachments: []) }
-        } replyExtras: { _ in EmptyView() }
+            ChatStarterView(message: "Ask anything.", suggestions: ["Summarize this PDF"]) { send($0, attachments: []) }
+        } replyExtras: { _ in
+            EmptyView()          // your own buttons under a reply
+        } widget: { _ in
+            EmptyView()          // a tool call's MCP App view: MCPAppWidgetSlot, from LocalLMLabSDKMCPAppsHost
+        } customCard: { _ in
+            EmptyView()          // a card of your own
+        }
         ChatComposer(controller: controller, isEnabled: hasModel,
                      send: { send($0, attachments: $1) }, addSource: { showAddSource() }) {
             EmptyView()          // a banner above the box
         } leading: {
-            EmptyView()          // the row under it: the model's name, status lights
+            EmptyView()          // the left of the row under it: status lights
+        } modelLabel: {
+            ChatModelLabel("Qwen3 8B")   // the model's name, under the box
         }
     }
 }
