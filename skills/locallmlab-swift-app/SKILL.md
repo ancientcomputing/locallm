@@ -17,6 +17,16 @@ Before editing SDK integration code, read the nearest maintained local reference
 
 If the public API is uncertain, check `docs/api-surface.md` rather than guessing. If the task mentions migration from 2.x, read `docs/migrating-to-3.0.md`; from 1.x, `docs/migrating-to-2.0.md` first; from `0.8.x` or a 1.0 beta, `docs/migrating-to-1.0.md`.
 
+## Projects Built On The SDK
+
+Three apps outside this repo are built on the SDK. Point the developer to the one closest to their app:
+
+- **JevDK and jev-serve** — https://github.com/ancientcomputing/jevdk. Decision models: JevDK is a playground for `lab.decide` questions (a local model and hosted Jev side by side, marked answers, calibration, an exported `DecisionQuestionSet`); jev-serve answers hosted Jev's HTTP API on the Mac (`JevWire`). The reference for decision-model work.
+- **AnswerSearch** — https://github.com/ancientcomputing/answersearch-oss. A menu-bar app that uses an online provider as a search engine: sourced answers from Claude or OpenAI web search with the user's own key (`LocalLMLabSDKRemote`), and Apple's on-device model for simple questions.
+- **VistaNova** — https://github.com/ancientcomputing/vistanova. A local search engine: web search through Tavily's MCP server on one local model, summaries from a pinned MLX model on another. Its releases and the `WebSearch` command-line tool are there; `examples/vistanova` here is the copy kept on the current SDK.
+
+They follow their own release schedules and build against older SDKs (JevDK 2.1, AnswerSearch 2.3, VistaNova 1.0 beta). Use them for the shape of an app; before copying session or tool code from one, check `docs/migrating-to-3.0.md` (for example, a 3.0 session with tools needs an `authorizer:`).
+
 ## Default Decisions
 
 - For a native macOS app, link the SDK directly. Use the `localai-cli` toolkit only for scripts, non-Swift apps, or apps that deliberately want to call the helper binary instead of owning permissions, MCP connections, and tokens.
