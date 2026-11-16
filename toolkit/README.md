@@ -16,24 +16,24 @@ Starting with `1.0.0-beta.4`, the toolkit is shipped as
 release assets on
 **[github.com/ancientcomputing/locallm](https://github.com/ancientcomputing/locallm/releases)**,
 alongside the LocalLM Lab app DMG and the SDK xcframeworks.
-Latest (`2.3.0-GA`):
+Latest (`3.0.0-GA`):
 
 ```bash
-curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/localai-toolkit-2.3.0-GA-arm64.zip
-curl -LO https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/localai-toolkit-2.3.0-GA-arm64.zip.sha256
+curl -LO https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/localai-toolkit-3.0.0-GA-arm64.zip
+curl -LO https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/localai-toolkit-3.0.0-GA-arm64.zip.sha256
 ```
 
 
 ## Verify
 
 ```bash
-shasum -a 256 -c localai-toolkit-2.3.0-GA-arm64.zip.sha256
+shasum -a 256 -c localai-toolkit-3.0.0-GA-arm64.zip.sha256
 ```
 
 ## Install
 
 ```bash
-unzip localai-toolkit-2.3.0-GA-arm64.zip
+unzip localai-toolkit-3.0.0-GA-arm64.zip
 ```
 
 This produces `localai-cli`, `localai-playground-run` (macOS 27),
@@ -51,3 +51,9 @@ which LocalLM Lab writes from its **Connectors**, **MCP Servers**, and
 **AI Models** screens. LocalLM Lab must be **running** for `localai-cli` calls
 to work — connector and MCP calls execute inside the app's own process, reached
 over a local socket. See the examples folders above for setup and sample calls.
+
+Which tool calls run is set in LocalLM Lab's **Security** panel: **API Lab: tool access** applies to
+`localai-cli` (both `--run` and `--chat`), since a script has no window to confirm a call in. At
+**Reads only**, every MCP tool call is refused. See
+[Which calls run](../examples/localai-cli/README.md#which-calls-run-locallm-labs-security-settings).
+3.0.0-GA toolkit downloads from before November 16, 2026 ignore that setting; download it again.

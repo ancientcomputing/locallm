@@ -64,6 +64,26 @@ for that one call, via `connectors` and `mcp_tools` fields:
   a deliberate least-privilege default. Every tool a call can use must be
   listed explicitly in that call's own request.
 
+### Which calls run: LocalLM Lab's Security settings
+
+A script has no window to answer "Allow this tool call?" in, so `localai-cli` calls follow the
+**API Lab: tool access** setting in LocalLM Lab's **Security** panel, for both `--run` and `--chat`:
+
+| Tool access | What runs |
+|---|---|
+| **Everything** (the default) | every tool the request names |
+| **Reads and changes** | everything except tools that delete (MCP tool calls count as changes, so they run) |
+| **Reads only** | connector reads only. Every MCP tool call is refused: an MCP tool can't be shown to only read, so it counts as a change |
+
+Each connector's own level in the Security panel (Read-only, Changes, Full) also applies. A server's
+"Confirm each tool call" is a Prompt Playground setting and doesn't apply here: there is no one to ask.
+
+A refused call doesn't fail the request. The model is told `DENIED: …` and answers without that tool;
+with `--run`, the refusal is in that call's `output` in `tool_calls`.
+
+3.0.0-GA toolkit downloads from before November 16, 2026 ignore this setting and run every call as if it
+were **Everything**. Download the toolkit again from the 3.0.0-GA release.
+
 ## The example scripts
 
 These aren't a product. Each `.swift` file is a **worked example of one way

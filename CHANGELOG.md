@@ -24,7 +24,7 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
-## 3.0.0 — GA — 2026-11-09
+## 3.0.0 — GA — 2026-11-09 (binaries re-published 2026-11-14 and 2026-11-15)
 
 A major release. Four things change how an app uses the SDK:
 
@@ -178,6 +178,12 @@ sent as an object.
   Hadamard-rotated basis, with the activations rotated using stock MLX ops. `prism-ml/Ternary-Bonsai-2-27B-mlx-2bit`
   (8.6 GB) passes `capabilityProbe` and the prompt-cache self-test. Text only.
 - Apple's model-service failures read in plain words, name the app's model, and a failed turn is marked unanswered.
+- **Examples say how tool calls are decided.** Every example whose tools write, or call an MCP server's tools,
+  passes an authorizer, since a 3.0 session without one refuses those calls: `AllowingToolAuthorizer()` in
+  `code-buddy`, `repo-qa-local` and `aiql`; a `ConfirmingToolAuthorizer` in `workspace-buddy-local` (an alert before
+  writes and edits), `security-demo`, `mcp-chat` and `vistanova` (a policy that allows only `tavily_search`). The
+  [annotated examples](docs/annotated-examples.md) list them. JevDK and jev-serve are their own project
+  ([ancientcomputing/jevdk](https://github.com/ancientcomputing/jevdk)); their folders here point to it.
 - `JevWire`'s response extensions are `fidelity` (`native`, `tokenScored`, `generated`), `calibrated`, and a refusal
   marker `{"type":"refusal"}`.
 
