@@ -201,8 +201,8 @@ and checksum strings in place.
 
 **`artifact of binary target 'LocalLMLabSDKCore' has changed checksum`**, or in Xcode
 **`Missing package product 'LocalLMLabSDKCore' / 'LocalLMLabSDKRemote' / 'LocalLMLabSDKComponents'`**
-— same cause: you built this example once against an *earlier* cut of the same version tag (during
-a pre-release beta, a `vX.Y.Z` release asset can be re-uploaded with new bytes), and SwiftPM /
+— same cause: you built this example once against an *earlier* cut of the same version tag (a
+`vX.Y.Z` release asset can be re-uploaded with new bytes; 3.0.0-GA's were, last on 2026-11-16), and SwiftPM /
 Xcode won't silently swap the cached artifact for one with a different checksum — so the download
 is refused and the products it would have provided go "missing". The manifest is correct; the
 stale copy is local.
