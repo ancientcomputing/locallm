@@ -42,7 +42,7 @@ public enum MCPAppsDecision: Sendable, Equatable {
 ///
 /// Defaults are closed except for tool calls the spec already scopes to app-visible tools of the
 /// bound server: `ui/message`, `ui/update-model-context`, `ui/open-link` and non-`ui://` resource
-/// reads are DENIED unless the host opts in. A host with no model in the loop simply keeps the
+/// reads are DENIED unless the host opts in. Shape A (no model in the loop) simply keeps the
 /// defaults.
 @MainActor
 public protocol MCPAppsBridgePolicy {

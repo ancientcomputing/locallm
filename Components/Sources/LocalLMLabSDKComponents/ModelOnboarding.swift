@@ -238,21 +238,26 @@ public final class ModelOnboardingModel {
 public struct ModelOnboardingView: View {
     private let model: ModelOnboardingModel
     private let showsDownloadProgress: Bool
+    private let showsCancel: Bool
     private let onFinished: (([InstalledModel]) -> Void)?
     private let onDismiss: (() -> Void)?
 
     /// - Parameters:
     ///   - showsDownloadProgress: `false` when another view already shows the download's progress
     ///     (as `ModelPickerView` does), so it isn't drawn twice.
+    ///   - showsCancel: `false` hides the **Cancel** button while the flow runs, for a host that offers its own
+    ///     way to stop (and decides what stopping means, e.g. confirming first). It can stop the flow with
+    ///     `model.cancel()`.
     ///   - onFinished: called with the completed models when the user presses Done.
     ///   - onDismiss: when set, a **Dismiss** button is offered after a failure so the host can clear the
     ///     flow and return to its resting state.
     public init(
-        model: ModelOnboardingModel, showsDownloadProgress: Bool = true,
+        model: ModelOnboardingModel, showsDownloadProgress: Bool = true, showsCancel: Bool = true,
         onFinished: (([InstalledModel]) -> Void)? = nil, onDismiss: (() -> Void)? = nil
     ) {
         self.model = model
         self.showsDownloadProgress = showsDownloadProgress
+        self.showsCancel = showsCancel
         self.onFinished = onFinished
         self.onDismiss = onDismiss
     }
@@ -292,7 +297,7 @@ public struct ModelOnboardingView: View {
     private var controls: some View {
         HStack {
             if model.isRunning {
-                Button("Cancel") { model.cancel() }
+                if showsCancel { Button("Cancel") { model.cancel() } }
             } else if model.isFinished {
                 Button("Done") { onFinished?(model.completed) }
                     .keyboardShortcut(.defaultAction)

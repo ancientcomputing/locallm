@@ -194,7 +194,7 @@ public final class MCPAppViewController: NSObject, ObservableObject {
     ///
     /// Closing a widget means `close()` **and releasing** this controller and its `webView`: the
     /// widget's WebContent process (~100 MB) ends only when the web view is deallocated, not when
-    /// `close()` returns (measured). `MCPAppViewPool` does both.
+    /// `close()` returns (prototype P2). `MCPAppViewPool` does both.
     public func close() async {
         guard !closed else { return }
         closed = true

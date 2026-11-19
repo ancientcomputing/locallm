@@ -15,7 +15,7 @@ and only the answer's shape (column names, row count) comes back. So the model c
 invent a single value.
 
 This is the SwiftUI counterpart to the pipeline in
-[`docs/sdk-guide.md` §8b](../../docs/sdk-guide.md).
+[`sdk-guide.md`, "`FileBackedTool` + the AIQL data verbs"](../../docs/sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline).
 
 ## What Go does
 
@@ -77,7 +77,7 @@ Three existing examples stitched together, plus the SQL tools:
 | [`workspace-buddy-local`](../workspace-buddy-local) | SwiftUI + App Sandbox + `MLXModelProvider` download + `NSOpenPanel` folder picker + security-scoped bookmark |
 | [`plate-today`](../plate-today) | the MCP client + the OAuth redirect wired through `AppDelegate` (not SwiftUI's `.onOpenURL`) + `CFBundleURLTypes`. AIQL uses `LocalLMLab`, so its server goes into `lab.mcp`, the lab's manager — never an `MCPServerManager` of its own |
 | [`repo-qa`](../repo-qa) | tools built from a live MCP schema — here by `makeSession` from `lab.mcp`: `setToolEnabled` for the chosen data tools (a new server's tools start disabled), and `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)` so each one is offered as a `FileBackedTool` with `saveAs` |
-| SDK §8b | `loadTable` + `sqlQuery` — JSON records → an ephemeral SQLite table → one read-only `SELECT` → CSV. `describeJson` / `csvInfo` for discovery/verification |
+| [SDK guide, "`FileBackedTool` + the AIQL data verbs"](../../docs/sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline) | `loadTable` + `sqlQuery` — JSON records → an ephemeral SQLite table → one read-only `SELECT` → CSV. `describeJson` / `csvInfo` for discovery/verification |
 
 Other things worth a look in `Sources/AIQL/AIQLApp.swift`:
 
@@ -103,7 +103,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 Skip it if `xcode-select -p` already points at Xcode 27 (adjust the path if yours lives elsewhere). Leaves your system default alone; lasts only for the current terminal (re-run it in each new one,
-or add it to your `~/.zshrc`). `Package.swift` builds against SDK `2.3.1-GA` with no further
+or add it to your `~/.zshrc`). `Package.swift` builds against SDK `3.0.0-GA` with no further
 setup (AIQL needs it: it uses `lab.mcp.setFileBackedOutput`, new in 2.0) — it links **two** binaries, `LocalLMLabSDKCore.xcframework` and
 `LocalLMLabSDKInference.xcframework` (the MLX runtime), from that one GitHub Release.
 `export LOCALLM_SDK_VERSION=<version>` to pin a different published release. **No Metal Toolchain
@@ -340,7 +340,7 @@ time. Instead: a **trust policy** (`MlxCommunityOnly` in `AIQLApp.swift`) refuse
 first download (stored outside the model cache), so re-downloading later gets the same bytes, not
 whatever the repo's `main` has become. The progress panel shows which version you got. To allow
 other publishers, edit the policy — each one is a party whose uploads your users will run.
-Background: [Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+Background: [Pinning, updating and cleaning up model versions](../../docs/local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions).
 
 Any `mlx-community/` MLX-format Hugging Face repo id works in the field. Avoid `mlx-community/gemma-3-12b-it-4bit`
 and its `qat` sibling — their shipped `model.safetensors.index.json` disagrees with the actual
@@ -350,12 +350,12 @@ The model field and the download progress panel here are hand-built (the panel i
 `session.events`). For a settings-screen version of the same thing — a model list with
 availability badges, on-disk sizes, and an "Add from Hugging Face" field — use `Components`'
 `ModelPickerView`; see
-[`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+[`docs/sdk-guide.md`, "Components"](../../docs/sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer).
 
 ## More
 
-- [`docs/sdk-guide.md` §8b](../../docs/sdk-guide.md) — `loadTable` + `sqlQuery` and the "AIQL"
-  data verbs, in prose. §6a — the model layer. §8 — App Sandbox + the folder picker.
+- [`sdk-guide.md`, "`FileBackedTool` + the AIQL data verbs"](../../docs/sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline) — `loadTable` + `sqlQuery` and the "AIQL"
+  data verbs, in prose. Also: [the model layer](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions); [App Sandbox](../../docs/sdk-guide.md#app-sandbox--building-for-the-mac-app-store); [Filesystem access](../../docs/sdk-guide.md#filesystem-access-security-scoped-bookmarks-example-not-in-core) (the folder picker).
 - [`workspace-buddy-local`](../workspace-buddy-local) — the sandbox + MLX + folder-picker base
   this builds on.
 - [`plate-today`](../plate-today) — the MCP + OAuth-redirect base.

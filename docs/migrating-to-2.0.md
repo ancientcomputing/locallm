@@ -1,4 +1,4 @@
-# Migrating to the LocalLM Lab SDK 2.0
+# Migrating to the LocalLM SDK 2.0
 
 2.0 is a **one-time breaking release**: every 2.x release after it is source compatible with
 `2.0.0`, additive changes only until 3.0. It breaks for two reasons. Several APIs had grown a
@@ -12,7 +12,7 @@ Most apps change little. The usual `makeSession`, `respond`, `LocalLMLab.Configu
 ## 1. Platform: unchanged
 
 `platforms: [.macOS("26.0")]`, Xcode 27 to build, macOS-27-only providers behind
-`if #available(macOS 27, *)` — as in 1.0 ([`sdk-guide.md` §1a](sdk-guide.md)).
+`if #available(macOS 27, *)` — as in 1.0 ([`sdk-guide.md`, "Targeting macOS 26 and 27"](sdk-guide.md)).
 
 ## 2. Point your manifest at the new release
 
@@ -47,7 +47,7 @@ difference for trusted servers — see §5. Save each server's `trust` and `tool
 server list (the manager doesn't persist them) and set them again after `restore(from:)`.
 `MCPServerState` gained fields, so a state JSON you encoded yourself under 1.0 won't decode;
 restore servers through `restore(from:)` instead. Full walkthrough:
-[`sdk-guide.md` §7c](sdk-guide.md).
+[`sdk-guide.md`, "Tool authorization"](sdk-guide.md).
 
 ## 4. New cases on two MCP enums
 
@@ -79,7 +79,7 @@ do {
 `SearchResult`: the hits are `.matches`, and `.skippedTooLarge` / `.scanBudgetExhausted` say what
 wasn't searched. If you only use the ready-made tools (`ReadWorkspaceFileTool`,
 `SearchWorkspaceTool`, …), nothing changes. Every operation and tool also takes an optional
-`limits: WorkspaceLimits` ([`sdk-guide.md` §8a](sdk-guide.md)).
+`limits: WorkspaceLimits` ([`sdk-guide.md`, "Workspace tools"](sdk-guide.md)).
 
 ## 5. What behaves differently
 
@@ -121,7 +121,7 @@ wasn't searched. If you only use the ready-made tools (`ReadWorkspaceFileTool`,
 ### MCP protocol
 
 The client now speaks MCP `2026-07-28` and falls back to the `2025` handshake on its own
-([`sdk-guide.md` §3a](sdk-guide.md#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care)).
+([`mcp-guide.md`, "MCP revisions"](mcp-guide.md#which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care)).
 Code needs no changes. What a user may notice:
 
 - **`2024-11-05` servers are refused.** `addServer` fails with `.protocolMismatch`, where 1.x
@@ -171,7 +171,7 @@ passed `restoring:` before `tools:`).
   calls that tool, sandboxed, with the view's own tool calls going through your authorizer.
   Declare support with `MCPSettings(handlers: MCPClientHandlers().advertisingMCPApps())`.
   Reference app: [`examples/mcp-chat`](../examples/mcp-chat/); walkthrough
-  [`sdk-guide.md` §3f](sdk-guide.md#3f-mcp-apps-showing-a-servers-interactive-views).
+  [`mcp-guide.md`, "MCP Apps"](mcp-guide.md#mcp-apps-showing-a-servers-interactive-views).
 - **Decision models (Jev).** `lab.decide(route:state:questions:)` asks typed questions (yes / no,
   one of several, a scale) and gets one allowed answer per question with probabilities, no text.
   The same call works with TypeSafe's Jev via OpenRouter and Featherless's Simple Jev
@@ -182,8 +182,8 @@ passed `restoring:` before `tools:`).
   CI. Decision routes are separate from chat routes and are saved by `lab.snapshot()`
   (`LocalLMLabState` gains `decisionRoutes`, defaulted, so existing call sites and saved snapshots
   are unaffected). Introduction: [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html);
-  API: [`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide); playground:
-  [`examples/jevdk`](../examples/jevdk/).
+  API: [`decision-models.md`, "Decision models"](decision-models.md); playground:
+  [JevDK](https://github.com/ancientcomputing/jevdk).
 - **Local (MLX) model usage, speed and memory per turn**: `MLXUsageMetadataKey` on the response's
   `usage.metadata` (tokens, pp / tg, model calls, MLX memory), and `MLXPrefillMonitor` for "what is the model
   reading right now" while nothing has appeared yet.
@@ -195,4 +195,4 @@ passed `restoring:` before `tools:`).
   server can push tool, prompt and resource list changes, and the client applies them without a
   reconnect (`MCPServerState.liveUpdates` shows the status). All automatic; older servers keep
   working through the `2025` handshake. See
-  [`sdk-guide.md` §3a](sdk-guide.md#3a-which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care).
+  [`mcp-guide.md`, "MCP revisions"](mcp-guide.md#which-mcp-revision-the-client-speaks--and-why-you-mostly-dont-have-to-care).

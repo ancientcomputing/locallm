@@ -68,3 +68,37 @@ private func call(_ name: String = "writeThing", impact: ToolImpact = .mutate) -
         Issue.record("an unanswered sheet should deny on timeout"); return
     }
 }
+
+/// The standard MCP note follows the call's impact, and a forced check offers neither Always Allow nor Trust.
+@available(macOS 26.0, *)
+@MainActor
+@Test func standardMCPExtrasMatchTheCall() {
+    let lab = LocalLMLab(configuration: .init(providers: []))
+    func server(_ name: String, trust: MCPServerTrust) -> MCPServerID {
+        let url = URL(string: "https://\(name.lowercased()).example/mcp")!
+        let id = MCPServerID(rawValue: url.absoluteString)
+        lab.mcp.restore(from: lab.mcp.snapshot() + [MCPServerSnapshot(
+            id: id, url: url, displayName: name, authType: .none, manualClientID: nil, enabled: true, tools: [],
+            trust: trust, toolApproval: nil, toolApprovals: [:], excludedTools: [])])
+        return id
+    }
+    let trusted = server("HuggingFace", trust: .trusted)
+    let untrusted = server("Orders", trust: .untrusted)
+    let presenter = ToolConfirmationPresenter()
+    presenter.useStandardMCPExtras(manager: lab.mcp, appName: "Test Chat")
+    func extras(_ id: MCPServerID, _ name: String, impact: ToolImpact, requiresUser: Bool = false) -> ToolConfirmationExtras {
+        presenter.extras!(PendingToolCall(toolName: "hf_fs", arguments: nil, argumentsDescription: "", origin: .mcp(server: id, displayName: name),
+                                          impact: impact, impactReason: requiresUser ? "Copied from a page." : nil, requiresUser: requiresUser))
+    }
+    // The screenshot's case: a read asked on a trusted server no longer says it "changes data".
+    #expect(extras(trusted, "HuggingFace", impact: .read).note == nil)
+    #expect(extras(trusted, "HuggingFace", impact: .mutate).note == "HuggingFace is trusted; its labels say hf_fs changes data.")
+    #expect(extras(trusted, "HuggingFace", impact: .destructive).note == "HuggingFace is trusted; its labels say hf_fs can delete.")
+    #expect(extras(trusted, "HuggingFace", impact: .read).alwaysAllow != nil)
+    for (id, name) in [(trusted, "HuggingFace"), (untrusted, "Orders")] {
+        let forced = extras(id, name, impact: .read, requiresUser: true)
+        #expect(forced.note == "This check asks every time, whatever \(name)'s trust or Always Allow says.")
+        #expect(forced.alwaysAllow == nil && forced.trust == nil)
+    }
+    #expect(extras(untrusted, "Orders", impact: .mutate).trust != nil)
+}

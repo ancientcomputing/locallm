@@ -24,7 +24,7 @@ struct SDKRelease {
 // strings in place. Needs a release that includes `MLXModelProvider(pinnedRevisions:)` and
 // `cancelDownload(_:)`: the checksums below are the 1.0.0-RC.1 binaries as re-published on
 // 2026-09-19. An RC.1 pulled earlier fails the checksum check — re-resolve packages.
-let defaultSDKVersion = "2.3.1-GA"
+let defaultSDKVersion = "3.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
     "2.3.0-GA": SDKRelease(
@@ -33,11 +33,11 @@ let knownSDKReleases: [String: SDKRelease] = [
         inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKInference-2.3.0-GA.xcframework.zip",
         inferenceChecksum: "63dc8bcba5e91e1324809ca412a23ebb0b9e04386361436eacc0be9fe6d4a8e0"
     ),
-    "2.3.1-GA": SDKRelease(
-        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip",
-        coreChecksum: "0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c",
-        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKInference-2.3.1-GA.xcframework.zip",
-        inferenceChecksum: "7663074fc31919ba2970c99d7835fbad93415370b29ad828a32def0db73c7e8e"
+    "3.0.0-GA": SDKRelease(
+        coreURL: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
+        coreChecksum: "2b286cfecae1f6596c64255d72550a30f6f3cfe8323e4aa2a5176a4275699451",
+        inferenceURL: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKInference-3.0.0-GA.xcframework.zip",
+        inferenceChecksum: "e89336700bba35a546967a66eb34e3fb59e44a8150758da44ec95a104047bd54"
     ),
 ]
 

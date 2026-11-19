@@ -1,6 +1,6 @@
 # Model Switch
 
-The reference app for [the SDK guide's §6b](../../docs/sdk-guide.md#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)
+The reference app for [the SDK's online providers guide](../../docs/remote-providers.md)
 — AnswerSearch-shaped. Add an online AI provider with an API key, tick web search, and switch
 freely between **every** configured model from one chat window and one `lab.makeSession` call site:
 

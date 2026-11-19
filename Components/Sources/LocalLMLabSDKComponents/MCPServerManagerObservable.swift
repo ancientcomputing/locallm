@@ -29,8 +29,21 @@ public final class MCPServerManagerObservable: ObservableObject {
         }
     }
 
+    /// Newest first, so a server just added is at the top, by the Add form; servers added before that was kept
+    /// (no `addedAt`) after them, by name. It was by name only, so a new server could land at the bottom (2026-10-31).
     public var sortedServers: [MCPServerState] {
-        servers.values.sorted { $0.displayName < $1.displayName }
+        Self.newestFirst(Array(servers.values))
+    }
+
+    static func newestFirst(_ servers: [MCPServerState]) -> [MCPServerState] {
+        servers.sorted { lhs, rhs in
+            switch (lhs.addedAt, rhs.addedAt) {
+            case let (l?, r?) where l != r: return l > r
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            }
+        }
     }
 }
 

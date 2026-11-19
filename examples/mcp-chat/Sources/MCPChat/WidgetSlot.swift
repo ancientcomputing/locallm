@@ -135,7 +135,10 @@ struct WidgetSlot: View {
             }
         }
 
-        let instance = record.id
+        // A changed widget is a new instance, so the authorizer asks it again.
+        let instance = MCPAppWidgetSlot.instanceID(record: record.id, widget: resource.sha256, bound: chat.widgetCache.sha256(forRecord: record.id))
+        chat.manager.audit.record(.widgetShown(instance: instance, server: server, sha256: resource.sha256,
+                                               changedSinceApproved: instance != record.id))
         let controller = pool.controller(for: instance) {
             var actions = MCPAppsHostActions.session(session, instance: instance, openLink: { NSWorkspace.shared.open($0) })
             // Route widget messages through the chat so the turn shows as running and is saved.

@@ -16,4 +16,4 @@ import LocalLMLabSDKCore
 //   render without it). ClaudeAuthField: API-key entry, value handed to the host, not persisted.
 //
 // Aggregate context-budget display (LocalLM Lab's own "Context budget" section, beyond the
-// per-server counts already shown here) isn't here yet — planned, not yet built.
+// per-server counts already shown here) isn't here yet.

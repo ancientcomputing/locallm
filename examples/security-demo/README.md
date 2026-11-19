@@ -88,7 +88,7 @@ gated.
 
 For tools that *are* in the session, "Confirm each" decides whether a call runs or asks first.
 The approval is set where the tools come from — per MCP server on `lab.mcp`, and for the app's
-own tools on the authorizer ([SDK guide §7c](../../docs/sdk-guide.md#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)):
+own tools on the authorizer ([the SDK guide ("Tool authorization", sdk-guide.md)](../../docs/sdk-guide.md#tool-authorization-two-levers--which-tools-and-whether-they-ask-first)):
 
 ```swift
 // Todoist (an MCP server): nil = the untrusted default, ask before each call; .allow = don't ask.
@@ -107,10 +107,11 @@ is on. Deny a card and
 the model gets `DENIED: not approved` back and continues — the turn doesn't crash. No answer
 within ~120s auto-denies (a forgotten sheet can't pin a turn open).
 
-With **every toggle off**, `makeSession` gets `authorizer: nil`. There is then no
-invocation gate at all: the model can call any tool that is in the session (the ones the
-level let through, plus the MCP tools), with whatever arguments it chooses, and every call
-runs immediately. No prompt, no denial. Same behaviour as a bare `LanguageModelSession`.
+With **every toggle off**, both approvals are `.allow`: the model can call any tool that is in
+the session (the ones the level let through, plus the MCP tools), with whatever arguments it
+chooses, and every call runs immediately. No prompt, no denial. The demo still passes the
+authorizer: since SDK 3.0, `authorizer: nil` is not "no gate" but fail-closed, so reads would
+run and every change, and every call to the untrusted Todoist server, would be denied.
 
 ### The SDK can't see inside an MCP tool
 

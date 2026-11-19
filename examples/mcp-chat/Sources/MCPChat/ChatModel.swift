@@ -337,57 +337,66 @@ final class ChatModel: ObservableObject {
 
     // MARK: servers (saved list; quiet reconnect)
 
+    /// The SDK's snapshot (cached tools with the user's on/off choices, trust, approvals, drift),
+    /// plus whether the server needed no credential when last connected.
     private struct SavedServer: Codable {
+        var snapshot: MCPServerSnapshot
+        var noAuth: Bool
+    }
+
+    /// The list saved before snapshots (servers.v1), read once to migrate.
+    private struct SavedServerV1: Codable {
         var url: URL
         var name: String
         var authType: MCPAuthType
         var manualClientID: String?
         var noAuth: Bool
-        /// The server's tools as last seen, with the user's on/off choice for each. New tools from
-        /// a server start off (the SDK's default); restoring these keeps the user's choices.
         var tools: [MCPToolDescriptor]?
-        /// The user's trust and tool approval for the server (server list). The manager doesn't
-        /// persist them; they are set again after restore.
         var trust: MCPServerTrust?
         var toolApproval: ToolApproval?
     }
 
-    private let savedServersKey = "servers.v1"
+    private let savedServersKey = "servers.v2"
+    private let savedServersV1Key = "servers.v1"
+
+    private func loadSavedServers() -> [SavedServer] {
+        if let data = UserDefaults.standard.data(forKey: savedServersKey),
+           let saved = try? JSONDecoder().decode([SavedServer].self, from: data) {
+            return saved
+        }
+        let v1 = (UserDefaults.standard.data(forKey: savedServersV1Key)
+            .flatMap { try? JSONDecoder().decode([SavedServerV1].self, from: $0) }) ?? []
+        return v1.map {
+            SavedServer(snapshot: MCPServerSnapshot(id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name,
+                                                    authType: $0.authType, manualClientID: $0.manualClientID, tools: $0.tools ?? [],
+                                                    trust: $0.trust ?? .untrusted, toolApproval: $0.toolApproval),
+                        noAuth: $0.noAuth)
+        }
+    }
 
     private func restoreServers() async {
-        let saved = (UserDefaults.standard.data(forKey: savedServersKey)
-            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
-        manager.restore(from: saved.map {
-            (id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name, tools: $0.tools ?? [], estimatedTokens: 0,
-             enabled: true, authType: $0.authType, manualClientID: $0.manualClientID, resources: [])
-        })
-        // Trust before reconnecting: trusting records the saved tool list, so a server whose tools
-        // changed while the app was closed shows "tools changed since trusted".
-        for server in saved {
-            let id = MCPServerID(rawValue: server.url.absoluteString)
-            if let trust = server.trust { manager.setTrust(trust, server: id) }
-            manager.setToolApproval(server.toolApproval, server: id)
-        }
+        let saved = loadSavedServers()
+        // Restored with trust and the list it trusted, so a server whose tools changed while the app
+        // was closed shows "tools changed since trusted" once reconnected.
+        manager.restore(from: saved.map(\.snapshot))
         // Only servers that need no sign-in, or have a stored credential, reconnect at launch: this
         // app never opens a browser unprompted.
-        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.url) != nil {
-            _ = await manager.reconnect(MCPServerID(rawValue: server.url.absoluteString))
+        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.snapshot.url) != nil {
+            _ = await manager.reconnect(server.snapshot.id)
         }
         servers.$servers.dropFirst().sink { [weak self] in self?.persist($0) }.store(in: &cancellables)
     }
 
     private func persist(_ states: [MCPServerID: MCPServerState]) {
-        let previous = (UserDefaults.standard.data(forKey: savedServersKey)
-            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
-        let saved = states.values.map { state in
-            SavedServer(url: state.url, name: state.displayName, authType: state.authType, manualClientID: state.manualClientID,
-                        noAuth: state.connectionStatus == .connected
-                            ? MCPCredentialProbe.storedKind(for: state.url) == nil
-                            : previous.first { $0.url == state.url }?.noAuth ?? false,
-                        tools: state.tools.isEmpty ? previous.first { $0.url == state.url }?.tools : state.tools,
-                        trust: state.trust, toolApproval: state.toolApproval)
+        let previous = loadSavedServers()
+        let saved = manager.snapshot().map { snapshot in
+            SavedServer(snapshot: snapshot,
+                        noAuth: states[snapshot.id]?.connectionStatus == .connected
+                            ? MCPCredentialProbe.storedKind(for: snapshot.url) == nil
+                            : previous.first { $0.snapshot.id == snapshot.id }?.noAuth ?? false)
         }
         if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data, forKey: savedServersKey) }
+        UserDefaults.standard.removeObject(forKey: savedServersV1Key)
     }
 
     /// The MCP tools the model is given on its next turn.

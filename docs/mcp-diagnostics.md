@@ -107,6 +107,21 @@ Where a credential has to be shown so two log lines can be matched up, only its 
 characters appear (`‹redacted:…abcd›`). The export is safe to paste into a ticket — but give it
 a glance before sending it on.
 
+**New in 3.0, the scrub is wider.** It also removes the value of any field or `key=value` pair named like a
+credential (`token`, `api_key`, `x-api-key`, `secret`, `password`, `credential`, `private_key`, `cookie`, `session`
+and a few more), wherever it appears: in a query string, a header line, a JSON object such as a tool call's
+arguments, or a local server's error output. It removes the value of an `Authorization` header (`Basic`, `Digest`,
+`Token` or `Bearer`), and anything shaped like a known key (`sk-…`, `ghp_…`, a JSON Web Token). So logging a tool
+call's arguments at `debug` level can't carry a credential into the log. A tool's error is logged by its size, not by
+its text.
+
+### This is not the audit trail
+
+Diagnostics are for finding bugs. They are off-content and meant to be read by a developer, and a level below the
+current one is not recorded at all. If you need a record of what the AI did and who allowed it (each tool call, its
+decision and its outcome), use the audit stream, `lab.audit`: see
+[the security guide](security-guide-for-hosts.md#9-the-audit-stream).
+
 ## What each category logs
 
 | Category | What you'll find there |

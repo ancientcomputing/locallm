@@ -1,4 +1,4 @@
-# Changelog — LocalLM Lab SDK
+# Changelog — LocalLM SDK
 
 This tracks the **public SDK surface** (`LocalLMLabSDKCore`, `LocalLMLabSDKClaude`,
 `LocalLMLabSDKInference`, `LocalLMLabSDKRemote`, `LocalLMLabSDKComponents`) as consumed from
@@ -9,7 +9,7 @@ not here.
 **As of `1.0.0-beta.2`, the whole SDK builds for macOS 26** — the model layer works on
 macOS 26 with `SystemModelProvider` only; Private Cloud Compute / Claude / open-weight (MLX)
 models still need macOS 27. See the `1.0.0-beta.2` notes below and
-[`docs/sdk-guide.md` §1a](docs/sdk-guide.md).
+[`docs/sdk-guide.md`, "Targeting macOS 26 and 27"](docs/sdk-guide.md).
 
 **Compatibility policy from `1.0.0-RC.1` onward:** every release after RC.1 — later release candidates,
 `1.0.0` GA, and all 1.x minors — is **source compatible**: code that builds against RC.1 keeps building
@@ -24,30 +24,201 @@ recompiling. A breaking change waits for 2.0. (Before RC.1, `1.0.0-beta.N` and e
 beta.4 → RC.1 changes that can break a build are listed under *Changed — breaking (pre-GA)* in the
 RC.1 entry, and each entry's own "Beta caveats" apply to the betas.)
 
-## 2.3.1 — GA — 2026-11-10
+## 3.0.0 — GA — 2026-11-09 (binaries re-published 2026-11-14, 2026-11-15 and 2026-11-16)
 
-Fixes Private Cloud Compute (PCC) turns that stall. No API change: code that builds against 2.3.0
-builds unchanged. Only `LocalLMLabSDKCore` has a source change; `LocalLMLabSDKClaude`,
-`LocalLMLabSDKInference` and `LocalLMLabSDKRemote` are rebuilt for the version number only.
+A major release. Four things change how an app uses the SDK:
 
-### Fixed
+- **Dynamic tools.** Tools are *available*, not *attached*: an app makes plug-ins, MCP servers, commands and
+  workspaces available, and a small decider picks the few each message needs. A service is contacted only when one
+  of its tools is called. A chat can have hundreds of tools available and send a local model three.
+- **A prompt cache on by default** for local (MLX) models, with an optional encrypted disk tier.
+- **A gate that is always there.** Every tool call passes through a `ToolCallAuthorizer`. A session built without
+  one is now fail-closed, and the SDK ships injection defences, a sandbox for programs and an audit stream.
+- **Downloading is its own step.** Loading a model reads only the disk.
 
-- **A new PCC session is no longer prewarmed.** `makeSession` prewarmed every session, and for PCC
-  the prewarm is a server request of its own, sent the moment the session is made. On macOS 27.2
-  the server often generates a few hundred tokens for it anyway and rejects them (a recitation
-  rejection, `ModelManagerServices.InferenceError` 2008). A turn started on the same session at the
-  same time then stalled for about 30 seconds and ended with no text and no error. An app that
-  makes a session and sends at once hit it, even for a prompt like "2+2" with no tools; one that
-  makes its session earlier (when a chat opens, say) usually didn't. The model runs in Apple's
-  cloud, so there is nothing local to warm. Sessions for other providers are prewarmed as before.
+3.0 also folds in everything from 2.2.0, 2.3.0 and the unreleased 2.4.0 line (see the last section).
+
+**A new name:** from 3.0 the SDK is the **LocalLM SDK** (it was the LocalLM Lab SDK; LocalLM Lab is the Mac app). The
+modules, products, release files and API keep their names, so nothing in your code changes. Entries below 3.0 keep
+the old name.
+
+### Changed — breaking
+
+Code that builds against 2.3.0 may need edits for these.
+
+- **A session with no authorizer is fail-closed.** `makeSession(route:…)`'s `authorizer:` still defaults to `nil`,
+  but `nil` now means `FailClosedToolAuthorizer`: calls rated `.read` run, and anything that may change data or send
+  it out is denied with a result that says so. In 2.3 a session with no authorizer ran every call unasked. For the
+  old behavior, say so with `AllowingToolAuthorizer()` (a batch job, an eval); for an app with a UI, pass a
+  `ConfirmingToolAuthorizer`. An unrated tool counts as `.mutate`.
+- **Loading never downloads.** A session, `capabilityProbe`, `prewarm`, the prompt-cache self-test, a paired speed
+  helper or a paired adapter on a repo that isn't downloaded (at its pinned revision, if pinned) fails with
+  `.modelUnavailable(reason:)`. Call `download(_:)` first; check `availability`, size and `validate` before you do.
+  Because loading no longer touches the network, some things moved from load time to download time:
+  - The trust policy applies at download. A downloaded model, helper or adapter keeps loading after the policy
+    changes; revoke one with `remove(_:)` or `pairDraftModel(nil, with:)` / `pairAdapter(nil, with:)`. Sessions no
+    longer throw `.validation(stage: .trustPolicy, …)`.
+  - An unpinned model no longer updates itself on load. It stays at the snapshot `main` named at its last download
+    until you call `download` again. Pin a revision (`pinnedRevisions`) to control updates.
+  - A file deleted or corrupted inside a downloaded model fails the load; it is not re-fetched. Remove the model and
+    download it again.
+  - A speed helper that isn't downloaded fails the session instead of running without it.
+- **`ToolImpact` encodes as its name.** It is still `Codable`, but writes `"read"`, `"mutate"` or `"destructive"`
+  instead of `0`, `1`, `2`. Saved numbers still decode. Code that reads the JSON itself, or compares the integer,
+  must read names.
+- **MCP tools reach the model under prefixed names**, `<prefix>_<tool>` (`github_list_issues`), with a header on
+  each description naming the service. `MCPToolNaming` derives the prefix from the server's domain, package or
+  display name; `MCPServerState.toolPrefix` and `setToolPrefix(_:server:)` change it. A tool's own name is kept in
+  refs, approvals and records. A host that matched the names the model sees, in tests or in saved transcripts,
+  must expect the prefix.
+- **Developer overrides are debug-only.** The `LOCALLMLAB_*` environment variables (`MLXDeveloperOverride`) are
+  compiled out of release builds.
+- **The prompt cache is on by default** for verified model families and for any model that passes its self-test
+  (memory only, within a budget sized to the Mac). Turn it off with `promptCache: .off`, or per session with
+  `bypassPromptCache`.
+- **A reply ends only once its generation has stopped.** Call `MLXModelProvider.stopGenerating()` and wait for it
+  before quitting mid-reply.
+- **Wording and ratings.** Several built-in tools changed their descriptions, argument names or ratings, which can
+  change what a model does with them: `writeFile` takes `contents`; `readImageText` is rated a read; a tool's
+  description is sent once; two tools never share a name.
+- **The connector stores are read-only** (binaries re-published 2026-11-16). `CalendarAccess.store`, `RemindersAccess.store` and `ContactsAccess.store`
+  can still be read, but only the SDK replaces them (after a fresh grant), so the ready-made tools and your code always
+  share one store.
+
+### Added
+
+**Dynamic tools** (`LocalLMLabSDKCore`)
+- `DynamicTools`, passed as `makeSession(lab:restoring:dynamicTools:)` or `makeSession(route:…, dynamicTools:)`. It
+  needs a picker, with no default: `DynamicTools.matching(_:)` over a `ToolMatcher`, or your own `ToolSelector`;
+  `ToolCatalog` (`lab.tools`), `ToolPlugin`, `PluginID`, `PluginPermission`, `CapabilityCard`, `ToolSource`,
+  `ToolSummary`, `SelectableTool`, `SelectableSource`, `ToolSelectionRequest`, `ToolSelection`, `ToolSelectors`.
+- Picking per message: `ToolMatcher`, `KeywordToolMatcher`, `DecisionToolMatcher`, `ToolMatchingOptions`,
+  `ToolScores`; `SystemDecisionProvider` and `SystemToolMatcher` run the picker on the on-device model.
+- Per-turn results: `ToolPreparation`, `ToolSelectionExplanation` (with `suggested`, for a held-back server worth
+  offering after the reply), `ToolGate`, `PermissionAsking`, `ToolHistory`, `TurnRoomReport`; `updateDynamicTools`,
+  `pinTools`, `carryOverTools`, and `DynamicTools.missingToolGuidance` / `heldBackNote` / `toolContext` so the model
+  is told what is missing instead of guessing.
+- Rules the picker follows: a stricter bar for adding tools mid-conversation; a server must be named before it's
+  added; unused guessed tools are dropped after six turns; a tool called earlier and no longer offered answers that
+  it's gone; a tool that fails three times is stopped for the turn; one ask per tool per turn.
+- `MCPServerSnapshot`: held tools and the user's settings survive a relaunch. `MCPInitialTools`,
+  `MCPToolNaming`, `MCPToolLabels`. An MCP server is contacted only when one of its tools is called.
+- `LocalLMLabError.isRejectedToolCall`; a rejected or undeclared call is retried once.
+
+**Built-in plug-ins** (`LocalLMLabSDKCore`): `ClockPlugin` (`timeZone`), `WeatherPlugin`, `CalendarPlugin`,
+`RemindersPlugin`, `ContactsPlugin` (changes no longer create duplicates; postal addresses), `LocationPlugin` (the
+user's current location), `TablesPlugin` (`loadTable` reads CSV, TSV and JSON records), `DocumentsPlugin` (text,
+Markdown, PDF with a Vision fallback, slide decks with titles, RTF, HTML and Word `.docx`), `ImagesPlugin`
+(`readImageText`: OCR plus Apple's on-device model looking at photos, with layout looks for diagrams, charts and
+screenshots), `WebPlugin` (read a page, save it as Markdown, search; links, consent walls and an address policy,
+`WebAddressPolicy`), `WorkspacePlugin` and `WorkspacesPlugin` (Files over scratch space and the user's folders; copy,
+Trash on delete, kept old versions on overwrite, several edits per call).
+
+**Workspaces** (`LocalLMLabSDKCore`): `Workspace`, `SavedWorkspace`, `SavedWorkspaces`; access levels, off-limits
+paths, a default workspace, one workspace per chat, commands that follow the chat's workspace.
+
+**Local programs — direct-download builds only** (`LocalLMLabSDKCore`): `ExternalPrograms` and
+`ExternalProgramsSwitch` (off in sandboxed apps), `ProcessCommandRunner` with `SandboxProfile` (Seatbelt, no
+network unless allowed), `CommandSpec`, `CommandRunner`, `RegisteredCommand`, `CommandsPlugin`, `CommandRisk`; local
+MCP servers over stdio (`MCPStdioLaunch`, `MCPLocalServerStart`). A local server asks before every start (`localServerStartApproval`),
+and one that died is started again on the next call, with approval, up to 3 times in 5 minutes.
+
+**Security** (`LocalLMLabSDKCore`): `FailClosedToolAuthorizer`, `AllowingToolAuthorizer`, `ToolCallDecider`,
+`ToolCallVerdict` (who decided), `CallImpact`, `CallImpactRatedTool`, `ArgumentCheckedTool`, `OutboundTool`,
+`DriftPolicy`, `DriftAction`, `ToolDrift`, `ContentFrame`, `ReplyLinks` / `LinkSource`, and the audit stream
+`lab.audit` (`SecurityAudit`, `SecurityEvent`, `SecurityAuditEntry`). Defences: a call copied out of content always
+asks; page text a reader can't see is dropped; outside content reaches the model framed as data; control-token text
+in content is made inert; links from content are marked and confirmed; a call that would send read content off the
+Mac is noted, and the user's trust decides. What the SDK does and what your app must do: `docs/security-guide-for-hosts.md`.
+
+**MCP** (`LocalLMLabSDKCore`, `LocalLMLabSDKComponents`)
+- Resources and prompts: `MCPResourceContent`, `MCPContentReader`, `PromptFill`, `MCPCompletionReference`,
+  `MCPPromptImage`. The assistant can read a server's shared content when a question needs it; attach shared content
+  from the paperclip menu; a `/` menu for the server's prompts, with an argument form and the server's suggestions.
+- Tool results can carry images, embedded resources and returned links.
+- Paste a server's JSON setup (Claude Desktop `mcpServers`, VS Code `servers`, one entry or a bare `command` and
+  `args`) into the add-server form: `MCPServerConfigPaste`, `MCPServerConfigEntry`.
+- `MCPServerPickerView` takes `toolsMode` (`.static` or `.dynamic`), `allowsLocalPrograms` and `detail`
+  (`ChatToolDetail.plain` or `.detailed`); the Tool Sources sheet has Tools, Content and Prompts sections and
+  "Check connection" in place of Reconnect.
+
+**Prompt cache and memory** (`LocalLMLabSDKInference`): `MLXPromptCache`, `MLXPromptCacheStorage`,
+`MLXPromptCacheDisk`, `MLXPromptCacheStats`, `MLXPromptCacheModelStatus`, `promptCacheStatus(for:)`,
+`MLXMemoryStatus`, `MLXMemoryPressure`, `MLXPromptCapacity`. A memory tier and an encrypted SSD tier (key in the
+Keychain, excluded from backups); a saved conversation is segments plus restore points, written once per turn.
+Verified families: Qwen3.5/3.8, Qwen3, Qwen3 MoE, Llama, Nemotron 3.5; any other model gets a one-time self-test.
+MLX's buffer cache is capped, prompts too big for memory are read in smaller pieces before being refused, and the
+cache gives memory back before it would cause a refusal. `MLXModelProvider.stopGenerating()`;
+`MLXPromptCacheDisk.clear()` and `storedBytes`; `RejectedToolCallDiagnostics`.
+
+**Chat core and views** (`LocalLMLabSDKCore`, `LocalLMLabSDKComponents`): `ChatController`, `ChatCard`,
+`ChatConfiguration` (`turnFinished`, `turnFailed`), `ChatSetup`, `ChatPlugins`, `ChatCompaction`, `ChatStatus`,
+`ComposerIntent`, `ConversationStore`, `ChatAttachments`; Components' `MarkdownView`, `ChatComposerBanner`,
+`ChatCardView`, `ToolChoiceChip`, permission, sign-in, clarify and server-suggestion cards,
+`WorkspaceSettingsRow`, `ModelOnboardingView(showsCancel:)`. A chat compacts into a summary the model writes when it
+fills up; an unknown context window gets an assumed room.
+
+**MCP Apps** (`LocalLMLabSDKMCPAppsHost`): `MCPAppWidgetSlot`, `MCPAppWidgetContext`, `MCPAppsInlinePolicy`,
+`MCPAppsOfflineBackend`. A changed widget is a new instance, so remembered answers don't carry over to code the user
+hasn't seen.
+
+**Remote providers** (`LocalLMLabSDKRemote`): Anthropic requests default to a 64K output limit and a cut-off tool
+call fails with that reason; tool input is sent whole and a call with no arguments sends `{}`; every tool schema is
+sent as an object.
+
+**Testing:** a pre-release harness (scenarios, a soak run, robustness and leak checks) qualified this release. It
+and the internal evaluation tools behind the measurements aren't published.
+
+### Changed
+
+- Additive signatures (source-compatible): `respond` and `streamResponse` take `attachments: [URL] = []`;
+  `addServer` takes `stayConnected`, `initialTools` and `interactiveSignIn`; Calendar `updateEvent` and `deleteEvent`
+  take `atTime`; Contacts `addContact`, `updateContact` and `deleteContact` take addresses, `card` and `pinned`.
+  `MCPTool` is an `OriginTaggedTool`; `MCPResourceContent` is `Equatable`.
+- **LFM3 models load** (`lfm3`). `LocalLMLabSDKInference`'s MLX runtime pin moves from `dea880a` to `cf22d79`:
+  `dea880a` plus upstream mlx-swift-lm's LFM3 support (#750) and nothing else. Before, `LiquidAI/LFM3-*` failed with
+  "Unsupported model type: lfm3". `LFM3-1.7B-MLX-bf16` passes `capabilityProbe` (prompt, tool call, reasoning off);
+  it has no prompt cache, because it has sliding-window layers.
+- **PrismML Bonsai 2 loads** (`prism_hadamard_qwen35`). The pin moves on to `82c3ce3`, which adds upstream
+  mlx-swift-lm PR #630 (not merged upstream yet): Qwen3.8-27B with ternary weights stored as MLX 2-bit in a
+  Hadamard-rotated basis, with the activations rotated using stock MLX ops. `prism-ml/Ternary-Bonsai-2-27B-mlx-2bit`
+  (8.6 GB) passes `capabilityProbe` and the prompt-cache self-test. Text only.
+- Apple's model-service failures read in plain words, name the app's model, and a failed turn is marked unanswered.
+- **Tools named in a chat's custom instructions are offered** (binaries re-published 2026-11-14).
+  `ToolSelectionRequest.standingInstructions`, set from `LocalLMLabSession` and `ChatSetup.standingInstructions`, is
+  what the user asks for on every message. An MCP server named there is offered on every message, whole up to
+  `ToolMatchingOptions.wholeNamedServerLimit` (12) tools (`offersServersNamedInInstructions`, on by default), with
+  the new reason `ToolSelectionExplanation.Reason.namedInInstructions`; a `switch` over `Reason` needs
+  `@unknown default`. A reply saying a tool is missing, when the model didn't call `requestTools`, makes the session
+  ask for it and run the turn again with what it finds (once a turn, with `requestsTools` on).
+- **Saved workspaces stay available after a restart** (binaries re-published 2026-11-14). A workspace's identity is
+  its volume's UUID and inode; it was the device number, which macOS assigns at each mount, so after a restart every
+  saved workspace was refused. A list saved before matches by inode and is rewritten.
+  `SavedWorkspaces.sameFolder(saved:now:)` (a static) compares two identities.
+- **Examples say how tool calls are decided.** Every example whose tools write, or call an MCP server's tools,
+  passes an authorizer, since a 3.0 session without one refuses those calls: `AllowingToolAuthorizer()` in
+  `code-buddy`, `repo-qa-local` and `aiql`; a `ConfirmingToolAuthorizer` in `workspace-buddy-local` (an alert before
+  writes and edits), `security-demo`, `mcp-chat` and `vistanova` (a policy that allows only `tavily_search`). The
+  [annotated examples](docs/annotated-examples.md) list them. JevDK and jev-serve are their own project
+  ([ancientcomputing/jevdk](https://github.com/ancientcomputing/jevdk)); their folders here point to it.
+- `JevWire`'s response extensions are `fidelity` (`native`, `tokenScored`, `generated`), `calibrated`, and a refusal
+  marker `{"type":"refusal"}`.
+
+### Folded in from 2.2.0, 2.3.0 and the 2.4.0 line
+
+- **2.2.0:** Nemotron 3.5 support, with `mlx-swift-lm` pinned at `dea880a`; balanced primed `<think>` tags.
+- **2.3.0:** OpenAI's Decisions API as a fourth decider, with refusals in `Decision` (see the 2.3.0 entry below).
+- **2.4.0 (never released on its own):** the `decisionformer` backend in JevDK; each app registers its OAuth client
+  under its own name, with a redirect form check; a sign-in reply on this Mac when a server refuses the app's
+  scheme; reverse-domain redirect schemes.
 
 ### Checksums (SHA-256)
 
 ```
-LocalLMLabSDKCore-2.3.1-GA.xcframework.zip       0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c
-LocalLMLabSDKClaude-2.3.1-GA.xcframework.zip     4b4989f288b70d7762d9151fe1c7745cc76234854dd97693a53bbc81569955e1
-LocalLMLabSDKInference-2.3.1-GA.xcframework.zip  7663074fc31919ba2970c99d7835fbad93415370b29ad828a32def0db73c7e8e
-LocalLMLabSDKRemote-2.3.1-GA.xcframework.zip     79247d567ad5dddecd14b0cc7662ab1ac61a322c3507029abd9fd4fb093d9ab6
+LocalLMLabSDKCore-3.0.0-GA.xcframework.zip       2b286cfecae1f6596c64255d72550a30f6f3cfe8323e4aa2a5176a4275699451
+LocalLMLabSDKClaude-3.0.0-GA.xcframework.zip     d610c8e5c82402ed2e898eb239ef8af02983c459b73ec531e84781d478a6d159
+LocalLMLabSDKInference-3.0.0-GA.xcframework.zip  e89336700bba35a546967a66eb34e3fb59e44a8150758da44ec95a104047bd54
+LocalLMLabSDKRemote-3.0.0-GA.xcframework.zip     54ca50806e65d96a80ef928b56952bf9b827ba959bcb466c25088b3cb2995507
 ```
 
 ---
@@ -375,7 +546,7 @@ A **decision model** answers a few typed questions about one input — yes / no,
 options, a point on a scale — with a probability for every option, and writes no text. One API
 asks them of TypeSafe's Jev, Featherless's Simple Jev, or **OpenJev**, the SDK's own decider on a
 local MLX model. Introduction: [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html);
-API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdecide).
+API: [`docs/decision-models.md`, "Decision models"](docs/decision-models.md).
 
 - **Core:** `LocalLMLab.decide(route:state:questions:)`; questions in Jev's vocabulary
   (`DecisionQuestion.noul` / `.choice` / `.score`, `DecisionState`, `DecisionRequest`,
@@ -426,14 +597,14 @@ API: [`docs/sdk-guide.md` §6c](docs/sdk-guide.md#6c-decision-models-jev--labdec
 
 ### Added — examples
 
-- [`jev-serve`](examples/jev-serve/): hosted Jev's HTTP API (`/api/alpha/decisions`,
+- [`jev-serve`](https://github.com/ancientcomputing/jevdk): hosted Jev's HTTP API (`/api/alpha/decisions`,
   `/v1/classifier`) answered by OpenJev on this Mac, from a config JevDK exports (**File → Export
   Server Config…**: the model pinned to its tested version, the system instructions, the
   calibration, an optional token). Downloads the model if needed; loopback by default.
-- [`jevdk`](examples/jevdk/): JevDK, a playground for decision-model questions — run them on a
+- [`jevdk`](https://github.com/ancientcomputing/jevdk): JevDK, a playground for decision-model questions — run them on a
   local MLX model and on hosted Jev side by side, score a batch against your marked answers,
   calibrate, compare models in a results CSV, and export the tested questions for your app. With a
-  plain-English [developer's guide](examples/jevdk/GUIDE.md) ([on the web](https://thisbrain.ai/locallm/jdk-guide.html)).
+  plain-English [developer's guide](https://github.com/ancientcomputing/jevdk) ([on the web](https://thisbrain.ai/locallm/jdk-guide.html)).
 - [`mcp-chat`](examples/mcp-chat/): a chat with a local model (Qwen3 8B via MLX, or Apple's
   on-device model) that shows MCP Apps views inline, with streaming, per-server trust and
   approval, the date every turn, and conversations that reopen.
@@ -469,8 +640,8 @@ Everything below is in `LocalLMLabSDKInference` unless noted (the 2026-09-19 re-
 `LocalLMLabSDKCore` items under *Added — sampling options on Apple's on-device model*); apart from
 *Changed — breaking (pre-GA)*, all of it is additive. **RC.1 is the source-compatibility baseline:** from
 here to GA, changes are additive or fixes only. The narrative is
-[`docs/sdk-guide.md` §6a](docs/sdk-guide.md#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference)
-and [Pinning, updating and cleaning up model versions](docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+[`docs/sdk-guide.md`, "The model layer"](docs/local-models-mlx.md#mlxmodelprovider--run-open-weight-models-locally-locallmlabsdkinference)
+and [Pinning, updating and cleaning up model versions](docs/local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions).
 `docs/api-surface.md` is regenerated for this release; the lines in its diff against beta.4 that can
 break a build are the ones under *Changed — breaking (pre-GA)*.
 
@@ -496,7 +667,7 @@ break a build are the ones under *Changed — breaking (pre-GA)*.
 - `SessionOptions.appleGenerationOptions()` (the mapping, for hosts calling `languageModelSession`
   directly) and `LocalLMLabSession.respond(to:options:)` (per-call override).
 - A seed is best-effort on this model: reproducible within a process, but the first request after launch
-  can differ. See [`docs/sdk-guide.md` §6a](docs/sdk-guide.md).
+  can differ. See [`docs/sdk-guide.md`, "The model layer"](docs/sdk-guide.md).
 
 ### Added — model pinning, updates and cleanup
 
@@ -574,7 +745,7 @@ LocalLMLabSDKRemote-1.0.0-RC.1.xcframework.zip     3e763c2fb542f7cc8493cf8e4ba2e
 
 ## 1.0.0-beta.4 — 2026-09-10
 
-### Added — MCP client: protocol revision `2025-11-25` (`docs/sdk-guide.md` §3a–§3e)
+### Added — MCP client: protocol revision `2025-11-25` (`docs/mcp-guide.md`, "MCP revisions")
 
 The client now negotiates MCP `2025-11-25` (down to `2024-11-05`); every server that worked
 before still works. `MCPServerState.negotiatedProtocolVersion` reports where each connection
@@ -708,7 +879,7 @@ values instead of an opaque "routed to `pcc` fails" reaching the host (roadmap i
   a spent free-tier quota reports `.unavailable(kind: .providerError)` with the reset date
   rather than `.available`.
 
-### Added — `Core` workspace: file-backed tools + the "AIQL" data verbs (`docs/sdk-guide.md` §8b)
+### Added — `Core` workspace: file-backed tools + the "AIQL" data verbs (`docs/sdk-guide.md`, "File-backed tools")
 
 The building blocks for a "plain-English query over an MCP-fronted dataset → a CSV file"
 pipeline where the row data never passes through the model, so it can't be fabricated.
@@ -831,7 +1002,7 @@ additive.
 ### Added — the model layer
 
 A new layer for running models, opt-in and orthogonal to the MCP/connector surface that has
-been here since `0.7.0`. Full walkthrough: [`docs/sdk-guide.md` §6a](docs/sdk-guide.md).
+been here since `0.7.0`. Full walkthrough: [`docs/sdk-guide.md`, "The model layer"](docs/sdk-guide.md).
 
 - **`LocalLMLabSDKInference.xcframework`** — a second binary (the MLX runtime), linked from
   the same release only when you use local open-weight models. See

@@ -6,7 +6,7 @@ import LocalLMLabSDKCore
 /// tell when a server's widget changed.
 ///
 /// One file per widget **version** (SHA-256 of its HTML), not per call: a widget is 1.6–3.2 MB
-/// (measured), and many calls render the same version. The cache also remembers which version each tool
+/// (P2), and many calls render the same version. The cache also remembers which version each tool
 /// call was rendered with (`bind(recordID:sha256:)`), because a record alone does not say. Least
 /// recently used versions are evicted past `maxBytes`.
 @MainActor

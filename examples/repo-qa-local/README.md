@@ -152,7 +152,7 @@ version you first download, and a later re-download gets those same bytes. The r
 to `~/Library/Application Support/RepoQALocal/LocalLMLab/mlx-pins.json`, outside the model cache, so
 they survive `rm -rf` on the cache; delete that file to forget them. To change a default, review the
 new version, then update the repo and its commit together. See
-[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+[Pinning, updating and cleaning up model versions](../../docs/local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions).
 
 ## What the model layer adds (diff against `repo-qa`)
 
@@ -166,7 +166,7 @@ differences:
 | `SystemLanguageModel.default` availability check | `MLXModelProvider` + `LocalLMLab` + `lab.models.route(.local, to: …)` |
 | — | `mlx.validate` → `mlx.download` (streamed) if the weights aren't local yet |
 | `let manager = MCPServerManager()` → `manager.addServer(…)` | `lab.mcp.addServer(…)` — the lab's manager; never a second one |
-| an `MCPTool(descriptor:manager:)` per tool | `lab.mcp.setToolEnabled(server:tool:enabled: true)` per tool — a new server's tools start **disabled** (security default), so without this the model gets no tools |
+| an `MCPTool(descriptor:manager:)` per tool | `lab.mcp.setToolEnabled(true, server:tool:)` per tool — a new server's tools start **disabled** (security default), so without this the model gets no tools |
 | `LanguageModelSession(tools: tools) { instructions }` | `lab.makeSession(route: .local, instructions:, includeMCPTools: true)` — builds the `MCPTool`s from `lab.mcp`'s enabled tools |
 | `session.respond(to:)` (a `LanguageModelSession`) | `session.respond(to:)` (a `LocalLMLabSession`) — same FoundationModels session underneath, plus the SDK's context-overflow retry and per-turn MCP tool refresh |
 
@@ -174,7 +174,7 @@ That's the point: the model layer is a swap-in, not a rewrite.
 
 > **Building a UI for this?** This CLI prints download `%` to stderr by hand to show the raw
 > `mlx.download` event stream. A real app doesn't need to: `Components`' `ModelPickerView`
-> ([`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer))
+> ([`docs/sdk-guide.md`, "Components"](../../docs/sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer))
 > binds to `lab.models` and renders the model list, availability badges, on-disk sizes, the
 > progress bar, and an "Add from Hugging Face" field for you.
 
@@ -204,6 +204,6 @@ bridge streams it through inline — carve it out consumer-side if you want a cl
 
 - [`repo-qa`](../repo-qa) — the on-device-model original this is a twin of.
 - [`code-buddy`](../code-buddy) — the model layer end to end.
-- [`docs/sdk-guide.md` §6a](../../docs/sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) —
+- [`docs/sdk-guide.md`, "The model layer"](../../docs/sdk-guide.md#the-model-layer-models-routing-and-sessions) —
   the model layer, in prose.
 - [`docs/tested-models.md`](../../docs/tested-models.md) — which open-weight models tool-call.

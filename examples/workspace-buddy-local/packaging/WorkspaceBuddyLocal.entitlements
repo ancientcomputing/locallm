@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<!-- Same sandbox story as workspace-buddy: sandboxing is unconditional here, which is what
-	     makes the security-scoped bookmark pattern (docs/sdk-guide.md §8) necessary to
+	     makes the security-scoped bookmark pattern (docs/sdk-guide.md ("Filesystem access")) necessary to
 	     demonstrate. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>

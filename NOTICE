@@ -1,4 +1,4 @@
-LocalLM Lab SDK
+LocalLM SDK
 Copyright 2026 ThisBrainAI LLC
 
 This product includes software developed by ThisBrainAI LLC
@@ -40,6 +40,16 @@ LocalLMLabSDKInference.xcframework  (also links everything in Core, above)
     * swift-collections     — Apple Inc. and the Swift project authors           https://github.com/apple/swift-collections
     * swift-crypto          — The SwiftCrypto Project authors                    https://github.com/apple/swift-crypto
     * swift-asn1            — The SwiftASN1 Project authors                      https://github.com/apple/swift-asn1
+
+Design attribution (LocalLMLabSDKInference prompt cache)
+--------------------------------------------------------
+
+  The prompt cache is a Swift design that adapts ideas from the open-source oMLX project
+  (Apache License 2.0, https://github.com/jundot/omlx): matching on the prompt's actual tokens,
+  saved restore points for models whose memory cannot simply be cut back, a memory tier plus a
+  disk tier, and a dedicated restore point for the system prompt and tools. oMLX's paged cache is
+  in turn adapted from vllm-mlx, which follows the vLLM v1 block pool (Apache License 2.0). No
+  oMLX source code is distributed in the binaries; the attribution is given for the design.
 
 The full Apache License 2.0 text is at https://www.apache.org/licenses/LICENSE-2.0
 and the MIT License text at https://opensource.org/license/mit. The additional

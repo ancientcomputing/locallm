@@ -1,4 +1,4 @@
-# Migrating to the LocalLM Lab SDK 1.0
+# Migrating to the LocalLM SDK 1.0
 
 1.0 (`1.0.0-beta.N`, `1.0.0` at GA) has a **macOS 26 deployment floor** as of `1.0.0-beta.2`.
 One app runs on macOS 26 and macOS 27 from a single build — Private Cloud Compute, Claude, and
@@ -7,7 +7,7 @@ connectors, no model layer — continues separately for consumers that don't wan
 
 The jump from `0.8.x` is **mostly additive**: the connectors and Keychain storage are unchanged,
 and every MCP server that worked still works. What's new is the model layer and a batch of MCP
-spec-2025-11-25 capabilities (`sdk-guide.md` §3a–§3e); what can break your build is one
+spec-2025-11-25 capabilities (`mcp-guide.md`, "MCP revisions"–§3e); what can break your build is one
 enum-resilience change, one MCP return-type change, and — if you wrote a custom `ModelProvider`
 — one protocol change.
 
@@ -20,7 +20,7 @@ enum-resilience change, one MCP return-type change, and — if you wrote a custo
 No platform bump — `1.0.0-beta.2` keeps the `0.8.x` floor. You still need **Xcode 27**
 to build: the xcframeworks are compiled with the macOS 27 SDK (27-only symbols weak-linked), and
 an older Xcode fails with `'v27' is unavailable`. Register the macOS-27-only providers behind
-`if #available(macOS 27, *)` — see [`sdk-guide.md` §1a](sdk-guide.md).
+`if #available(macOS 27, *)` — see [`sdk-guide.md`, "Targeting macOS 26 and 27"](sdk-guide.md).
 
 ## 2. Point your manifest at the new release
 
@@ -115,7 +115,7 @@ No API change — just accurate now.
 
 ## 5. What's new (opt in when you want it)
 
-The **model layer** (`sdk-guide.md` §6a) — offer Apple's on-device model, Claude, and
+The **model layer** (`sdk-guide.md`, "The model layer") — offer Apple's on-device model, Claude, and
 locally-run open-weight (MLX) models behind one API, with routing and residency the SDK owns:
 
 - `LocalLMLab` — the optional front door bundling the model registry, MCP manager, and
@@ -133,7 +133,7 @@ locally-run open-weight (MLX) models behind one API, with routing and residency 
   `capabilityProbe`; `residentModelLimit`, `MLXPreflightLimits`, `residencyEventStream` for
   the memory story on a constrained Mac.
 
-Since `1.0.0-beta.3`, also **online providers** (`sdk-guide.md` §6b) — GPT, Claude's online
+Since `1.0.0-beta.3`, also **online providers** (`remote-providers.md`, "Online providers") — GPT, Claude's online
 Messages API, OpenRouter, or any OpenAI-compatible server, with provider-native web search,
 behind the same `lab.makeSession(route:)`. Add the `LocalLMLabSDKRemote` binaryTarget,
 `import LocalLMLabSDKRemote`, register `try RemoteModelProvider(config)`. Nothing about the
@@ -146,7 +146,7 @@ Purely additive: new `Tool` structs plus `CSVCodec` / `JSONPath` building blocks
 `append:` option on `WorkspaceAccess.writeFile`. [`examples/aiql`](../examples/aiql/) is the
 worked app.
 
-Also new on the **MCP client** (`sdk-guide.md` §3a–§3e), all backward compatible:
+Also new on the **MCP client** (`mcp-guide.md`, "MCP revisions"–§3e), all backward compatible:
 
 - The client negotiates **MCP `2025-11-25`** (down to `2024-11-05`). Older servers are
   unaffected; `MCPServerState.negotiatedProtocolVersion` reports where each landed.

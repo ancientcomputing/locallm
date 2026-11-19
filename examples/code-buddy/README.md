@@ -4,7 +4,7 @@
 open-weight model — downloaded once from Hugging Face — reads and edits files in a project
 directory you point it at. No cloud service, no API key, nothing leaves the machine.
 
-It exists as a **reference example for the LocalLM Lab SDK**. If you're thinking about building
+It exists as a **reference example for the LocalLM SDK**. If you're thinking about building
 your own Mac app where a local model does real work — not just chat, but calling tools, editing
 files, running commands — this is that whole pattern end to end, in a few hundred lines of Swift
 you can read in one sitting. Concretely it shows:
@@ -291,7 +291,7 @@ version you first download, and a later re-download gets those same bytes. The r
 to `~/Library/Application Support/CodeBuddy/LocalLMLab/mlx-pins.json`, outside the model cache, so
 they survive `rm -rf` on the cache; delete that file to forget them. To change a default, review the
 new version, then update the repo and its commit together. See
-[Pinning, updating and cleaning up model versions](../../docs/sdk-guide.md#pinning-updating-and-cleaning-up-model-versions).
+[Pinning, updating and cleaning up model versions](../../docs/local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions).
 
 ## Running local models on a memory-constrained Mac
 
@@ -312,7 +312,7 @@ model, a Compact/Balanced/Full tool-result preset) if you'd rather see it in a U
 code-buddy prints its download progress to stderr by hand to show the raw `mlx.download` stream.
 In a SwiftUI app, `Components`' `ModelPickerView` renders the model list, availability badges,
 on-disk sizes, the progress bar, and an "Add from Hugging Face" field from `lab.models` directly
-— see [`docs/sdk-guide.md` §11](../../docs/sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer).
+— see [`docs/sdk-guide.md`, "Components"](../../docs/sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer).
 
 ## The `git` and `run_tests` tools (this example provides them, not the SDK)
 

@@ -15,7 +15,7 @@
 > original 15-round rig below.)
 
 Applies to the **model layer** only (`LocalLMLabSDKInference` + `MLXModelProvider` — see
-[`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions)). The
+[`sdk-guide.md`, "The model layer"](sdk-guide.md#the-model-layer-models-routing-and-sessions)). The
 example that exercises all of it is [`code-buddy`](../examples/code-buddy/), which defaults
 to `mlx-community/Qwen3-8B-4bit` for exactly the reasons below.
 
@@ -35,16 +35,16 @@ built-in `ClockTool` cross-check.
 | **DeepSeek** (R1-Distill-Qwen 7B/14B, R1-Distill-Llama 8B, V2-Lite-Chat) | ❌ | 4/4 zero tool calls, across 3 lineages + 2 base architectures. Root cause: chat templates with no working tool-definition/tool-call mechanism the app can drive. Also fabricates confidently. **Check the chat template before downloading any DeepSeek model for tool use.** |
 | **Phi-4** (14B, `mlx-community/phi-4-4bit`) | ❌ | Same root cause as DeepSeek despite an "instruction/tool-tuned" reputation. Phi-4-mini untested — different checkpoint, don't assume it carries over. |
 | **Phi-4-mini**, **SmolLM3-3B** | ❌ | Fail on the *input* side: templates try to list tools via a convention `swift-transformers` doesn't supply. Structurally unreachable regardless of the model. SmolLM3 then fabricates badly. |
-| **gpt-oss-20B** | ⚠️ app-side gap | The model correctly formats a real call — in OpenAI's "Harmony" format, which `mlx-swift-lm` has no parser for, so the call is never recognized. Not a model gap; a known limitation of `mlx-swift-lm`'s parser. |
+| **gpt-oss-20B** | ⚠️ app-side gap (since fixed) | The model correctly formats a real call — in OpenAI's "Harmony" format, which `mlx-swift-lm` had no parser for, so the call was never recognized. Not a model gap. Later SDK releases read Harmony calls, so gpt-oss now calls tools; see the [current list](https://thisbrain.ai/locallm/mlx-models.html). |
 
 ## As a decider (OpenJev, `lab.decide`)
 
 Point-in-time too: **2026-10-03**, SDK `2.0.0-dev` (a pre-release build; not re-run on `2.0.0-GA`), a 64 GB Apple-silicon Mac, the SDK's own
 decision-question evaluation and JevDK's customer-support example. A decider answers typed
 questions from the probabilities of each option's label, with no generation
-([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide)), so what matters is
+([`decision-models.md`, "Decision models"](decision-models.md)), so what matters is
 different from tool calling. **Test your own questions on your own marked inputs in
-[JevDK](../examples/jevdk/); these rows only say where to start.**
+[JevDK](https://github.com/ancientcomputing/jevdk); these rows only say where to start.**
 
 | Model | As a decider | Notes |
 |---|---|---|
@@ -59,7 +59,8 @@ probabilities.
 
 ## Capacity notes (this Mac, this workload)
 
-- **Apple on-device** (`SystemModelProvider` / `.system`): ~8,192-token context window. A
+- **Apple on-device** (`SystemModelProvider` / `.system`): ~8,192-token context window as we measured it then
+  (current guides use about 4,000 tokens, Apple's figure; plan for that). A
   two-tool-call turn whose results carry real content **hard-fails** with a context-overflow
   error. Use `session.contextBudget` and `retryOnContextOverflow`, or route heavier turns to
   `.pcc` / Claude / a local model with a bigger window.

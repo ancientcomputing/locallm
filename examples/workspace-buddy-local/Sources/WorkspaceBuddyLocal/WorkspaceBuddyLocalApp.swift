@@ -28,7 +28,7 @@ let workspaceModelRepo = "mlx-community/Qwen3-8B-4bit"
 // model, review the new version, then update both lines.
 let workspaceModelRevision = "545dc4251c05440727734bcd94334791f6ab0192"
 
-// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8) — verbatim from workspace-buddy
+// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md ("Filesystem access")) — verbatim from workspace-buddy
 
 enum FolderAccess {
     private static let bookmarkKey = "workspaceFolderBookmark"
@@ -179,8 +179,13 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 Explain what you changed and why, briefly.
                 """
             do {
+                // The gate: a write or an edit asks the user first (an alert; a real app uses Components'
+                // ToolConfirmationPresenter). With no authorizer a session fails closed — reads would run,
+                // writes would be denied — so a sample that writes says how writes are decided.
                 let session = try self.lab.makeSession(
-                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false
+                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false,
+                    authorizer: ConfirmingToolAuthorizer(channel: AlertConfirmationChannel(),
+                                                         hostTools: .ask(atOrAbove: .mutate, by: .user))
                 )
 
                 // `session.events` is the side-channel around generation — here, which tool the
@@ -329,5 +334,20 @@ struct WorkspaceBuddyLocalApp: App {
             ContentView(model: model)
         }
         .windowResizability(.contentMinSize)
+    }
+}
+
+/// Asks the user with an alert before a tool that changes the folder runs. The smallest possible
+/// `ToolConfirmationChannel`; Components' `ToolConfirmationPresenter` is the one for a real app.
+struct AlertConfirmationChannel: ToolConfirmationChannel {
+    func requestDecision(for call: PendingToolCall) async -> Bool {
+        await MainActor.run {
+            let alert = NSAlert()
+            alert.messageText = "Allow \(call.toolName)?"
+            alert.informativeText = (call.impactReason.map { $0 + "\n\n" } ?? "") + call.argumentsDescription
+            alert.addButton(withTitle: "Allow")
+            alert.addButton(withTitle: "Deny")
+            return alert.runModal() == .alertFirstButtonReturn
+        }
     }
 }

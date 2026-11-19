@@ -1,30 +1,31 @@
-# LocalLM Lab — Examples
+# LocalLM — Examples
 
-Code samples for LocalLM Lab, split by which feature they use.
+Code samples for the LocalLM SDK and the LocalLM Lab app, split by which one they use.
 
 | Folder | Feature | What it shows |
 |---|---|---|
 | [api-lab/](api-lab/) | API Lab (OpenAI-compatible HTTP endpoint) | Conformance/smoke test scripts and a simple Python chat app that talk to a running LocalLM Lab server over HTTP. |
 | [localai-cli/](localai-cli/) | `localai-cli` toolkit (Python) | Calling the local AI helper binary directly via subprocess — no HTTP server, no LocalLM Lab dependency for the call itself. |
 | [localai-cli-swift/](localai-cli-swift/) | `localai-cli` toolkit (Swift) | Same examples as localai-cli/, in Swift. |
-| [plate-today/](plate-today/) | LocalLM Lab SDK (Core), Path B | A native SwiftUI app linking `LocalLMLabSDKCore` directly — Calendar/Reminders connectors, a real Todoist MCP OAuth flow, and a signed path to both Developer ID distribution and the Mac App Store. Each connector gets its own hand-written `Tool` adapter. |
-| [plate-today-tools/](plate-today-tools/) | LocalLM Lab SDK (Core), Path A | The exact same app as `plate-today/`, rebuilt on Core's ready-made `Tool`s (`GetUpcomingEventsTool`, `MCPTool`, etc.) instead of hand-written adapters — diff the two to see precisely what changes. |
-| [repo-qa/](repo-qa/) | LocalLM Lab SDK (Core), Path A | A minimal command-line tool — no signing, no macOS permission needed. Builds a `Tool` for a real MCP server's (Deepwiki's) own tools straight from their live schema, no hand-written `Arguments` struct. Answered by Apple's on-device model. |
-| [repo-qa-local/](repo-qa-local/) | LocalLM Lab SDK (Core **+ Inference**) | The exact same tool as `repo-qa/`, but the answer comes from an **open-weight MLX model you download and run locally** (`mlx-community/Qwen3-8B-4bit` by default), routed through the 1.0 model layer. The smallest possible model-layer + MLX example — diff the two `main.swift`s to see what the model layer adds. |
-| [workspace-buddy/](workspace-buddy/) | LocalLM Lab SDK (Core), Path A | A local AI-assisted coding example: pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`. Sandboxed — the security-scoped bookmark demo. |
-| [workspace-buddy-local/](workspace-buddy-local/) | LocalLM Lab SDK (Core **+ Inference**) | The same sandboxed `.app` as `workspace-buddy/`, but with a downloadable **open-weight MLX model** routed through the model layer. The one example running the model layer inside **App Sandbox** (adds the `network.client` entitlement for the model download). |
-| [code-buddy/](code-buddy/) | LocalLM Lab SDK (Core **+ Inference**) | The full model layer: a CLI coding agent running **locally-run MLX models** through `LocalLMLab` + `MLXModelProvider` (heavy/light routes, one resident at a time), Core's Workspace tools, a no-auth MCP server, and two **host-owned** `Process` tools (git, run-tests) the SDK deliberately doesn't ship. |
-| [mlx-control-room/](mlx-control-room/) | LocalLM Lab SDK (Core **+ Inference**) | A live control panel for an MLX model session: the sampling / prefill / pairing knobs with **gauges that prove each reaches `mlx-swift-lm`**, plus the model-pinning flow made visible — validate → download → pin, a per-model version you can **check, update, roll back** and clean up, a built-in model its developer can move to a newer version **without an app release**, and two curated model pairs (speed helper, adapter). Sandboxed `.app` with the network entitlement. |
-| [os-matrix/](os-matrix/) | LocalLM Lab SDK (Core **+ Inference**) | One `.macOS("26.0")` CLI that runs on both macOS 26 and 27 with no source `#if` — shows `ModelAvailability.requiresOS` gating the 27-only providers. |
-| [components-demo/](components-demo/) | LocalLM Lab SDK (`Components`) | The same SDK, via the prebuilt `LocalLMLabSDKComponents` MCP server picker UI instead of building your own. |
-| [model-switch/](model-switch/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | The online / remote providers: add a provider + API key, tick web search, switch between every configured model (on-device, PCC, Claude-4-FM, GPT, Claude online, OpenRouter) from one chat window. |
-| [components-updates-demo/](components-updates-demo/) | LocalLM Lab SDK (`Components`) | The model **onboarding stepper**, **update** view and **versions-on-disk** view driven by simulated sources (no network, no MLX): a failed preflight, a hash mismatch, a download, an update with the pause point, a rollback, and cleaning up old versions. |
-| [security-demo/](security-demo/) | LocalLM Lab SDK (Core **+ Remote** + `Components`) | Tool authorization: a "Security" panel whose two controls are `Sequence.limited(toMaxImpact:)` (which tools the model sees) and `ConfirmingToolAuthorizer` + `Components.ToolConfirmationPresenter` (whether a call runs or asks first). A frontier model against a real Calendar and a real Todoist MCP server. |
-| [vistanova/](vistanova/) | LocalLM Lab SDK (Core **+ Inference**) | A tiny local search engine: a SwiftUI app that runs web search through a Tavily MCP server on one local model and summarizes on another — by default a downloaded MLX model **shipped pinned to an exact commit** (`MLXModelProvider(pinnedRevisions:)`), so a new upstream version is never picked up silently. Also shows a hand-written `Tool` over an MCP tool, and the defenses a small model needs: verify from `session.events` that it really called the tool, probe `capabilityProbe` before trusting structured output. |
-| [aiql/](aiql/) | LocalLM Lab SDK (Core **+ Inference**) | "Ask your data": a SwiftUI app that pulls an MCP-fronted dataset and writes the spreadsheet you asked for — `FileBackedTool` + the data verbs (`jsonToCsv` / `filterRows` / `sortRows` / …, guide §8b) do every row-level step so a local MLX model can't fabricate a value. Sandboxed; MCP OAuth via the `aiql://` URL scheme. |
-| [jevdk/](jevdk/) | LocalLM Lab SDK (Core **+ Inference + Remote**), **2.3** | The decision API (Jev): a playground for the yes/no, choice and score questions an app asks a decision model. Runs them on a local MLX model (`OpenJevDecisionProvider`) and on hosted deciders (TypeSafe via OpenRouter, Featherless, OpenAI Decisions) side by side, scores a batch against your marked answers, fits calibration, appends runs to a results CSV for comparing models, and exports the tested questions for your app (`DecisionQuestionSet`). Comes with [a developer's guide](jevdk/GUIDE.md). |
-| [jev-serve/](jev-serve/) | LocalLM Lab SDK (Core **+ Inference**), **2.3** (through `../jevdk`) | Hosted Jev's HTTP API (OpenRouter's `/api/alpha/decisions`, Featherless's `/v1/classifier`) answered by OpenJev on a local MLX model: code that calls hosted Jev, in any language, switches to private on-device decisions by changing its base URL. Serves the setup tested in JevDK (model pinned to its version, system instructions, calibration) from JevDK's exported config; downloads the model if needed; loopback, optional token. |
-| [mcp-chat/](mcp-chat/) | LocalLM Lab SDK (Core **+ Inference** + `Components` + `MCPAppsHost`), **2.0** | MCP Apps in a chat: a local MLX model (or Apple's on-device model) whose tool calls show the server's interactive widget inline in the conversation — Todoist's task list, a system monitor. The widget's own calls go through the session, so they meet the same per-server trust / approval as the model's. Streaming replies, reasoning split out, conversations that survive relaunch. Sandboxed `.app`. |
+| [plate-today/](plate-today/) | LocalLM SDK (Core), Path B | A native SwiftUI app linking `LocalLMLabSDKCore` directly — Calendar/Reminders connectors, a real Todoist MCP OAuth flow, and a signed path to both Developer ID distribution and the Mac App Store. Each connector gets its own hand-written `Tool` adapter. |
+| [plate-today-tools/](plate-today-tools/) | LocalLM SDK (Core), Path A | The exact same app as `plate-today/`, rebuilt on Core's ready-made `Tool`s (`GetUpcomingEventsTool`, `MCPTool`, etc.) instead of hand-written adapters — diff the two to see precisely what changes. |
+| [repo-qa/](repo-qa/) | LocalLM SDK (Core), Path A | A minimal command-line tool — no signing, no macOS permission needed. Builds a `Tool` for a real MCP server's (Deepwiki's) own tools straight from their live schema, no hand-written `Arguments` struct. Answered by Apple's on-device model. |
+| [repo-qa-local/](repo-qa-local/) | LocalLM SDK (Core **+ Inference**) | The exact same tool as `repo-qa/`, but the answer comes from an **open-weight MLX model you download and run locally** (`mlx-community/Qwen3-8B-4bit` by default), routed through the 1.0 model layer. The smallest possible model-layer + MLX example — diff the two `main.swift`s to see what the model layer adds. |
+| [workspace-buddy/](workspace-buddy/) | LocalLM SDK (Core), Path A | A local AI-assisted coding example: pick a folder, the on-device model reads/creates/edits files in it via Core's `WorkspaceTools`. Sandboxed — the security-scoped bookmark demo. |
+| [workspace-buddy-local/](workspace-buddy-local/) | LocalLM SDK (Core **+ Inference**) | The same sandboxed `.app` as `workspace-buddy/`, but with a downloadable **open-weight MLX model** routed through the model layer. The one example running the model layer inside **App Sandbox** (adds the `network.client` entitlement for the model download). |
+| [code-buddy/](code-buddy/) | LocalLM SDK (Core **+ Inference**) | The full model layer: a CLI coding agent running **locally-run MLX models** through `LocalLMLab` + `MLXModelProvider` (heavy/light routes, one resident at a time), Core's Workspace tools, a no-auth MCP server, and two **host-owned** `Process` tools (git, run-tests) the SDK deliberately doesn't ship. |
+| [mlx-control-room/](mlx-control-room/) | LocalLM SDK (Core **+ Inference**) | A live control panel for an MLX model session: the sampling / prefill / pairing knobs with **gauges that prove each reaches `mlx-swift-lm`**, plus the model-pinning flow made visible — validate → download → pin, a per-model version you can **check, update, roll back** and clean up, a built-in model its developer can move to a newer version **without an app release**, and two curated model pairs (speed helper, adapter). Sandboxed `.app` with the network entitlement. |
+| [os-matrix/](os-matrix/) | LocalLM SDK (Core **+ Inference**) | One `.macOS("26.0")` CLI that runs on both macOS 26 and 27 with no source `#if` — shows `ModelAvailability.requiresOS` gating the 27-only providers. |
+| [components-demo/](components-demo/) | LocalLM SDK (`Components`) | The same SDK, via the prebuilt `LocalLMLabSDKComponents` MCP server picker UI instead of building your own. |
+| [model-switch/](model-switch/) | LocalLM SDK (Core **+ Remote** + `Components`) | The online / remote providers: add a provider + API key, tick web search, switch between every configured model (on-device, PCC, Claude-4-FM, GPT, Claude online, OpenRouter) from one chat window. |
+| [components-updates-demo/](components-updates-demo/) | LocalLM SDK (`Components`) | The model **onboarding stepper**, **update** view and **versions-on-disk** view driven by simulated sources (no network, no MLX): a failed preflight, a hash mismatch, a download, an update with the pause point, a rollback, and cleaning up old versions. |
+| [security-demo/](security-demo/) | LocalLM SDK (Core **+ Remote** + `Components`) | Tool authorization: a "Security" panel whose two controls are `Sequence.limited(toMaxImpact:)` (which tools the model sees) and `ConfirmingToolAuthorizer` + `Components.ToolConfirmationPresenter` (whether a call runs or asks first). A frontier model against a real Calendar and a real Todoist MCP server. |
+| [vistanova/](vistanova/) | LocalLM SDK (Core **+ Inference**) | A tiny local search engine: a SwiftUI app that runs web search through a Tavily MCP server on one local model and summarizes on another — by default a downloaded MLX model **shipped pinned to an exact commit** (`MLXModelProvider(pinnedRevisions:)`), so a new upstream version is never picked up silently. Also shows a hand-written `Tool` over an MCP tool, and the defenses a small model needs: verify from `session.events` that it really called the tool, probe `capabilityProbe` before trusting structured output. VistaNova also has its own project, with releases: [ancientcomputing/vistanova](https://github.com/ancientcomputing/vistanova). |
+| [aiql/](aiql/) | LocalLM SDK (Core **+ Inference**) | "Ask your data": a SwiftUI app that pulls an MCP-fronted dataset and writes the spreadsheet you asked for — `FileBackedTool` + the data verbs (`jsonToCsv` / `filterRows` / `sortRows` / …; the SDK guide's "`FileBackedTool` + the AIQL data verbs") do every row-level step so a local MLX model can't fabricate a value. Sandboxed; MCP OAuth via the `aiql://` URL scheme. |
+| [jevdk](https://github.com/ancientcomputing/jevdk) | JevDK, its own project: [ancientcomputing/jevdk](https://github.com/ancientcomputing/jevdk) | The decision API (Jev): a playground for the yes/no, choice and score questions an app asks a decision model, run on a local MLX model and on hosted Jev side by side. Source and releases are in the JevDK repo; this folder only points there. |
+| [jev-serve](https://github.com/ancientcomputing/jevdk) | jev-serve, part of the JevDK project: [ancientcomputing/jevdk](https://github.com/ancientcomputing/jevdk) | Hosted Jev's HTTP API answered by OpenJev on your Mac. Comes with the JevDK download; source and releases are in the JevDK repo. |
+| [answersearch-oss](https://github.com/ancientcomputing/answersearch-oss) | LocalLM SDK (Core **+ Remote**), its own project: [ancientcomputing/answersearch-oss](https://github.com/ancientcomputing/answersearch-oss) | An online AI provider as a search engine: a menu-bar app that gets sourced answers from Claude or OpenAI web search with your own key, and uses Apple's on-device model for simple questions. Built on SDK 2.3 today. Source is in its own repo; this folder only points there. |
+| [mcp-chat/](mcp-chat/) | LocalLM SDK (Core **+ Inference** + `Components` + `MCPAppsHost`), **2.0** | MCP Apps in a chat: a local MLX model (or Apple's on-device model) whose tool calls show the server's interactive widget inline in the conversation — Todoist's task list, a system monitor. The widget's own calls go through the session, so they meet the same per-server trust / approval as the model's. Streaming replies, reasoning split out, conversations that survive relaunch. Sandboxed `.app`. |
 
 **Path A vs Path B**, for the four Core-based examples above: two ways to turn a connector or MCP
 server into something the on-device model can call as a tool. **Path A** drops in a ready-made
@@ -32,7 +33,7 @@ server into something the on-device model can call as a tool. **Path A** drops i
 description. **Path B** hand-writes a custom adapter directly against the underlying connector
 call (`CalendarAccess`, `MCPServerManager`, etc.) for full control over tool names, schemas, and
 descriptions. Neither is the "real" one — both ship in Core, and an app can mix them. See
-[`../docs/sdk-guide.md` §7a](../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
+[`../docs/sdk-guide.md`, "Two paths to tool-calling"](../docs/sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
 for the full framing.
 
 The `localai-cli` examples require the CLI toolkit itself. `1.0.0-beta.4` through
@@ -59,7 +60,7 @@ advanced model-layer features (Private Cloud Compute, open-weight/MLX, Claude, o
 need it — but it isn't universal: [`os-matrix/`](os-matrix/) is built and tested to run unchanged
 on **macOS 26** too (see its README).
 
-The examples on this `2.3.1-GA` branch build against SDK **`2.3.1-GA`**; the ones on `main`
+The examples on this `3.0.0-GA` branch build against SDK **`3.0.0-GA`**; the ones on `main`
 build against the latest stable release. No environment variable is needed for either.
 
 ### What each example needs
@@ -73,8 +74,6 @@ build against the latest stable release. No environment variable is needed for e
 | `mlx-control-room` | SwiftUI + App Sandbox (network only) | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); it keeps no security-scoped bookmark, so **Sign to Run Locally** works too | **any** identity — `packaging/build-and-sign.sh` |
 | `components-updates-demo` | SwiftUI, no system permissions, simulated data | ✅ via `Package.swift` / `swift run` (no `.xcodeproj`) | — (no `packaging/`) |
 | `workspace-buddy`, `workspace-buddy-local`, `aiql` | SwiftUI + App Sandbox | ✅ via the committed `.xcodeproj` — **Automatic** signing (as above); a stable team identity is what lets the security-scoped bookmark survive a rebuild. Bare `swift run` is compile-only. | same as `plate-today` |
-| `jevdk` | SwiftUI, no system permissions, no sandbox; hosted deciders optional (Featherless demo needs no key) | ✅ via the committed `.xcodeproj` — ad-hoc signed (*Sign to Run Locally*), not sandboxed, no account needed; or `swift build -c release` and run `.build/release/JevDK` | — (no `packaging/`) |
-| `jev-serve` | CLI (an HTTP server on this Mac) | ✅ `swift build -c release`, then `.build/release/jev-serve --config jev-serve.json` (from JevDK) or `--model <repo>` | — (no `packaging/`) |
 | `mcp-chat` | SwiftUI + App Sandbox (network) | Compile-only via `Package.swift` / `swift build` (no `.xcodeproj`) | **any** identity, or **none** (`APP_IDENTITY=-`) — `packaging/build-and-sign.sh` |
 
 "Apple Development" = the free identity Xcode creates once you add any Apple ID under
@@ -158,7 +157,7 @@ resolution doesn't inherit shell environment variables.
 
 ```bash
 cd examples/repo-qa
-LOCALLM_SDK_VERSION=2.3.0-GA \
+LOCALLM_SDK_VERSION=2.2.0-GA \
   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift run RepoQA facebook/react
 ```
@@ -171,13 +170,13 @@ previous one. (`code-buddy/sample-workspace/Package.swift` is not one of these �
 dependency-free fixture for the code-buddy walkthrough, not an SDK consumer.)
 
 ```swift
-let defaultSDKVersion = "2.3.1-GA"
+let defaultSDKVersion = "3.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
     "2.3.0-GA": SDKRelease(url: "…/v2.3.0-GA/LocalLMLabSDKCore-2.3.0-GA.xcframework.zip",
                            checksum: "7821197d…"),
-    "2.3.1-GA": SDKRelease(url: "…/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip",
-                           checksum: "0dc1e302…"),
+    "3.0.0-GA": SDKRelease(url: "…/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
+                           checksum: "2b286cfe…"),
 ]
 ```
 
@@ -188,10 +187,10 @@ every module ships its own checksum (`Core`, `Inference`, `Remote`, and `Claude`
 distinct `.xcframework.zip.sha256`; don't reuse Core's for another module):
 
 ```bash
-curl -sL https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKCore-2.3.1-GA.xcframework.zip.sha256
-# → 0dc1e30235607fa2991e13fc97ca1f5c87b1b60b33999570d09ac31ae0c7990c
-curl -sL https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKClaude-2.3.1-GA.xcframework.zip.sha256
-# → 4b4989f288b70d7762d9151fe1c7745cc76234854dd97693a53bbc81569955e1
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip.sha256
+# → 2b286cfecae1f6596c64255d72550a30f6f3cfe8323e4aa2a5176a4275699451
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKClaude-3.0.0-GA.xcframework.zip.sha256
+# → d610c8e5c82402ed2e898eb239ef8af02983c459b73ec531e84781d478a6d159
 ```
 
 Then point `defaultSDKVersion` at it (works everywhere, Xcode included) or pass
@@ -202,13 +201,14 @@ and checksum strings in place.
 
 **`artifact of binary target 'LocalLMLabSDKCore' has changed checksum`**, or in Xcode
 **`Missing package product 'LocalLMLabSDKCore' / 'LocalLMLabSDKRemote' / 'LocalLMLabSDKComponents'`**
-— same cause: you built this example once against an *earlier* cut of the same version tag (during
-a pre-release beta, a `vX.Y.Z` release asset can be re-uploaded with new bytes), and SwiftPM /
+— same cause: you built this example once against an *earlier* cut of the same version tag (a
+`vX.Y.Z` release asset can be re-uploaded with new bytes; 3.0.0-GA's were, last on 2026-11-16), and SwiftPM /
 Xcode won't silently swap the cached artifact for one with a different checksum — so the download
 is refused and the products it would have provided go "missing". The manifest is correct; the
 stale copy is local.
 
 ```bash
+swift package purge-cache                                  # SwiftPM's shared cache keeps the old zip by URL
 rm -rf examples/<name>/.build                              # swift build
 rm -rf ~/Library/Developer/Xcode/DerivedData/<Name>-*      # Xcode (or: File ▸ Packages ▸ Reset Package Caches)
 ```

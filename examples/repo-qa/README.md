@@ -21,7 +21,7 @@ key.
 - **`MCPTool` — using a server you didn't build.** You write no per-tool code. The SDK reads the
   server's own live description of its tools and builds a callable tool for each one, in a loop —
   point the same code at a different MCP server and it adapts. (This is "Path A" — ready-made
-  tools from Core; see [`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own).)
+  tools from Core; see [`docs/sdk-guide.md`, "Two paths to tool-calling"](../../docs/sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own).)
 - **Why you still choose which tools to expose.** Deepwiki offers three tools; this app
   deliberately wires up only two. The third returns an entire repo wiki in one go — far more
   text than the model can hold — and nothing in the tool's description says so. Deciding which
@@ -125,7 +125,7 @@ hard-failing the session.
 
 `MCPTool` can't know a tool's real-world response size from its JSON Schema (schema describes
 shape, not payload size) — that curation is the integrating app's job, exactly as
-[`docs/sdk-guide.md` §3](../../docs/sdk-guide.md#3-connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them)
+[`docs/mcp-guide.md`, "Connecting to an MCP server"](../../docs/mcp-guide.md#connecting-to-an-mcp-server-three-auth-options-and-how-to-pick-between-them)
 warns ("don't naively pass all of them… without picking the ones your prompt actually needs").
 The full writeup is in the tool-building loop's comment in `Sources/RepoQA/main.swift`. A tool
 whose schema doesn't build is skipped with a warning, not fatal.
@@ -153,7 +153,7 @@ failure before it was excluded.
 
 - [`repo-qa-local`](../repo-qa-local) — this tool with a locally-run MLX model instead of the
   on-device one (the model layer).
-- [`docs/sdk-guide.md` §7a](../../docs/sdk-guide.md#7a-two-paths-to-tool-calling-ready-made-tools-or-write-your-own) —
+- [`docs/sdk-guide.md`, "Two paths to tool-calling"](../../docs/sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own) —
   `MCPTool` and the Path A / Path B framing, in prose.
 - [`plate-today-tools`](../plate-today-tools) — `MCPTool` again, against an OAuth-gated server
   (Todoist), inside a signed GUI app.

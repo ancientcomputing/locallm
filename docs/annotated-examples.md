@@ -12,8 +12,8 @@ each app shown whole.
 | Marker | What it marks | Used in |
 |---|---|---|
 | `// ← SDK` | Core | every example |
-| `// ← SDK (Inference)` | the MLX runtime, for local open-weight models | `code-buddy`, `repo-qa-local`, `workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat`, `jevdk`, `jev-serve` |
-| `// ← SDK (Remote)` | online providers | `model-switch`, `security-demo`, `jevdk` |
+| `// ← SDK (Inference)` | the MLX runtime, for local open-weight models | `code-buddy`, `repo-qa-local`, `workspace-buddy-local`, `os-matrix`, `aiql`, `vistanova`, `mlx-control-room`, `mcp-chat` |
+| `// ← SDK (Remote)` | online providers | `model-switch`, `security-demo` |
 | `// ← SDK (MCPAppsHost)` | showing an MCP server's interactive views | `mcp-chat` |
 | `// ← Components` | the prebuilt SwiftUI views | `components-demo`, `components-updates-demo`, `mcp-chat` |
 | `// ← SDK (Path A)` | Core's ready-made tools | `plate-today-tools`, `repo-qa` |
@@ -31,10 +31,29 @@ A comment also still makes sense in the real `.swift` file.
 - **`plate-today` (Path B)** writes its own `Tool` adapters.
 - **`plate-today-tools` (Path A)** uses Core's ready-made tools.
 
-§7a of [`sdk-guide.md`](sdk-guide.md) explains the two paths.
+[`sdk-guide.md`, "Two paths to tool-calling"](sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)
+explains the two paths.
 
 `repo-qa` is Path A on its own: a small command-line tool that uses `MCPTool` with an MCP server
 that needs no sign-in. Compare `plate-today-tools`, whose Todoist server needs an OAuth sign-in.
+
+### Who decides whether a tool call runs (SDK 3.0)
+
+Since 3.0, a session made with `lab.makeSession` and no `authorizer:` fails closed: reads run, and anything that may
+change data or send it out is refused (`DENIED: …`, which the model reads). Every example whose tools write, or call an
+MCP server's tools (unrated, so they count as changes), says how calls are decided:
+
+| Example | Authorizer | Why |
+|---|---|---|
+| `code-buddy`, `repo-qa-local`, `aiql` | `AllowingToolAuthorizer()` | a command-line tool or a fixed pipeline, with no one to ask |
+| `workspace-buddy-local` | `ConfirmingToolAuthorizer` with a small alert channel | writes and edits ask first; reads run |
+| `security-demo` | `ConfirmingToolAuthorizer` with Components' `ToolConfirmationPresenter` | the Security panel decides which calls ask; with nothing set to confirm, every call runs |
+| `mcp-chat` | `ConfirmingToolAuthorizer` with `ToolConfirmationPresenter` | per-server trust and approval; a changed MCP App widget is asked about again |
+| `vistanova` | `ConfirmingToolAuthorizer` whose policy allows only `tavily_search` | the user typing a query is the consent; any other tool is refused |
+
+`os-matrix`, `model-switch` and `mlx-control-room` pass none: their tools only read, or they have none. `plate-today`,
+`plate-today-tools`, `repo-qa` and `workspace-buddy` build Apple's `LanguageModelSession(tools:)` directly, so the SDK's
+authorizer isn't involved. [The tool authorizer](tool-authorizer.md) explains the three ready-made authorizers.
 
 ## How much code is this, really?
 
@@ -46,22 +65,20 @@ non-comment lines; these examples are commented far more heavily than production
 |---|--:|--:|---|
 | [`repo-qa`](#examplesrepo-qa) | 66 | 115 | Apple's on-device model calling a real MCP server's tools, built from its live schema — no `Arguments` structs |
 | [`os-matrix`](#examplesos-matrix) | 74 | 97 | one binary that runs on macOS 26 **and** 27, model families gated by OS at registration |
-| [`repo-qa-local`](#examplesrepo-qa-local) | 96 | 129 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
+| [`repo-qa-local`](#examplesrepo-qa-local) | 97 | 144 | `repo-qa` again, but the answer comes from a downloaded open-weight MLX model, **pinned** to a reviewed commit (the model layer) |
 | [`components-demo`](#examplescomponents-demo) | 141 | 189 | a working "add / manage MCP servers" screen from prebuilt `Components` views, no MCP UI written |
 | [`plate-today-tools`](#examplesplate-today-tools) | 149 | 235 | Calendar + Reminders + Todoist (OAuth MCP) → a spoken-language day summary, on Core's ready-made tools |
 | [`workspace-buddy`](#examplesworkspace-buddy) | 173 | 227 | sandboxed AI edits to a user-picked folder, on-device model, a security-scoped bookmark that survives relaunch |
-| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 256 | 333 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
+| [`workspace-buddy-local`](#examplesworkspace-buddy-local) | 270 | 353 | `workspace-buddy` + a downloaded MLX model, running **inside** the App Sandbox, streaming its answer |
 | [`plate-today`](#examplesplate-today) | 216 | 359 | the same day summary as `plate-today-tools`, built with hand-written `Tool` adapters (Path B) |
-| [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (3 files) |
-| [`security-demo`](#examplessecurity-demo) | ~250 | ~490 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (6 files) |
-| [`code-buddy`](#examplescode-buddy) | 315 | 413 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
-| [`aiql`](#examplesaiql) | 402 | 459 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
-| [`vistanova`](#examplesvistanova) | 931 | 1,294 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
-| [`mcp-chat`](#examplesmcp-chat) | 938 | 1,026 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
-| [`jevdk`](#examplesjevdk) | 2,819 | 3,080 | a playground for decision-model questions: local OpenJev and hosted Jev side by side through one API, marked answers, calibration, and the tested setup exported for an app or for jev-serve (15 files, excerpted) |
-| [`jev-serve`](#examplesjev-serve) | 591 | 640 | hosted Jev's HTTP API answered by OpenJev on this Mac: `JevWire` for the wire format, the tested setup from JevDK's config, models pinned and downloaded (4 files, excerpted) |
-| [`components-updates-demo`](#examplescomponents-updates-demo) | 151 | 170 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
-| [`mlx-control-room`](#examplesmlx-control-room) | 1,434 | 1,812 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
+| [`model-switch`](#examplesmodel-switch) | 328 | 415 | GPT / Claude online / OpenRouter + on-device, one chat call site, provider-run web search + citations (4 files) |
+| [`security-demo`](#examplessecurity-demo) | 432 | 588 | a "Security" panel → `limited(toMaxImpact:)` (which tools) + `ConfirmingToolAuthorizer` (whether they ask), a frontier model against Calendar + Todoist MCP (7 files) |
+| [`code-buddy`](#examplescode-buddy) | 315 | 418 | a CLI coding agent: two models with routing, workspace + host `Process` tools, MCP, a persistent REPL session (2 files) |
+| [`aiql`](#examplesaiql) | 403 | 515 | a plain-English request → one read-only SQL `SELECT` over an MCP dataset → the CSV you asked for, sandboxed SwiftUI, zero fabricated values; a pinned default model and a trust policy for the free-text picker |
+| [`vistanova`](#examplesvistanova) | 939 | 1,309 | a tiny local search engine: web search through a Tavily MCP server on one local model, summaries from a **pinned** MLX model on another; defends against a model that skips the tool call (7 files) |
+| [`mcp-chat`](#examplesmcp-chat) | 948 | 1,149 | a chat with a local model where an MCP server's own interactive view (Todoist's task list) shows up under the tool call: the conversation is `hostTranscript`, the view is `MCPAppsHost` (4 files, views excerpted) |
+| [`components-updates-demo`](#examplescomponents-updates-demo) | 158 | 182 | the `Components` model **onboarding**, **update** and **versions** views, driven by simulated sources so every state is reachable |
+| [`mlx-control-room`](#examplesmlx-control-room) | 1,431 | 1,806 | every MLX knob with a gauge, plus the supply-chain flow made visible: validate, download, **pin**, update, roll back, clean up (excerpted; UI omitted) |
 
 The SDK-specific part of each — the lines carrying a `// ← SDK` marker — is a few dozen at most
 (`mcp-chat`, whose conversation UI *is* the SDK's chat history, is the exception), and each
@@ -72,15 +89,15 @@ argument parsing.
 
 *`Sources/PlateToday/PlateTodayApp.swift` — 216 lines of code (359 with comments).*
 
-Demonstrates `Core` directly: Calendar/Reminders connectors, the MCP client, Keychain-backed OAuth
+Demonstrates `Core` directly: Calendar/Reminders connectors (plus opt-in Location and Contacts tools), the MCP client, Keychain-backed OAuth
 — no `Components` involved. This is "Path B" — a hand-written `Tool` adapter per connector; see
 [`plate-today-tools`](#examplesplate-today-tools)
 below for the same app rebuilt on Core's ready-made "Path A" `Tool`s instead.
 
 ```swift
 // "What's on my plate today" — v1: Todoist (via Core's MCP client) + Calendar + Reminders (also
-// via Core, through CalendarAccess/RemindersAccess — see below). Linear is intentionally out of
-// scope for this example — it demonstrates Calendar/Reminders/Todoist only.
+// via Core, through CalendarAccess/RemindersAccess — see below). Linear is a planned v2 addition,
+// deliberately deferred.
 //
 // SwiftUI app shape (not a bare CLI): launch -> request Calendar/Reminders/Todoist access on
 // first run -> pull + synthesize -> show result -> Done closes the app. Packaged as a real signed
@@ -177,6 +194,42 @@ struct TodaysLocationTool: Tool {
         // actively misleading; telling the model the margin lets it hedge appropriately
         // ("approximately") instead of stating a wrong city as fact.
         return "\(place) (±\(Int(location.horizontalAccuracyMeters))m accuracy — this is a network-based estimate, not GPS, and may be inaccurate on a desktop Mac)"
+    }
+}
+#endif
+
+// MARK: - Contacts tool (via Core's ContactsAccess connector)
+
+#if PLATETODAY_INCLUDE_CONTACTS
+// Permission-gated like TodaysLocationTool, so it lives in the app rather than in Core. Mirrors
+// LocalLM Lab's own SearchContactsTool: same name, description, and read-only guarantee.
+//
+// Build-time opt-in, default off: contacts aren't part of a daily summary, so this is an
+// on-demand lookup the model uses when a person's name comes up, and the default build avoids
+// an extra Contacts permission prompt.
+struct SearchContactsTool: Tool {
+    let name = "searchContacts"
+    let description = "Searches the user's Contacts by name and returns matching contacts — name, organization, phone numbers, and email addresses. Only call this when the user is explicitly asking to look up, find, or search for a person in their Contacts, or when enriching a calendar/reminder item that names a specific person. Read-only; cannot create, modify, or delete contacts."
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The name (or partial name) to search for, e.g. \"Jane\" or \"Jane Smith\".")
+        var query: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        let access = await Connectors.requestAccess(.contacts)        // ← SDK
+        guard access.granted else { return access.error ?? "Contacts access not granted." }
+
+        let matches = ContactsAccess.search(query: arguments.query, limit: 10)  // ← SDK
+        if matches.isEmpty { return "No contacts found matching \"\(arguments.query)\"." }
+        return matches.map { contact in
+            var line = "- \(contact.name)"
+            if let org = contact.organization, !org.isEmpty { line += " (\(org))" }
+            if !contact.phoneNumbers.isEmpty { line += " — phone: \(contact.phoneNumbers.joined(separator: ", "))" }
+            if !contact.emails.isEmpty { line += " — email: \(contact.emails.joined(separator: ", "))" }
+            return line
+        }.joined(separator: "\n")
     }
 }
 #endif
@@ -279,6 +332,10 @@ final class PlateTodayModel: ObservableObject {
         tools.append(WeatherTool())                                   // ← SDK
         checks.append("the user's current location and today's weather there (getCurrentLocation, then getWeather with that place)")
         summarizeNote = ", including the weather"
+        #endif
+        #if PLATETODAY_INCLUDE_CONTACTS
+        // Not added to `checks`: it's an on-demand lookup, not something to check every run.
+        tools.append(SearchContactsTool())
         #endif
         let prompt = """
         What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
@@ -389,16 +446,16 @@ struct PlateTodayApp: App {
 }
 ```
 
-**Tally**: of ~230 lines of actual code (excluding comments/blank lines), 18 touch the SDK directly
+**Tally**: of 216 lines of actual code (excluding comments/blank lines), 21 touch the SDK directly
 (marked above) — everything else is ordinary SwiftUI state/view code and FoundationModels session
 setup that would look the same regardless of where the tools' data comes from.
 
 ## `examples/plate-today-tools`
 
-*`Sources/PlateTodayTools/PlateTodayToolsApp.swift` — 149 lines of code (235 with comments) — ~130 fewer than `plate-today` for the same app.*
+*`Sources/PlateTodayTools/PlateTodayToolsApp.swift` — 149 lines of code (235 with comments) — 67 fewer lines of code than `plate-today` for the same app.*
 
 The Path A twin of plate-today above — same app, same UI, same connectors, rebuilt on Core's
-ready-made FoundationModels Tools (§7a of `sdk-guide.md`) instead of hand-writing a `Tool` struct
+ready-made FoundationModels Tools ([`sdk-guide.md`, "Two paths to tool-calling"](sdk-guide.md#two-paths-to-tool-calling-ready-made-tools-or-write-your-own)) instead of hand-writing a `Tool` struct
 per connector. Marked the same way, plus `// ← SDK (Path A)` specifically on lines that only exist
 *because* a ready-made Tool replaces what used to be a whole hand-written struct — diff this
 against the section above to see the two approaches side by side.
@@ -408,8 +465,8 @@ against the section above to see the two approaches side by side.
 // UI, same prompt, same connectors), rebuilt on Core's ready-made FoundationModels Tools instead
 // of hand-writing a Tool struct per connector. Diff this file against plate-today's
 // PlateTodayApp.swift to see the "Path A vs Path B" difference described in
-// docs/sdk-guide.md §7a in actual code, not just prose — every place the two files diverge is
-// called out below with a `DIFF FROM plate-today:` comment.
+// docs/sdk-guide.md ("Two paths to tool-calling") in actual code, not just prose — every place the two files
+// diverge is called out below with a `DIFF FROM plate-today:` comment.
 
 import Foundation
 import FoundationModels
@@ -541,8 +598,8 @@ final class PlateTodayToolsModel: ObservableObject {
 // "platetoday", so both apps' OAuth callbacks can coexist on the same Mac)
 ```
 
-**Tally**: essentially the same line count as plate-today for UI/plumbing, but roughly 130 fewer
-lines overall — every hand-written `Tool` struct plate-today needed for Calendar/Reminders/
+**Tally**: essentially the same line count as plate-today for UI/plumbing, but 124 fewer
+lines overall (67 fewer lines of code) — every hand-written `Tool` struct plate-today needed for Calendar/Reminders/
 Location/Contacts is gone, replaced by a single `Core` type each. The MCP integration keeps the
 same line count either way (`MCPTool(descriptor:manager:)` vs. a hand-written `TodoistTasksTool`
 struct), but trades pinned arguments for a raw, server-defined tool surface — see the
@@ -564,7 +621,7 @@ touches nothing TCC-gated, so there's no permission prompt to need a real bundle
 // TCC-gated: MCP network calls need no macOS permission, so a bare `swift run` binary works
 // end to end, no packaging/ directory, no code signing, no Info.plist. That's the point of this
 // example existing separately rather than as a third tool bolted onto plate-today-tools — it
-// shows Core's MCPTool (Path A — see docs/sdk-guide.md §7a) in its simplest possible setting.
+// shows Core's MCPTool (Path A — see docs/sdk-guide.md ("Two paths to tool-calling")) in its simplest possible setting.
 //
 // Narrative: ask a free-form question about any public GitHub repository's own documentation,
 // answered by Apple's on-device model calling Deepwiki's real hosted MCP server
@@ -627,7 +684,7 @@ func run() async {
     // call, ~20x this model's whole ~8,000-token context window. The on-device model has no way to
     // know that in advance from the tool's name/description alone, and picked it for a plain
     // "what is the plugin system?" question in real testing, hard-failing the whole session. This
-    // is exactly the risk docs/sdk-guide.md §3 already warns about ("don't naively pass all of
+    // is exactly the risk docs/mcp-guide.md ("Connecting to an MCP server") already warns about ("don't naively pass all of
     // them into a LanguageModelSession without picking the ones your prompt actually needs") —
     // MCPTool itself has no way to know a tool's real-world response size from its schema, since
     // JSON Schema describes shape, not payload size; that judgment call is the integrating app's
@@ -683,7 +740,7 @@ leaf per `MCPToolAdapter`'s documented behavior for constructs past the common c
 `read_wiki_contents` exclusion above the tool-building loop: it's app-level curation, not an SDK
 behavior — `MCPTool` will happily wrap any tool a server advertises, real-world response size and
 all; deciding which of a server's tools are actually safe to hand a small on-device model is
-entirely this app's judgment call, the same point docs/sdk-guide.md §6 makes about tool selection
+entirely this app's judgment call, the same point docs/mcp-guide.md ("The MCP client API") makes about tool selection
 generally.
 
 ## `examples/workspace-buddy`
@@ -692,8 +749,8 @@ generally.
 
 A fourth shape again: the first reference app that writes to disk, and the first sandboxed by
 default. Pick a folder, describe a change, the on-device model reads/creates/edits files in it via
-`WorkspaceTools` (Path A). The folder-picker/bookmark code (`FolderAccess`) is §8's own documented
-pattern, extended with one real addition — see the `// ← SDK` markers below and the inline comment
+`WorkspaceTools` (Path A). The folder-picker/bookmark code (`FolderAccess`) is the documented pattern from
+[`sdk-guide.md`'s "Filesystem access" section](sdk-guide.md#filesystem-access-security-scoped-bookmarks-example-not-in-core), extended with one real addition — see the `// ← SDK` markers below and the inline comment
 on `withFolderAccessAsync`.
 
 ```swift
@@ -706,10 +763,11 @@ import FoundationModels
 import LocalLMLabSDKCore                                              // ← SDK
 import SwiftUI
 
-// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8)
+// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md ("Filesystem access"))
 
-// Verbatim from §8's documented pattern, with one real addition not covered there: an
-// async-aware access wrapper. §8's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —
+// Verbatim from the guide's "Filesystem access" pattern, with one real addition not covered
+// there: an async-aware access wrapper. The guide's withFolderAccess<T>(_:) brackets a
+// SYNCHRONOUS body —
 // fine for a single read, but this app's actual file access happens inside
 // LanguageModelSession.respond(to:), which can invoke several tool calls over one async call.
 // The security-scoped access window has to stay open for that whole call, not just a synchronous
@@ -752,8 +810,8 @@ enum FolderAccess {
         return url
     }
 
-    // DIFF FROM §8's synchronous withFolderAccess<T>(_:): brackets an ASYNC body, so the access
-    // window stays open for a whole LanguageModelSession.respond(to:) call.
+    // DIFF FROM the guide's synchronous withFolderAccess<T>(_:): brackets an ASYNC body, so the
+    // access window stays open for a whole LanguageModelSession.respond(to:) call.
     @MainActor
     static func withFolderAccessAsync<T>(_ body: (URL) async throws -> T) async rethrows -> T? {
         guard let url = resolveBookmarkedFolder() else { return nil }
@@ -768,12 +826,19 @@ enum FolderAccess {
 @available(macOS 26.0, *)
 @MainActor
 final class WorkspaceBuddyModel: ObservableObject {
-    enum State { case idle, working, ready(String), failed(String) }
+    enum State {
+        case idle
+        case working
+        case ready(String)
+        case failed(String)
+    }
 
     @Published private(set) var folderURL: URL?
     @Published private(set) var state: State = .idle
 
-    init() { folderURL = FolderAccess.resolveBookmarkedFolder() }
+    init() {
+        folderURL = FolderAccess.resolveBookmarkedFolder()
+    }
 
     func chooseFolder() {
         guard let url = FolderAccess.pickFolder() else { return }
@@ -834,10 +899,10 @@ final class WorkspaceBuddyModel: ObservableObject {
 // MARK: - UI (ordinary SwiftUI — folder path display, a text field, a Go button, a result view)
 ```
 
-**Tally**: of ~150 lines of actual code (excluding the UI section, which is plain SwiftUI with no
+**Tally**: of 109 lines of actual code (excluding the UI section, which is plain SwiftUI with no
 SDK touchpoints), five lines touch the SDK directly — four Tool instantiations and one error
-formatter. The folder-picker/bookmark machinery is entirely `FolderAccess`, §8's own documented
-pattern rather than Core code — the point being made here isn't "look how much SDK code this
+formatter. The folder-picker/bookmark machinery is entirely `FolderAccess`, the guide's documented
+"Filesystem access" pattern rather than Core code — the point being made here isn't "look how much SDK code this
 needs," it's the opposite: given a resolved URL, actually reading/writing files safely inside a
 sandbox is four one-line Tool instantiations, not a filesystem library to write yourself.
 
@@ -1060,12 +1125,15 @@ get a `>>` loop over one persistent session, and it downloads an open-weight MLX
 run (pinned to the exact commit the example was tried against, so a fresh download never silently
 picks up whatever `main` has become), then drives Core's Workspace tools + host `Process` tools + (auto) MCP tools through a routed
 `LocalLMLabSession`. Ctrl-C cancels the running turn — reaching the `Process` tools so a child
-`swift test` is terminated, not orphaned — and quits from an idle prompt. See
-[`sdk-guide.md` §6a](sdk-guide.md#6a-the-model-layer-local-models-routing-sessions) for the prose.
+`swift test` is terminated, not orphaned — and quits from an idle prompt. Because a coding agent's
+tools change files, and SDK 3.0 denies those when a session has no authorizer, `makeSession` passes
+`authorizer: AllowingToolAuthorizer()`: a CLI with nobody at a prompt runs every call unasked (an app
+with a UI would pass a `ConfirmingToolAuthorizer`). See
+[`sdk-guide.md`, "The model layer"](sdk-guide.md#the-model-layer-models-routing-and-sessions) for the prose.
 
 ### `Sources/CodeBuddy/main.swift`
 
-*220 lines of code (290 with comments).*
+*220 lines of code (295 with comments).*
 
 ```swift
 import Foundation
@@ -1073,7 +1141,7 @@ import FoundationModels
 import LocalLMLabSDKCore                                              // ← SDK
 import LocalLMLabSDKInference                                         // ← SDK (Inference)
 
-// code-buddy — a minimal coding agent on the LocalLM Lab SDK.
+// code-buddy — a minimal coding agent on the LocalLM SDK.
 //   code-buddy [--route heavy|light] [--heavy <repo>] [--light <repo>]
 //              [--test-cmd "<cmd>"] [--no-mcp] [--no-verbose] <workspace-dir> [task...]
 // With a task: run it and stop. Without: a >> loop over one session until `quit` / Ctrl-D.
@@ -1134,7 +1202,10 @@ func startSigintWatch(_ interrupt: Interrupt) -> any DispatchSourceSignal {
     signal(SIGINT, SIG_IGN)
     let src = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
     src.setEventHandler {
-        if interrupt.fire() { note("\nquitting…"); exit(130) }   // process exit; no explicit session.cancel() here
+        if interrupt.fire() {
+            note("\nquitting…")
+            exit(130)                       // process exit; no explicit session.cancel() here
+        }
         note("\n^C  interrupting this turn — Ctrl-C again to quit")
     }
     src.resume()
@@ -1152,7 +1223,9 @@ final class Interrupt: @unchecked Sendable {
     func fire() -> Bool {   // → true means "quit now"
         lock.lock(); defer { lock.unlock() }
         guard let turn, !armed else { return true }
-        turn.cancel(); armed = true; return false
+        turn.cancel()
+        armed = true
+        return false
     }
 }
 
@@ -1216,8 +1289,9 @@ func run() async {
         note("connecting DeepWiki (docs lookup)…")
         let result = await lab.mcp.addServer(url: URL(string: "https://mcp.deepwiki.com/mcp")!, displayName: "DeepWiki")   // ← SDK
         if case .success(let state) = result {
+            // read_wiki_contents dumps an entire wiki unscoped, so it stays off.
             for tool in state.tools where tool.name == "read_wiki_contents" {
-                lab.mcp.setToolEnabled(server: state.id, tool: tool.name, enabled: false)   // ← SDK
+                lab.mcp.setToolEnabled(false, server: state.id, tool: tool.name)   // ← SDK
             }
             note("  \(lab.mcp.toolsForSession().count) MCP tool(s)")   // ← SDK
         } else {
@@ -1240,7 +1314,11 @@ func run() async {
     // One call: a session on the chosen route, with these tools AND the enabled MCP tools merged.
     let session: LocalLMLabSession                                   // ← SDK
     do {
-        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions)   // ← SDK
+        // SDK 3.0: with no authorizer a session denies anything that changes data, and a coding
+        // agent's job is to edit files and run tests. This CLI runs with nobody at a prompt, so
+        // every call runs unasked. An app with a UI would pass a ConfirmingToolAuthorizer instead.
+        session = try lab.makeSession(route: opts.route, tools: tools, instructions: instructions,   // ← SDK
+                                      authorizer: AllowingToolAuthorizer())   // ← SDK
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }
@@ -1271,23 +1349,34 @@ func run() async {
             var shown = ""
             for try await content in session.streamResponse(to: prompt) {   // ← SDK
                 if content.isEmpty || content == shown { continue }
-                if content.hasPrefix(shown) { print(content.dropFirst(shown.count), terminator: "") }
-                else if shown.hasPrefix(content) { continue }   // snapshot shrank; already shown
-                else { print(shown.isEmpty ? content : "\n" + content, terminator: "") }
-                shown = content; fflush(stdout)
+                if content.hasPrefix(shown) {
+                    print(content.dropFirst(shown.count), terminator: "")
+                } else if shown.hasPrefix(content) {
+                    continue                        // snapshot shrank; already shown
+                } else {
+                    print(shown.isEmpty ? content : "\n" + content, terminator: "")
+                }
+                shown = content
+                fflush(stdout)
             }
             print()
         } catch is CancellationError {
             note("\n(interrupted — nothing further will run)")
         } catch {
-            note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+            if Task.isCancelled {                // a cancelled turn can surface as another error
+                note("\n(interrupted — nothing further will run)")
+            } else {
+                note("\nerror: \(await GenerationErrorDescription.describe(error))")   // ← SDK
+            }
         }
     }
 
     // Run a turn as a cancellable child Task the Ctrl-C handler can reach.
     func turn(_ prompt: String) async {
         let t = Task { await ask(prompt) }
-        interrupt.begin(t); await t.value; interrupt.end()
+        interrupt.begin(t)
+        await t.value
+        interrupt.end()
     }
 
     if !opts.task.isEmpty {
@@ -1296,12 +1385,15 @@ func run() async {
     } else {
         note("\ncode-buddy — interactive. Type a request; `quit`, Ctrl-D, or Ctrl-C at the prompt to exit.\n")
         while true {
-            print(">> ", terminator: ""); fflush(stdout)
+            print(">> ", terminator: "")
+            fflush(stdout)
             guard let line = readLine() else { note(""); break }     // EOF / Ctrl-D
             let task = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if task.isEmpty { continue }
             if task == "quit" || task == "exit" { break }
-            print(); await turn(task); print()
+            print()
+            await turn(task)
+            print()
         }
     }
 
@@ -1314,12 +1406,12 @@ func run() async {
 await run()
 ```
 
-**Tally**: of the file's 220 non-comment/non-blank lines, 31 touch the SDK directly (marked
-above) — and that 31 is the *entire* model layer: pick providers, name routes, preflight/download,
-make a session, stream it, watch `.events`, plus the seven ready-made Workspace `Tool`s and the
+**Tally**: of the file's 220 non-comment/non-blank lines, 32 touch the SDK directly (marked
+above) — and that 32 is the *entire* model layer: pick providers, name routes, preflight/download,
+make a session (with its `AllowingToolAuthorizer`), stream it, watch `.events`, plus the seven ready-made Workspace `Tool`s and the
 MCP add-server/tool-disable calls. Everything MLX-specific is a handful of lines (`MLXModelProvider` with its `pinnedRevisions:` /
 `pinStore:` pin, `validate`, `download`, `effectivePin(for:)`, and the import); use `ClaudeModelProvider` from `LocalLMLabSDKClaude`
-instead (a macOS-27 target — see `sdk-guide.md` §1a) and the rest of the file is unchanged.
+instead (a macOS-27 target — see `sdk-guide.md`, "Targeting macOS 26 and 27") and the rest of the file is unchanged.
 `RouteName` is the only new type the caller names by hand. The REPL loop and Ctrl-C handling add
 no SDK surface — one persistent `LocalLMLabSession` spans every turn, and `session.cancel()` /
 Task cancellation is the whole cancel story.
@@ -1329,7 +1421,7 @@ Task cancellation is the whole cancel story.
 *95 lines of code (123 with comments) — host-owned tool code; none of it is SDK API.*
 
 Not SDK code at all — this is the worked example of the **host-owned `Process` tool** pattern
-that `sdk-guide.md` §7 calls out: the SDK deliberately does **not** ship shell/git/test-runner
+that `sdk-guide.md`, "Connectors" calls out: the SDK deliberately does **not** ship shell/git/test-runner
 tools (App Sandbox + Mac App Store can't run `Process`), so a Developer-ID CLI like this one
 implements them itself, scoped to the workspace, with its own safety policy. Zero `// ← SDK`
 marks — it's here to show the boundary, not a touchpoint.
@@ -1349,8 +1441,11 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
     let pipe = Pipe()
     process.standardOutput = pipe
     process.standardError = pipe
-    do { try process.run() }
-    catch { return "Failed to launch \(exe): \(error.localizedDescription)" }
+    do {
+        try process.run()
+    } catch {
+        return "Failed to launch \(exe): \(error.localizedDescription)"
+    }
 
     let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
     DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
@@ -1364,7 +1459,9 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
                 cont.resume(returning: d)
             }
         }
-    } onCancel: { if process.isRunning { process.terminate() } }
+    } onCancel: {
+        if process.isRunning { process.terminate() }
+    }
     deadline.cancel()
 
     var output = String(decoding: data, as: UTF8.self)
@@ -1373,7 +1470,9 @@ func runProcess(_ exe: String, _ args: [String], cwd: URL, timeout: TimeInterval
         output = String(output.prefix(cap)) + "\n…[truncated, \(output.count) chars total]"
     }
     let status = process.terminationStatus
-    return output.isEmpty ? "(no output; exit \(status))" : "\(output)\n[exit \(status)]"
+    return output.isEmpty
+        ? "(no output; exit \(status))"
+        : "\(output)\n[exit \(status)]"
 }
 
 /// Read-only git. Mutating subcommands are refused — the host's policy, not the SDK's.
@@ -1394,7 +1493,8 @@ struct GitTool: Tool {
     func call(arguments: Arguments) async throws -> String {
         try Task.checkCancellation()   // a tool call queued after a Ctrl-C never launches
         let parts = arguments.command
-            .split(whereSeparator: { $0 == " " || $0 == "\n" }).map(String.init)
+            .split(whereSeparator: { $0 == " " || $0 == "\n" })
+            .map(String.init)
         guard let sub = parts.first else { return "No git subcommand given." }
         guard Self.readOnlySubcommands.contains(sub) else {
             return "Refused: '\(sub)' is not an allowed read-only git subcommand."
@@ -1419,7 +1519,9 @@ struct RunTestsTool: Tool {
         try Task.checkCancellation()
         guard let exe = command.first else { return "No test command configured." }
         var args = Array(command.dropFirst())
-        if let filter = arguments.filter, !filter.isEmpty { args += ["--filter", filter] }
+        if let filter = arguments.filter, !filter.isEmpty {
+            args += ["--filter", filter]
+        }
         let resolved = exe.hasPrefix("/") ? exe : (which(exe) ?? "/usr/bin/env")
         let finalArgs = resolved == "/usr/bin/env" ? [exe] + args : args
         return await runProcess(resolved, finalArgs, cwd: root)
@@ -1443,7 +1545,7 @@ make Ctrl-C in the REPL terminate a running `swift test` instead of orphaning it
 
 ## `examples/repo-qa-local`
 
-*`Sources/RepoQALocal/main.swift` — 96 lines of code (129 with comments).*
+*`Sources/RepoQALocal/main.swift` — 97 lines of code (144 with comments).*
 
 The **minimal** model-layer example: [`repo-qa`](#examplesrepo-qa) above, with Apple's
 on-device model swapped for an open-weight MLX model you download and run locally — including the
@@ -1454,7 +1556,10 @@ on-device model swapped for an open-weight MLX model you download and run locall
 **`lab.mcp`** — the lab's one MCP manager — and `makeSession` offers its enabled tools
 (`includeMCPTools`), instead of the example building `MCPTool`s itself. A new server's tools start
 off, so the example turns on the ones it wants (`MCPTool(descriptor:manager:)` is used only to skip
-a tool whose schema doesn't build). The turn runs on the session's own `respond(to:)`. One of
+a tool whose schema doesn't build). Because DeepWiki isn't marked trusted, SDK 3.0 counts its tools
+as changes and denies them in a session with no authorizer; this CLI has nobody at a prompt, so
+`makeSession` passes `authorizer: AllowingToolAuthorizer()` (an app with a UI would pass a
+`ConfirmingToolAuthorizer`). The turn runs on the session's own `respond(to:)`. One of
 several examples linking `LocalLMLabSDKInference` (`// ← SDK (Inference)`); `// ← SDK` is Core as
 elsewhere.
 
@@ -1554,7 +1659,7 @@ func run() async {
     // host opts in), so enable the ones this example uses. `read_wiki_contents` stays off: it dumps
     // a repo's entire wiki unscoped (~165K tokens for anthropics/claude-code in one call), which
     // `MCPTool` can't know from the schema — that curation is the app's job (see
-    // docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal (makeSession
+    // docs/mcp-guide.md ("Connecting to an MCP server")). A tool whose schema doesn't build is skipped, not fatal (makeSession
     // would otherwise fail on it).
     var enabled: [String] = []
     for descriptor in state.tools {
@@ -1564,7 +1669,7 @@ func run() async {
         }
         do { _ = try MCPTool(descriptor: descriptor, manager: lab.mcp) }  // ← SDK
         catch { note("Skipping \(descriptor.name): \(error)"); continue }
-        lab.mcp.setToolEnabled(server: state.id, tool: descriptor.name, enabled: true)  // ← SDK
+        lab.mcp.setToolEnabled(true, server: state.id, tool: descriptor.name)  // ← SDK
         enabled.append(descriptor.name)
     }
     guard !enabled.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
@@ -1576,7 +1681,11 @@ func run() async {
     let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     let session: LocalLMLabSession                                   // ← SDK
     do {
-        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true)  // ← SDK
+        // SDK 3.0: with no authorizer, an untrusted server's tools count as changes and are denied.
+        // This CLI only asks read-only documentation questions, with nobody at a prompt, so every
+        // call runs unasked. (An app with a UI passes a ConfirmingToolAuthorizer.)
+        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true,  // ← SDK
+                                      authorizer: AllowingToolAuthorizer())  // ← SDK
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }
@@ -1601,18 +1710,18 @@ if #available(macOS 26.0, *) {
 }
 ```
 
-**Tally**: of the file's 96 non-comment/non-blank lines, 19 touch the SDK directly (marked above).
+**Tally**: of the file's 97 non-comment/non-blank lines, 20 touch the SDK directly (marked above).
 The model layer is ~8 lines (`MLXModelProvider` / `LocalLMLab` / `ModelID` / `route` /
 `availability` / `validate` / `download`, plus the diagnostic `note(...)` line that reads
 `LocalLMLabSDKVersion.current`); pinning adds the `shippedPins` dictionary, the `pinStore:` argument
 and an `effectivePin(for:)` call that reports which version is in use and where the pin came from
 (`.shipped` vs `.captured`). The MCP half is `lab.mcp.addServer`, a `setToolEnabled` per tool, and
-`makeSession(includeMCPTools: true)`; `--apple` proves the same route can point at Apple's on-device
+`makeSession(includeMCPTools: true, authorizer: AllowingToolAuthorizer())`; `--apple` proves the same route can point at Apple's on-device
 model with no other change.
 
 ## `examples/workspace-buddy-local`
 
-*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 256 lines of code (333 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
+*`Sources/WorkspaceBuddyLocal/WorkspaceBuddyLocalApp.swift` — 270 lines of code (353 with comments) — the verbatim `FolderAccess` enum and the plain-SwiftUI
 UI are elided below.*
 
 [`workspace-buddy`](#examplesworkspace-buddy) above —
@@ -1625,6 +1734,11 @@ commit the app was tried against (`pinnedRevisions:`), so a fresh download alway
 than whatever `main` has become. One of several examples linking
 `LocalLMLabSDKInference`. The `FolderAccess` enum is verbatim from `workspace-buddy` and is
 elided here — see that section above.
+
+Unlike `workspace-buddy`, which uses Apple's `LanguageModelSession` directly, this app goes through
+`makeSession`, and since 3.0 a session with no `authorizer:` refuses writes. So it passes a
+`ConfirmingToolAuthorizer` that asks the user, through a small `NSAlert`-based
+`AlertConfirmationChannel`, before any write or edit; reads run without asking.
 
 Where `workspace-buddy` awaits `respond(to:)` whole behind a spinner, this one **streams**: an
 8B model on the GPU is slow enough that a bare spinner reads as stuck, so the answer renders as
@@ -1647,7 +1761,7 @@ let workspaceModelRepo = "mlx-community/Qwen3-8B-4bit"
 let workspaceModelRevision = "545dc4251c05440727734bcd94334791f6ab0192"
 
 // MARK: - FolderAccess { pickFolder / resolveBookmarkedFolder / withFolderAccessAsync }
-//   — verbatim from workspace-buddy (docs/sdk-guide.md §8); see that section above. Elided here.
+//   — verbatim from workspace-buddy (docs/sdk-guide.md ("Filesystem access")); see that section above. Elided here.
 
 // MARK: - View model
 
@@ -1745,8 +1859,12 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 Explain what you changed and why, briefly.
                 """
             do {
+                // Writes and edits ask the user first (an alert here; a real app uses Components'
+                // ToolConfirmationPresenter). With no authorizer a session refuses writes.
                 let session = try self.lab.makeSession(              // ← SDK
-                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false
+                    route: .local, tools: tools, instructions: instructions, includeMCPTools: false,
+                    authorizer: ConfirmingToolAuthorizer(channel: AlertConfirmationChannel(),   // ← SDK
+                                                         hostTools: .ask(atOrAbove: .mutate, by: .user))   // ← SDK
                 )
 
                 // .events is the side-channel around generation — here, the tool running during
@@ -1754,9 +1872,12 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
                 let events = Task { @MainActor in
                     for await event in session.events {             // ← SDK
                         switch event {
-                        case .toolCallStarted(_, let name, _): self.activity = Self.activityLabel(for: name)
-                        case .toolCallFinished:                self.activity = nil
-                        default: break
+                        case .toolCallStarted(_, let name, _):
+                            self.activity = Self.activityLabel(for: name)
+                        case .toolCallFinished:
+                            self.activity = nil
+                        default:
+                            break
                         }
                     }
                 }
@@ -1796,20 +1917,39 @@ final class WorkspaceBuddyLocalModel: ObservableObject {
 @main
 struct WorkspaceBuddyLocalApp: App {
     @StateObject private var model = WorkspaceBuddyLocalModel()
+
     var body: some Scene {
-        WindowGroup { ContentView(model: model) }
-            .windowResizability(.contentMinSize)
+        WindowGroup {
+            ContentView(model: model)
+        }
+        .windowResizability(.contentMinSize)
+    }
+}
+
+/// Asks the user with an alert before a tool that changes the folder runs. The smallest possible
+/// `ToolConfirmationChannel`; Components' `ToolConfirmationPresenter` is the one for a real app.
+struct AlertConfirmationChannel: ToolConfirmationChannel {                 // ← SDK
+    func requestDecision(for call: PendingToolCall) async -> Bool {        // ← SDK (type)
+        await MainActor.run {
+            let alert = NSAlert()
+            alert.messageText = "Allow \(call.toolName)?"
+            alert.informativeText = (call.impactReason.map { $0 + "\n\n" } ?? "") + call.argumentsDescription
+            alert.addButton(withTitle: "Allow")
+            alert.addButton(withTitle: "Deny")
+            return alert.runModal() == .alertFirstButtonReturn
+        }
     }
 }
 ```
 
-**Tally**: of ~110 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
-UI section both elided), 17 touch the SDK (marked above). Against `workspace-buddy`'s five (four
+**Tally**: of 149 lines of actual code (the verbatim `FolderAccess` enum and the plain-SwiftUI
+UI section both elided), 21 touch the SDK (marked above). Against `workspace-buddy`'s five (four
 Tool instantiations + one error formatter), the delta is the model layer (provider/lab/route setup
-and the `pinnedRevisions:` pin, the first-run `availability` check, the `validate` + `download` progress loop) plus the streaming
-turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond`.
-The `makeSession` call and the four `WorkspaceTools` are identical to `workspace-buddy`'s — the
-sandbox changes nothing in the code, only the entitlements.
+and the `pinnedRevisions:` pin, the first-run `availability` check, the `validate` + `download` progress loop), the streaming
+turn — `session.events` for the tool-activity line and `streamResponse` instead of `respond` — and
+the write gate: the `ConfirmingToolAuthorizer` passed to `makeSession` and the `AlertConfirmationChannel`
+it asks through. The four `WorkspaceTools` are identical to `workspace-buddy`'s — the sandbox
+changes nothing in the code, only the entitlements.
 
 ## `examples/os-matrix`
 
@@ -1820,7 +1960,7 @@ One `.macOS("26.0")` CLI that runs unchanged on macOS 26 and macOS 27 — no sou
 OSes; the macOS-27-only model families (`PCCModelProvider`, open-weight via `MLXModelProvider`) are
 simply absent on 26, and `ModelAvailability.requiresOS` / `lab.models.schemesRequiringNewerOS` are
 what a picker reads to show them as disabled rows. See
-[`sdk-guide.md` §1a](sdk-guide.md#1a-targeting-macos-26-and-macos-27-from-one-build). It links
+[`sdk-guide.md`, "Targeting macOS 26 and 27"](sdk-guide.md#targeting-macos-26-and-macos-27-from-one-build). It links
 `LocalLMLabSDKInference` for the MLX types but never forces a 27 deployment target — the
 `#available` gate is the whole story.
 
@@ -1912,7 +2052,7 @@ func describe(_ a: ModelAvailability) -> String {                     // ← SDK
         if case .requiresOS(let os) = kind { return "requires \(os)" }   // ← SDK (.requiresOS)
         return "unavailable — \(detail)"
     @unknown default:
-        return "unknown"                                              // non-frozen — see sdk-guide §9
+        return "unknown"                                              // non-frozen — see sdk-guide.md ("Scope and boundaries")
     }
 }
 
@@ -1939,8 +2079,8 @@ independently re-verified in this pass.
 *328 lines of code across the app's four files — `AppModel.swift`, `ProviderGlue.swift`,
 `ModelSwitchApp.swift` (all below) and `Keychain.swift` (a 33-line generic-password wrapper, not shown).*
 
-The **online / remote providers** example (`sdk-guide.md`
-[§6b](sdk-guide.md#6b-online-providers--gpt-claude-online-openrouter-locallmlabsdkremote)): a chat
+The **online / remote providers** example
+([Online providers](remote-providers.md)): a chat
 window that talks to Apple's on-device model, PCC, Claude-via-Foundation-Models, and any number of
 HTTP providers (GPT, Claude online, OpenRouter, OpenAI-compatible) from one `lab.makeSession`
 call, with provider-run web search. This is the only example linking a **fourth** binary,
@@ -2263,13 +2403,13 @@ seam that keeps `Components` free of any dependency on `Remote`.
 
 ## `examples/security-demo`
 
-*~250 lines of code across 6 files; the SDK surface is two of them — `DemoSecurity.swift` and `AppModel.swift` (both below). The three view files (`SecurityPane`, `RunPane`, `ContentView`) and `SecurityDemoApp` are ordinary SwiftUI, elided; `Keychain.swift` is ~30 lines of `SecItem*` with no SDK in it (a credential belongs in the Keychain, not `UserDefaults` — that's the only reason it exists).*
+*432 lines of code across 7 files (588 with comments); the SDK surface is two of them — `DemoSecurity.swift` and `AppModel.swift` (both below). The three view files (`SecurityPane`, `RunPane`, `ContentView`) and `SecurityDemoApp` are ordinary SwiftUI, elided — except `ContentView`'s one `.toolConfirmationSheet(model.presenter)` line, which is the whole confirmation UI; `Keychain.swift` is 33 lines of `SecItem*` with no SDK in it (a credential belongs in the Keychain, not `UserDefaults` — that's the only reason it exists).*
 
 ### `Sources/SecurityDemo/DemoSecurity.swift`
 
 This file is the whole idea: a "Security panel" is **two SDK levers**, and nothing else. In 2.0
 the second lever is stated **where the tools come from** — the app's own tools on the
-authorizer, an MCP server's on `lab.mcp` ([sdk-guide.md §7c](sdk-guide.md#7c-tool-authorization-two-levers--which-tools-and-whether-they-ask-first)). `DemoSecurity` is the observable UI state; `DemoPolicy` is the immutable snapshot a run takes so editing the panel mid-turn can't change a session already built (the same split `SecurityPolicy` uses in LocalLM Lab).
+authorizer, an MCP server's on `lab.mcp` ([sdk-guide.md ("Tool authorization")](sdk-guide.md#tool-authorization-two-levers--which-tools-and-whether-they-ask-first)). `DemoSecurity` is the observable UI state; `DemoPolicy` is the immutable snapshot a run takes so editing the panel mid-turn can't change a session already built (the same split `SecurityPolicy` uses in LocalLM Lab).
 
 ```swift
 import FoundationModels
@@ -2280,6 +2420,7 @@ enum ConnectorLevel: String, CaseIterable, Identifiable, Sendable {
     case readOnly = "Read-only"
     case changes  = "Changes"
     case full     = "Full"
+
     var id: String { rawValue }
 
     // A connector "level" is just a ToolImpact ceiling.
@@ -2292,14 +2433,17 @@ enum ConnectorLevel: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-@MainActor @Observable
+@MainActor
+@Observable
 final class DemoSecurity {
     var calendarLevel: ConnectorLevel = .changes
     var calendarConfirm = true
-    var todoistConfirm  = true
+    var todoistConfirm = true
 
     func snapshot() -> DemoPolicy {
-        DemoPolicy(calendarLevel: calendarLevel, calendarConfirm: calendarConfirm, todoistConfirm: todoistConfirm)
+        DemoPolicy(calendarLevel: calendarLevel,
+                   calendarConfirm: calendarConfirm,
+                   todoistConfirm: todoistConfirm)
     }
 }
 
@@ -2307,9 +2451,6 @@ struct DemoPolicy: Sendable {
     var calendarLevel: ConnectorLevel
     var calendarConfirm: Bool
     var todoistConfirm: Bool
-
-    // No confirmation wanted anywhere ⇒ makeSession gets no authorizer, runs like a bare session.
-    var wantsConfirmation: Bool { calendarConfirm || todoistConfirm }
 
     // Lever 1 — selection. Drop every Calendar tool above the level's ceiling.
     func limitedCalendarTools(_ tools: [any Tool]) -> [any Tool] {
@@ -2332,14 +2473,15 @@ struct DemoPolicy: Sendable {
 
 ### `Sources/SecurityDemo/AppModel.swift`
 
-*About 130 lines of code (230 with comments).* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`.
+*159 lines of code (230 with comments); excerpted below.* `bootstrap()` is the host-app setup a real app would give proper UI (register providers, grant Calendar, connect Todoist MCP). `run()` is the payoff — `DemoPolicy` → a tool list + an authorizer → `lab.makeSession`. The run **always** passes a `ConfirmingToolAuthorizer`: since SDK 3.0 a session with no authorizer fails closed (reads run, every change and every untrusted MCP call is denied). With both confirm toggles off, both approvals are `.allow`, so every call runs unasked.
 
 ```swift
 import LocalLMLabSDKComponents                                        // ← Components
 import LocalLMLabSDKCore                                              // ← SDK
 import LocalLMLabSDKRemote                                            // ← SDK (Remote)
 
-@MainActor @Observable
+@MainActor
+@Observable
 final class AppModel {
     let security = DemoSecurity()
     @ObservationIgnored let presenter = ToolConfirmationPresenter()    // ← Components  — the ToolConfirmationChannel
@@ -2347,10 +2489,23 @@ final class AppModel {
 
     // MARK: bootstrap  (a real app has UI for all of this)
 
+    // A pasted API key: persist to the Keychain, register the provider now — no relaunch.
+    private func registerProvider(_ p: FrontierProvider, key: String) {
+        var cfg = p == .anthropic
+            ? RemoteProviderConfig.anthropic(apiKey: key)             // ← SDK (Remote) (preset)
+            : RemoteProviderConfig.openAI(apiKey: key)                // ← SDK (Remote) (preset)
+        cfg.allowArbitraryModelIDs = true                            // ← SDK (Remote)
+        do {
+            lab.models.replace(try RemoteModelProvider(cfg))          // ← SDK  — register-or-swap by scheme
+        } catch {
+            providerNote = "Couldn't use that key: \(error.localizedDescription)"
+        }
+    }
+
     private func bootstrap() async {
         lab = LocalLMLab()                                            // ← SDK  — empty; a pasted key is registered live
         for p in FrontierProvider.allCases where hasKey(for: p) {
-            registerProvider(p, key: storedKey(for: p))               // ← SDK (Remote)  — see below
+            registerProvider(p, key: storedKey(for: p))               // ← SDK (Remote)  — see above
             availableProviders.append(p)
         }
 
@@ -2363,22 +2518,9 @@ final class AppModel {
                                        authType: auth.type, patToken: auth.token) {
         case .success(let state):
             for tool in todoistTools where state.tools.contains(where: { $0.name == tool }) {
-                lab.mcp.setToolEnabled(server: state.id, tool: tool, enabled: true)   // ← SDK
+                lab.mcp.setToolEnabled(true, server: state.id, tool: tool)   // ← SDK
             }
         case .failure(let error): appendSetup("Couldn't connect Todoist MCP: \(error)…")
-        }
-    }
-
-    // A pasted API key: persist to the Keychain, register the provider now — no relaunch.
-    private func registerProvider(_ p: FrontierProvider, key: String) {
-        var cfg = p == .anthropic
-            ? RemoteProviderConfig.anthropic(apiKey: key)             // ← SDK (Remote) (preset)
-            : RemoteProviderConfig.openAI(apiKey: key)                // ← SDK (Remote) (preset)
-        cfg.allowArbitraryModelIDs = true                            // ← SDK (Remote)
-        do {
-            lab.models.replace(try RemoteModelProvider(cfg))          // ← SDK  — register-or-swap by scheme
-        } catch {
-            providerNote = "Couldn't use that key: \(error.localizedDescription)"
         }
     }
 
@@ -2394,17 +2536,17 @@ final class AppModel {
 
             // Lever 1 — selection. ClockTool is always on (a .read; the model needs "today").
             let hostTools: [any Tool] = [ClockTool()] + policy.limitedCalendarTools([   // ← SDK  — Core's EventKit tools
-                GetUpcomingEventsTool(), AddCalendarEventTool(),
-                UpdateCalendarEventTool(), DeleteCalendarEventTool(),
+                GetUpcomingEventsTool(),
+                AddCalendarEventTool(),
+                UpdateCalendarEventTool(),
+                DeleteCalendarEventTool(),
             ])
 
             // Lever 2 — invocation. Todoist's approval lives on its server in lab.mcp; the Calendar
-            // tools' on the authorizer. nil when the panel asks for no confirmation.
-            lab.mcp.setToolApproval(policy.todoistApproval,               // ← SDK  — per-server approval
-                                    server: MCPServerID(rawValue: todoistURL.absoluteString))
-            let authorizer: (any ToolCallAuthorizer)? = policy.wantsConfirmation   // ← SDK (type)
-                ? ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)   // ← SDK
-                : nil
+            // tools' on the authorizer. Always pass one: with no authorizer, 3.0 fails closed.
+            // With both toggles off, both approvals are .allow, so every call runs unasked.
+            lab.mcp.setToolApproval(policy.todoistApproval, server: MCPServerID(rawValue: todoistURL.absoluteString))   // ← SDK  — per-server approval
+            let authorizer = ConfirmingToolAuthorizer(channel: presenter, hostTools: policy.calendarApproval)   // ← SDK
 
             let session = try lab.makeSession(                        // ← SDK
                 route: "frontier",
@@ -2413,9 +2555,12 @@ final class AppModel {
                 includeMCPTools: true,      // pulls the enabled Todoist tools, tagged .mcp origin
                 authorizer: authorizer)
 
-            for await ev in session.events {                          // ← SDK  — toolCallStarted / toolCallFinished → the "Tool calls" list
-                // …append to model.toolLog…
+            let events = Task { [weak self] in
+                for await ev in session.events {                      // ← SDK  — toolCallStarted / toolCallFinished → the "Tool calls" list
+                    // …append to toolLog…
+                }
             }
+            defer { events.cancel() }
 
             output = try await session.respond(to: prompt)           // ← SDK
         } catch {
@@ -2425,24 +2570,24 @@ final class AppModel {
 }
 ```
 
-**Tally**: of the file's ~130 non-comment/non-blank lines, 22 touch the SDK directly (marked
+**Tally**: of the file's 159 non-comment/non-blank lines, 21 touch the SDK directly (marked
 above, plus 2 more marked `← Components`) — and every SDK one is either setup (`LocalLMLab()`,
 `registerProvider`, `addServer` + `setToolEnabled`,
 `CalendarAccess.requestAccess`) or the one `run()` call site: `route` → build `hostTools` with
 `limited(toMaxImpact:)` → set Todoist's approval with `setToolApproval` → a
 `ConfirmingToolAuthorizer` carrying Calendar's approval → `makeSession(authorizer:)` →
-`respond`. `DemoSecurity.swift` adds 4 more, all in `DemoPolicy` — the two levers themselves.
+`respond`. `DemoSecurity.swift` adds 6 more: the import, `maxImpact`'s `ToolImpact`, and 4 in `DemoPolicy` — the two levers themselves.
 The `ToolConfirmationPresenter` + `.toolConfirmationSheet(_:)` (in `ContentView`, one line) is
 the entire confirmation UI. Nothing in the three panel views touches the SDK — they bind to
 `DemoSecurity`, and the snapshot does the rest.
 
 ## `examples/aiql`
 
-*`Sources/AIQL/AIQLApp.swift` — 402 lines of code (459 with comments) — one file: view model +
+*`Sources/AIQL/AIQLApp.swift` — 403 lines of code (515 with comments) — one file: view model +
 pipeline + SwiftUI UI. The `FolderAccess` enum and the `ContentView` UI are elided below.*
 
-The **file-backed MCP tools + `loadTable` + `sqlQuery`** showcase (`sdk-guide.md`
-[§8b](sdk-guide.md#8b-filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
+The **file-backed MCP tools + `loadTable` + `sqlQuery`** showcase
+([`sdk-guide.md`, "`FileBackedTool` + the AIQL data verbs"](sdk-guide.md#filebackedtool--the-aiql-data-verbs-a-mechanical-mcp-dataset--csv-pipeline)):
 type a local model, an MCP data source, and a plain-English request; the app pulls the dataset
 into a file (so the raw payload never enters the model's context), `loadTable`s it into an
 ephemeral SQLite table, and has the model write **one read-only `SELECT`** to a CSV. The model
@@ -2451,12 +2596,16 @@ there's only ever one query call. `WHERE` / `BETWEEN` / `ORDER BY … LIMIT` / `
 SQLite. In 2.0 the data tools come from **`lab.mcp`**: the app adds the server there, turns on its
 four most data-like tools, and sets `lab.mcp.setFileBackedOutput(MCPFileBackedOutput(root:…), server:)`
 for the run's folder, so `makeSession(includeMCPTools: true)` offers each with a `saveAs` argument
-that writes its result to a file — under `raw/`, data-file types only (the default `SaveAsPolicy`). Links `LocalLMLabSDKInference` for the MLX model. Because the model
+that writes its result to a file — under `raw/`, data-file types only (the default `SaveAsPolicy`).
+The server you add isn't marked trusted, so SDK 3.0 counts its tools as changes and denies them in a
+session with no authorizer; AIQL only reads (one `SELECT` per question) from a server the user added,
+so `makeSession` passes `authorizer: AllowingToolAuthorizer()` (an app that wants a prompt would pass
+a `ConfirmingToolAuthorizer`). Links `LocalLMLabSDKInference` for the MLX model. Because the model
 field is free text, the app can't pin everything ahead of time, so it layers three supply-chain
 controls: the default model is **pinned** to a reviewed commit (`pinnedRevisions:`), any other model
 is pinned on first download (`MLXFilePinStore`), and a **trust policy** (`MlxCommunityOnly`) limits
 which repos can be fetched at all; downloads are hash-verified by default. `FolderAccess` is
-verbatim from `workspace-buddy-local` (`sdk-guide.md` §8) and elided.
+verbatim from `workspace-buddy-local` (`sdk-guide.md`, "Filesystem access") and elided.
 
 ```swift
 // AIQL — "ask your data". A SwiftUI app aimed at someone who lives in a marketing tool, not a
@@ -2470,7 +2619,7 @@ verbatim from `workspace-buddy-local` (`sdk-guide.md` §8) and elided.
 //
 // The model only writes the SQL — the host runs it read-only and the rows never enter the
 // model's context, so there is nothing to fabricate. loadTable + sqlQuery are Core tools; see
-// docs/sdk-guide.md §8b.
+// docs/sdk-guide.md ("`FileBackedTool` + the AIQL data verbs").
 //
 // Structure borrowed from: workspace-buddy-local (SwiftUI + App Sandbox + MLX model + folder
 // picker + security-scoped bookmark), plate-today (MCP client + OAuth redirect via AppDelegate),
@@ -2483,7 +2632,7 @@ import LocalLMLabSDKCore                                             // ← SDK
 import LocalLMLabSDKInference                                        // ← SDK (Inference)
 import SwiftUI
 
-// MARK: - Folder picker + security-scoped bookmark (docs/sdk-guide.md §8) — verbatim from workspace-buddy-local
+// MARK: - Folder picker + security-scoped bookmark (docs/sdk-guide.md ("Filesystem access")) — verbatim from workspace-buddy-local
 
 // … FolderAccess — elided (see the section intro)
 
@@ -2632,7 +2781,7 @@ final class AIQLModel: ObservableObject {
         let ranked = serverTools.sorted { lhs, rhs in Self.dataLikelihood(lhs.name) > Self.dataLikelihood(rhs.name) }
         let chosen = ranked.prefix(4).map(\.name)
         for tool in serverTools {
-            lab.mcp.setToolEnabled(server: serverID, tool: tool.name, enabled: chosen.contains(tool.name))  // ← SDK
+            lab.mcp.setToolEnabled(chosen.contains(tool.name), server: serverID, tool: tool.name)  // ← SDK
         }
         // File-backed: each data tool gets a `saveAs` argument that writes its raw result into the
         // chosen folder, so the dataset never enters the model's context. Only for this run —
@@ -2681,8 +2830,12 @@ final class AIQLModel: ObservableObject {
             // effort: .off — skip the model's <think> pass. The Qwen3 family has the
             // template toggle; the pipeline is mechanical (pick a tool, name a table, write
             // one SELECT) so the reasoning trace buys nothing but latency.
+            // SDK 3.0: with no authorizer, an untrusted server's tools count as changes and are
+            // denied. AIQL only reads, from a server you added yourself, so every call runs unasked.
+            // An app that wants a prompt passes a ConfirmingToolAuthorizer instead.
             session = try lab.makeSession(route: .local, tools: tools, instructions: instructions,  // ← SDK
-                                          includeMCPTools: true, options: SessionOptions(effort: .off))  // ← SDK
+                                          includeMCPTools: true, options: SessionOptions(effort: .off),  // ← SDK
+                                          authorizer: AllowingToolAuthorizer())  // ← SDK
         } catch LocalLMLabError.mcp {                                // ← SDK
             return .failed("Couldn't read that server's tools — its data format isn't supported yet.")
         } catch {
@@ -2813,9 +2966,9 @@ struct AIQLApp: App {
 }
 ```
 
-**Tally**: 42 lines carry a marker (32 Core, 10 Inference). The model layer is the same ~7 lines as
+**Tally**: 43 lines carry a marker (33 Core, 10 Inference). The model layer is the same ~7 lines as
 `repo-qa-local` (`MLXModelProvider` / `LocalLMLab` / `route` / `availability` / `validate` /
-`download` / `makeSession`), plus the supply-chain controls above: an `MLXModelTrustPolicy`
+`download` / `makeSession`, here with an `AllowingToolAuthorizer`), plus the supply-chain controls above: an `MLXModelTrustPolicy`
 conformance (~5 lines), the `pinnedRevisions:` / `supplyChainPolicy:` / `pinStore:` arguments on
 `MLXModelProvider`, and an `effectivePin(for:)` call that tells the user which version they got. The
 MCP side is `lab.mcp.addServer`, `setToolEnabled` for the chosen four, and one
@@ -2828,9 +2981,9 @@ doing the orchestration is the real work of this example; `WorkspaceAccess` read
 
 ## `examples/vistanova`
 
-*`Sources/VistaNova/AppModel.swift`, `TavilySearchTool.swift`, and `ModelStateStore` from
-`Persistence.swift` — the app's SDK-facing code, 931 lines of code in the whole app (1,294 with
-comments), of which `AppModel` is 361. The SwiftUI views, theme, settings screen
+*The app's SDK-facing code: `TavilySearchTool.swift`, `ModelStateStore` from `Persistence.swift`,
+and `AppModel.swift` — 939 lines of code in the whole app (1,309 with comments), of which
+`AppModel` is 369. The SwiftUI views, theme, settings screen
 are plain SwiftUI/Foundation and omitted; elisions are marked
 `// …`.*
 
@@ -2838,17 +2991,23 @@ A search engine whose two jobs use **two different local models**, because they 
 risk: *search* needs a model that reliably calls a tool (Apple's on-device model by default);
 *summarize* is pure text synthesis with no tool call, so it defaults to a downloaded MLX model,
 `mlx-community/Qwen3-4B-4bit`, **shipped pinned to an exact commit** (`sdk-guide.md`
-[Pinning, updating and cleaning up model versions](sdk-guide.md#pinning-updating-and-cleaning-up-model-versions)).
+[Pinning, updating and cleaning up model versions](local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions)).
 The search runs through Tavily's hosted MCP server with a static API key (`authType: .pat`), via a
-hand-written Path B `Tool`. Most of the interesting code is defensive: it never trusts a small
+hand-written Path B `Tool`. Every session passes `authorizer: Self.searchOnly`, a
+`ConfirmingToolAuthorizer` whose policy allows `tavily_search` and denies anything else:
+`TavilySearchTool` is unrated, so the SDK counts it as a change, and since SDK 3.0 a session with
+no authorizer would deny every search. Most of the interesting code is defensive: it never trusts a small
 model to have actually called the tool, or to have produced a usable shape. Links both
 `LocalLMLabSDKCore` and `LocalLMLabSDKInference`. Sandbox-free, ad-hoc signed (no entitlements).
+
+*`Sources/VistaNova/TavilySearchTool.swift` — the whole file, 33 lines of code (49 with comments).*
 
 ```swift
 // TavilySearchTool.swift — Path B: a hand-written Tool over one MCP tool, instead of Core's
 // auto-assembled MCPTool. Two things Path A can't give: max_results/search_depth pinned in
 // Swift (the model only ever chooses `query`), and the query the model actually sent.
 
+import Foundation
 import FoundationModels
 import LocalLMLabSDKCore                                              // ← SDK
 
@@ -2891,6 +3050,8 @@ struct TavilySearchTool: Tool {                                       // Foundat
 }
 ```
 
+*`Sources/VistaNova/Persistence.swift` — excerpt: only `ModelStateStore`.*
+
 ```swift
 // Persistence.swift — the SDK's own snapshot type is Codable: routes, residency and installed
 // records round-trip through one JSON file. The app keeps no model-choice setting of its own.
@@ -2908,6 +3069,8 @@ enum ModelStateStore {
     // …
 }
 ```
+
+*`Sources/VistaNova/AppModel.swift` — excerpt; 369 lines of code (591 with comments).*
 
 ```swift
 // AppModel.swift
@@ -2936,19 +3099,17 @@ final class AppModel {
         AppModel.summaryModelRepo: AppModel.summaryModelRevision,
     ])
 
-    static let summaryModelRepo = "mlx-community/Qwen3-4B-4bit"
-    static let summaryModelRevision = "4dcb3d101c2a062e5c1d4bb173588c54ea6c4d25"   // full commit hash, not a branch
-    static let defaultSummaryModel = ModelID(scheme: "mlx", rest: summaryModelRepo)!   // ← SDK
-
     // Two independent model choices — two routes, not one model: search needs reliable
     // tool-calling, summarize doesn't.
     var searchModel: ModelID = .system                                // ← SDK
     var summaryModel: ModelID = AppModel.defaultSummaryModel
+    static let summaryModelRepo = "mlx-community/Qwen3-4B-4bit"
+    static let summaryModelRevision = "4dcb3d101c2a062e5c1d4bb173588c54ea6c4d25"   // full commit hash, not a branch
+    static let defaultSummaryModel = ModelID(scheme: "mlx", rest: summaryModelRepo)!   // ← SDK
 
     init() {
         // …
-        lab = LocalLMLab(configuration: .init(                        // ← SDK
-            providers: [SystemModelProvider(), mlxProvider]))         // ← SDK / ← SDK (Inference)
+        lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider(), mlxProvider]))   // ← SDK / ← SDK (Inference)
         if let modelState = ModelStateStore.load() {
             lab.restore(from: modelState)                             // ← SDK — routes + installed records back
         }
@@ -2977,10 +3138,8 @@ final class AppModel {
     }
 
     private func reconnectTavily(shape: PersistedTavilyServer) async {
-        lab.mcp.restore(from: [(                                      // ← SDK — no network, no key prompt
-            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName,
-            tools: [], estimatedTokens: shape.estimatedTokens, enabled: true,
-            authType: .pat, manualClientID: nil, resources: []
+        lab.mcp.restore(from: [MCPServerSnapshot(                     // ← SDK — no network, no key prompt
+            id: tavilyServerID, url: tavilyURL, displayName: shape.displayName, authType: .pat
         )])
         let result = await lab.mcp.reconnect(tavilyServerID)          // ← SDK — pulls the key from the Keychain
         // …
@@ -3015,9 +3174,20 @@ final class AppModel {
     // `effort: .off` suppresses a Qwen3-family model's <think> block (a documented no-throw
     // preference: a model that always reasons just keeps reasoning instead of failing the turn).
     private func makeSessionSuppressingThinking(route: RouteName, tools: [any Tool] = [], instructions: String, includeMCPTools: Bool) throws -> LocalLMLabSession {
-        try lab.makeSession(route: route, tools: tools, instructions: instructions,   // ← SDK
-                            includeMCPTools: includeMCPTools, options: .init(effort: .off))   // ← SDK
+        try lab.makeSession(route: route, tools: tools, instructions: instructions, includeMCPTools: includeMCPTools,   // ← SDK
+                            options: .init(effort: .off), authorizer: Self.searchOnly)   // ← SDK  — every session gets the authorizer below
     }
+
+    // TavilySearchTool is unrated, so the SDK counts it as a change (it sends the query out), and
+    // since SDK 3.0 a session with no authorizer denies those: every search would come back DENIED.
+    // Typing a query is the user asking for that search, so allow tavily_search, deny anything else.
+    private static let searchOnly = ConfirmingToolAuthorizer(        // ← SDK
+        channel: nil,
+        policy: { call in
+            call.origin == .host && call.toolName == "tavily_search"   // ← SDK  — the call's origin and name
+                ? .allow : .deny(reason: "VistaNova only runs tavily_search")   // ← SDK
+        },
+        hostTools: .ask(atOrAbove: .read, by: .policy))               // ← SDK  — every host call goes to the policy
 
     private func attemptSearch(query: String, using session: LocalLMLabSession, supportsGuidedGeneration: Bool) async throws -> [SearchResultLink] {
         // A plausible-looking answer proves nothing: a model can answer from its own training data
@@ -3037,8 +3207,7 @@ final class AppModel {
                 // Guided generation (`generating:`) has no SDK turn method, so this one call stays on
                 // Apple's session — the escape hatch — which also keeps the recovery below reading
                 // Apple's own error.
-                let response = try await session.languageModelSession.respond(   // ← SDK — a plain FoundationModels session
-                    to: query, generating: SearchResults.self)
+                let response = try await session.languageModelSession.respond(to: query, generating: SearchResults.self)   // ← SDK — a plain FoundationModels session
                 guard toolWasCalled else { throw SearchParseError.toolNotCalled }
                 return response.content.pages.map { /* … */ }
             } catch {
@@ -3067,8 +3236,7 @@ final class AppModel {
         // of metadata is on disk and `installed` already lists the repo), so the app also keeps its
         // own record of "the last attempt didn't finish" and always re-runs the tracked download.
         if summaryModel.scheme == "mlx",
-           !mlxProvider.installed.contains(where: { $0.id == summaryModel })   // ← SDK (Inference)
-            || incompleteDownloadRepoIDs.contains(summaryModel.rest) {
+           !mlxProvider.installed.contains(where: { $0.id == summaryModel }) || incompleteDownloadRepoIDs.contains(summaryModel.rest) {   // ← SDK (Inference)
             guard await downloadSummaryModel() else { return }
         }
         // …
@@ -3094,7 +3262,7 @@ final class AppModel {
 }
 ```
 
-**Tally**: of `AppModel`'s 361 lines of code, 34 touch the SDK directly (marked above; another 8 in
+**Tally**: of `AppModel`'s 369 lines of code, 37 touch the SDK directly (marked above; another 8 in
 `TavilySearchTool` and `ModelStateStore`) — the rest is search-result parsing, thread bookkeeping
 and state. **The pin is one parameter**
 (`pinnedRevisions:` on `MLXModelProvider`) **plus two constants** — everything downstream
@@ -3110,10 +3278,10 @@ pinned `max_results` and the captured query.
 
 ## `examples/components-updates-demo`
 
-*`Sources/UpdatesDemo/UpdatesDemoApp.swift` — 151 lines of code (170 with comments) — the whole file is shown below.*
+*`Sources/UpdatesDemo/UpdatesDemoApp.swift` — 158 lines of code (182 with comments) — the whole file is shown below.*
 
 The `LocalLMLabSDKComponents` views for **onboarding, updating and cleaning up** a downloaded model
-([`sdk-guide.md` §11](sdk-guide.md#11-components-prebuilt-swiftui-mcp-servers--the-model-layer)), driven by
+([`sdk-guide.md`, "Components"](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)), driven by
 **simulated** sources: short sleeps stand in for the network and for MLX, so every state of every view can be
 reached on demand — a denied preflight, a download that fails part-way, a download that resolves to a different
 commit than the app ships, an update with the host's pause point, a failed update, a fixed model that can't be
@@ -3129,6 +3297,7 @@ the work; in a real host they call `MLXModelProvider` — `validate`, `download`
 `Components/README.md` has the ~40-line adapter.
 
 ```swift
+import AppKit
 import LocalLMLabSDKComponents                                    // ← Components
 import LocalLMLabSDKCore                                          // ← SDK
 import SwiftUI
@@ -3141,6 +3310,15 @@ private let newerCommit = "ff1143e3a10547c9f2129e94ca37059b096b23f4"
 @main
 @available(macOS 27, *)
 struct UpdatesDemoApp: App {
+    init() {
+        // Under `swift run` there is no app bundle, so the window can open behind the terminal.
+        // Become a regular app (only if not one already) and come to the front.
+        if NSApplication.shared.activationPolicy() != .regular {
+            NSApplication.shared.setActivationPolicy(.regular)
+        }
+        DispatchQueue.main.async { NSApplication.shared.activate() }
+    }
+
     var body: some Scene {
         WindowGroup("Components: onboarding, updates, versions") {
             DemoView().frame(minWidth: 640, minHeight: 720)
@@ -3301,7 +3479,7 @@ private struct DemoView: View {
 }
 ```
 
-**Tally**: of the file's 151 non-comment/non-blank lines, 38 touch the SDK (marked above), and every one of them is a
+**Tally**: of the file's 158 non-comment/non-blank lines, 38 touch the SDK (marked above), and every one of them is a
 `Components` type or a Core value type handed to one. Almost all of the rest is the *simulation* — the sleeps, the
 fault switches, the state for each demo section. The seams to notice:
 
@@ -3326,12 +3504,12 @@ fault switches, the state for each demo section. The seams to notice:
 ## `examples/mlx-control-room`
 
 *`Sources/MLXControlRoom/MLXControlRoomApp.swift` — the view-model half (`ControlRoomModel` and the constants above
-it), excerpted: 1,434 lines of code in the whole file (1,812 with comments), of which the SwiftUI views (`// MARK: - UI`,
-about 863 lines) are plain SwiftUI and omitted. Elisions are marked `// …`.*
+it), excerpted: 1,431 lines of code in the whole file (1,806 with comments), of which the SwiftUI views (`// MARK: - UI`,
+about 857 lines) are plain SwiftUI and omitted. Elisions are marked `// …`.*
 
 The example that shows how a host app can **deploy models from Hugging Face without a "just download anything"
 approach**, and exposes the MLX knobs with a gauge beside each. Read it as one tour of `MLXModelProvider`'s
-supply-chain and lifecycle surface ([`sdk-guide.md` §6a](sdk-guide.md#pinning-updating-and-cleaning-up-model-versions)):
+supply-chain and lifecycle surface ([`sdk-guide.md`, "The model layer"](local-models-mlx.md#pinning-updating-and-cleaning-up-model-versions)):
 
 1. **Check before you fetch.** `validate(_:)` runs the preflight (`trustPolicy`, `repoReachable`, `mlxFormat`,
    `architectureSupported`, `sizeVsMemory`, `diskSpace`, `cacheQuota`) and names the stage that failed.
@@ -3496,6 +3674,14 @@ final class ControlRoomModel: ObservableObject {
     private let managedPinStore = MLXFileManagedPinStore()        // ← SDK (Inference)
 
     // …
+    /// The `beforeSwitch` hook: the SDK has downloaded and verified the new version and is about to
+    /// move the pin. Stop new runs, let the one in flight finish, then return.
+    private func pauseInferenceForSwitch() async throws {
+        inferencePaused = true
+        onboardingLogLine("update downloaded and verified — pausing inference to switch")
+        while state == .working { try await Task.sleep(for: .milliseconds(100)) }
+    }
+
     /// Which kind of pin the active single model is on, if it can be updated here at all:
     /// - `.captured` — the user's own choice; the user decides, and the target is whatever `main` is now;
     /// - `.shipped` — a built-in model **the developer's feed vouches for**: the target is the commit
@@ -3520,14 +3706,6 @@ final class ControlRoomModel: ObservableObject {
     var activeBuildTimeRevision: String? {
         guard case .single(let repo) = activeLaunch else { return nil }
         return mlx?.buildTimePin(for: repo)                       // ← SDK (Inference)
-    }
-
-    /// The `beforeSwitch` hook: the SDK has downloaded and verified the new version and is about to
-    /// move the pin. Stop new runs, let the one in flight finish, then return.
-    private func pauseInferenceForSwitch() async throws {
-        inferencePaused = true
-        onboardingLogLine("update downloaded and verified — pausing inference to switch")
-        while state == .working { try await Task.sleep(for: .milliseconds(100)) }
     }
 
     func checkForPinUpdate() {
@@ -3799,574 +3977,16 @@ minimal end (one `pinnedRevisions:` and nothing else). The one thing worth copyi
 `AllowMLXCommunityOrShipped`: an allow-list keyed on `mlx-community/` plus the exact artifacts the app itself ships,
 because a curated adapter lives in a different namespace.
 
-## `examples/jevdk`
-
-*2,819 lines of code across 15 files (3,080 with comments). Excerpted: the SDK-facing parts of
-`AppModel.swift` and `HostedBackends.swift` are below; the editor, batch grid, calibration
-sheet, model browser, About panel and results-CSV writer are plain SwiftUI and Foundation and are
-omitted (`// …`).*
-
-A playground for **decision models** ([`sdk-guide.md` §6c](sdk-guide.md#6c-decision-models-jev--labdecide);
-for what a decision model is, see [Decision models (Jev) in your app](https://thisbrain.ai/locallm/jev.html)).
-Write yes / no, choice and score questions, run them on a local MLX model and on hosted Jev side
-by side, mark the right answers, calibrate, and export the tested setup for your app or for
-[`jev-serve`](#examplesjev-serve). Four SDK pieces carry it:
-
-- **`lab.decide`** for every hosted run: each enabled backend is a `JevDecisionProvider`
-  registered under its own scheme with its own decision route, so the demo and the keyed
-  Featherless endpoint coexist in one lab.
-- **`OpenJevDecisionProvider`** for local runs, built with the editor's wrapper so the system
-  instructions stay editable, and called through `decideWithDiagnostics` for the exact prompts
-  and how much probability fell on the allowed labels. It validates against the provider's limits
-  first, as `lab.decide` would.
-- **`DecisionCalibration`, `DecisionQuestionSet`, `DecisionAnswerSet`** for the workflow around
-  the runs: fitting, exporting the questions with their `Tuning` (model, version, wrapper,
-  calibration), opening an exported file again, and importing / exporting marked answers as CSV.
-- **`MLXModelProvider`** lists, checks and downloads models, and reports each one's version
-  (`resolvedRevision`), which every export records so what ships is what was tested.
-
-**Export Server Config…** writes the same `Tuning` into a `jev-serve` config (`JevServeConfig`,
-the example's own type in `OpenJevKit`). The released JevDK app carries `jev-serve` inside it; the
-app menu's **Install jev-serve Command…** links it onto the PATH (that's plain AppKit, not shown).
-
-Links `LocalLMLabSDKCore`, `LocalLMLabSDKInference` and `LocalLMLabSDKRemote`. Not sandboxed;
-API keys live in the Keychain (or, for headless runs, environment variables), never in a file.
-
-### `Sources/JevDK/AppModel.swift` (excerpt)
-
-Runs one input on every enabled backend concurrently: hosted through `lab.decide`, local through
-the OpenJev provider directly. Then the files: the questions exported for an app (and for
-jev-serve), answers imported from a CSV, and Open, which also reads an exported `.decisions.json`
-back. There's no prompt building and no answer parsing anywhere: questions go in typed, answers
-come back typed.
-
-```swift
-import AppKit
-import Foundation
-import LocalLMLabSDKCore   // ← SDK
-import LocalLMLabSDKInference   // ← SDK (Inference)
-import LocalLMLabSDKRemote   // ← SDK (Remote)
-import Observation
-import OpenJevKit
-import UniformTypeIdentifiers
-    // …
-    /// The SDK front door hosted runs go through.
-    let lab = LocalLMLab()   // ← SDK
-    /// Local models: listing, preflight, download, and the weights OpenJev scores on.
-    let mlx = MLXModelProvider()   // ← SDK (Inference)
-    // …
-    func refreshModels() {
-        let probe = OpenJevDecisionProvider(mlx: mlx)   // ← SDK (Inference)
-        models = mlx.installed.map { m in   // ← SDK (Inference)
-            LocalChoice(repoID: m.repoID, sizeBytes: m.sizeBytes,
-                        isMoE: probe.warnings(for: Self.openJevID(m.repoID)).contains(.mixtureOfExperts),   // ← SDK (Inference)
-                        revision: m.resolvedRevision)
-        }.sorted { ($0.sizeBytes ?? 0) < ($1.sizeBytes ?? 0) }
-    // …
-    private struct HostedPlan {
-        let route: RouteName   // ← SDK
-        let label: String
-        let requestPreview: String
-        let info: ResultsCSV.BackendInfo
-    }
-
-    /// Register the enabled hosted backends and point a decision route at each. Re-registered every
-    /// run so a changed key or model takes effect.
-    private func hostedPlans(for request: DecisionRequest) -> [HostedPlan] {   // ← SDK
-        enabledHosted.compactMap { b in
-            let model = hostedModel[b] ?? b.defaultModel
-            guard let id = b.modelID(model) else { return nil }
-            lab.models.replace(decision: JevDecisionProvider(b.config(key: b.needsKey ? apiKey(b) : nil)))   // ← SDK (Remote)
-            let route = RouteName("hosted.\(b.rawValue)")   // ← SDK
-            lab.models.route(decision: route, to: id)   // ← SDK
-            let body = (try? JevDecisionProvider.requestBody(model: model, request: request))   // ← SDK (Remote)
-                .flatMap { try? JSONSerialization.jsonObject(with: $0) }
-                .flatMap { try? JSONSerialization.data(withJSONObject: $0, options: [.prettyPrinted]) }
-                .map { String(decoding: $0, as: UTF8.self) } ?? ""
-            return HostedPlan(route: route, label: hostedLabel(b),
-                              requestPreview: "POST \(b.config(key: nil).endpoint.absoluteString)\n\(body)",
-                              info: .init(backend: b.rawValue, model: model, revision: nil, sizeBytes: nil, isMoE: nil,
-                                          wrapperLabel: nil, wrapperSystem: nil))
-        }
-    }
-
-    /// Run `input` on every enabled backend, concurrently.
-    private func runAll(_ input: String) async -> [BackendRun] {
-        let questions = set.questions
-        let request = DecisionRequest(state: .text(input), questions: questions.map(\.sdkQuestion))   // ← SDK
-        let plans = hostedPlans(for: request)
-        let local: (LocalChoice, OpenJevDecisionProvider)? = useLocal ? selectedModel.map { m in   // ← SDK (Inference)
-            (m, OpenJevDecisionProvider(mlx: mlx, wrapper: OpenJevWrapper(system: set.system, inputLabel: set.inputLabel)))   // ← SDK (Inference)
-        } : nil
-        let localLabel = self.localLabel
-        let localInfo = local.map { m, openjev in
-            ResultsCSV.BackendInfo(backend: "local", model: m.repoID,
-                                   revision: mlx.installed.first { $0.repoID == m.repoID }?.resolvedRevision,   // ← SDK (Inference)
-                                   sizeBytes: m.sizeBytes, isMoE: m.isMoE,
-                                   wrapperLabel: openjev.wrapper.inputLabel, wrapperSystem: openjev.wrapper.system)
-        }
-
-        return await withTaskGroup(of: (Int, BackendRun).self) { group in
-            if let (m, openjev) = local {
-                // Local runs call the provider directly for its diagnostics (exact prompts, label
-                // mass), validating against its limits first as lab.decide would.
-                group.addTask {
-                    do {
-                        try request.validate(against: openjev.limits)   // ← SDK
-                        let (d, diag) = try await openjev.decideWithDiagnostics(request, using: Self.openJevID(m.repoID))   // ← SDK (Inference)
-                        let qd = diag.questions.mapValues {
-                            QuestionDiagnostics(labels: $0.labels, prompt: $0.prompt, labelMass: $0.labelMass,
-                                                milliseconds: Self.ms($0.latency))
-                        }
-                        let rows = QuestionResult.rows(for: questions, decision: d, diagnostics: qd)
-                        return (0, BackendRun(label: localLabel, result: DecisionResult(
-                            input: input, results: rows, sharedPrefixTokens: diag.sharedPrefixTokens,
-                            milliseconds: Self.ms(d.latency), backend: localLabel), info: localInfo))
-                    } catch {
-                        return (0, BackendRun(label: localLabel, error: error.localizedDescription, info: localInfo))
-                    }
-                }
-            }
-            for (i, plan) in plans.enumerated() {
-                group.addTask { @MainActor in
-                    do {
-                        let d = try await self.lab.decide(route: plan.route, state: .text(input), questions: request.questions)   // ← SDK
-                        let rows = QuestionResult.rows(for: questions, decision: d, prompt: plan.requestPreview)
-                        return (i + 1, BackendRun(label: plan.label, result: DecisionResult(
-                            input: input, results: rows, sharedPrefixTokens: 0, milliseconds: Self.ms(d.latency),
-                            backend: plan.label, usage: d.usage?.summary), info: plan.info,
-                            inputTokens: d.usage?.inputTokens, costUSD: d.usage?.cost))
-                    } catch {
-                        return (i + 1, BackendRun(label: plan.label, error: error.localizedDescription, info: plan.info))
-                    }
-                }
-            }
-            var out: [(Int, BackendRun)] = []
-            for await r in group { out.append(r) }
-            return out.sorted { $0.0 < $1.0 }.map(\.1)
-        }
-    }
-    // …
-    /// Fit on the marked answers with the SDK's `DecisionCalibration.fit`.
-    func fitCalibration() {
-        guard let m = selectedModel else { errorMessage = "Pick a local model first."; return }
-        let samples = calibrationSamples
-        guard !samples.isEmpty else { errorMessage = "Mark some correct answers in the batch grid first."; return }
-        let fitted = DecisionCalibration.fit(samples)   // ← SDK
-        calibration = FittedCalibration(
-            noulTemperature: fitted.noulTemperature, choiceTemperature: fitted.choiceTemperature,
-            scoreTemperature: fitted.scoreTemperature, repoID: m.repoID, revision: selectedRevision ?? "?",
-            system: set.system, inputLabel: set.inputLabel, fittedAt: Date(),
-            samples: Dictionary(grouping: samples, by: \.kind.rawValue).mapValues(\.count))
-        applyCalibration = true
-    }
-    // …
-    /// What the questions are being tested with, for the exported question set: the local model,
-    /// its revision, the wrapper and (when it matches) the calibration. Nil with Local off.
-    var exportTuning: DecisionQuestionSet.Tuning? {   // ← SDK
-        guard useLocal, let m = selectedModel else { return nil }
-        let cal = calibrationMismatch == nil ? calibration?.sdk : nil
-        return .init(model: Self.openJevID(m.repoID), revision: selectedRevision, system: set.system,
-                     inputLabel: set.inputLabel, calibration: cal, testedAt: Date())
-    }
-
-    /// The questions as the SDK's `DecisionQuestionSet` JSON, for the app to bundle and load, so
-    /// the shipped questions are exactly the tested ones.
-    func exportForApp() {
-        if let q = set.questions.first(where: { !$0.problems.isEmpty }) {
-            errorMessage = "Fix “\(q.name)” first: \(q.problems.joined(separator: "; "))."
-            return
-        }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        let base = set.name.isEmpty ? "questions" : set.name.lowercased().replacingOccurrences(of: " ", with: "-")
-        panel.nameFieldStringValue = "\(base).decisions.json"
-        panel.message = "A question set for your app: bundle it and load it with DecisionQuestionSet(contentsOf:)."   // ← SDK
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let tuning = exportTuning
-            let file = DecisionQuestionSet(name: set.name, questions: set.questions.map(\.sdkQuestion), tuning: tuning)   // ← SDK
-            try file.jsonData().write(to: url)
-            errorMessage = nil
-            notice = "Exported \(set.questions.count) questions to \(url.lastPathComponent)" + Self.tuningSummary(tuning) + "."
-        } catch {
-            errorMessage = "Couldn't export: \(error.localizedDescription)"
-        }
-    }
-
-    /// ", for Qwen3-4B-4bit pinned to 4dcb3d1, calibrated" — what an export carries.
-    static func tuningSummary(_ t: DecisionQuestionSet.Tuning?) -> String {   // ← SDK
-        guard let t, let model = t.model else { return " (no local model: questions only)" }
-        let name = model.rest.split(separator: "/").last.map(String.init) ?? model.rest   // ← SDK
-        var s = ", for \(name)"
-        if let r = t.revision { s += " pinned to \(r.prefix(7))" }
-        s += t.calibration == nil ? ", not calibrated" : ", calibrated"
-        return s
-    }
-
-    /// Add this setup (local model, its version, system instructions, calibration) to a jev-serve
-    /// config, creating one if needed (see the jev-serve example). An existing config keeps its other
-    /// models, listen address and token; the entry with this question set's name is replaced.
-    func exportServerConfig() {
-        guard let tuning = exportTuning else {
-            errorMessage = "Pick a local model first: jev-serve serves a local model."
-            return
-        }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "jev-serve.json"
-        panel.message = "A jev-serve config. If the file exists, this setup is added to it (or replaces the one with the same name)."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        var config: JevServeConfig
-        var created = false
-        if FileManager.default.fileExists(atPath: url.path) {
-            do { config = try JevServeConfig.read(url) } catch {
-                errorMessage = "\(url.lastPathComponent) isn't a jev-serve config, so it wasn't changed: \(error.localizedDescription)"
-                return
-            }
-        } else {
-            created = true
-            let alert = NSAlert()
-            alert.messageText = "Require a token?"
-            alert.informativeText = "With a token, jev-serve only answers requests that send it (Authorization: Bearer …). It's saved in the config file, which only you can read."
-            alert.addButton(withTitle: "Generate a Token")
-            alert.addButton(withTitle: "No Token")
-            config = JevServeConfig(token: alert.runModal() == .alertFirstButtonReturn ? JevServeConfig.newToken() : nil)
-        }
-        let name = Self.slug(set.name.isEmpty ? "decider" : set.name)
-        config.upsert(.init(name: name, tuning: tuning))
-        do {
-            try config.write(to: url)
-            errorMessage = nil
-            notice = "\(created ? "Wrote" : "Updated") \(url.lastPathComponent): “\(name)”" + Self.tuningSummary(tuning)
-                + (config.token != nil ? ", token required" : "") + ". Serve it with: jev-serve --config \(url.lastPathComponent)"
-        } catch {
-            errorMessage = "Couldn't write \(url.lastPathComponent): \(error.localizedDescription)"
-        }
-    }
-    // …
-    /// Load an answer set (CSV: `input`, then a column per question with the correct answer) into
-    /// the batch list and the marks. Inputs with line breaks are joined onto one line, since the
-    /// batch list is one input per line.
-    func importAnswerSet() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
-        panel.message = "An answer set: a CSV with an input column and one column per question, holding the correct answer."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let answers = try DecisionAnswerSet(csv: String(contentsOf: url, encoding: .utf8))   // ← SDK
-            let questions = set.questions.map(\.sdkQuestion)
-            let problems = answers.problems(for: questions)   // ← SDK
-            guard problems.isEmpty else {
-                errorMessage = "\(url.lastPathComponent) doesn't fit these questions: " + problems.prefix(3).joined(separator: " ")
-                    + (problems.count > 3 ? " (and \(problems.count - 3) more)" : "")
-                return
-            }
-            var newLabels: [String: [String: String]] = [:]
-            var inputs: [String] = []
-            var joined = 0
-            for e in answers.examples {
-                let one = e.input.split(whereSeparator: \.isNewline).joined(separator: " ")
-                if one != e.input { joined += 1 }
-                inputs.append(one)
-                var marks: [String: String] = [:]
-                for q in questions {
-                    if let raw = e.answers[q.id], let key = DecisionAnswerSet.answerKey(raw, for: q) { marks[q.id] = key }   // ← SDK
-                }
-                if !marks.isEmpty { newLabels[one] = marks }
-            }
-            batchText = inputs.joined(separator: "\n")
-            labels = newLabels
-            batchRows = []
-            errorMessage = joined > 0 ? "Imported \(inputs.count) inputs; \(joined) had line breaks and were joined onto one line." : nil
-        } catch {
-            errorMessage = "Couldn't import: \(error.localizedDescription)"
-        }
-    }
-    // …
-    /// Open a workspace file (what Save Workspace writes), or a questions file exported for an app
-    /// (`.decisions.json`): its questions and system instructions, and the calibration it carries.
-    func open() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.message = "A JevDK workspace, or a questions file exported for an app (.decisions.json)."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try Data(contentsOf: url)
-            if let saved = try? JSONDecoder().decode(SavedSet.self, from: data) {
-                set = saved.set
-                input = saved.input ?? input
-                batchText = saved.batch ?? batchText
-                labels = saved.labels ?? [:]
-                calibration = saved.calibration
-                applyCalibration = saved.calibration != nil
-            } else if let exported = try? DecisionQuestionSet(json: data) {   // ← SDK
-                let t = exported.tuning   // ← SDK
-                set = QuestionSet(name: exported.name, system: t?.system ?? QuestionSet.defaultSystem,
-                                  inputLabel: t?.inputLabel ?? QuestionSet.defaultInputLabel,
-                                  questions: exported.questions.map(EditableQuestion.init))
-                labels = [:]
-                if let cal = t?.calibration, let model = t?.model {
-                    calibration = FittedCalibration(
-                        noulTemperature: cal.noulTemperature, choiceTemperature: cal.choiceTemperature,
-                        scoreTemperature: cal.scoreTemperature, repoID: model.rest, revision: t?.revision ?? "?",   // ← SDK
-                        system: set.system, inputLabel: set.inputLabel, fittedAt: t?.testedAt ?? Date(), samples: [:])
-                } else {
-                    calibration = nil
-                }
-                applyCalibration = calibration != nil
-                // An app file isn't a workspace: ⌘S asks where to save one rather than overwriting it.
-                results = []; batchRows = []; samples = []
-                fileURL = nil
-                return
-            } else {
-                set = try JSONDecoder().decode(QuestionSet.self, from: data)
-            }
-            results = []
-            batchRows = []
-            samples = []
-            fileURL = url
-        } catch {
-            errorMessage = "Couldn't open \(url.lastPathComponent): \(error.localizedDescription)"
-        }
-    }
-```
-
-### `Sources/JevDK/HostedBackends.swift` (excerpt)
-
-The SDK presets, each given its own scheme, and where a key comes from.
-
-```swift
-    /// The SDK config, with a scheme of its own so the demo and the keyed Featherless endpoint
-    /// can both be registered in one lab.
-    func config(key: String?) -> JevProviderConfig {   // ← SDK (Remote)
-        var c: JevProviderConfig   // ← SDK (Remote)
-        switch self {
-        case .featherlessDemo: c = .featherlessDemo()   // ← SDK (Remote)
-        case .featherless: c = .featherless(key: key ?? "")   // ← SDK (Remote)
-        case .openRouter: c = .openRouter(key: key ?? "")   // ← SDK (Remote)
-        }
-        c.scheme = rawValue.lowercased()
-        return c
-    }
-    // …
-/// The API key for a hosted backend: the one saved in the Keychain from **Backends**, else the
-/// environment variable (for CI and headless runs). Never printed. There is no key file: a key
-/// in a file next to the code is too easy to commit or share.
-enum APIKeys {
-    static func key(for backend: HostedBackend) -> String? {
-        if let k = Keychain.get(account(backend)), !k.isEmpty { return k }
-        guard let name = backend.keyVariable, let v = ProcessInfo.processInfo.environment[name], !v.isEmpty else { return nil }
-        return v
-    }
-
-    static func account(_ backend: HostedBackend) -> String { "key.\(backend.rawValue)" }
-}
-```
-
-**Tally:** 21 lines Core (`// ← SDK`), 9 Inference, 8 Remote, in the excerpts above. The
-decision API itself is a handful of calls (`register`/`replace(decision:)`, `route(decision:)`,
-`decide`, `decideWithDiagnostics`, `DecisionCalibration.fit`, `DecisionQuestionSet`,
-`DecisionAnswerSet`); the rest of the app is the playground around them.
-
-## `examples/jev-serve`
-
-*591 lines of code across 4 files (640 with comments), plus 13 tests. Excerpted: the routes'
-decision path and the decider from `Service.swift`, and model readiness and the providers from
-`main.swift`; the HTTP/1.1 server (`HTTPServer.swift`, on `Network.framework`), the health and
-model-list routes, the token check, the queue, argument parsing and `--self-check` are omitted
-(`// …`).*
-
-Hosted Jev's HTTP API, answered on this Mac: `POST /api/alpha/decisions` (OpenRouter / TypeSafe)
-and `POST /v1/classifier` (Featherless) take hosted Jev's request and return its response, from
-OpenJev on a local MLX model. Code that calls hosted Jev, in any language, switches by changing its
-base URL ([`sdk-guide.md` §6c](sdk-guide.md#serving-decisions-over-http-jev-serve)). It serves the
-setup tested in [`jevdk`](#examplesjevdk), from the config JevDK exports. Three SDK pieces carry it:
-
-- **`JevWire`** (Core) reads the request and writes the response, keeping questions and options in
-  the caller's order: the same code the SDK's `JevDecisionProvider` uses as a client, so the
-  client and this server can't disagree (the tests check it both ways).
-- **`OpenJevDecisionProvider(mlx:tunedWith:)`** answers with each config entry's wrapper and
-  calibration; `tuningMismatch(for:)` turns calibration off, with a warning, if the model on disk
-  isn't the version it was fitted on.
-- **`MLXModelProvider(pinnedRevisions:)`** makes each model ready before the server listens:
-  pinned to the version in the config, then found, verified or pre-flighted and downloaded.
-
-The server talks to its model through a small `Decider` protocol, so the routes, token, limits and
-queue are tested with a scripted decider and no GPU. Links `LocalLMLabSDKCore` and
-`LocalLMLabSDKInference` (tests add `LocalLMLabSDKRemote` for the client round trip). The JevDK
-download carries it; `swift build` builds it.
-
-### `Sources/JevServeKit/Service.swift` (excerpt)
-
-A decision request: decode, pick the model, validate against the decider's limits (plus the
-config's input cap), wait its turn, decide, encode. Every failure is hosted Jev's error shape.
-
-```swift
-/// What answers a served model's questions. jev-serve uses `OpenJevDecider` (OpenJev on MLX); tests
-/// use a scripted one, so routing, auth, limits and the queue are tested without a GPU.
-public protocol Decider: Sendable {
-    var limits: DecisionLimits { get }   // ← SDK
-    var calibrated: Bool { get }
-    /// The decision, and the input tokens it read (for `usage`).
-    func decide(_ request: DecisionRequest) async throws -> (decision: Decision, inputTokens: Int?)   // ← SDK
-}
-    // …
-/// OpenJev on a local MLX model, with one config entry's wrapper and calibration.
-public struct OpenJevDecider: Decider {
-    public let provider: OpenJevDecisionProvider   // ← SDK (Inference)
-    public let id: ModelID   // ← SDK
-
-    public init(provider: OpenJevDecisionProvider, id: ModelID) {   // ← SDK (Inference)
-        self.provider = provider
-        self.id = id
-    }
-
-    public var limits: DecisionLimits { provider.limits }   // ← SDK
-    public var calibrated: Bool { provider.calibration != nil }
-
-    public func decide(_ request: DecisionRequest) async throws -> (decision: Decision, inputTokens: Int?) {   // ← SDK
-        let (decision, diagnostics) = try await provider.decideWithDiagnostics(request, using: id)   // ← SDK (Inference)
-        return (decision, diagnostics.sharedPrefixTokens)
-    }
-}
-    // …
-    private func decide(_ req: HTTPRequest) async -> (HTTPResponse, String) {
-        let wire: JevWire.Request   // ← SDK
-        do { wire = try JevWire.decodeRequest(req.body) } catch {   // ← SDK
-            return (Self.error(400, Self.message(error)), "")
-        }
-        let name = wire.model ?? defaultModel
-        guard let served = model(named: name) else {
-            return (Self.error(404, "jev-serve doesn't serve “\(name)”. Served: \(models.map(\.name).joined(separator: ", ")).", type: "not_found"), "")
-        }
-        let note = "\(served.name) \(wire.request.questions.count)q"
-        let l = served.decider.limits
-        let limits = DecisionLimits(maxQuestions: l.maxQuestions, maxChoiceCriteria: l.maxChoiceCriteria,   // ← SDK
-                                    maxScoreLevels: l.maxScoreLevels, maxStateCharacters: maxStateCharacters ?? l.maxStateCharacters)
-        do { try wire.request.validate(against: limits) } catch {   // ← SDK
-            return (Self.error(400, Self.message(error)), note)
-        }
-        guard await queue.acquire() else {
-            return (Self.error(503, "Busy: too many requests waiting. Try again shortly.", type: "overloaded"), note)
-        }
-        do {
-            var (decision, tokens) = try await served.decider.decide(wire.request)
-            await queue.release()
-            decision.usage = DecisionUsage(inputTokens: tokens, outputTokens: 0, cost: 0)   // ← SDK
-            let body = try JevWire.encodeResponse(decision, model: served.repo, request: wire.request)   // ← SDK
-            return (.json(200, body), note)
-        } catch let e as DecisionError {   // ← SDK
-            await queue.release()
-            switch e {
-            case .invalidRequest: return (Self.error(400, Self.message(e)), note)
-            case .unavailable: return (Self.error(503, Self.message(e), type: "unavailable"), note)
-            default: return (Self.error(500, Self.message(e), type: "server_error"), note)
-            }
-        } catch {
-            await queue.release()
-            return (Self.error(500, Self.message(error), type: "server_error"), note)
-        }
-    }
-```
-
-### `Sources/JevServe/main.swift` (excerpt)
-
-Startup: one MLX provider pinned to the configured versions; each model made ready (with download
-progress); each config entry's provider built from its `Tuning`; the default model loaded before
-the server listens.
-
-```swift
-let mlx = MLXModelProvider(residentModelLimit: max(1, repos.count), pinnedRevisions: pins, pinStore: MLXFilePinStore())   // ← SDK (Inference)
-// …
-@MainActor func ensureReady(_ repo: String) async {
-    let id = ModelID(scheme: "mlx", rest: repo)!   // ← SDK
-    switch mlx.availability(for: id) {   // ← SDK (Inference)
-    case .available:
-        return
-    case .unavailable(_, let detail):
-        fail("\(repo) can't run here: \(detail)")
-    case .needsCredential:
-        fail("\(repo) needs a Hugging Face credential")
-    case .notDownloaded:
-        break
-    @unknown default:
-        break
-    }
-    let other = mlx.installed.first { $0.repoID == repo }?.resolvedRevision   // ← SDK (Inference)
-    let what: String
-    if let want = pins[repo], let other, other != want {
-        what = "\(repo) version \(want.prefix(7)) (the one in the config) isn't on this Mac; version \(other.prefix(7)) is"
-    } else {
-        what = "\(repo) isn't on this Mac"
-    }
-    if noDownload { fail("\(what), and --no-download is set. Drop --no-download to fetch it, or download it in JevDK's Models.") }
-    if other != nil { jevServeLog("\(what): fetching the configured version") }
-    if let pre = try? await mlx.validate(repo), !pre.passed {   // ← SDK (Inference)
-        fail("pre-flight failed for \(repo) (\(pre.failedStage?.rawValue ?? "?")): \(pre.detail ?? "")")
-    }
-    let version = pins[repo].map { " @ \($0.prefix(7))" } ?? ""
-    jevServeLog("downloading \(repo)\(version) (a copy already in the Hugging Face cache is verified, only missing files fetched)…")
-    do {
-        var last = -1
-        for try await event in mlx.download(repo) {   // ← SDK (Inference)
-            if case .progress(_, _, let f) = event {
-                let pct = Int(f * 100)
-                if pct != last {
-                    last = pct
-                    FileHandle.standardError.write(Data("\u{1B}[2K\r  \(repo)\(version)  \(pct)%".utf8))
-                }
-            }
-        }
-        FileHandle.standardError.write(Data("\u{1B}[2K\r".utf8))
-        jevServeLog("\(repo): ready")
-    } catch {
-        FileHandle.standardError.write(Data("\n".utf8))
-        fail("download of \(repo) failed: \(error.localizedDescription)")
-    }
-}
-// …
-var served: [ServedModel] = []
-for m in config.models {
-    let repo = m.tuning.model!.rest   // ← SDK
-    var tuning = m.tuning
-    let set = DecisionQuestionSet(name: m.name, questions: [], tuning: tuning)   // ← SDK
-    let probe = OpenJevDecisionProvider(mlx: mlx, tunedWith: set)   // ← SDK (Inference)
-    let id = ModelID(scheme: probe.scheme, rest: repo)!   // ← SDK
-    if let why = probe.tuningMismatch(for: id) {   // ← SDK (Inference)
-        jevServeLog("warning: “\(m.name)”: \(why); serving it without its calibration")
-        tuning.calibration = nil
-    }
-    if probe.warnings(for: id).contains(.mixtureOfExperts) {   // ← SDK (Inference)
-        jevServeLog("warning: \(repo) is a mixture-of-experts model; its probabilities are unstable as a decider")
-    }
-    let provider = OpenJevDecisionProvider(mlx: mlx, tunedWith: DecisionQuestionSet(name: m.name, questions: [], tuning: tuning))   // ← SDK (Inference)
-    let revision = mlx.effectivePin(for: repo)?.revision ?? tuning.revision   // ← SDK (Inference)
-        ?? mlx.installed.first { $0.repoID == repo }?.resolvedRevision   // ← SDK (Inference)
-    served.append(ServedModel(name: m.name, repo: repo, revision: revision, decider: OpenJevDecider(provider: provider, id: id)))
-}
-let defaultName = config.defaultModel ?? served[0].name
-guard let defaultModel = served.first(where: { $0.name == defaultName }) else {
-    fail("defaultModel “\(defaultName)” isn't one of the models")
-}
-jevServeLog("loading \(defaultModel.repo)…")
-if let d = defaultModel.decider as? OpenJevDecider { await d.provider.prewarm(d.id) }   // ← SDK (Inference)
-```
-
-**Tally:** 16 lines Core (`// ← SDK`), 15 Inference, 0 Remote, in the excerpts above. The wire
-format is three `JevWire` calls; the decision is one `decideWithDiagnostics`; the rest is
-HTTP, configuration and model housekeeping.
-
 ## `examples/mcp-chat`
 
-*938 lines of code across 4 files (1,026 with comments). `ChatModel.swift`, `WidgetSlot.swift`
+*948 lines of code across 4 files (1,149 with comments). `ChatModel.swift`, `WidgetSlot.swift`
 and `MCPChatApp.swift` are below in full; from `ChatViews.swift` the views that read the SDK are
 shown and the plain-SwiftUI ones (bubbles, composer, settings, the first-run screen) are elided,
 marked `// …`.*
 
 A chat with a local model (Qwen3 8B through MLX, or Apple's on-device model) where a tool call
 that has an **MCP App** — a server's own interactive view, such as Todoist's task list — shows
-that view in the conversation ([`sdk-guide.md` §3f](sdk-guide.md#3f-mcp-apps-showing-a-servers-interactive-views)).
+that view in the conversation ([`mcp-guide.md`, "MCP Apps"](mcp-guide.md#mcp-apps-showing-a-servers-interactive-views)).
 The model never asks for a view: it calls a tool, and if the tool's listing names a view, the app
 draws it under the call. Three SDK pieces carry the app:
 
@@ -4392,6 +4012,11 @@ isn't here: no tool list is rebuilt when the user turns a tool on (a session fol
 its own), no approval policy (each server's trust and approval live on `lab.mcp`, set from the
 server list), no `<think>` parsing (`hostTranscript` splits it). A new session is made only when
 the user switches models — carrying both the model's memory and the transcript over.
+
+SDK 3.0 sessions without an `authorizer:` fail closed, so every session gets one
+`ConfirmingToolAuthorizer`: it follows each server's trust and approval and asks the user through
+the approval sheet. The saved server list is the SDK's own `MCPServerSnapshot` per server
+(`manager.snapshot()` / `manager.restore(from:)`), with the older `servers.v1` list migrated once.
 
 ```swift
 import AppKit
@@ -4733,57 +4358,66 @@ final class ChatModel: ObservableObject {
 
     // MARK: servers (saved list; quiet reconnect)
 
+    /// The SDK's snapshot (cached tools with the user's on/off choices, trust, approvals, drift),
+    /// plus whether the server needed no credential when last connected.
     private struct SavedServer: Codable {
+        var snapshot: MCPServerSnapshot   // ← SDK
+        var noAuth: Bool
+    }
+
+    /// The list saved before snapshots (servers.v1), read once to migrate.
+    private struct SavedServerV1: Codable {
         var url: URL
         var name: String
         var authType: MCPAuthType   // ← SDK
         var manualClientID: String?
         var noAuth: Bool
-        /// The server's tools as last seen, with the user's on/off choice for each. New tools from
-        /// a server start off (the SDK's default); restoring these keeps the user's choices.
         var tools: [MCPToolDescriptor]?   // ← SDK
-        /// The user's trust and tool approval for the server (server list). The manager doesn't
-        /// persist them; they are set again after restore.
         var trust: MCPServerTrust?   // ← SDK
         var toolApproval: ToolApproval?   // ← SDK
     }
 
-    private let savedServersKey = "servers.v1"
+    private let savedServersKey = "servers.v2"
+    private let savedServersV1Key = "servers.v1"
+
+    private func loadSavedServers() -> [SavedServer] {
+        if let data = UserDefaults.standard.data(forKey: savedServersKey),
+           let saved = try? JSONDecoder().decode([SavedServer].self, from: data) {
+            return saved
+        }
+        let v1 = (UserDefaults.standard.data(forKey: savedServersV1Key)
+            .flatMap { try? JSONDecoder().decode([SavedServerV1].self, from: $0) }) ?? []
+        return v1.map {
+            SavedServer(snapshot: MCPServerSnapshot(id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name,   // ← SDK
+                                                    authType: $0.authType, manualClientID: $0.manualClientID, tools: $0.tools ?? [],
+                                                    trust: $0.trust ?? .untrusted, toolApproval: $0.toolApproval),
+                        noAuth: $0.noAuth)
+        }
+    }
 
     private func restoreServers() async {
-        let saved = (UserDefaults.standard.data(forKey: savedServersKey)
-            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
-        manager.restore(from: saved.map {   // ← SDK
-            (id: MCPServerID(rawValue: $0.url.absoluteString), url: $0.url, displayName: $0.name, tools: $0.tools ?? [], estimatedTokens: 0,   // ← SDK
-             enabled: true, authType: $0.authType, manualClientID: $0.manualClientID, resources: [])
-        })
-        // Trust before reconnecting: trusting records the saved tool list, so a server whose tools
-        // changed while the app was closed shows "tools changed since trusted".
-        for server in saved {
-            let id = MCPServerID(rawValue: server.url.absoluteString)   // ← SDK
-            if let trust = server.trust { manager.setTrust(trust, server: id) }   // ← SDK
-            manager.setToolApproval(server.toolApproval, server: id)   // ← SDK
-        }
+        let saved = loadSavedServers()
+        // Restored with trust and the list it trusted, so a server whose tools changed while the app
+        // was closed shows "tools changed since trusted" once reconnected.
+        manager.restore(from: saved.map(\.snapshot))   // ← SDK
         // Only servers that need no sign-in, or have a stored credential, reconnect at launch: this
         // app never opens a browser unprompted.
-        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.url) != nil {   // ← SDK
-            _ = await manager.reconnect(MCPServerID(rawValue: server.url.absoluteString))   // ← SDK
+        for server in saved where server.noAuth || MCPCredentialProbe.storedKind(for: server.snapshot.url) != nil {   // ← SDK
+            _ = await manager.reconnect(server.snapshot.id)   // ← SDK
         }
         servers.$servers.dropFirst().sink { [weak self] in self?.persist($0) }.store(in: &cancellables)   // ← Components
     }
 
     private func persist(_ states: [MCPServerID: MCPServerState]) {   // ← SDK
-        let previous = (UserDefaults.standard.data(forKey: savedServersKey)
-            .flatMap { try? JSONDecoder().decode([SavedServer].self, from: $0) }) ?? []
-        let saved = states.values.map { state in
-            SavedServer(url: state.url, name: state.displayName, authType: state.authType, manualClientID: state.manualClientID,
-                        noAuth: state.connectionStatus == .connected
-                            ? MCPCredentialProbe.storedKind(for: state.url) == nil   // ← SDK
-                            : previous.first { $0.url == state.url }?.noAuth ?? false,
-                        tools: state.tools.isEmpty ? previous.first { $0.url == state.url }?.tools : state.tools,
-                        trust: state.trust, toolApproval: state.toolApproval)
+        let previous = loadSavedServers()
+        let saved = manager.snapshot().map { snapshot in   // ← SDK
+            SavedServer(snapshot: snapshot,
+                        noAuth: states[snapshot.id]?.connectionStatus == .connected
+                            ? MCPCredentialProbe.storedKind(for: snapshot.url) == nil   // ← SDK
+                            : previous.first { $0.snapshot.id == snapshot.id }?.noAuth ?? false)
         }
         if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data, forKey: savedServersKey) }
+        UserDefaults.standard.removeObject(forKey: savedServersV1Key)
     }
 
     /// The MCP tools the model is given on its next turn.
@@ -4859,7 +4493,9 @@ struct ConversationStore {
 One tool call's view. First showing: fetch the server's view, cache it by hash, bind it to the
 call. Later (scrolled back past the live limit, after a relaunch, after a session switch):
 `MCPAppRecreation.revalidate` decides whether the stored result still fits the server's current
-view. The view's own calls go through `MCPAppsSessionBackend` → the session's authorizer.
+view. The view's own calls go through `MCPAppsSessionBackend` → the session's authorizer. A view
+whose content changed since it was approved gets a new instance ID, so the authorizer asks again,
+and each showing is recorded in the audit log.
 
 ```swift
 import AppKit
@@ -4999,7 +4635,10 @@ struct WidgetSlot: View {
             }
         }
 
-        let instance = record.id
+        // A changed widget is a new instance, so the authorizer asks it again.
+        let instance = MCPAppWidgetSlot.instanceID(record: record.id, widget: resource.sha256, bound: chat.widgetCache.sha256(forRecord: record.id))   // ← SDK (MCPAppsHost)
+        chat.manager.audit.record(.widgetShown(instance: instance, server: server, sha256: resource.sha256,   // ← SDK
+                                               changedSinceApproved: instance != record.id))
         let controller = pool.controller(for: instance) {   // ← SDK (MCPAppsHost)
             var actions = MCPAppsHostActions.session(session, instance: instance, openLink: { NSWorkspace.shared.open($0) })   // ← SDK (MCPAppsHost)
             // Route widget messages through the chat so the turn shows as running and is saved.
@@ -5402,9 +5041,9 @@ struct MCPChatApp: App {
 }
 ```
 
-**Tally**: 139 lines carry a marker — more than any other example, because this one is mostly SDK
+**Tally**: 140 lines carry a marker — more than any other example, because this one is mostly SDK
 surface: 86 `← SDK` (setup, sessions, the transcript the UI draws, saving and restoring servers
-and conversations), 39 `← SDK (MCPAppsHost)` (rendering, the pool, the cache, re-creation, the
+and conversations), 40 `← SDK (MCPAppsHost)` (rendering, the pool, the cache, re-creation, the
 bridge policy), 4 `← SDK (Inference)` (the pinned Qwen3 provider and its download), 10
 `← Components` (the server list, the approval sheet, the observable server state). What the app writes itself is the chat look,
 the settings, where conversations and servers are saved, and the policy a view runs under

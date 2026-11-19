@@ -93,7 +93,7 @@ func run() async {
     // host opts in), so enable the ones this example uses. `read_wiki_contents` stays off: it dumps
     // a repo's entire wiki unscoped (~165K tokens for anthropics/claude-code in one call), which
     // `MCPTool` can't know from the schema — that curation is the app's job (see
-    // docs/sdk-guide.md §3). A tool whose schema doesn't build is skipped, not fatal (makeSession
+    // docs/mcp-guide.md ("Connecting to an MCP server")). A tool whose schema doesn't build is skipped, not fatal (makeSession
     // would otherwise fail on it).
     var enabled: [String] = []
     for descriptor in state.tools {
@@ -103,7 +103,7 @@ func run() async {
         }
         do { _ = try MCPTool(descriptor: descriptor, manager: lab.mcp) }
         catch { note("Skipping \(descriptor.name): \(error)"); continue }
-        lab.mcp.setToolEnabled(server: state.id, tool: descriptor.name, enabled: true)
+        lab.mcp.setToolEnabled(true, server: state.id, tool: descriptor.name)
         enabled.append(descriptor.name)
     }
     guard !enabled.isEmpty else { note("Deepwiki didn't offer any usable tools."); return }
@@ -115,7 +115,11 @@ func run() async {
     let instructions = "You answer questions about GitHub repositories using the documentation tools available to you. Always ground your answer in what the tools actually return — don't answer from general knowledge if a tool call would give a more specific, current answer."
     let session: LocalLMLabSession
     do {
-        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true)
+        // SDK 3.0: a session with no authorizer is fail-closed, and DeepWiki isn't marked trusted here, so its tools
+        // count as changes and would be denied. This is a CLI asking read-only documentation questions, with nobody at a
+        // prompt, so it runs every call unasked, as before 3.0. (An app with a UI passes a ConfirmingToolAuthorizer.)
+        session = try lab.makeSession(route: .local, instructions: instructions, includeMCPTools: true,
+                                      authorizer: AllowingToolAuthorizer())
     } catch {
         note("makeSession failed: \(error)"); exit(1)
     }

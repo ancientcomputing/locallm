@@ -233,3 +233,11 @@ private struct NoBackend: MCPAppsBackend {
     func callTool(name: String, arguments: [String: MCPValue]) async -> Result<MCPToolResult, MCPServerError> { .failure(.unreachable) }
     func readResource(uri: String) async -> Result<MCPResourceContent, MCPServerError> { .failure(.unreachable) }
 }
+
+// C26 (security review 2026-10-28): the authorizer remembers a widget's answers per instance, so a version of the
+// widget the server serves after the call was first shown gets an instance of its own and is asked again.
+@Test func aChangedWidgetIsANewInstance() {
+    #expect(MCPAppWidgetSlot.instanceID(record: "r1", widget: "abc", bound: nil) == "r1", "first showing: bound now")
+    #expect(MCPAppWidgetSlot.instanceID(record: "r1", widget: "abc", bound: "abc") == "r1", "the version the call was shown with")
+    #expect(MCPAppWidgetSlot.instanceID(record: "r1", widget: "0123456789abcdef", bound: "abc") == "r1@0123456789ab", "another version")
+}

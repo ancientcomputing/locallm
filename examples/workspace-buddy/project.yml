@@ -7,7 +7,7 @@
 # to make a distributable / MAS .app.
 #
 # This app is ALWAYS App-Sandboxed (that's the point of the example — see the security-scoped
-# bookmark story in docs/sdk-guide.md §8). The NSOpenPanel folder pick + the
+# bookmark story in docs/sdk-guide.md ("Filesystem access")). The NSOpenPanel folder pick + the
 # user-selected.read-write entitlement are all it needs — folder access has no TCC
 # usage-description requirement.
 #

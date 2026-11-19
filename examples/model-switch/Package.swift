@@ -3,7 +3,7 @@ import Foundation
 import PackageDescription
 
 // Model Switch — reference app for the online / remote AI providers (SDK
-// docs/sdk-guide.md §6b). The user adds a provider + API key, ticks web search, and
+// docs/remote-providers.md ("Online providers")). The user adds a provider + API key, ticks web search, and
 // switches between every configured model — Apple on-device, PCC, Claude-4-FM, GPT, Claude
 // online, any OpenRouter model — from one chat window, one `lab.makeSession` call site.
 //
@@ -28,16 +28,16 @@ struct SDKRelease {
 // `swift build` / CI, NOT inside Xcode), or edit `defaultSDKVersion` here. For a
 // release not listed, add its entry (URL + the `.sha256` next to the zip on the
 // GitHub release) or just replace the strings in place.
-let defaultSDKVersion = "2.3.1-GA"
+let defaultSDKVersion = "3.0.0-GA"
 
 let knownSDKReleases: [String: SDKRelease] = [
     "2.3.0-GA": SDKRelease(
         remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.0-GA/LocalLMLabSDKRemote-2.3.0-GA.xcframework.zip",
         remoteChecksum: "dae65d45bea196f6cd2538328fad1a0e33eceae5fac5ee965183706ac942daaf"
     ),
-    "2.3.1-GA": SDKRelease(
-        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v2.3.1-GA/LocalLMLabSDKRemote-2.3.1-GA.xcframework.zip",
-        remoteChecksum: "79247d567ad5dddecd14b0cc7662ab1ac61a322c3507029abd9fd4fb093d9ab6"
+    "3.0.0-GA": SDKRelease(
+        remoteURL: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKRemote-3.0.0-GA.xcframework.zip",
+        remoteChecksum: "54ca50806e65d96a80ef928b56952bf9b827ba959bcb466c25088b3cb2995507"
     ),
 ]
 

@@ -13,10 +13,10 @@ import FoundationModels
 import LocalLMLabSDKCore
 import SwiftUI
 
-// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md §8)
+// MARK: - Folder picker + security-scoped bookmark (see docs/sdk-guide.md ("Filesystem access"))
 
-// Verbatim from §8's documented pattern, with one real addition not covered there: an
-// async-aware access wrapper. §8's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —
+// Verbatim from the guide's "Filesystem access" pattern, with one real addition not covered there: an
+// async-aware access wrapper. The guide's own withFolderAccess<T>(_:) brackets a SYNCHRONOUS body —
 // fine for a single read, but this app's actual file access happens inside
 // LanguageModelSession.respond(to:), which can invoke several tool calls over the course of one
 // async call. The security-scoped access window has to stay open for that whole call, not just a
@@ -61,7 +61,7 @@ enum FolderAccess {
         return url
     }
 
-    // DIFF FROM §8's synchronous withFolderAccess<T>(_:): this brackets an ASYNC body, so the
+    // DIFF FROM the guide's synchronous withFolderAccess<T>(_:): this brackets an ASYNC body, so the
     // access window stays open for a whole LanguageModelSession.respond(to:) call — including
     // every WorkspaceTools call the model makes along the way — not just one synchronous read.
     @MainActor
