@@ -5,6 +5,10 @@ on-device model or an open-weight model, or a hosted model when you want one. No
 and no data leaving the machine unless you choose. The SDK is free. Release notes are in the [CHANGELOG](CHANGELOG.md),
 and the project site is [thisbrain.ai/locallm](https://thisbrain.ai/locallm/).
 
+**You need:** a Mac with Apple Silicon, Xcode 27 to build, and macOS 27 with Apple Intelligence turned on. Apple's on-device
+model also runs on macOS 26; open-weight, hosted and Private Cloud Compute models need macOS 27. The first chat needs no
+account or key.
+
 > **A new name.** From 3.0 this is the **LocalLM SDK**; it was the LocalLM Lab SDK. LocalLM Lab is the Mac app built on it.
 > Nothing in your code changes: the modules, products and release files keep their names (`LocalLMLabSDKCore`,
 > `LocalLMLabSDKInference`, …), and so does the API (`LocalLMLab`, `lab.makeSession`).
@@ -95,6 +99,14 @@ guess (confirm names in `docs/api-surface.md`, give every session an `authorizer
 - **Work in your own project.** Copy `skills/locallm-swift-app` into `~/.claude/skills/` (Claude Code), and give the agent the
   docs: clone this repo beside your project and start with `claude --add-dir ../locallm`, or rely on the skill's fallback to
   the same files on the `3.0.0-GA` branch.
+
+**Starting from nothing?** You need an Apple Silicon Mac with macOS 27 and Xcode 27 (see above); no project yet is fine. Ask for a Swift package
+you can open in Xcode, and ask the agent to explain what it built:
+
+> Use the locallm-swift-app skill. I have a Mac with Apple Silicon, macOS 27 and Xcode 27, but I have never built a Mac app.
+> Create a new SwiftUI Mac app called Chatty, using LocalLM SDK 3.0.0-GA, with a chat window that talks to Apple's on-device
+> model. Start from docs/quickstart.md in the repo. I don't use Xcode much, so make it a Swift package I can open in Xcode and
+> run. Build it, then tell me exactly how to run it, and explain in plain language what each file does and where the SDK is used.
 
 A prompt that works well says what the agent can't read from the SDK: the version, which models, how the app is
 distributed, who approves tool calls, and how to check the result.

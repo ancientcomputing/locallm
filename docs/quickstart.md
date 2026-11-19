@@ -31,10 +31,20 @@ let package = Package(
             url: "https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip",
             checksum: "..."   // the contents of the .sha256 file on that release
         ),
-        .executableTarget(name: "YourApp", dependencies: ["LocalLMLabSDKCore"]),
+        .executableTarget(
+            name: "YourApp",
+            dependencies: ["LocalLMLabSDKCore"],
+            // A Swift package program has no runtime search path, so without this line it builds but dies at launch
+            // with "Library not loaded: @rpath/LocalLMLabSDKCore.framework". This points it at the framework SwiftPM places beside it.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])]
+        ),
     ]
 )
 ```
+
+To run it from Xcode, open the folder that has `Package.swift` (`open Package.swift`, or File → Open), pick the scheme named after your
+program with **My Mac** as the destination, and press ⌘R. From a terminal, `swift run` works too. An Xcode app project, below, doesn't need the
+linker line: Xcode embeds the framework for you.
 
 To get the checksum, read the `.sha256` file beside the zip on the release:
 

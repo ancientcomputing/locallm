@@ -67,7 +67,9 @@ let package = Package(
         ),
         .executableTarget(
             name: "YourApp",
-            dependencies: ["LocalLMLabSDKCore"]
+            dependencies: ["LocalLMLabSDKCore"],
+            // Needed for a Swift package program: without it, it builds but dies at launch with "Library not loaded: @rpath/...".
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])]
         )
     ]
 )

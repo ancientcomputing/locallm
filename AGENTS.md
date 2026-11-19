@@ -47,7 +47,7 @@ Use these in order, and do not write SDK code from memory:
 ## Linking the SDK
 
 The frameworks (`Core`, `Inference`, `Remote`, `Claude`) are binary targets: add the release's `.xcframework.zip` URL and the
-checksum from the `.sha256` file beside it. `Components` and `MCPAppsHost` are source packages in this repo. The
+checksum from the `.sha256` file beside it. A Swift package *executable* also needs `linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])]`, or it builds but fails at launch with `Library not loaded: @rpath/...`; an Xcode app project doesn't. `Components` and `MCPAppsHost` are source packages in this repo. The
 [quickstart](docs/quickstart.md) has the manifest, and the examples' `Package.swift` files have working ones.
 
 ## If you do not have this repo on disk
