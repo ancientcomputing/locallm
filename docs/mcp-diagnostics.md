@@ -132,6 +132,22 @@ decision and its outcome), use the audit stream, `lab.audit`: see
 | `MCP.oauth` | the protected-resource metadata fetch; which `.well-known` discovery URL resolved (or that none did); the choice between Dynamic Client Registration, CIMD, and a manual client id — and why CIMD was skipped if it was; the PKCE check; the browser being opened (endpoint, `client_id`, scope); an `iss` mismatch; the code coming back; the token-exchange HTTP status; whether a silent refresh worked; every failure with the server's actual (truncated, redacted) response |
 | `MCP.stream` | each server-sent-event frame as it's classified — an inbound request (`elicitation/create` and the like), a notification, a result; a server error result; a stream that broke mid-request; a stream that ended without the result it was waiting for |
 
+### Four more areas, filed under `MCP.connection`
+
+The exported text (`MCPDiagnostics.exportText()`) and each `MCPDiagnosticEvent` handed to `MCPDiagnostics.observer` label every line `MCP.<area>`. Four areas that were added later have no
+Apple unified-log category of their own, so in Console and `log stream` their lines appear under `MCP.connection`. Search the
+exported text for the area name, or search the unified log for the message text.
+
+| Area (in the export) | What you'll find there |
+|---|---|
+| `MCP.drift` | a server's tools changing: the change found against the last list the user accepted (each tool and what changed), a change accepted or rejected (a rejected one turns the server off), a server blocked until reviewed because it reported a different name, the drift policy changing and pending changes being judged again, and a tool's own "Always allow" being reset or dropped because the tool was reviewed or removed. These lines say that the SDK held something; the audit stream (`lab.audit`) is the record of who decided. |
+| `MCP.stdio` | a local program running as a server: it started (its command line, process id, whether it may use the network), a message over the size limit that stopped it, output that was not JSON and was ignored, and its stderr (at `debug` only, cut to 500 characters, credentials scrubbed). |
+| `MCP.results` | a `tools/list` entry left out because its name is not valid. |
+| `MCP.elicitation` | a server's request declined in Core before any sheet was built (it asked for a password, key, token or card number, or for a URL that is not a web address), with the reason. |
+
+Drift is the area to read when a tool a user expects is missing: a held tool is off until the user accepts it, and the line says
+which server, which tool and what changed.
+
 ## The typical support flow
 
 1. Ship with `logLevel = .info` and `MCPDiagnostics.setEnabled(true)`, plus a "Copy MCP

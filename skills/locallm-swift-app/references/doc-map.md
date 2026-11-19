@@ -27,6 +27,14 @@ Use these local files as the source of truth while working in this repository.
 - `docs/tested-models.md` is a point-in-time MLX model snapshot. Treat it as a starting point only;
   `MLXModelProvider.capabilityProbe` is authoritative for a user's chosen model.
 
+## When the repo is not on disk
+
+These paths are relative to the SDK repo. If the developer's project does not have it (or does not add it as an extra
+directory), read the same files from the `3.0.0-GA` branch instead:
+`https://raw.githubusercontent.com/ancientcomputing/locallm/3.0.0-GA/<path>`, for example `.../docs/api-surface.md`,
+`.../docs/tool-authorizer.md` and `.../examples/mcp-chat/Sources/...`. `AGENTS.md` at the repo root lists the rules that are
+easy to get wrong in 3.0.
+
 ## Public Site
 
 The public site is `https://thisbrain.ai/locallm/`. Prefer local repo docs while editing code. Use the website when the user asks for public-facing wording, external links, or developer-facing copy that should match the published site. For decision models, `jev.html` is the plain-English introduction (with links to TypeSafe's, OpenRouter's and Featherless's own docs) and `jdk-guide.html` is the JevDK workflow.

@@ -19,8 +19,12 @@ The prompt cache, which is on by default for these models in 3.0, is described i
 ```swift
 let mlx = MLXModelProvider(residentModelLimit: 1)   // 1 model resident at a time
 
+// Loading never downloads (3.0): a model that isn't on disk fails a session with .modelUnavailable.
+// So ask first. `lab.models.availability(for:)` says whether it's on disk; if not:
+
 // Before you download: is this model sane for this machine? (no weights pulled)
 let check = try await mlx.validate("mlx-community/Qwen3-8B-4bit")   // PreflightResult
+//   check.weightBytes is the download size: show it and ask the user before you call download.
 //   → repo reachable? MLX format? architecture supported? weight size vs this Mac's RAM?
 //     each failure names its stage.
 

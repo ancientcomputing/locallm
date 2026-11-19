@@ -36,6 +36,12 @@ let package = Package(
 )
 ```
 
+To get the checksum, read the `.sha256` file beside the zip on the release:
+
+```bash
+curl -sL https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip.sha256
+```
+
 Easiest start: a Swift package with an app or executable target, as above, which you can build from Xcode.
 
 **Using an Xcode app project instead?** Xcode apps link the SDK through a small local package that only vends the framework. Several examples are set up this way, for instance [`vistanova`](../examples/vistanova/), whose `Package.swift` and `.xcodeproj` you can copy from.
@@ -180,3 +186,4 @@ conversations. `examples/repo-qa` is the smallest example, a command-line tool. 
 - [The tool authorizer](tool-authorizer.md): who decides whether a tool call may run, and what changed in 3.0.
 - [The security guide](security-guide-for-hosts.md): what your app must do before it ships.
 - [The glossary](glossary.md): every term used in these docs.
+- [Build with an AI coding agent](https://thisbrain.ai/locallm/coding-agents.html): set up Claude Code, Codex or another agent, with starter prompts.

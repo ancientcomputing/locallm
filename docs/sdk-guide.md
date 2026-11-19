@@ -882,7 +882,7 @@ permission-gated at all — no entitlement, no Info.plist key, nothing to reques
 
 ```swift
 let tools: [any Tool] = [ClockTool(), WeatherTool(), /* ... */]
-let session = LanguageModelSession(tools: tools)
+let session = try lab.makeSession(route: .chat, tools: tools)   // both only read, so they run with no authorizer
 ```
 
 - **`ClockTool`** returns the current wall-clock date/time — fully local, no network.
@@ -925,15 +925,16 @@ let tools: [any Tool] = [
     SearchContactsTool(), ListContactsTool(),
     GetCurrentLocationTool(),
 ]
-let session = LanguageModelSession(tools: tools)
+// Pass an authorizer: AddCalendarEventTool and AddReminderTool change data, and a 3.0 session with none refuses them.
+let session = try lab.makeSession(route: .chat, tools: tools, authorizer: authorizer)
 ```
 
-The mutating ones — `UpdateCalendarEventTool`/`DeleteCalendarEventTool`,
-`UpdateReminderTool`/`DeleteReminderTool`, `AddContactTool`/`UpdateContactTool`/
-`DeleteContactTool` — take no permission gate of their own (no per-connector level, matching this
-section's already-stated SDK philosophy: that decision is entirely yours). Whether to expose them
-at all is a plain array-membership choice — include them in `tools` when your UI is ready to let
-the model delete something, don't when it isn't.
+The ones that change data — `AddCalendarEventTool` and `UpdateCalendarEventTool` (rated `.mutate`), `DeleteCalendarEventTool`
+(`.destructive`), and the Reminders and Contacts add, update and delete tools — carry no per-connector level of their own.
+What gates them is the session's authorizer ([Tool authorization](#tool-authorization-two-levers--which-tools-and-whether-they-ask-first)): a 3.0 session with none refuses them,
+and `ConfirmingToolAuthorizer` asks the user first. Whether to expose them at all is still a plain array-membership choice:
+include them in `tools` when your UI is ready to let the model delete something, don't when it isn't. Hand these tools to
+`lab.makeSession`, not to Apple's `LanguageModelSession(tools:)`, which has no authorizer and runs them unasked.
 
 These wrappers exist because real, observed on-device model failures shaped their design, and
 that guidance is baked in verbatim rather than left for you to rediscover independently:
@@ -968,7 +969,7 @@ no `Arguments` struct required:
 ```swift
 let descriptor = state.tools.first { $0.name == "search_issues" }!
 let tool = try MCPTool(descriptor: descriptor, manager: manager)
-let session = LanguageModelSession(tools: [tool])
+let session = try lab.makeSession(route: .chat, tools: [tool], authorizer: authorizer)   // an MCP tool is untrusted: it asks
 ```
 
 It works by turning the tool's real JSON Schema (`rawSchema`) into a FoundationModels

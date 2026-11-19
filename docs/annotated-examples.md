@@ -46,13 +46,13 @@ MCP server's tools (unrated, so they count as changes), says how calls are decid
 | Example | Authorizer | Why |
 |---|---|---|
 | `code-buddy`, `repo-qa-local`, `aiql` | `AllowingToolAuthorizer()` | a command-line tool or a fixed pipeline, with no one to ask |
+| `plate-today`, `plate-today-tools` | `AllowingToolAuthorizer()` | a one-shot summary whose tools only read, with no one to ask |
 | `workspace-buddy-local` | `ConfirmingToolAuthorizer` with a small alert channel | writes and edits ask first; reads run |
 | `security-demo` | `ConfirmingToolAuthorizer` with Components' `ToolConfirmationPresenter` | the Security panel decides which calls ask; with nothing set to confirm, every call runs |
 | `mcp-chat` | `ConfirmingToolAuthorizer` with `ToolConfirmationPresenter` | per-server trust and approval; a changed MCP App widget is asked about again |
 | `vistanova` | `ConfirmingToolAuthorizer` whose policy allows only `tavily_search` | the user typing a query is the consent; any other tool is refused |
 
-`os-matrix`, `model-switch` and `mlx-control-room` pass none: their tools only read, or they have none. `plate-today`,
-`plate-today-tools`, `repo-qa` and `workspace-buddy` build Apple's `LanguageModelSession(tools:)` directly, so the SDK's
+`os-matrix`, `model-switch` and `mlx-control-room` pass none: their tools only read, or they have none. `repo-qa` and `workspace-buddy` build Apple's `LanguageModelSession(tools:)` directly, so the SDK's
 authorizer isn't involved. [The tool authorizer](tool-authorizer.md) explains the three ready-made authorizers.
 
 ## How much code is this, really?
@@ -341,15 +341,22 @@ final class PlateTodayModel: ObservableObject {
         What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
         friendly, concise way\(summarizeNote).
         """
-        let session = LanguageModelSession(tools: tools)
+        // The session comes from the SDK, so every tool call passes an authorizer (these tools only read and there
+        // is no one to ask, so AllowingToolAuthorizer; a tool that changes data would use ConfirmingToolAuthorizer).
+        let lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider()]))  // ← SDK
+        lab.models.route(.chat, to: .system)                                            // ← SDK
 
         do {
-            let response = try await session.respond(to: prompt)
-            state = .ready(response.content)
+            let session = try lab.makeSession(route: .chat, tools: tools, authorizer: AllowingToolAuthorizer())  // ← SDK
+            state = .ready(try await session.respond(to: prompt))
         } catch {
             state = .failed(await GenerationErrorDescription.describe(error))  // ← SDK
         }
     }
+}
+
+extension RouteName {   // ← SDK
+    static let chat: RouteName = "chat"   // a route is just a name; lab.models.route(.chat, to: .system) points it at Apple's model
 }
 
 // MARK: - UI
@@ -582,15 +589,22 @@ final class PlateTodayToolsModel: ObservableObject {
         What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
         friendly, concise way\(summarizeNote).
         """
-        let session = LanguageModelSession(tools: tools)
+        // The session comes from the SDK, so every tool call passes an authorizer (these tools only read and there
+        // is no one to ask, so AllowingToolAuthorizer; a tool that changes data would use ConfirmingToolAuthorizer).
+        let lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider()]))  // ← SDK
+        lab.models.route(.chat, to: .system)                                            // ← SDK
 
         do {
-            let response = try await session.respond(to: prompt)
-            state = .ready(response.content)
+            let session = try lab.makeSession(route: .chat, tools: tools, authorizer: AllowingToolAuthorizer())  // ← SDK
+            state = .ready(try await session.respond(to: prompt))
         } catch {
             state = .failed(await GenerationErrorDescription.describe(error))  // ← SDK
         }
     }
+}
+
+extension RouteName {   // ← SDK
+    static let chat: RouteName = "chat"   // a route is just a name; lab.models.route(.chat, to: .system) points it at Apple's model
 }
 
 // MARK: - UI, AppDelegate, App (identical in shape to plate-today's — nothing here changes

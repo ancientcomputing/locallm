@@ -254,15 +254,24 @@ final class PlateTodayModel: ObservableObject {
         What's on my plate today? Check \(checks.joined(separator: ", ")). Summarize my day in a \
         friendly, concise way\(summarizeNote).
         """
-        let session = LanguageModelSession(tools: tools)
+        // The session comes from the SDK, so every tool call passes an authorizer. In 3.0 a session with none refuses
+        // anything that may change data. These tools only read, and this one-shot summary has no place to ask the user,
+        // so it passes AllowingToolAuthorizer(). An app whose tools change data passes ConfirmingToolAuthorizer instead
+        // (docs/tool-authorizer.md). Handing the tools to Apple's LanguageModelSession(tools:) would skip the authorizer.
+        let lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider()]))
+        lab.models.route(.chat, to: .system)
 
         do {
-            let response = try await session.respond(to: prompt)
-            state = .ready(response.content)
+            let session = try lab.makeSession(route: .chat, tools: tools, authorizer: AllowingToolAuthorizer())
+            state = .ready(try await session.respond(to: prompt))
         } catch {
             state = .failed(await GenerationErrorDescription.describe(error))
         }
     }
+}
+
+extension RouteName {
+    static let chat: RouteName = "chat"   // a route is just a name; lab.models.route(.chat, to: .system) points it at Apple's model
 }
 
 // MARK: - UI

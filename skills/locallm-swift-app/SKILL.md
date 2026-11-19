@@ -15,6 +15,8 @@ Before editing SDK integration code, read the nearest maintained local reference
 - For choosing an example to copy or diff, use [references/example-selector.md](references/example-selector.md).
 - For app-bundle, TCC, OAuth, sandbox, and signing work, use [references/macos-integration-checklist.md](references/macos-integration-checklist.md).
 
+The paths below are relative to the SDK repo. If it is not on disk, `references/doc-map.md` says how to read the same files from the `3.0.0-GA` branch. The repo's `AGENTS.md` lists the rules that are easy to get wrong in 3.0.
+
 If the public API is uncertain, check `docs/api-surface.md` rather than guessing. If the task mentions migration from 2.x, read `docs/migrating-to-3.0.md`; from 1.x, `docs/migrating-to-2.0.md` first; from `0.8.x` or a 1.0 beta, `docs/migrating-to-1.0.md`.
 
 ## Projects Built On The SDK
@@ -32,7 +34,7 @@ They follow their own release schedules and build against older SDKs (JevDK 2.1,
 - For a native macOS app, link the SDK directly. Use the `localai-cli` toolkit only for scripts, non-Swift apps, or apps that deliberately want to call the helper binary instead of owning permissions, MCP connections, and tokens.
 - Prefer Path A ready-made `Tool`s (`GetUpcomingEventsTool`, `MCPTool`, `WorkspaceTools`, etc.) unless the app needs custom tool names, argument schemas, behavior, or descriptions. Use Path B hand-written adapters when that control matters.
 - Give every `lab.makeSession` that has tools an `authorizer:`. Since 3.0, none means `FailClosedToolAuthorizer`: reads run, and anything that may change data or send it out (an unrated tool, every tool from an MCP server the user hasn't trusted) is refused. The model reads `DENIED: …` and the turn goes on, so nothing throws and the bug is silent. An app with a UI passes `ConfirmingToolAuthorizer` with Components' `ToolConfirmationPresenter`, and shows `.toolConfirmationSheet(presenter)` on its root view; a command-line tool, batch job or eval with no one to ask passes `AllowingToolAuthorizer()`; a fixed rule is a `policy:` function on `ConfirmingToolAuthorizer`. Rate your own tools (`ImpactRatedTool`) so a read isn't treated as a change. Tools handed to Apple's `LanguageModelSession(tools:)` directly bypass the authorizer altogether. See `docs/tool-authorizer.md`.
-- Loading a model never downloads it (3.0). For an MLX model, check `availability`, its size and `validate`, then call `download(_:)` before the first session; a session on a model that isn't on disk fails with `.modelUnavailable`.
+- Loading a model never downloads it (3.0). For an MLX model, check `availability`, call `validate` (`PreflightResult.weightBytes` is the size to show the user), ask, then call `download(_:)` before the first session; a session on a model that isn't on disk fails with `.modelUnavailable`.
 - Match the target feature to the closest example and copy that shape. The examples are maintained as integration references, not throwaway demos.
 - Treat Info.plist usage strings, entitlements, OAuth callback routing, App Sandbox settings, and final bundle signing as part of the implementation, not packaging afterthoughts.
 - For model-layer work, register macOS-27-only providers behind availability checks and link only the SDK modules the app actually uses.

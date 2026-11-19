@@ -572,6 +572,37 @@ into a `LanguageModelSession` without picking the ones your prompt actually need
 `Components`' `MCPServerPickerView` ([Components](sdk-guide.md#components-prebuilt-swiftui-mcp-servers--the-model-layer)), which already builds a per-tool enable/disable UI
 over exactly this.
 
+**On trust, approval and changed tools** (new in 3.0): a server you add is **untrusted**. Every one of its tools counts as one that
+may change data, so a call asks first, and the server's own `readOnlyHint` and `destructiveHint` are ignored until you say otherwise.
+A session built with no authorizer fails closed, which refuses those calls (reads still run), so pass one that can ask:
+`ConfirmingToolAuthorizer` for an app with a UI, `AllowingToolAuthorizer` only where no one is there to ask and you accept the tools
+([the tool authorizer](tool-authorizer.md)). Set trust and approval on the manager, and decide what happens when a server's tools
+change after the user accepted them:
+
+```swift
+manager.setTrust(.trusted, server: state.id)                        // believe its read-only / destructive labels
+manager.setToolApproval(.ask(atOrAbove: .destructive, by: .user), server: state.id)
+manager.setToolApproval(.allow, server: state.id, tool: "search")    // "Always allow this tool"
+
+manager.driftPolicy = .standard                                      // .strict, .permissive, or your own
+if let drift = manager.servers[state.id]?.pendingDrift {             // a change is waiting for the user
+    // show drift.changes, then:
+    manager.acceptDrift(server: state.id)                            // keep using it with the changes
+    // or manager.rejectDrift(server: state.id)                      // turn the server off until reviewed
+}
+let saved = manager.snapshot()                                       // store it; manager.restore(from: saved) next launch
+```
+
+Drift is measured against the last tool list the user **accepted**, never the last one the SDK saw, so a change nobody accepted
+is reported again on every connect. A rewritten description asks the user, a new tool stays off until accepted, a server that
+reports a new name is blocked, and a tool relabeled as safer keeps its old rating until accepted (`DriftPolicy.standard`).
+Restore the snapshot on launch so a pending change is never accepted by accident. Components' `ToolChangesCardView` and
+`MCPServerPickerView` draw the review for you. Every decision goes to the audit stream (`lab.audit.events()`), which is the record
+of who allowed what; `MCPDiagnostics` is the log for finding bugs, and its `MCP.drift` lines say when the SDK held something. The full
+account, with the table of what each kind of change does, is in
+[the security guide](security-guide-for-hosts.md#4-servers-trust-approval-and-drift); the short version for MCP is
+[MCP security in your app](https://thisbrain.ai/locallm/mcp-security.html).
+
 **On tool-calling from FoundationModels**: `MCPServerManager` itself hands you plain data
 (`MCPToolDescriptor`, `callTool`). To give a tool to a model, either let `makeSession` add the
 enabled MCP tools for you (each wrapped as `MCPTool`, a FoundationModels `Tool`), wrap a descriptor

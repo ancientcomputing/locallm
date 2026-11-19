@@ -8,7 +8,7 @@ Pick the nearest reference app before inventing a new integration shape.
 - `examples/repo-qa-local`: minimal model-layer plus `LocalLMLabSDKInference` example using an open-weight MLX model.
 - `examples/os-matrix`: one macOS 26 deployment-target CLI that gates macOS 27 providers without source-level branching throughout the app.
 - `examples/code-buddy`: full local coding-agent shape with model routing, Workspace tools, MCP, and host-owned process tools.
-- `examples/plate-today-tools`: SwiftUI app using ready-made Path A tools for Calendar, Reminders, and Todoist MCP OAuth.
+- `examples/plate-today-tools`: SwiftUI app using ready-made Path A tools for Calendar, Reminders, and Todoist MCP OAuth. The Calendar example to copy (`examples/mcp-chat` has no Calendar). Its session is built with Apple's `LanguageModelSession(tools:)`, which has no authorizer: for a tool that writes, build the session with `lab.makeSession(route:tools:authorizer:)` instead.
 - `examples/plate-today`: same product idea as `plate-today-tools`, but with hand-written Path B tool adapters.
 - `examples/workspace-buddy`: sandboxed SwiftUI app where the user picks a folder and the on-device model reads, creates, and edits files through Workspace tools.
 - `examples/workspace-buddy-local`: sandboxed SwiftUI app combining Workspace tools with a downloadable MLX model.
