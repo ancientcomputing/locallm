@@ -1,3 +1,8 @@
+# Notes
+
+1. The 3.0.0-GA release branch is at https://github.com/ancientcomputing/locallm/tree/3.0.0-GA
+2. The project website is at https://thisbrain.ai/locallm/
+
 # LocalLM SDK
 
 Add a chat assistant that can use tools to your own Mac app, with the model running on the Mac: Apple's
