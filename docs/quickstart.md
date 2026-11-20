@@ -24,7 +24,7 @@ one yet, choose File → New → Project, pick **macOS → App** with SwiftUI, o
 1. Choose **File → Add Package Dependencies…** and paste `https://github.com/ancientcomputing/locallm` into the search box.
 2. Xcode starts on **Up to Next Major Version** (it may show `1.0.0`). Change **Dependency Rule** to **Branch** and type `3.0.0-GA`, then click
    **Add Package**. Left on the default, Xcode can't find a matching version, because releases here are branches.
-3. Choose the libraries your app uses and add them to your app target. For this page, `LocalLMLabSDKCore` is enough; add
+3. In the next dialog, every library starts with **None** under **Add to Target**. Set each library your app uses to your app target. For this page, `LocalLMLabSDKCore` is enough; add
    `LocalLMLabSDKComponents` later for the approval sheet and chat views. Xcode builds and embeds them with your app.
 4. Set the app target's deployment target to macOS 27 (or 26, if you support both), then `import LocalLMLabSDKCore` in your code.
 
