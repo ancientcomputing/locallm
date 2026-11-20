@@ -48,8 +48,13 @@ Upgrading from 2.x? [Migrating to 3.0](migrating-to-3.0.md) lists what to change
 > case to copy from; [`code-buddy`](../examples/code-buddy/) and
 > [`model-switch`](../examples/model-switch/) show the multi-binary shapes below.
 
-`LocalLMLabSDKCore` ships as a `Core.xcframework` binary, published as a GitHub Release asset on
-the [locallm GitHub repo](https://github.com/ancientcomputing/locallm). Add it to your own `Package.swift` as a `binaryTarget`, pointing at the exact release
+The simplest way to add the SDK is by URL: the [locallm repo](https://github.com/ancientcomputing/locallm) is a Swift package. In Xcode choose
+File → Add Package Dependencies, paste the repo URL, set the rule to **Branch** `3.0.0-GA`, and pick the libraries you use; in a
+`Package.swift`, add `.package(url: "https://github.com/ancientcomputing/locallm", branch: "3.0.0-GA")` and
+`.product(name: "LocalLMLabSDKCore", package: "locallm")`. [The quickstart](quickstart.md#1-add-the-sdk) has the steps and explains why it is a branch.
+
+To pin the exact files yourself instead: `LocalLMLabSDKCore` ships as a `Core.xcframework` binary, published as a GitHub Release asset on
+the repo. Add it to your own `Package.swift` as a `binaryTarget`, pointing at the exact release
 you want:
 
 ```swift

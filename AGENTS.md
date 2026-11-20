@@ -46,9 +46,14 @@ Use these in order, and do not write SDK code from memory:
 
 ## Linking the SDK
 
-The frameworks (`Core`, `Inference`, `Remote`, `Claude`) are binary targets: add the release's `.xcframework.zip` URL and the
-checksum from the `.sha256` file beside it. A Swift package *executable* also needs `linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])]`, or it builds but fails at launch with `Library not loaded: @rpath/...`; an Xcode app project doesn't. `Components` and `MCPAppsHost` are source packages in this repo. The
-[quickstart](docs/quickstart.md) has the manifest, and the examples' `Package.swift` files have working ones.
+This repo is a Swift package. Add it by URL with the rule **Branch** `3.0.0-GA` (a `-GA` tag is a pre-release to SwiftPM, so a
+version rule such as "Up to Next Major" finds nothing): in Xcode, File → Add Package Dependencies; in a `Package.swift`,
+`.package(url: "https://github.com/ancientcomputing/locallm", branch: "3.0.0-GA")` and
+`.product(name: "LocalLMLabSDKCore", package: "locallm")`. The products are `LocalLMLabSDKCore`, `LocalLMLabSDKInference`,
+`LocalLMLabSDKRemote`, `LocalLMLabSDKClaude`, `LocalLMLabSDKComponents` and `LocalLMLabSDKMCPAppsHost`; add only what the app uses.
+To pin the exact files instead, the four frameworks are binary targets: the release's `.xcframework.zip` URL and the checksum from
+the `.sha256` file beside it. A Swift package *executable* (not an Xcode app project) also needs `linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])]`, or it builds but fails at launch with `Library not loaded: @rpath/...`; an Xcode app project doesn't. `Components` and `MCPAppsHost` are source in this repo. The
+[quickstart](docs/quickstart.md) has the steps and a manifest, and the examples' `Package.swift` files have working ones.
 
 ## If you do not have this repo on disk
 

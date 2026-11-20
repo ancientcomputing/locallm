@@ -18,8 +18,8 @@ account or key.
 
 ## What it looks like
 
-A model, a tool and a gate that asks the user, in a SwiftUI app. Add the SDK as a Swift package binary target
-([the quickstart](docs/quickstart.md) has the manifest), then:
+A model, a tool and a gate that asks the user, in a SwiftUI app. Add this repo as a Swift package (File → Add Package Dependencies,
+branch `3.0.0-GA`; [the quickstart](docs/quickstart.md) has the steps), then:
 
 ```swift
 import LocalLMLabSDKCore

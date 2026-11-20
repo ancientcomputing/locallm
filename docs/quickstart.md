@@ -14,9 +14,54 @@ deployment target to 26. [Targeting macOS 26 and 27](sdk-guide.md#targeting-maco
 
 ## 1. Add the SDK
 
-The SDK's core ships as a prebuilt framework on [GitHub Releases](https://github.com/ancientcomputing/locallm/releases).
-In your `Package.swift`, add it as a binary target. Use the release you want (these examples use `3.0.0-GA`) and copy its `checksum` from the matching `.sha256` file
-next to the `.xcframework.zip` on that release:
+This repository is a Swift package, so you add it by its URL. The SDK's core libraries are prebuilt frameworks that the package
+fetches from [GitHub Releases](https://github.com/ancientcomputing/locallm/releases); each is checked against a fingerprint, so you get
+exactly the files that were released.
+
+**In an Xcode app project:**
+
+1. Choose **File → Add Package Dependencies…** and paste `https://github.com/ancientcomputing/locallm` into the search box.
+2. Set **Dependency Rule** to **Branch** and type `3.0.0-GA`. Click **Add Package**.
+3. Choose the libraries your app uses and add them to your app target. For this page, `LocalLMLabSDKCore` is enough; add
+   `LocalLMLabSDKComponents` later for the approval sheet and chat views. Xcode builds and embeds them with your app.
+4. Set the app target's deployment target to macOS 27 (or 26, if you support both), then `import LocalLMLabSDKCore` in your code.
+
+**In a Swift package** (a program you build with `swift build`, or open in Xcode):
+
+```swift
+// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "YourApp",
+    platforms: [.macOS("27.0")],
+    dependencies: [
+        .package(url: "https://github.com/ancientcomputing/locallm", branch: "3.0.0-GA"),
+    ],
+    targets: [
+        .executableTarget(
+            name: "YourApp",
+            dependencies: [.product(name: "LocalLMLabSDKCore", package: "locallm")],
+            // A Swift package program has no runtime search path, so without this line it builds but dies at launch
+            // with "Library not loaded: @rpath/LocalLMLabSDKCore.framework". This points it at the framework SwiftPM places beside it.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])]
+        ),
+    ]
+)
+```
+
+To run it from Xcode, open the folder that has `Package.swift` (`open Package.swift`, or File → Open), pick the scheme named after your
+program with **My Mac** as the destination, and press ⌘R. From a terminal, `swift run` works too. An Xcode app project doesn't need the
+linker line: Xcode embeds the framework for you.
+
+**Why a branch, and what it costs.** The releases are tagged `v3.0.0-GA`, and Xcode treats a version that ends in `-GA` as a
+pre-release, so its default "Up to Next Major Version" rule finds nothing. A branch works right away. Xcode records the exact commit it
+fetched, so your build doesn't change until you update the package. Adding the package downloads about 16 MB, because all four
+prebuilt libraries (Core, Inference, Remote and Claude) come with it; only the ones you add to your target are linked into your app.
+
+**Prefer to write the manifest yourself?** You can pin the files directly, for a locked-down network or to be sure of the exact
+release. Add the framework as a binary target. Use the release you want (this one is `3.0.0-GA`) and copy its `checksum` from the
+matching `.sha256` file next to the `.xcframework.zip` on that release:
 
 ```swift
 // swift-tools-version: 6.0
@@ -42,19 +87,13 @@ let package = Package(
 )
 ```
 
-To run it from Xcode, open the folder that has `Package.swift` (`open Package.swift`, or File → Open), pick the scheme named after your
-program with **My Mac** as the destination, and press ⌘R. From a terminal, `swift run` works too. An Xcode app project, below, doesn't need the
-linker line: Xcode embeds the framework for you.
-
 To get the checksum, read the `.sha256` file beside the zip on the release:
 
 ```bash
 curl -sL https://github.com/ancientcomputing/locallm/releases/download/v3.0.0-GA/LocalLMLabSDKCore-3.0.0-GA.xcframework.zip.sha256
 ```
 
-Easiest start: a Swift package with an app or executable target, as above, which you can build from Xcode.
-
-**Using an Xcode app project instead?** Xcode apps link the SDK through a small local package that only vends the framework. Several examples are set up this way, for instance [`vistanova`](../examples/vistanova/), whose `Package.swift` and `.xcodeproj` you can copy from.
+**In an Xcode app project, with your own manifest?** Xcode apps link the SDK through a small local package that only vends the framework. Several examples are set up this way, for instance [`vistanova`](../examples/vistanova/), whose `Package.swift` and `.xcodeproj` you can copy from.
 
 1. Next to your `.xcodeproj`, make a folder (call it `SDK`) with a `Package.swift` like the one above, but with no app target. Add a `products:` line that exposes the framework:
 
@@ -66,9 +105,8 @@ Easiest start: a Swift package with an app or executable target, as above, which
 3. When Xcode asks which target gets the package product, choose your app and select `LocalLMLabSDKCore`. Xcode then builds and embeds the framework with your app.
 4. Set the app target's deployment target to macOS 27 (or 26, if you support both), then `import LocalLMLabSDKCore` in your code.
 
-The other frameworks
-(`Inference` for open-weight models, which are models you can download and run yourself, `Remote` for hosted models, `Claude`, and the source packages `Components` and
-`MCPAppsHost`) are added the same way when you want them. You don't need them yet.
+The other libraries (`Inference` for open-weight models, which are models you can download and run yourself, `Remote` for hosted
+models, `Claude`, and the source libraries `Components` and `MCPAppsHost`) are added the same way when you want them. You don't need them yet.
 
 ## 2. Four words
 
