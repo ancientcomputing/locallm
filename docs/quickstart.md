@@ -207,6 +207,10 @@ Then run it and ask something that doesn't need current facts, for example "Say 
 If the reply never starts, check that Apple Intelligence is on in System Settings. You can also ask the SDK:
 `lab.models.availability(for: .system)` says whether the model is ready and, if not, why.
 
+**Want to run a finished version first?** [`examples/model-chat`](../examples/model-chat/) in this repo is a complete chat window with a
+model picker (Apple's on-device model or an open-weight model on this Mac) and two tools shown as rows. It is about 200 lines. Clone the repo and run
+`swift run ModelChat` in that folder, or read its `ModelChatApp.swift` beside the steps above.
+
 ## 4. What next
 
 Pick what you need. Each is a short step.
