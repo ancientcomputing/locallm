@@ -54,8 +54,9 @@ To run it from Xcode, open the folder that has `Package.swift` (`open Package.sw
 program with **My Mac** as the destination, and press ⌘R. From a terminal, `swift run` works too. An Xcode app project doesn't need the
 linker line: Xcode embeds the framework for you.
 
-**Why a branch, and what it costs.** The releases are tagged `v3.0.0-GA`, and Xcode treats a version that ends in `-GA` as a
-pre-release, so its default "Up to Next Major Version" rule finds nothing. A branch works right away. Xcode records the exact commit it
+**Why a branch, and what it costs.** Each release of the SDK is its own branch of this repository, named for the release (`3.0.0-GA`),
+so you choose **Branch** and type the release you want. A version rule such as "Up to Next Major Version" doesn't apply, because
+releases here are branches, not version tags. To move to a later release, change the branch name. Xcode records the exact commit it
 fetched, so your build doesn't change until you update the package. Adding the package downloads about 16 MB, because all four
 prebuilt libraries (Core, Inference, Remote and Claude) come with it; only the ones you add to your target are linked into your app.
 

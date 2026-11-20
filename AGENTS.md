@@ -46,8 +46,8 @@ Use these in order, and do not write SDK code from memory:
 
 ## Linking the SDK
 
-This repo is a Swift package. Add it by URL with the rule **Branch** `3.0.0-GA` (a `-GA` tag is a pre-release to SwiftPM, so a
-version rule such as "Up to Next Major" finds nothing): in Xcode, File → Add Package Dependencies; in a `Package.swift`,
+This repo is a Swift package. Add it by URL with the rule **Branch** `3.0.0-GA` (each release is its own branch, so a
+version rule such as "Up to Next Major" does not apply): in Xcode, File → Add Package Dependencies; in a `Package.swift`,
 `.package(url: "https://github.com/ancientcomputing/locallm", branch: "3.0.0-GA")` and
 `.product(name: "LocalLMLabSDKCore", package: "locallm")`. The products are `LocalLMLabSDKCore`, `LocalLMLabSDKInference`,
 `LocalLMLabSDKRemote`, `LocalLMLabSDKClaude`, `LocalLMLabSDKComponents` and `LocalLMLabSDKMCPAppsHost`; add only what the app uses.

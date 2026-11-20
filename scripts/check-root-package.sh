@@ -24,6 +24,12 @@ for f in ["Components/Package.swift"] + sorted(glob.glob("examples/*/Package.swi
     for h in re.findall(r'"([0-9a-f]{64})"', m.group(1)):
         if h not in known:
             bad.append(f"{f}: {h[:12]}... is not one of the {release} checksums in Package.swift")
+branch = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
+if re.fullmatch(r"\d+\.\d+\.\d+-GA", branch) and branch != release:
+    bad.append(f"Package.swift: release is {release} but this is the {branch} branch")
+for f in ["docs/quickstart.md", "AGENTS.md"]:
+    if f'branch: "{release}"' not in open(f).read() and f"**Branch** `{release}`" not in open(f).read():
+        bad.append(f"{f}: does not tell people to add the package with the Branch rule {release}")
 if "--online" in sys.argv:
     for mod, h in expected.items():
         url = f"https://github.com/ancientcomputing/locallm/releases/download/v{release}/{mod}-{release}.xcframework.zip.sha256"
