@@ -265,7 +265,6 @@ saveNote tool." In `ChatView`, add `.toolConfirmationSheet(chat.confirmations)` 
 A sheet appears that names the tool (`saveNote`), says **Changes data**, shows the text, and offers **Deny** and **Allow**. Nothing is written until you
 press Allow.
 
-![The approval sheet over the chat window: Allow this action? Tool saveNote, From this app, Impact Changes data, text buy milk, with Deny and Allow buttons.](https://raw.githubusercontent.com/ancientcomputing/locallm/3.0.0-GA/docs/images/approval-sheet.png)
  After **Allow**, the file `/tmp/quickstart-note.txt` holds the note and the model says it saved it. After **Deny**, the file is untouched and
 the model says the note wasn't approved. The `ChatView` above shows only the messages, not the tool call itself; add a `case .toolCall(let record):`
 to its `switch` to show each call and whether it ran or was refused.

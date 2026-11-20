@@ -63,7 +63,11 @@ Three things feed each decision:
 
 ## What the user and the model see
 
-- **The user** sees a sheet asking whether the tool may run, which Components' `ToolConfirmationPresenter` draws.
+- **The user** sees a sheet asking whether the tool may run, which Components' `ToolConfirmationPresenter` draws. It names the tool, where it
+  came from and what it can do (here, "Changes data"), shows the arguments, and offers Deny and Allow:
+
+  ![The approval sheet over a chat window: Allow this action? Tool saveNote, From this app, Impact Changes data, text buy milk, with Deny and Allow buttons.](https://raw.githubusercontent.com/ancientcomputing/locallm/3.0.0-GA/docs/images/approval-sheet.png)
+
 - **The model** is told when a call is refused: the result comes back as `DENIED: <reason>`, so the turn continues and
   the model can answer another way. Once the user declines a tool, further calls to it in that turn are refused without
   asking again.

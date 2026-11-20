@@ -42,11 +42,6 @@ for try await _ in session.streamResponse(to: "What time is it?") {}
 // Put .toolConfirmationSheet(confirmations) on your root view, and a tool that changes data asks first.
 ```
 
-When the model calls a tool that changes data, your app decides first. This is the sheet the code above raises for a tool that saves a note
-(the full steps are in [the quickstart](docs/quickstart.md#4-what-next)):
-
-![A macOS chat window with an approval sheet: Allow this action? Tool saveNote, From this app, Impact Changes data, text buy milk, with Deny and Allow buttons.](docs/images/approval-sheet.png)
-
 The model never runs code: it writes a tool call, your app decides whether to run it, and the result goes back. The full
 chat, with tool-call rows, servers and saved conversations, is [`examples/mcp-chat`](examples/mcp-chat/).
 
