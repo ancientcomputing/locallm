@@ -41,7 +41,7 @@ for try await _ in session.streamResponse(to: "Do I need a jacket in Cupertino r
 
 ![A chat window with a model picker set to Qwen3 4B running on the Mac. The model called a weather tool, shown as a row with a check mark, and answered from its result.](https://raw.githubusercontent.com/ancientcomputing/locallm/3.0.0-GA/docs/images/model-chat.png)
 
-*The same question on Qwen3 4B, running on this Mac; the picker also offers Apple's on-device model. The tool row is the weather tool the model called.*
+*The same question on Qwen3 4B, running on this Mac; the picker also offers Apple's on-device model. The tool row is the weather tool the model called. This window is [`examples/model-chat`](examples/model-chat/): about 200 lines, and the one to run first.*
 
 The model never runs code: it writes a tool call, your app runs the tool, and the result goes back. Tools that only read, like these two, run
 as they are; a tool that changes data needs you to say who approves it ([the tool authorizer](docs/tool-authorizer.md)). The full chat, with
