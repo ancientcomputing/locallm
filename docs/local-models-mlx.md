@@ -1,6 +1,12 @@
-# Open-weight models on the Mac (MLX)
+# Running MLX models in code
 
 Running open-weight models on the Mac through `LocalLMLabSDKInference`: loading, measuring a turn, and pinning versions. Part of [the model layer](sdk-guide.md#the-model-layer-models-routing-and-sessions).
+
+> **This page is about the code, not the list of models.** It shows how an app loads and runs any MLX model;
+> it doesn't say which models to use. For that, see [MLX models](https://thisbrain.ai/locallm/mlx-models.html),
+> the maintained list of open-weight models we've tested (Qwen, Gemma, Mistral, Granite, GLM and more), sized for
+> a 24 GB MacBook Air and a 64 GB Mac Studio, with tool-calling results. Whatever the list says, check your own
+> model with `capabilityProbe` (below).
 
 The prompt cache, which is on by default for these models in 3.0, is described in [the SDK guide](sdk-guide.md#the-prompt-cache-30).
 
@@ -45,7 +51,8 @@ let report = await mlx.capabilityProbe(installed.id)   // ModelCapabilityReport
 // report.capabilities: .toolCalling, .guidedGeneration (respond(to:generating:) — run on
 // languageModelSession, see "Running a turn"), .reasoningToggle
 // This is authoritative. For a starting shortlist of what tool-calls and what doesn't,
-// see the tested-models list — but always confirm your own model with capabilityProbe.
+// see the MLX models list (thisbrain.ai/locallm/mlx-models.html) — but always confirm your
+// own model with capabilityProbe.
 
 mlx.installed        // [InstalledModel] — what's on disk now
 mlx.storageUsed      // total bytes of weights

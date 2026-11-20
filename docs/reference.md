@@ -867,7 +867,7 @@ follow-up reads only what is new. In 3.0 it is on by default for MLX models: mem
 the Mac, for verified families straight away and for any other supported model after a one-time self-test. A miss
 costs a re-read, never a wrong answer. Everything here is `@available(macOS 27, *)` in `LocalLMLabSDKInference`.
 Guides: [The prompt cache](sdk-guide.md#the-prompt-cache-30),
-[Open-weight models on the Mac](local-models-mlx.md).
+[Running MLX models in code](local-models-mlx.md).
 
 ### The `promptCache:` setting
 

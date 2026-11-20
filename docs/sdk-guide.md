@@ -1742,7 +1742,7 @@ and your own Keychain, at launch, with whatever you've saved.
 
 - [The quickstart](quickstart.md) and [the glossary](glossary.md)
 - [The MCP client guide](mcp-guide.md)
-- [Open-weight models on the Mac (MLX)](local-models-mlx.md), [online providers](remote-providers.md) and
+- [Running MLX models in code](local-models-mlx.md), [online providers](remote-providers.md) and
   [decision models (Jev)](decision-models.md)
 - [The reference-app walkthrough](walkthrough-plate-today.md) and [annotated examples](annotated-examples.md)
 - [The reference](reference.md) and [the API surface](api-surface.md)
