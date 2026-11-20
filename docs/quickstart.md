@@ -187,6 +187,23 @@ Run it and ask a question. What the code does:
 - `session.hostTranscript` is the conversation as your screen should show it: your messages, the answers, and later
   the tool calls. It is `@Observable`, so a SwiftUI view that reads it redraws as it changes.
 
+**Show it in your app.** `ChatView` is a SwiftUI view, so put it where your app shows its first window. In a new Xcode project from the
+macOS **App** template, open the file with `@main struct MyApp: App` and change `ContentView()` to `ChatView()`. In a Swift package, add a file
+like this:
+
+```swift
+import SwiftUI
+
+@main
+struct YourApp: App {
+    var body: some Scene {
+        WindowGroup { ChatView() }
+    }
+}
+```
+
+Then run it and ask something that doesn't need current facts, for example "Say hello in three languages." Apple's on-device model is small.
+
 If the reply never starts, check that Apple Intelligence is on in System Settings. You can also ask the SDK:
 `lab.models.availability(for: .system)` says whether the model is ready and, if not, why.
 
@@ -215,6 +232,40 @@ let authorizer = ConfirmingToolAuthorizer(channel: confirmations,
 session = try lab.makeSession(route: .chat, tools: [ClockTool()], authorizer: authorizer)   // plus your tools that change things
 // and in your root view: .toolConfirmationSheet(confirmations)
 ```
+
+**See the approval sheet.** `ClockTool` only reads, so nothing asks. To see the sheet, give the chat a tool that changes something. This one writes a
+note to a file:
+
+```swift
+import FoundationModels   // Tool, Generable, Guide
+import LocalLMLabSDKCore
+
+struct SaveNoteTool: Tool, ImpactRatedTool {
+    let name = "saveNote"
+    let description = "Saves a short note to a file on this Mac."
+    var impact: ToolImpact { .mutate }   // says this tool changes data, so the authorizer asks first
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The text of the note")
+        var text: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        try arguments.text.write(toFile: "/tmp/quickstart-note.txt", atomically: true, encoding: .utf8)
+        return "Saved the note."
+    }
+}
+```
+
+In `Chat`, keep the presenter in a property (`let confirmations = ToolConfirmationPresenter()`), build the session with
+`tools: [ClockTool(), SaveNoteTool()]` and the authorizer above, and add to `instructions`: "When the user asks you to save a note, call the
+saveNote tool." In `ChatView`, add `.toolConfirmationSheet(chat.confirmations)` after the `VStack`'s closing brace. Then type "Please save a note that says: buy milk".
+
+A sheet appears that names the tool (`saveNote`), says **Changes data**, shows the text, and offers **Deny** and **Allow**. Nothing is written until you
+press Allow. After **Allow**, the file `/tmp/quickstart-note.txt` holds the note and the model says it saved it. After **Deny**, the file is untouched and
+the model says the note wasn't approved. The `ChatView` above shows only the messages, not the tool call itself; add a `case .toolCall(let record):`
+to its `switch` to show each call and whether it ran or was refused.
 
 [The tool authorizer](tool-authorizer.md) explains the rest, including what changed from 2.x.
 
