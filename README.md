@@ -18,32 +18,35 @@ account or key.
 
 ## What it looks like
 
-A model, a tool and a gate that asks the user, in a SwiftUI app. Add this repo as a Swift package (in an Xcode project: File → Add Package Dependencies,
-branch `3.0.0-GA`; or as a dependency in a `Package.swift`; [the quickstart](docs/quickstart.md) has the steps), then:
+A chat that can use Apple's on-device model, an open-weight model on the Mac, or a hosted model, and give any of them tools. Choosing the
+model is one line, and the rest of your code doesn't change. Add this repo as a Swift package (in an Xcode project: File → Add Package
+Dependencies, branch `3.0.0-GA`; or as a dependency in a `Package.swift`; [the quickstart](docs/quickstart.md) has the steps), then:
 
 ```swift
 import LocalLMLabSDKCore
-import LocalLMLabSDKComponents
+import LocalLMLabSDKInference   // open-weight models on this Mac (MLX)
 
-extension RouteName { static let chat: RouteName = "chat" }     // a route is a name for "the model for this job"
+extension RouteName { static let chat: RouteName = "chat" }   // a route is a name for "the model for this job"
 
-let lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider()]))
-lab.models.route(.chat, to: .system)                           // swap the model here, nowhere else
+let lab = LocalLMLab(configuration: .init(providers: [SystemModelProvider(), MLXModelProvider()]))
 
-let confirmations = ToolConfirmationPresenter()                // the approval sheet, from Components
-let session = try lab.makeSession(
-    route: .chat,
-    tools: [ClockTool()],                                      // plus your own tools, or an MCP server's
-    authorizer: ConfirmingToolAuthorizer(channel: confirmations,
-                                         hostTools: .ask(atOrAbove: .mutate, by: .user)))
+lab.models.route(.chat, to: .system)                                                          // Apple's on-device model
+// lab.models.route(.chat, to: ModelID(scheme: "mlx", rest: "mlx-community/Qwen3-4B-4bit")!)  // an open-weight model on this Mac (download it first)
+// lab.models.route(.chat, to: ModelID(scheme: "openai", rest: "gpt-…")!)                     // a hosted model (add a provider with your key)
 
-for try await _ in session.streamResponse(to: "What time is it?") {}
+let session = try lab.makeSession(route: .chat, tools: [ClockTool(), WeatherTool()])
+for try await _ in session.streamResponse(to: "Do I need a jacket in Cupertino right now?") {}
 // session.hostTranscript is @Observable: your SwiftUI view reads it and redraws as the reply streams.
-// Put .toolConfirmationSheet(confirmations) on your root view, and a tool that changes data asks first.
 ```
 
-The model never runs code: it writes a tool call, your app decides whether to run it, and the result goes back. The full
-chat, with tool-call rows, servers and saved conversations, is [`examples/mcp-chat`](examples/mcp-chat/).
+![A chat window with a model picker set to Qwen3 4B running on the Mac. The model called a weather tool, shown as a row with a check mark, and answered from its result.](https://raw.githubusercontent.com/ancientcomputing/locallm/3.0.0-GA/docs/images/model-chat.png)
+
+*The same question on Qwen3 4B, running on this Mac; the picker also offers Apple's on-device model. The tool row is the weather tool the model called.*
+
+The model never runs code: it writes a tool call, your app runs the tool, and the result goes back. Tools that only read, like these two, run
+as they are; a tool that changes data needs you to say who approves it ([the tool authorizer](docs/tool-authorizer.md)). The full chat, with
+tool-call rows, servers and saved conversations, is [`examples/mcp-chat`](examples/mcp-chat/); switching between hosted models from one chat window is
+[`examples/model-switch`](examples/model-switch/). Open-weight models: [the MLX guide](docs/local-models-mlx.md). Hosted: [online providers](docs/remote-providers.md).
 
 ## Start here
 
