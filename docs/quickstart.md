@@ -18,7 +18,8 @@ This repository is a Swift package, so you add it by its URL. The SDK's core lib
 fetches from [GitHub Releases](https://github.com/ancientcomputing/locallm/releases); each is checked against a fingerprint, so you get
 exactly the files that were released.
 
-**In an Xcode app project:**
+**In an Xcode app project.** The Add Package Dependencies command only exists while a project or workspace is open. If you don't have
+one yet, choose File → New → Project, pick **macOS → App** with SwiftUI, or skip to the Swift package route below. With a project open:
 
 1. Choose **File → Add Package Dependencies…** and paste `https://github.com/ancientcomputing/locallm` into the search box.
 2. Set **Dependency Rule** to **Branch** and type `3.0.0-GA`. Click **Add Package**.
