@@ -556,7 +556,9 @@ private struct MessageFieldImports: NSViewRepresentable {
             field.isRichText = true
             field.importsGraphics = true
             guard let storage = field.textStorage else { return }
-            editing = NotificationCenter.default.addObserver(forName: NSTextStorage.willProcessEditingNotification, object: storage, queue: nil) { [weak self] _ in
+            editing = NotificationCenter.default.addObserver(forName: NSTextStorage.willProcessEditingNotification, object: storage, queue: nil) { [weak self] note in
+                // The storage comes from the notification rather than being captured: NSTextStorage isn't Sendable.
+                guard let storage = note.object as? NSTextStorage else { return }
                 // Read now: the text field passes its text on as plain text, which drops the picture. Changed after:
                 // the text can't change while an edit is being processed.
                 let pictures = Self.pictures(in: storage)
