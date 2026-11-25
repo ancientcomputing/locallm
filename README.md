@@ -41,17 +41,32 @@ for try await _ in session.streamResponse(to: "Do I need a jacket in Cupertino r
 
 ![A chat window with a model picker set to Qwen3 4B running on the Mac. The model called a weather tool, shown as a row with a check mark, and answered from its result.](https://raw.githubusercontent.com/ancientcomputing/locallm/3.0.0-GA/docs/images/model-chat.png)
 
-*The same question on Qwen3 4B, running on this Mac; the picker also offers Apple's on-device model. The tool row is the weather tool the model called. This window is [`examples/model-chat`](examples/model-chat/): about 200 lines, and the one to run first.*
+*The same question on Qwen3 4B, running on this Mac; the picker also offers Apple's on-device model. The tool row is the weather tool the model called. This window is [`examples/model-chat`](examples/model-chat/): about 200 lines. To build your own, start with [the quickstart](docs/quickstart.md); to run a finished version first, run this one.*
 
 The model never runs code: it writes a tool call, your app runs the tool, and the result goes back. Tools that only read, like these two, run
 as they are; a tool that changes data needs you to say who approves it ([the tool authorizer](docs/tool-authorizer.md)). The full chat, with
 tool-call rows, servers and saved conversations, is [`examples/mcp-chat`](examples/mcp-chat/); switching between hosted models from one chat window is
 [`examples/model-switch`](examples/model-switch/). Open-weight models: [the MLX guide](docs/local-models-mlx.md). Hosted: [online providers](docs/remote-providers.md).
 
+## Where each model runs
+
+Pick the model that you want to use. You can switch to a different model with one line, and an app can use more than one model.
+
+| Model | Where it runs | Does data leave the Mac? | macOS | What you need |
+|---|---|---|---|---|
+| Apple's on-device model | On the Mac | No | 26 or later | Apple Intelligence turned on. Nothing to download, no key. |
+| Open-weight models (MLX), such as Qwen, Gemma or Llama | On the Mac | No | 27 | A one-time download per model (about 2 GB for Qwen3 4B). See [the tested models](https://thisbrain.ai/locallm/mlx-models.html). |
+| Private Cloud Compute | Apple's servers | Yes, to Apple's Private Cloud Compute | 27 | Apple's managed PCC entitlement for your app ([details](docs/sdk-guide.md#shipping-the-model-layer-through-app-store-connect)). |
+| Hosted models (Claude, GPT, OpenRouter, any OpenAI-compatible server) | The provider's servers | Yes, to that provider | 27 | An API key from the provider. |
+
+Whichever you choose, tool calls go through the same gate: a tool that changes data asks before it runs
+([the tool authorizer](docs/tool-authorizer.md)).
+
 ## Start here
 
-1. **[Quickstart](docs/quickstart.md)**: a working SwiftUI chat in about 50 lines. Needs macOS 27 with
-   Apple Intelligence on, and Xcode 27 to build.
+1. **[Quickstart](docs/quickstart.md)**: a working SwiftUI chat in about 50 lines, on Apple's on-device model, with nothing to
+   download and no key. Needs macOS 27 with Apple Intelligence on, and Xcode 27 to build. Want to run a finished version first?
+   [`examples/model-chat`](examples/model-chat/) is the same idea, complete.
 2. **[Examples](examples/README.md)**: complete apps, from a command-line tool to a full chat with servers and
    tool-call rows. `examples/mcp-chat` is the one to read for a chat UI,
    and [answersearch-oss](https://github.com/ancientcomputing/answersearch-oss) shows hosted web search in a menu-bar app.
